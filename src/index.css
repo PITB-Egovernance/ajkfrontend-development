@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom global styles can be added below */
+@layer base {
+  /* Add base layer styles here */
+}
+
+@layer components {
+  /* Add reusable component styles here */
+}
+
+@layer utilities {
+  /* Add custom utility styles here */
+}
