@@ -245,77 +245,77 @@ export default function RequisitionForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen py-6 px-4">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <div className="mb-6 text-center">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-300 bg-clip-text text-transparent">
             Job Requisition Form
           </h1>
-          <p className="text-gray-600 mt-2">Create a new job requisition in 5 simple steps</p>
+          <p className="text-slate-500 mt-2">Create a new job requisition in 5 simple steps</p>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="relative">
-            <div className="absolute top-1/2 left-0 right-0 h-2 bg-gray-200 rounded-full -translate-y-1/2"></div>
-            <div 
-              className="absolute top-1/2 left-0 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full -translate-y-1/2 transition-all duration-500 ease-out"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-        </div>
-
-        {/* Steps Indicator */}
-        <div className="flex justify-between mb-8 relative">
-          {steps.map(({ number, title, icon: Icon, color }) => (
-            <div key={number} className="flex flex-col items-center relative z-10">
-              <button
-                type="button"
-                onClick={() => handleStepClick(number)}
-                className={`w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-300 transform hover:scale-110 ${
-                  step >= number 
-                    ? `${color} ring-4 ring-opacity-30 ring-current` 
-                    : 'bg-gray-300'
-                }`}
-              >
-                <Icon size={24} />
-              </button>
-              <div className={`mt-2 text-sm font-medium ${step >= number ? 'text-gray-900' : 'text-gray-500'}`}>
-                Step {number}
-              </div>
-              <div className={`text-xs ${step >= number ? 'text-gray-700' : 'text-gray-400'}`}>
-                {title}
-              </div>
+        {/* Steps Indicator + Centered Progress */}
+        <div className="relative mb-6">
+          {/* centered progress line positioned at top-middle of stepper */}
+          <div className="absolute left-6 right-6 top-0 flex items-center justify-center pointer-events-none">
+            <div className="w-full max-w-4xl relative">
+              <div className="h-1 bg-slate-200 rounded-full"></div>
+              <div
+                className="absolute left-0 top-0 h-1 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
             </div>
-          ))}
+          </div>
+
+          <div className="flex justify-between relative pt-6">
+            {steps.map(({ number, title, icon: Icon, color }) => (
+              <div key={number} className="flex flex-col items-center relative z-10 px-2">
+                <button
+                  type="button"
+                  onClick={() => handleStepClick(number)}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-300 transform hover:scale-105 ${
+                    step >= number ? `${color} ring-4 ring-opacity-20 ring-current` : 'bg-slate-300'
+                  }`}
+                >
+                  <Icon size={20} />
+                </button>
+                <div className={`mt-2 text-sm font-medium ${step >= number ? 'text-slate-900' : 'text-slate-500'}`}>
+                  Step {number}
+                </div>
+                <div className={`text-xs ${step >= number ? 'text-slate-700' : 'text-slate-400'}`}>
+                  {title}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Message Alert */}
         {message && (
-          <div className={`mb-6 rounded-xl p-4 shadow-lg transform transition-all duration-300 ${
-            message.type === 'error' 
-              ? 'bg-gradient-to-r from-red-50 to-red-100 border border-red-200' 
-              : 'bg-gradient-to-r from-green-50 to-green-100 border border-green-200'
+          <div className={`mb-4 rounded-lg p-3 shadow transform transition-all duration-250 ${
+            message.type === 'error'
+              ? 'bg-red-50 border border-red-100'
+              : 'bg-emerald-50 border border-emerald-100'
           }`}>
-            <div className="flex items-center">
-              <div className={`mr-3 ${message.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>
-                {message.type === 'error' ? '⚠️' : '✅'}
+            <div className="flex items-center gap-3">
+              <div className={`text-lg ${message.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
+                {message.type === 'error' ? '✖' : '✓'}
               </div>
-              <div className="font-medium">{message.text}</div>
+              <div className="font-medium text-sm">{message.text}</div>
             </div>
           </div>
         )}
 
         {/* Form Container */}
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
-          <form onSubmit={handleSubmit} className="p-8">
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
+          <form onSubmit={handleSubmit} className="p-6">
             {/* Step 1: Job Info */}
             {step === 1 && (
-              <div className="space-y-8 animate-fadeIn">
-                <div className="flex items-center mb-6">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4">
-                    <Briefcase className="text-blue-600" size={24} />
+              <div className="space-y-6 animate-fadeIn">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                    <Briefcase className="text-emerald-600" size={20} />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">Job Information</h2>

@@ -7,6 +7,7 @@ import {
   StickyNote,
   Megaphone,
   BookOpen,
+  CheckCircle,
   Briefcase,
   Send,
   Table,
@@ -82,15 +83,15 @@ const Sidebar = () => {
               to="/dashboard/requisitions"
               className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/requisitions") ? activeItem : inactiveItem}`}
             >
-              <div className="w-1.5 h-1.5 bg-emerald-300 rounded-full mr-3" aria-hidden />
-              List of Requisitions
+              <FileText size={16} className="mr-3 text-emerald-300" aria-hidden />
+              <span>List of Requisitions</span>
             </Link>
             <Link
               to="/dashboard/approved-requisitions"
               className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/approved-requisitions") ? activeItem : inactiveItem}`}
             >
-              <div className="w-1.5 h-1.5 bg-emerald-300 rounded-full mr-3" aria-hidden />
-              Approved Requisitions
+              <CheckCircle size={16} className="mr-3 text-emerald-300" aria-hidden />
+              <span>Approved Requisitions</span>
             </Link>
             <Link
               to="/dashboard/add-notes"
