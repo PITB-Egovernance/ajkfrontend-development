@@ -12,9 +12,8 @@ const Navbar = ({ user }) => {
   };
 
   return (
-    <nav className="px-6 py-4 flex items-center justify-between">
+    <nav className="px- py-4 flex items-center justify-between">
       <div className="flex-1">
-        <h2 className="text-2xl font-semibold text-slate-800">Dashboard</h2>
       </div>
 
       {/* Right Side - User Dropdown */}

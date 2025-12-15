@@ -11,41 +11,20 @@ import AddNotes from './Views/Pages/AddNotes';
 import AdvertisementRecords from './Views/Pages/AdvertisementRecords';
 import AnnexAList from './Views/Pages/AnnexAList';
 import JobCreation from './Views/Pages/JobCreation';
-import DispatchReceived from './Views/Pages/DispatchReceived';
-import DispatchSent from './Views/Pages/DispatchSent';
+import DispatchReceived from './Views/Dispatch/DispatchRecieved';
+import DispatchSent from './Views/Dispatch/DispatrchSent';
 import PscTable from './Views/Pages/PscTable';
 
 function App() {
   return (
-     <Router>
+    <Router>
       <Routes>
         {/* Public pages */}
+        <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
         {/* Protected dashboard route with nested pages */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="requisition-form" element={<RequisitionForm />} />
-          <Route path="requisitions" element={<RequisitionList />} />
-          <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
-          <Route path="add-notes" element={<AddNotes />} />
-          <Route path="advertisement-records" element={<AdvertisementRecords />} />
-          <Route path="annex-a" element={<AnnexAList />} />
-          <Route path="job-creation" element={<JobCreation />} />
-          <Route path="dispatch/received" element={<DispatchReceived />} />
-          <Route path="dispatch/sent" element={<DispatchSent />} />
-          <Route path="psc-table" element={<PscTable />} />
-        </Route>
-
-        {/* Root route - redirect to dashboard */}
         <Route
           path="/dashboard"
           element={
