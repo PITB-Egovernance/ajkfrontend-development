@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import Dashboard from './Views/Dashboard';
 import Login from "./Views/Auth/Login/Login";
-import ProtectedRoute from "./Routes/ProtectedAuthRoutes";
+import ProtectedRoute from "./Routes/ProtectedRoute";
 import Register from "./Views/Auth/Register/Register";
 
 function App() {
@@ -14,7 +14,7 @@ function App() {
 
         {/* Protected page */}
         <Route
-          path="/"
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard/>

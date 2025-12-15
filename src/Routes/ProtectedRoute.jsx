@@ -10,5 +10,5 @@ import AuthService from "../Services/AuthService";
  * <Route element={<ProtectedRoute><Dashboard /></ProtectedRoute>} path="/dashboard" />
  */
 export default function ProtectedRoute({ children }) {
-  return AuthService.isAuthenticated() ? children : <Navigate to="/" />;
+  return AuthService.isAuthenticated() ? children : <Navigate to="/dashboard" />;
 }

@@ -128,13 +128,15 @@ class AuthService {
   // Helpers
   // ──────────────────────────────────────────────────────
   static _saveAuth(result) {
-    if (result.token) {
-      localStorage.setItem("authToken", result.token);
-      localStorage.setItem("user", JSON.stringify(result.user));
+   
+    if (result.data.token) {
+      localStorage.setItem("authToken", result.data.token);
+      localStorage.setItem("user", JSON.stringify(result.data.user));
     }
   }
 
   static getToken() {
+    console.log('Token 2', localStorage.getItem("authToken"))
     return localStorage.getItem("authToken");
   }
 

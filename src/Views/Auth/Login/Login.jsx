@@ -182,7 +182,7 @@ export default function Login() {
     <div className="login-card card p-md-7 p-2">
       {/* Logo */}
       <div className="app-brand justify-content-center mt-4 mb-3 text-center">
-        <a href="/" className="app-brand-link gap-2">
+        <a href="/dashboard" className="app-brand-link gap-2">
           <span className="app-brand-logo">
             <img
               src="/assets/img/favicon/Logo.PNG"
