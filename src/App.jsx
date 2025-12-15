@@ -3,7 +3,7 @@ import Dashboard from './Views/Dashboard';
 import Login from "./Views/Auth/Login/Login";
 import ProtectedRoute from "./Routes/ProtectedRoute";
 import Register from "./Views/Auth/Register/Register";
-import DashboardLayout from './Views/DashboardLayout';
+import DashboardLayout from './Views/Layouts/DashboardLayout';
 import RequisitionForm from './Views/RequisitionForm/RequisitionForm';
 import RequisitionList from './Views/Pages/RequisitionList';
 import ApprovedRequisitions from './Views/Pages/ApprovedRequisitions';
