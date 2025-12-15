@@ -15,16 +15,12 @@ export default function Auth() {
   const [message, setMessage] = useState(null);
   const [captcha, setCaptcha] = useState({ token: null, image: null });
   const [loadingCaptcha, setLoadingCaptcha] = useState(false);
-
   const [loginData, setLoginData] = useState({ cnic: '', password: '', captcha: '' });
   const [signupData, setSignupData] = useState({
-    name: '',
-    email: '',
+    username: '',
     cnic: '',
-    phone: '',
     password: '',
-    confirmPassword: '',
-    captcha: '',
+    password_confirmation: '',
   });
   const [errors, setErrors] = useState({});
 
@@ -45,7 +41,6 @@ export default function Auth() {
       const response = await AuthService.generateCaptcha();
       setCaptcha({ token: response.captcha_token, image: response.captcha_image });
       setLoginData((s) => ({ ...s, captcha: '' }));
-      setSignupData((s) => ({ ...s, captcha: '' }));
     } catch (err) {
       setMessage({ type: 'error', text: 'Failed to load CAPTCHA' });
     } finally {
@@ -75,13 +70,10 @@ export default function Auth() {
 
   const validateSignup = () => {
     const e = {};
-    if (!signupData.name) e.name = 'Name required';
-    if (!signupData.email || !/\S+@\S+\.\S+/.test(signupData.email)) e.email = 'Valid email required';
-    if (!signupData.cnic || signupData.cnic.length !== 13) e.cnic = 'Valid CNIC required';
-    if (!signupData.phone || signupData.phone.length < 10) e.phone = 'Valid phone required';
+    if (!signupData.username) e.username = 'Username required';
+    if (!signupData.cnic || signupData.cnic.length !== 13) e.cnic = 'Valid CNIC required (13 digits)';
     if (!signupData.password || signupData.password.length < 6) e.password = 'Password min 6 chars';
-    if (signupData.password !== signupData.confirmPassword) e.confirmPassword = 'Passwords must match';
-    if (!signupData.captcha) e.captcha = 'CAPTCHA required';
+    if (signupData.password !== signupData.password_confirmation) e.password_confirmation = 'Passwords must match';
     return e;
   };
 
@@ -121,45 +113,52 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const captchaRes = await AuthService.validateCaptcha({ captcha_token: captcha.token, captcha: signupData.captcha });
-      if (!captchaRes.success) throw new Error(captchaRes.message || 'CAPTCHA failed');
-
       const signupRes = await AuthService.register({
-        name: signupData.name,
-        email: signupData.email,
+        username: signupData.username,
         cnic: signupData.cnic,
-        phone: signupData.phone,
         password: signupData.password,
+        password_confirmation: signupData.password_confirmation,
       });
 
       setMessage({ type: 'success', text: 'Registration successful! Redirecting to login...' });
       setTimeout(() => {
         setIsLogin(true);
         loadCaptcha();
-      }, 2000);
+      }, 1200);
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Registration failed' });
-      loadCaptcha();
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       {/* Animated background shapes */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{ y: [0, 20, 0] }}
-          transition={{ duration: 8, repeat: Infinity }}
-          className="absolute top-20 left-10 w-72 h-72 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"
-        />
-        <motion.div
-          animate={{ y: [0, -20, 0] }}
-          transition={{ duration: 7, repeat: Infinity }}
-          className="absolute top-40 right-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"
-        />
-      </div>
+<div className="fixed inset-0 overflow-hidden pointer-events-none">
+  
+  {/* Top Left Blob */}
+  <motion.div
+    animate={{ y: [0, 20, 0] }}
+    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+    className="absolute top-20 left-20 w-72 h-72 bg-emerald-200 rounded-full mix-blend-multiply blur-3xl opacity-50"
+  />
+
+  {/* Top Right Blob */}
+  <motion.div
+    animate={{ y: [0, -20, 0] }}
+    transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+    className="absolute top-20 right-60 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply blur-3xl opacity-50"
+  />
+
+  {/* Bottom Right Blob */}
+  <motion.div
+    animate={{ y: [0, -30, 0] }}
+    transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+    className="absolute bottom-20 right-20 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply blur-3xl opacity-50"
+  />
+</div>
+
 
       {/* Main card container */}
       <motion.div
@@ -270,27 +269,15 @@ export default function Auth() {
                   <h3 className="text-2xl font-bold text-slate-900 mb-6">Create Account</h3>
 
                   <div>
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input id="signup-name" name="name" placeholder="Your full name" value={signupData.name} onChange={handleSignupChange} disabled={loading} error={errors.name} />
-                    {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input id="signup-email" name="email" type="email" placeholder="your@email.com" value={signupData.email} onChange={handleSignupChange} disabled={loading} error={errors.email} />
-                    {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email}</p>}
+                    <Label htmlFor="signup-username">Username</Label>
+                    <Input id="signup-username" name="username" placeholder="Choose a username" value={signupData.username} onChange={handleSignupChange} disabled={loading} error={errors.username} />
+                    {errors.username && <p className="text-red-600 text-xs mt-1">{errors.username}</p>}
                   </div>
 
                   <div>
                     <Label htmlFor="signup-cnic">CNIC</Label>
                     <Input id="signup-cnic" name="cnic" placeholder="12345-1234567-1" value={signupData.cnic} onChange={handleSignupChange} disabled={loading} error={errors.cnic} />
                     {errors.cnic && <p className="text-red-600 text-xs mt-1">{errors.cnic}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="signup-phone">Phone</Label>
-                    <Input id="signup-phone" name="phone" placeholder="+92-XXX-XXXXXXX" value={signupData.phone} onChange={handleSignupChange} disabled={loading} error={errors.phone} />
-                    {errors.phone && <p className="text-red-600 text-xs mt-1">{errors.phone}</p>}
                   </div>
 
                   <div>
@@ -318,37 +305,19 @@ export default function Auth() {
                     <div className="relative">
                       <Input
                         id="signup-confirm"
-                        name="confirmPassword"
+                        name="password_confirmation"
                         type={showConfirmPassword ? 'text' : 'password'}
                         placeholder="Confirm password"
-                        value={signupData.confirmPassword}
+                        value={signupData.password_confirmation}
                         onChange={handleSignupChange}
                         disabled={loading}
-                        error={errors.confirmPassword}
+                        error={errors.password_confirmation}
                       />
                       <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700">
                         {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
-                    {errors.confirmPassword && <p className="text-red-600 text-xs mt-1">{errors.confirmPassword}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="signup-captcha">CAPTCHA</Label>
-                    <div className="flex gap-2 mb-2">
-                      {captcha.image ? (
-                        <img src={captcha.image} alt="captcha" className="h-12 border border-slate-300 rounded-lg" />
-                      ) : (
-                        <div className="h-12 border border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
-                          <div className="animate-spin h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full" />
-                        </div>
-                      )}
-                      <button type="button" onClick={loadCaptcha} disabled={loadingCaptcha || loading} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium text-sm disabled:opacity-50">
-                        ↻
-                      </button>
-                    </div>
-                    <Input id="signup-captcha" name="captcha" placeholder="Enter CAPTCHA" value={signupData.captcha} onChange={handleSignupChange} disabled={loading} error={errors.captcha} maxLength={4} />
-                    {errors.captcha && <p className="text-red-600 text-xs mt-1">{errors.captcha}</p>}
+                    {errors.password_confirmation && <p className="text-red-600 text-xs mt-1">{errors.password_confirmation}</p>}
                   </div>
 
                   <Button variant="primary" size="lg" className="w-full mt-6" disabled={loading}>

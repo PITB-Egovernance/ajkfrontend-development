@@ -291,18 +291,18 @@ export default function RequisitionForm() {
           </div>
         </div>
 
-        {/* Message Alert */}
+        {/* Toast Message (floating) */}
         {message && (
-          <div className={`mb-4 rounded-lg p-3 shadow transform transition-all duration-250 ${
-            message.type === 'error'
-              ? 'bg-red-50 border border-red-100'
-              : 'bg-emerald-50 border border-emerald-100'
-          }`}>
-            <div className="flex items-center gap-3">
-              <div className={`text-lg ${message.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
-                {message.type === 'error' ? '✖' : '✓'}
+          <div className="fixed top-6 right-6 z-50">
+            <div
+              role="alert"
+              className={`min-w-[220px] max-w-lg rounded-lg p-3 shadow-lg transform transition-all duration-250 ${
+                message.type === 'error' ? 'bg-red-50 border border-red-100' : 'bg-emerald-50 border border-emerald-100'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="font-medium text-sm">{message.text}</div>
               </div>
-              <div className="font-medium text-sm">{message.text}</div>
             </div>
           </div>
         )}
@@ -444,37 +444,8 @@ export default function RequisitionForm() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-sm font-semibold text-gray-700">Service Rules (PDF)</label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors duration-300">
-                      <Upload className="mx-auto text-gray-400 mb-2" size={32} />
-                      <input
-                        type="file"
-                        name="service_rules"
-                        accept=".pdf"
-                        onChange={handleChange}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <div className="text-sm text-gray-600">
-                        {data.service_rules ? data.service_rules.name : 'Click to upload PDF'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
                     <label className="block text-sm font-semibold text-gray-700">Syllabus (PDF)</label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors duration-300">
-                      <Upload className="mx-auto text-gray-400 mb-2" size={32} />
-                      <input
-                        type="file"
-                        name="syllabus"
-                        accept=".pdf"
-                        onChange={handleChange}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <div className="text-sm text-gray-600">
-                        {data.syllabus ? data.syllabus.name : 'Click to upload PDF'}
-                      </div>
-                    </div>
+
                   </div>
                 </div>
               </div>
@@ -1157,7 +1128,7 @@ export default function RequisitionForm() {
                   <button
                     type="button"
                     onClick={handleNext}
-                    className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 transform hover:translate-x-1"
+                    className="flex items-center px-6 py-3 bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-950 border-r border-emerald-800/50 text-white rounded-xl hover:from-emerald-800 hover:via-emerald-700 hover:to-emerald-600 transition-all duration-300 transform hover:translate-x-1"
                   >
                     Next Step
                     <ChevronRight size={20} className="ml-2" />
