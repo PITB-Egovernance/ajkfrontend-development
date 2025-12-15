@@ -1,11 +1,25 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Button } from '../../components/ui';
+import { DataGrid } from '@mui/x-data-grid';
 
 export default function DispatrchSent() {
-  const sample = [
-    { id: 'S-101', to: 'Officer X', subject: 'Appointment', date: '2025-11-12' },
-    { id: 'S-102', to: 'Officer Y', subject: 'Memo', date: '2025-11-20' },
+  const rows = [
+    { id: 1, ref: 'S-101', to: 'Officer X', subject: 'Appointment', date: '2025-11-12' },
+    { id: 2, ref: 'S-102', to: 'Officer Y', subject: 'Memo', date: '2025-11-20' },
+  ];
+
+  const columns = [
+    { field: 'ref', headerName: 'ID', width: 110 },
+    { field: 'to', headerName: 'To', flex: 1 },
+    { field: 'subject', headerName: 'Subject', flex: 1 },
+    { field: 'date', headerName: 'Sent', width: 140 },
+    { field: 'actions', headerName: 'Actions', width: 180, sortable: false, renderCell: () => (
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm">View</Button>
+        <Button variant="secondary" size="sm">Resend</Button>
+      </div>
+    ) },
   ];
 
   return (
@@ -21,34 +35,8 @@ export default function DispatrchSent() {
       </div>
 
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-slate-500">
-              <tr>
-                <th className="py-3">ID</th>
-                <th className="py-3">To</th>
-                <th className="py-3">Subject</th>
-                <th className="py-3">Sent</th>
-                <th className="py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {sample.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50">
-                  <td className="py-3 font-medium">{row.id}</td>
-                  <td className="py-3">{row.to}</td>
-                  <td className="py-3">{row.subject}</td>
-                  <td className="py-3">{row.date}</td>
-                  <td className="py-3">
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">View</Button>
-                      <Button variant="secondary" size="sm">Resend</Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="h-72">
+          <DataGrid rows={rows} columns={columns} pageSize={5} rowsPerPageOptions={[5]} disableSelectionOnClick />
         </div>
       </Card>
     </div>

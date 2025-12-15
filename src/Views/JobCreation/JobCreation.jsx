@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Config from '../../Config/Baseurl';
+import Step1 from './Steps/Step1';
+import Step2 from './Steps/Step2';
+import Step3 from './Steps/Step3';
+import Step4 from './Steps/Step4';
+import Step5 from './Steps/Step5';
 
 const initial = {
   // Step1 - Job Information
@@ -182,311 +187,23 @@ export default function JobCreation() {
           </div>
 
           {step===1 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Job Title</label>
-                <input name="job_title" value={data.job_title} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.job_title && <div className="text-red-600 text-sm">{errors.job_title}</div>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Case Number</label>
-                <input name="case_number" value={data.case_number} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.case_number && <div className="text-red-600 text-sm">{errors.case_number}</div>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Requisition Number</label>
-                <input name="requisition_number" value={data.requisition_number} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.requisition_number && <div className="text-red-600 text-sm">{errors.requisition_number}</div>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Advertisement Number</label>
-                <input name="advertisement_number" value={data.advertisement_number} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.advertisement_number && <div className="text-red-600 text-sm">{errors.advertisement_number}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Advertisement Date</label>
-                <input type="date" name="advertisement_date" value={data.advertisement_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.advertisement_date && <div className="text-red-600 text-sm">{errors.advertisement_date}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Job Type</label>
-                <input name="job_type" value={data.job_type} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Department</label>
-                <select name="department" value={data.department} onChange={change} className="mt-1 w-full rounded border-gray-200">
-                  <option value="">Select</option>
-                  <option>Education</option>
-                  <option>Health</option>
-                  <option>Administration</option>
-                </select>
-                {errors.department && <div className="text-red-600 text-sm">{errors.department}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Designation</label>
-                <select name="designation" value={data.designation} onChange={change} className="mt-1 w-full rounded border-gray-200">
-                  <option value="">Select</option>
-                  <option>Officer</option>
-                  <option>Clerk</option>
-                  <option>Supervisor</option>
-                </select>
-                {errors.designation && <div className="text-red-600 text-sm">{errors.designation}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Grade BPS</label>
-                <select name="grade_bps" value={data.grade_bps} onChange={change} className="mt-1 w-full rounded border-gray-200">
-                  <option value="">Select</option>
-                  <option>BPS-16</option>
-                  <option>BPS-17</option>
-                  <option>BPS-18</option>
-                </select>
-                {errors.grade_bps && <div className="text-red-600 text-sm">{errors.grade_bps}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Number of Posts</label>
-                <input type="number" name="number_of_posts" value={data.number_of_posts} onChange={change} min={1} className="mt-1 w-full rounded border-gray-200" />
-                {errors.number_of_posts && <div className="text-red-600 text-sm">{errors.number_of_posts}</div>}
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Vacant Post Detail</label>
-                <textarea name="vacant_post_detail" value={data.vacant_post_detail} onChange={change} className="mt-1 w-full rounded border-gray-200" rows={3} />
-              </div>
-            </div>
+            <Step1 data={data} change={change} errors={errors} />
           )}
 
           {step===2 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Number of Ad HOC Posts</label>
-                <input type="number" name="number_of_ad_hoc_posts" value={data.number_of_ad_hoc_posts} onChange={change} min={0} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Ad HOC Post Details</label>
-                <textarea name="ad_hoc_post_details" value={data.ad_hoc_post_details} onChange={change} className="mt-1 w-full rounded border-gray-200" rows={3} />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Initial Appointment Date</label>
-                <input type="date" name="initial_appointment_date" value={data.initial_appointment_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Date Of Last Extension</label>
-                <input type="date" name="date_of_last_extension" value={data.date_of_last_extension} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Post Date (Creation Date)</label>
-                <input type="date" name="post_date" value={data.post_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.post_date && <div className="text-red-600 text-sm">{errors.post_date}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Apply Start Date</label>
-                <input type="date" name="start_date" value={data.start_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.start_date && <div className="text-red-600 text-sm">{errors.start_date}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Apply End Date</label>
-                <input type="date" name="end_date" value={data.end_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.end_date && <div className="text-red-600 text-sm">{errors.end_date}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Press Release Date</label>
-                <input type="date" name="release_date" value={data.release_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Close Job Date</label>
-                <input type="date" name="close_date" value={data.close_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-            </div>
+            <Step2 data={data} change={change} errors={errors} />
           )}
 
           {step===3 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Min Age</label>
-                <input type="number" name="min_age" value={data.min_age} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Max Age</label>
-                <input type="number" name="max_age" value={data.max_age} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Age Relaxation</label>
-                <input type="number" name="age_relaxation" value={data.age_relaxation} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Age Relaxation Note</label>
-                <input name="age_relaxation_note" value={data.age_relaxation_note} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Gender Eligibility</label>
-                <div className="flex gap-4 mt-2">
-                  <label className="inline-flex items-center"><input type="radio" name="gender_eligibility" value="Male" checked={data.gender_eligibility==='Male'} onChange={change} /> <span className="ml-2">Male</span></label>
-                  <label className="inline-flex items-center"><input type="radio" name="gender_eligibility" value="Female" checked={data.gender_eligibility==='Female'} onChange={change} /> <span className="ml-2">Female</span></label>
-                </div>
-                {errors.gender_eligibility && <div className="text-red-600 text-sm">{errors.gender_eligibility}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Nationality</label>
-                <input name="nationality" value={data.nationality} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Domicile</label>
-                <select name="domicile" value={data.domicile} onChange={change} className="mt-1 w-full rounded border-gray-200">
-                  <option value="">Select</option>
-                  <option>Muzaffarabad</option>
-                  <option>Mirpur</option>
-                  <option>Kotli</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Educational Requirement</label>
-                <select name="educational_requirement" multiple value={data.educational_requirement} onChange={change} className="mt-1 w-full rounded border-gray-200">
-                  <option value="Matric">Matric</option>
-                  <option value="Intermediate">Intermediate</option>
-                  <option value="Bachelor">Bachelor</option>
-                  <option value="Master">Master</option>
-                </select>
-                {errors.educational_requirement && <div className="text-red-600 text-sm">{errors.educational_requirement}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Medical Requirement</label>
-                <input name="medical_requirement" value={data.medical_requirement} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Experience Requirement</label>
-                <select name="experience_requirement" multiple value={data.experience_requirement} onChange={change} className="mt-1 w-full rounded border-gray-200">
-                  <option value="1-2 Years">1-2 Years</option>
-                  <option value="3-5 Years">3-5 Years</option>
-                  <option value="5+ Years">5+ Years</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Other Requirement</label>
-                <input name="other_requirement" value={data.other_requirement} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Dynamic Fields</label>
-                <input name="dynamic_fields" value={data.dynamic_fields} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-            </div>
+            <Step3 data={data} change={change} errors={errors} />
           )}
 
           {step===4 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Examination Fee</label>
-                <input type="number" name="examination_fee" value={data.examination_fee} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.examination_fee && <div className="text-red-600 text-sm">{errors.examination_fee}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Payment Integration (PSID)</label>
-                <input name="payment_integration_psid" value={data.payment_integration_psid} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">PSID Expiry Date</label>
-                <input type="date" name="psid_expiry_date" value={data.psid_expiry_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Payment Status</label>
-                <select name="payment_status" value={data.payment_status} onChange={change} className="mt-1 w-full rounded border-gray-200">
-                  <option value="">Select</option>
-                  <option>Pending</option>
-                  <option>Paid</option>
-                  <option>Failed</option>
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Test Center Preference</label>
-                <div className="flex gap-4 mt-2">
-                  <label className="inline-flex items-center"><input type="checkbox" name="test_center_preference" value="Muzaffarabad" onChange={(e)=>{
-                    // adapt to checkbox handling
-                    const checked = e.target.checked;
-                    const val = e.target.value;
-                    const cur = new Set(data.test_center_preference || []);
-                    if (checked) cur.add(val); else cur.delete(val);
-                    setData(s=> ({...s, test_center_preference: Array.from(cur)}));
-                  }} /> <span className="ml-2">Muzaffarabad</span></label>
-
-                  <label className="inline-flex items-center"><input type="checkbox" name="test_center_preference" value="Mirpur" onChange={(e)=>{
-                    const checked = e.target.checked; const val = e.target.value; const cur = new Set(data.test_center_preference || []);
-                    if (checked) cur.add(val); else cur.delete(val);
-                    setData(s=> ({...s, test_center_preference: Array.from(cur)}));
-                  }} /> <span className="ml-2">Mirpur</span></label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Test Date</label>
-                <input type="date" name="test_date" value={data.test_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-                {errors.test_date && <div className="text-red-600 text-sm">{errors.test_date}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Interview Date</label>
-                <input type="date" name="interview_date" value={data.interview_date} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Test Duration</label>
-                <input name="test_duration" value={data.test_duration} onChange={change} className="mt-1 w-full rounded border-gray-200" placeholder="e.g., 2 hours" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Syllabus / Paper Pattern</label>
-                <input name="syllabus_paper_pattern" value={data.syllabus_paper_pattern} onChange={change} className="mt-1 w-full rounded border-gray-200" />
-              </div>
-            </div>
+            <Step4 data={data} change={change} errors={errors} />
           )}
 
           {step===5 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Short Details</label>
-                <textarea name="short_details" value={data.short_details} onChange={change} className="mt-1 w-full rounded border-gray-200" rows={3} />
-                {errors.short_details && <div className="text-red-600 text-sm">{errors.short_details}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Full Job Details</label>
-                <textarea name="full_job_details" value={data.full_job_details} onChange={change} className="mt-1 w-full rounded border-gray-200" rows={4} />
-                {errors.full_job_details && <div className="text-red-600 text-sm">{errors.full_job_details}</div>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Additional Information</label>
-                <textarea name="additional_information" value={data.additional_information} onChange={change} className="mt-1 w-full rounded border-gray-200" rows={3} />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Notes (Internal)</label>
-                <textarea name="notes_internal" value={data.notes_internal} onChange={change} className="mt-1 w-full rounded border-gray-200" rows={3} />
-              </div>
-            </div>
+            <Step5 data={data} change={change} errors={errors} />
           )}
 
           <div className="flex justify-between pt-4">
