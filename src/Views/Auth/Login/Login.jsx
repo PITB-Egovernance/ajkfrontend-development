@@ -1,419 +1,372 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import "../Login/Login.css";
-import AuthService from "../../../Services/AuthService";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Eye, EyeOff } from 'lucide-react';
+import AuthService from '../../../Services/AuthService';
+import { Button, Input, Card } from '../../../components/ui';
+import Label from '../../../components/ui/Label';
 
-export default function Login() {
+export default function Auth() {
   const navigate = useNavigate();
-
-  const [formData, setFormData] = useState({
-    cnic: "",
-    password: "",
-    captcha: "",
-  });
-
-  const [captcha, setCaptcha] = useState({
-    token: null,
-    image: null,
-  });
-
-  const [errors, setErrors] = useState({});
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingCaptcha, setLoadingCaptcha] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [captcha, setCaptcha] = useState({ token: null, image: null });
+  const [loadingCaptcha, setLoadingCaptcha] = useState(false);
 
-  // Load CAPTCHA on component mount
+  const [loginData, setLoginData] = useState({ cnic: '', password: '', captcha: '' });
+  const [signupData, setSignupData] = useState({
+    name: '',
+    email: '',
+    cnic: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+    captcha: '',
+  });
+  const [errors, setErrors] = useState({});
+
   useEffect(() => {
     loadCaptcha();
-
-    // Check if user was redirected after registration
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("registered")) {
-      setSuccessMessage("Registration successful! Please login.");
-    }
   }, []);
 
-  // Auto-hide success alert
   useEffect(() => {
-    if (successMessage) {
-      const timer = setTimeout(() => {
-        setSuccessMessage("");
-      }, 4000);
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 4000);
       return () => clearTimeout(timer);
     }
-  }, [successMessage]);
+  }, [message]);
 
-  // Auto-hide error alert
-  useEffect(() => {
-    if (errorMessage) {
-      const timer = setTimeout(() => {
-        setErrorMessage("");
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [errorMessage]);
-
-  // Load CAPTCHA
   const loadCaptcha = async () => {
     setLoadingCaptcha(true);
     try {
       const response = await AuthService.generateCaptcha();
-      setCaptcha({
-        token: response.captcha_token,
-        image: response.captcha_image,
-      });
-      setFormData({ ...formData, captcha: "" });
-      setErrors({ ...errors, captcha: "" });
-    } catch (error) {
-      setErrorMessage(
-        error.message || "Failed to load CAPTCHA. Please try again."
-      );
+      setCaptcha({ token: response.captcha_token, image: response.captcha_image });
+      setLoginData((s) => ({ ...s, captcha: '' }));
+      setSignupData((s) => ({ ...s, captcha: '' }));
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to load CAPTCHA' });
     } finally {
       setLoadingCaptcha(false);
     }
   };
 
-  // CNIC Only Digits
-  const handleCnicInput = (e) => {
-    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 13);
-    setFormData({ ...formData, cnic: e.target.value });
-    if (errors.cnic) {
-      setErrors({ ...errors, cnic: "" });
-    }
-  };
-
-  // Handle input changes
-  const handleInputChange = (e) => {
+  const handleLoginChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    // Clear error for this field when user starts typing
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: "" });
-    }
+    setLoginData((s) => ({ ...s, [name]: name === 'cnic' ? value.replace(/\D/g, '').slice(0, 13) : value }));
+    if (errors[name]) setErrors((s) => ({ ...s, [name]: null }));
   };
 
-  // Validate form
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.cnic) {
-      newErrors.cnic = "CNIC is required";
-    } else if (formData.cnic.length !== 13) {
-      newErrors.cnic = "CNIC must be exactly 13 digits";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    }
-
-    if (!formData.captcha) {
-      newErrors.captcha = "CAPTCHA is required";
-    } else if (formData.captcha.length < 3) {
-      newErrors.captcha = "Please enter the CAPTCHA code";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleSignupChange = (e) => {
+    const { name, value } = e.target;
+    setSignupData((s) => ({ ...s, [name]: name === 'cnic' ? value.replace(/\D/g, '').slice(0, 13) : value }));
+    if (errors[name]) setErrors((s) => ({ ...s, [name]: null }));
   };
 
-  // Handle login
-  const handleSubmit = async (e) => {
+  const validateLogin = () => {
+    const e = {};
+    if (!loginData.cnic || loginData.cnic.length !== 13) e.cnic = 'Valid CNIC required (13 digits)';
+    if (!loginData.password) e.password = 'Password required';
+    if (!loginData.captcha) e.captcha = 'CAPTCHA required';
+    return e;
+  };
+
+  const validateSignup = () => {
+    const e = {};
+    if (!signupData.name) e.name = 'Name required';
+    if (!signupData.email || !/\S+@\S+\.\S+/.test(signupData.email)) e.email = 'Valid email required';
+    if (!signupData.cnic || signupData.cnic.length !== 13) e.cnic = 'Valid CNIC required';
+    if (!signupData.phone || signupData.phone.length < 10) e.phone = 'Valid phone required';
+    if (!signupData.password || signupData.password.length < 6) e.password = 'Password min 6 chars';
+    if (signupData.password !== signupData.confirmPassword) e.confirmPassword = 'Passwords must match';
+    if (!signupData.captcha) e.captcha = 'CAPTCHA required';
+    return e;
+  };
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setErrorMessage("");
-
-    if (!validateForm()) {
+    const e_ = validateLogin();
+    if (Object.keys(e_).length) {
+      setErrors(e_);
       return;
     }
 
     setLoading(true);
-
     try {
-      // First validate CAPTCHA
-      const captchaResponse = await AuthService.validateCaptcha({
-        captcha_token: captcha.token,
-        captcha: formData.captcha,
+      const captchaRes = await AuthService.validateCaptcha({ captcha_token: captcha.token, captcha: loginData.captcha });
+      if (!captchaRes.success) throw new Error(captchaRes.message || 'CAPTCHA failed');
+
+      const loginRes = await AuthService.login({ cnic: loginData.cnic, password: loginData.password });
+      localStorage.setItem('isLoggedIn', 'true');
+      setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
+
+      setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Login failed' });
+      loadCaptcha();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    const e_ = validateSignup();
+    if (Object.keys(e_).length) {
+      setErrors(e_);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const captchaRes = await AuthService.validateCaptcha({ captcha_token: captcha.token, captcha: signupData.captcha });
+      if (!captchaRes.success) throw new Error(captchaRes.message || 'CAPTCHA failed');
+
+      const signupRes = await AuthService.register({
+        name: signupData.name,
+        email: signupData.email,
+        cnic: signupData.cnic,
+        phone: signupData.phone,
+        password: signupData.password,
       });
 
-      if (!captchaResponse.success) {
-        throw new Error(
-          captchaResponse.message || "CAPTCHA validation failed"
-        );
-      }
-
-      // Then attempt login
-      const loginResponse = await AuthService.login({
-        cnic: formData.cnic,
-        password: formData.password,
-      });
-
-      setSuccessMessage("Login successful! Redirecting...");
-
-      // Store user info and redirect after a short delay
+      setMessage({ type: 'success', text: 'Registration successful! Redirecting to login...' });
       setTimeout(() => {
-        navigate("/dashboard");
-      }, 1500);
-    } catch (error) {
-      setErrorMessage(error.message || "Login failed. Please try again.");
-
-      // If CAPTCHA failed, reload it
-      if (
-        error.message &&
-        error.message.toLowerCase().includes("captcha")
-      ) {
+        setIsLogin(true);
         loadCaptcha();
-      } else {
-        // Still reload captcha for security (one-time use)
-        loadCaptcha();
-      }
-
-      // Set field-specific errors if provided
-      if (error.errors) {
-        setErrors(error.errors);
-      }
+      }, 2000);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Registration failed' });
+      loadCaptcha();
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="login-card card p-md-7 p-2">
-      {/* Logo */}
-      <div className="app-brand justify-content-center mt-4 mb-3 text-center">
-        <a href="/" className="app-brand-link gap-2">
-          <span className="app-brand-logo">
-            <img
-              src="/assets/img/favicon/Logo.PNG"
-              alt="Logo"
-              className="login-logo"
-            />
-          </span>
-        </a>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-4">
+      {/* Animated background shapes */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{ y: [0, 20, 0] }}
+          transition={{ duration: 8, repeat: Infinity }}
+          className="absolute top-20 left-10 w-72 h-72 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"
+        />
+        <motion.div
+          animate={{ y: [0, -20, 0] }}
+          transition={{ duration: 7, repeat: Infinity }}
+          className="absolute top-40 right-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"
+        />
       </div>
 
-      <div className="card-body mt-1">
-        {/* Error Message */}
-        {errorMessage && (
-          <div className="alert alert-danger alert-dismissible fade show mb-4">
-            <strong>Error!</strong> {errorMessage}
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setErrorMessage("")}
-            ></button>
-          </div>
-        )}
-
-        {/* Success Message */}
-        {successMessage && (
-          <div className="alert alert-success alert-dismissible fade show mb-4">
-            <strong>Success!</strong> {successMessage}
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setSuccessMessage("")}
-            ></button>
-          </div>
-        )}
-
-        <h5 className="login-title mb-3 text-center">
-          Azad Jammu & Kashmir (AJ&K-PSC)
-        </h5>
-
-        <form onSubmit={handleSubmit} className="mb-4">
-          {/* CNIC */}
-          <div className="form-floating form-floating-outline mb-4">
-            <input
-              type="text"
-              className={`form-control cnic-input ${
-                errors.cnic ? "is-invalid" : ""
-              }`}
-              id="cnic"
-              name="cnic"
-              maxLength="13"
-              pattern="\d{13}"
-              placeholder="Enter your CNIC"
-              onInput={handleCnicInput}
-              value={formData.cnic}
-              disabled={loading}
-            />
-            <label htmlFor="cnic" className="text-green">
-              CNIC
-            </label>
-            {errors.cnic && (
-              <div className="invalid-feedback d-block">{errors.cnic}</div>
-            )}
-          </div>
-
-          {/* Password */}
-          <div className="mb-4 form-password-toggle">
-            <div className="input-group input-group-merge">
-              <div className="form-floating form-floating-outline flex-grow-1">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  id="password"
-                  name="password"
-                  className={`form-control ${
-                    errors.password ? "is-invalid" : ""
-                  }`}
-                  placeholder="············"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  disabled={loading}
-                />
-                <label htmlFor="password" className="text-green">
-                  Password
-                </label>
+      {/* Main card container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md relative z-10"
+      >
+        <Card className="backdrop-blur-xl bg-white/95 shadow-2xl border border-white/20">
+          {/* Header */}
+          <div className="px-8 py-6 border-b border-slate-200">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <img src="/assets/img/favicon/Logo.PNG" alt="logo" className="w-12 h-12 rounded-lg" />
+              <div>
+                <div className="font-bold text-emerald-700 text-lg">AJ&K PSC</div>
+                <div className="text-xs text-slate-500">Admin Portal</div>
               </div>
-              <span
-                className="input-group-text cursor-pointer"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                <i className={`bi ${showPassword ? "bi-eye" : "bi-eye-slash"}`}></i>
-              </span>
             </div>
-            {errors.password && (
-              <div className="invalid-feedback d-block">{errors.password}</div>
-            )}
           </div>
 
-          {/* CAPTCHA */}
-          <div className="mb-4">
-            <label className="form-label">CAPTCHA</label>
-
-            <div className="captcha-wrapper d-flex align-items-center gap-2 flex-wrap">
-              {/* CAPTCHA Image */}
-              {captcha.image ? (
-                <img
-                  src={captcha.image}
-                  id="captcha-image"
-                  alt="CAPTCHA"
-                  className="captcha-img"
-                />
-              ) : (
-                <div className="captcha-img bg-light d-flex align-items-center justify-content-center">
-                  <span className="spinner-border spinner-border-sm"></span>
-                </div>
+          {/* Content */}
+          <div className="px-8 py-8">
+            {/* Message */}
+            <AnimatePresence>
+              {message && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`mb-4 p-4 rounded-lg text-sm font-medium ${
+                    message.type === 'error'
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  }`}
+                >
+                  {message.text}
+                </motion.div>
               )}
+            </AnimatePresence>
 
-              {/* Input */}
-              <input
-                type="text"
-                name="captcha"
-                className={`form-control captcha-input ${
-                  errors.captcha ? "is-invalid" : ""
-                }`}
-                placeholder="Enter text"
-                value={formData.captcha}
-                onChange={handleInputChange}
-                disabled={loading || loadingCaptcha}
-                maxLength="4"
-              />
+            {/* Forms */}
+            <AnimatePresence mode="wait">
+              {isLogin ? (
+                <motion.form key="login" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} onSubmit={handleLogin} className="space-y-4">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-6">Welcome Back</h3>
 
-              {/* Refresh Button */}
-              <button
-                type="button"
-                className="btn btn-outline-primary btn-sm rounded-md captcha-refresh-btn"
-                onClick={loadCaptcha}
-                disabled={loadingCaptcha || loading}
-              >
-                {loadingCaptcha ? (
-                  <span className="spinner-border spinner-border-sm"></span>
-                ) : (
-                  <i className="bi bi-arrow-clockwise fs-5"></i>
-                )}
-              </button>
-            </div>
-            {errors.captcha && (
-              <div className="invalid-feedback d-block">{errors.captcha}</div>
-            )}
+                  <div>
+                    <Label htmlFor="login-cnic">CNIC</Label>
+                    <Input id="login-cnic" name="cnic" placeholder="12345-1234567-1" value={loginData.cnic} onChange={handleLoginChange} disabled={loading} error={errors.cnic} />
+                    {errors.cnic && <p className="text-red-600 text-xs mt-1">{errors.cnic}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="login-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter your password"
+                        value={loginData.password}
+                        onChange={handleLoginChange}
+                        disabled={loading}
+                        error={errors.password}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="login-captcha">CAPTCHA</Label>
+                    <div className="flex gap-2 mb-2">
+                      {captcha.image ? (
+                        <img src={captcha.image} alt="captcha" className="h-12 border border-slate-300 rounded-lg" />
+                      ) : (
+                        <div className="h-12 border border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
+                          <div className="animate-spin h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full" />
+                        </div>
+                      )}
+                      <button type="button" onClick={loadCaptcha} disabled={loadingCaptcha || loading} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium text-sm disabled:opacity-50">
+                        ↻
+                      </button>
+                    </div>
+                    <Input id="login-captcha" name="captcha" placeholder="Enter CAPTCHA" value={loginData.captcha} onChange={handleLoginChange} disabled={loading} error={errors.captcha} maxLength={4} />
+                    {errors.captcha && <p className="text-red-600 text-xs mt-1">{errors.captcha}</p>}
+                  </div>
+
+                  <Button variant="primary" size="lg" className="w-full mt-6" disabled={loading}>
+                    {loading ? 'Signing in...' : 'Sign In'}
+                  </Button>
+
+                  <p className="text-center text-slate-600 text-sm mt-4">
+                    Don't have an account?{' '}
+                    <button type="button" onClick={() => { setIsLogin(false); setErrors({}); }} className="text-emerald-600 font-semibold hover:underline">
+                      Create one
+                    </button>
+                  </p>
+                </motion.form>
+              ) : (
+                <motion.form key="signup" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.3 }} onSubmit={handleSignup} className="space-y-3">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-6">Create Account</h3>
+
+                  <div>
+                    <Label htmlFor="signup-name">Full Name</Label>
+                    <Input id="signup-name" name="name" placeholder="Your full name" value={signupData.name} onChange={handleSignupChange} disabled={loading} error={errors.name} />
+                    {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input id="signup-email" name="email" type="email" placeholder="your@email.com" value={signupData.email} onChange={handleSignupChange} disabled={loading} error={errors.email} />
+                    {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signup-cnic">CNIC</Label>
+                    <Input id="signup-cnic" name="cnic" placeholder="12345-1234567-1" value={signupData.cnic} onChange={handleSignupChange} disabled={loading} error={errors.cnic} />
+                    {errors.cnic && <p className="text-red-600 text-xs mt-1">{errors.cnic}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signup-phone">Phone</Label>
+                    <Input id="signup-phone" name="phone" placeholder="+92-XXX-XXXXXXX" value={signupData.phone} onChange={handleSignupChange} disabled={loading} error={errors.phone} />
+                    {errors.phone && <p className="text-red-600 text-xs mt-1">{errors.phone}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signup-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Min 6 characters"
+                        value={signupData.password}
+                        onChange={handleSignupChange}
+                        disabled={loading}
+                        error={errors.password}
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700">
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signup-confirm">Confirm Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-confirm"
+                        name="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        placeholder="Confirm password"
+                        value={signupData.confirmPassword}
+                        onChange={handleSignupChange}
+                        disabled={loading}
+                        error={errors.confirmPassword}
+                      />
+                      <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700">
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                    {errors.confirmPassword && <p className="text-red-600 text-xs mt-1">{errors.confirmPassword}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signup-captcha">CAPTCHA</Label>
+                    <div className="flex gap-2 mb-2">
+                      {captcha.image ? (
+                        <img src={captcha.image} alt="captcha" className="h-12 border border-slate-300 rounded-lg" />
+                      ) : (
+                        <div className="h-12 border border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
+                          <div className="animate-spin h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full" />
+                        </div>
+                      )}
+                      <button type="button" onClick={loadCaptcha} disabled={loadingCaptcha || loading} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium text-sm disabled:opacity-50">
+                        ↻
+                      </button>
+                    </div>
+                    <Input id="signup-captcha" name="captcha" placeholder="Enter CAPTCHA" value={signupData.captcha} onChange={handleSignupChange} disabled={loading} error={errors.captcha} maxLength={4} />
+                    {errors.captcha && <p className="text-red-600 text-xs mt-1">{errors.captcha}</p>}
+                  </div>
+
+                  <Button variant="primary" size="lg" className="w-full mt-6" disabled={loading}>
+                    {loading ? 'Creating account...' : 'Create Account'}
+                  </Button>
+
+                  <p className="text-center text-slate-600 text-sm mt-4">
+                    Already have an account?{' '}
+                    <button type="button" onClick={() => { setIsLogin(true); setErrors({}); }} className="text-emerald-600 font-semibold hover:underline">
+                      Sign in
+                    </button>
+                  </p>
+                </motion.form>
+              )}
+            </AnimatePresence>
           </div>
-
-          {/* Remember + Forgot */}
-          <div className="mb-4 d-flex justify-content-between">
-            <div className="form-check mt-1">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id="remember-me"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-              />
-              <label className="form-check-label text-gray" htmlFor="remember-me">
-                Remember Me
-              </label>
-            </div>
-
-            <a href="/forgot-password" className="text-green mt-1">
-              Forgot Password?
-            </a>
-          </div>
-
-          {/* Login Button */}
-          <button
-            className="btn login-btn d-grid w-100 mb-4"
-            type="submit"
-            disabled={loading || loadingCaptcha}
-          >
-            {loading ? (
-              <>
-                <span
-                  className="spinner-border spinner-border-sm me-2"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
-                Logging in...
-              </>
-            ) : (
-              "Login"
-            )}
-          </button>
-        </form>
-
-        <p className="text-center mb-4">
-          <span className="text-gray">New on our platform?</span>{" "}
-          <a href="/register" className="text-green">
-            Create an account
-          </a>
-        </p>
-
-        <div className="divider my-4">
-          <div className="divider-text">or</div>
-        </div>
-
-        <div className="d-flex justify-content-center gap-2">
-          <a
-            href="#"
-            className="btn btn-icon rounded-circle btn-text-facebook"
-            onClick={(e) => e.preventDefault()}
-          >
-            <i className="bi bi-facebook"></i>
-          </a>
-          <a
-            href="#"
-            className="btn btn-icon rounded-circle btn-text-twitter"
-            onClick={(e) => e.preventDefault()}
-          >
-            <i className="bi bi-twitter"></i>
-          </a>
-          <a
-            href="#"
-            className="btn btn-icon rounded-circle btn-text-github"
-            onClick={(e) => e.preventDefault()}
-          >
-            <i className="bi bi-github"></i>
-          </a>
-          <a
-            href="#"
-            className="btn btn-icon rounded-circle btn-text-google"
-            onClick={(e) => e.preventDefault()}
-          >
-            <i className="bi bi-google"></i>
-          </a>
-        </div>
-      </div>
+        </Card>
+      </motion.div>
     </div>
   );
 }

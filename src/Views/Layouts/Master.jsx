@@ -1,27 +1,21 @@
-import React from "react";
-
 const Master = ({ Sidebar, Navbar, children }) => {
   return (
-    <div className="layout-wrapper layout-content-navbar">
-      <div className="layout-container">
-        {/* Sidebar */}
-        {Sidebar}
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-emerald-50">
+      {/* Sidebar for desktop, drawer for mobile */}
+      {Sidebar}
 
-        <div className="layout-page">
-          {/* Navbar */}
+      {/* Main content */}
+      <div className="flex-1 md:ml-72 transition-all duration-300">
+        {/* Navbar */}
+        <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
           {Navbar}
-
-          <div className="content-wrapper">
-            {/* Main Content */}
-            {children}
-
-            <div className="content-backdrop fade"></div>
-          </div>
         </div>
-      </div>
 
-      <div className="layout-overlay layout-menu-toggle"></div>
-      <div className="drag-target"></div>
+        {/* Page Content */}
+        <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+          {children}
+        </main>
+      </div>
     </div>
   );
 };

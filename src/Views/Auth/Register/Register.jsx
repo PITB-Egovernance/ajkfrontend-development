@@ -300,39 +300,6 @@ export default function Register() {
               Login instead
             </a>
           </p>
-
-          {/* Divider */}
-          <div className="divider my-4">
-            <div className="divider-text">or</div>
-          </div>
-
-          {/* Social Icons */}
-          <div className="d-flex justify-content-center gap-2 social-icons">
-            <a
-              href="#"
-              className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
-            >
-              <i className="bi bi-facebook"></i>
-            </a>
-            <a
-              href="#"
-              className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
-            >
-              <i className="bi bi-twitter"></i>
-            </a>
-            <a
-              href="#"
-              className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
-            >
-              <i className="bi bi-github"></i>
-            </a>
-            <a
-              href="#"
-              className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
-            >
-              <i className="bi bi-google"></i>
-            </a>
-          </div>
         </div>
       </div>
     </div>
