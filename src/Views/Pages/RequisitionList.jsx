@@ -1,25 +1,109 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
+import { Button, CircularProgress, Typography } from '@mui/material';
+import { Link } from 'react-router-dom';
 
 const RequisitionList = () => {
-  const rows = [
-    { id: 1, ref: 'R-100', title: 'Sample Requisition', status: 'Pending' },
-    { id: 2, ref: 'R-101', title: 'Teaching Posts', status: 'Approved' },
-  ];
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const pageSize = 10;
+
+  const API_BASE = 'http://127.0.0.1:8000/api';
+  const TOKEN = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150';
+
+  const fetchRequisitions = async (pageNum = 0) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE}/requisitions?page=${pageNum + 1}`, {
+        headers: {
+          'Authorization': `Bearer ${TOKEN}`,
+          'Accept': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch requisitions');
+      const result = await response.json();
+      if (result.status === 200) {
+        const requisitions = result.data.data.map((item) => ({
+          id: item.id,
+          designation: item.designation,
+          scale: item.scale,
+          num_posts: item.num_posts,
+          status: item.status,
+        }));
+        setRows(requisitions);
+        setTotal(result.data.total);
+      } else {
+        throw new Error(result.message || 'Invalid response');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequisitions(page);
+  }, [page]);
 
   const columns = [
-    { field: 'ref', headerName: 'Ref', width: 120 },
-    { field: 'title', headerName: 'Title', flex: 1 },
-    { field: 'status', headerName: 'Status', width: 140 },
-    { field: 'actions', headerName: 'Actions', width: 140, sortable: false, renderCell: () => (<button className="px-3 py-1 bg-emerald-600 text-white rounded">View</button>) },
+    { field: 'id', headerName: 'Ref', width: 100 },
+    { field: 'designation', headerName: 'Designation', flex: 1 },
+    { field: 'scale', headerName: 'Scale', width: 150 },
+    { field: 'num_posts', headerName: 'Posts', width: 100 },
+    { field: 'status', headerName: 'Status', width: 120 },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 150,
+      sortable: false,
+      renderCell: (params) => (
+        // ← THIS IS THE FIX: relative path
+        <Link to={`${params.row.id}`}>
+          <Button variant="contained" size="small" color="primary">
+            View
+          </Button>
+        </Link>
+      ),
+    },
   ];
 
   return (
-    <div className="card p-4">
-      <h3 className="text-lg font-semibold">List of Requisitions</h3>
-      <p className="text-slate-500">All requisitions are shown below.</p>
-      <div className="mt-4 h-72">
-        <DataGrid rows={rows} columns={columns} pageSize={5} rowsPerPageOptions={[5]} disableSelectionOnClick />
+    <div className="p-6 bg-white rounded-lg shadow">
+      <Typography variant="h6" className="font-semibold mb-2">
+        List of Requisitions
+      </Typography>
+      <Typography variant="body2" className="text-slate-500 mb-6">
+        All requisitions are shown below.
+      </Typography>
+
+      <div style={{ height: 600, width: '100%' }}>
+        {loading ? (
+          <div className="flex justify-center items-center h-full">
+            <CircularProgress />
+          </div>
+        ) : error ? (
+          <div className="text-red-600 text-center py-8">
+            Error: {error}
+          </div>
+        ) : (
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            pageSize={pageSize}
+            rowsPerPageOptions={[pageSize]}
+            pagination
+            paginationMode="server"
+            rowCount={total}
+            onPageChange={(newPage) => setPage(newPage)}
+            loading={loading}
+            disableSelectionOnClick
+          />
+        )}
       </div>
     </div>
   );

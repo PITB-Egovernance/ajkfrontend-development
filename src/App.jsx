@@ -14,6 +14,10 @@ import JobCreation from './Views/Pages/JobCreation';
 import DispatchReceived from './Views/Dispatch/DispatchRecieved';
 import DispatchSent from './Views/Dispatch/DispatrchSent';
 import PscTable from './Views/Pages/PscTable';
+import DispatchAddNew from "./Views/Dispatch/DispatchAddNew";
+import DispatchSentAddNew from "./Views/Dispatch/DispatchSentAddNew";
+import RequisitionDetail from "./Views/Pages/RequisitionDetail";
+
 
 function App() {
   return (
@@ -36,14 +40,17 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="requisition-form" element={<RequisitionForm />} />
           <Route path="requisitions" element={<RequisitionList />} />
+          <Route path="requisitions/:id" element={<RequisitionDetail />} />
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
           <Route path="add-notes" element={<AddNotes />} />
           <Route path="advertisement-records" element={<AdvertisementRecords />} />
           <Route path="annex-a" element={<AnnexAList />} />
           <Route path="job-creation" element={<JobCreation />} />
-          <Route path="dispatch/received" element={<DispatchReceived />} />
-          <Route path="dispatch/sent" element={<DispatchSent />} />
-          <Route path="psc-table" element={<PscTable />} />
+            <Route path="dispatch/received" element={<DispatchReceived />} />
+          <Route path="dispatch/recieved-form" element={<DispatchAddNew />} />
+  <Route path="dispatch/sent" element={<DispatchSent />} />
+  <Route path="dispatch/sent/add" element={<DispatchSentAddNew />} />
+  <Route path="psc-table" element={<PscTable />} />
         </Route>
       </Routes>
     </Router>

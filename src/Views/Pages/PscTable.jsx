@@ -1,24 +1,181 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
+import { CircularProgress, Chip, Link, Typography } from '@mui/material';
 
 const PscTable = () => {
-  const rows = [
-    { id: 1, stat: 'Total Requisitions', value: 123 },
-    { id: 2, stat: 'Approved', value: 45 },
-    { id: 3, stat: 'Pending', value: 78 },
-  ];
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
+
+  const API_BASE = 'http://127.0.0.1:8000';
+  const TOKEN = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150'; // Your Laravel token
+
+  const fetchRequisitions = async (pageNum = 1) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/psc-requisitions?page=${pageNum}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${TOKEN}`, // This is the key fix!
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized: Invalid or missing token. Please check your token.');
+        }
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const requisitions = result.data.data.map((item, index) => ({
+          id: item.id || (pageNum - 1) * 10 + index + 1, // Ensure unique ID
+          requisition_form: item.requisition_form,
+          annex_a_form: item.annex_a_form,
+          other_attachment: item.other_attachment,
+          remarks: item.remarks || '-',
+          status: item.status || 'pending',
+        }));
+
+        setRows(requisitions);
+        setTotal(result.data.total);
+
+        // Calculate stats from current page (best effort)
+        const statuses = result.data.data.map(r => r.status || 'pending');
+        const pendingCount = statuses.filter(s => s === 'pending').length;
+        const approvedCount = statuses.filter(s => s === 'approved').length;
+        const rejectedCount = statuses.filter(s => s === 'rejected').length;
+
+        setStats({
+          total: result.data.total,
+          pending: pendingCount,
+          approved: approvedCount,
+          rejected: rejectedCount,
+        });
+      } else {
+        throw new Error(result.message || 'Invalid response format');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequisitions(page);
+  }, [page]);
+
+  const renderFileLink = (path) => {
+    if (!path) return <span className="text-gray-400 italic">No file</span>;
+    const fullUrl = `${API_BASE}/${path}`;
+    const fileName = path.split('/').pop();
+    const shortName = fileName.length > 35 ? fileName.substring(0, 35) + '...' : fileName;
+
+    return (
+      <Link href={fullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+        {shortName}
+      </Link>
+    );
+  };
 
   const columns = [
-    { field: 'stat', headerName: 'Metric', flex: 1 },
-    { field: 'value', headerName: 'Value', width: 140 },
+    { field: 'requisition_form', headerName: 'Requisition Form', flex: 1, renderCell: (params) => renderFileLink(params.value) },
+    { field: 'annex_a_form', headerName: 'Annex-A Form', flex: 1, renderCell: (params) => renderFileLink(params.value) },
+    { field: 'other_attachment', headerName: 'Other Attachment', flex: 1, renderCell: (params) => renderFileLink(params.value) },
+    { field: 'remarks', headerName: 'Remarks', flex: 1 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: (params) => {
+        const status = params.value.toLowerCase();
+        let color = 'default';
+        if (status === 'approved') color = 'success';
+        else if (status === 'rejected') color = 'error';
+        else if (status === 'pending') color = 'warning';
+
+        return (
+          <Chip
+            label={status.toUpperCase()}
+            color={color}
+            size="small"
+          />
+        );
+      },
+    },
   ];
 
   return (
-    <div className="card p-4">
-      <h3 className="text-lg font-semibold">PSC Table</h3>
-      <p className="text-slate-500">Administrative table and quick stats.</p>
-      <div className="mt-4 h-56">
-        <DataGrid rows={rows} columns={columns} pageSize={5} rowsPerPageOptions={[5]} hideFooter />
+    <div className="bg-white rounded-lg shadow p-6">
+      <Typography variant="h6" className="font-semibold mb-2">
+        PSC Requisitions
+      </Typography>
+      <Typography variant="body2" className="text-slate-500 mb-6">
+        All submitted requisitions with document links and status.
+      </Typography>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-blue-50 p-4 rounded-lg text-center">
+          <Typography variant="h5" className="font-bold text-blue-700">{stats.total}</Typography>
+          <Typography variant="caption" className="text-gray-600">Total</Typography>
+        </div>
+        <div className="bg-yellow-50 p-4 rounded-lg text-center">
+          <Typography variant="h5" className="font-bold text-yellow-700">{stats.pending}</Typography>
+          <Typography variant="caption" className="text-gray-600">Pending</Typography>
+        </div>
+        <div className="bg-green-50 p-4 rounded-lg text-center">
+          <Typography variant="h5" className="font-bold text-green-700">{stats.approved}</Typography>
+          <Typography variant="caption" className="text-gray-600">Approved</Typography>
+        </div>
+        <div className="bg-red-50 p-4 rounded-lg text-center">
+          <Typography variant="h5" className="font-bold text-red-700">{stats.rejected}</Typography>
+          <Typography variant="caption" className="text-gray-600">Rejected</Typography>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div style={{ height: 600, width: '100%' }}>
+        {loading ? (
+          <div className="flex justify-center items-center h-full">
+            <CircularProgress />
+          </div>
+        ) : error ? (
+          <div className="text-red-600 text-center py-10">
+            <strong>Error:</strong> {error}
+            <br />
+            <small>Check console for details. Make sure token is valid and backend is running.</small>
+          </div>
+        ) : (
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            pagination
+            paginationMode="server"
+            rowCount={total}
+            pageSize={10}
+            rowsPerPageOptions={[10]}
+            onPageChange={(newPage) => setPage(newPage + 1)} // MUI pages are 0-indexed
+            loading={loading}
+            disableSelectionOnClick
+          />
+        )}
       </div>
     </div>
   );
