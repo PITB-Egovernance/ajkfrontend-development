@@ -81,35 +81,35 @@ const Sidebar = () => {
           <div className="space-y-1 mt-1">
             <Link
               to="/dashboard/requisitions"
-              className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/requisitions") ? activeItem : inactiveItem}`}
+              className={`${baseItem} text-xs  ${isActive("/dashboard/requisitions") ? activeItem : inactiveItem}`}
             >
               <FileText size={16} className="mr-3 text-emerald-300" aria-hidden />
               <span>List of Requisitions</span>
             </Link>
             <Link
               to="/dashboard/approved-requisitions"
-              className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/approved-requisitions") ? activeItem : inactiveItem}`}
+              className={`${baseItem} text-xs  ${isActive("/dashboard/approved-requisitions") ? activeItem : inactiveItem}`}
             >
               <CheckCircle size={16} className="mr-3 text-emerald-300" aria-hidden />
               <span>Approved Requisitions</span>
             </Link>
             <Link
               to="/dashboard/add-notes"
-              className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/add-notes") ? activeItem : inactiveItem}`}
+              className={`${baseItem} text-xs  ${isActive("/dashboard/add-notes") ? activeItem : inactiveItem}`}
             >
               <StickyNote size={16} className="ml-1" />
               Add Notes
             </Link>
             <Link
               to="/dashboard/advertisement-records"
-              className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/advertisement-records") ? activeItem : inactiveItem}`}
+              className={`${baseItem} text-xs  ${isActive("/dashboard/advertisement-records") ? activeItem : inactiveItem}`}
             >
               <Megaphone size={16} className="ml-1" />
               Advertisement Records
             </Link>
             <Link
               to="/dashboard/annex-a"
-              className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/annex-a") ? activeItem : inactiveItem}`}
+              className={`${baseItem} text-xs  ${isActive("/dashboard/annex-a") ? activeItem : inactiveItem}`}
             >
               <BookOpen size={16} className="ml-1" />
               List of Annex "A"
@@ -154,14 +154,14 @@ const Sidebar = () => {
           <div className="space-y-1 mt-1">
             <Link
               to="/dashboard/dispatch/received"
-              className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/dispatch/received") ? activeItem : inactiveItem}`}
+              className={`${baseItem} text-xs  ${isActive("/dashboard/dispatch/received") ? activeItem : inactiveItem}`}
             >
               <Package size={16} className="ml-1" />
               List of Received
             </Link>
             <Link
               to="/dashboard/dispatch/sent"
-              className={`${baseItem} text-xs pl-10 ${isActive("/dashboard/dispatch/sent") ? activeItem : inactiveItem}`}
+              className={`${baseItem} text-xs  ${isActive("/dashboard/dispatch/sent") ? activeItem : inactiveItem}`}
             >
               <Send size={16} className="ml-1" />
               List of Dispatch

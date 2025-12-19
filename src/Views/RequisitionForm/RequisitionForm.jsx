@@ -246,15 +246,7 @@ export default function RequisitionForm() {
 
   return (
     <div className="min-h-screen py-6 px-4">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 text-center">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-300 bg-clip-text text-transparent">
-            Job Requisition Form
-          </h1>
-          <p className="text-slate-500 mt-2">Create a new job requisition in 5 simple steps</p>
-        </div>
-
+      <div className="max-w-6xl mx-auto">
         {/* Steps Indicator + Centered Progress */}
         <div className="relative mb-6">
           {/* centered progress line positioned at top-middle of stepper */}
@@ -1155,25 +1147,6 @@ export default function RequisitionForm() {
               </div>
             </div>
           </form>
-        </div>
-
-        {/* Form Progress Summary */}
-        <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-gray-900">Progress Summary</h3>
-              <p className="text-sm text-gray-600">{step} of 5 steps completed</p>
-            </div>
-            <div className="w-48 bg-gray-200 rounded-full h-2.5">
-              <div 
-                className="bg-gradient-to-r from-green-400 to-blue-500 h-2.5 rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-            <div className="text-lg font-bold text-gray-900">
-              {progress}%
-            </div>
-          </div>
         </div>
       </div>
 
