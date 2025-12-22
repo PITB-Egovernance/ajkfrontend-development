@@ -122,9 +122,6 @@ const AdvertisementRecords = () => {
             </div>
             Advertisement Records
           </h1>
-          <p className="text-slate-500 mt-2">
-            Manage and view all advertisement records ({pagination.total} total)
-          </p>
         </div>
       </motion.div>
 

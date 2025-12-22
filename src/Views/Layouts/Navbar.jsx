@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Menu } from 'lucide-react';
 
-const Navbar = ({ user }) => {
+const Navbar = ({ user, toggleSidebar }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleLogout = () => {
@@ -13,7 +13,14 @@ const Navbar = ({ user }) => {
 
   return (
     <nav className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-      <div className="flex-1">
+      <div className="flex items-center gap-4 flex-1">
+        <button
+          onClick={toggleSidebar}
+          className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+          aria-label="Toggle Sidebar"
+        >
+          <Menu size={20} />
+        </button>
         <h2 className="text-lg sm:text-xl font-semibold text-slate-800">Dashboard</h2>
       </div>
 
