@@ -109,44 +109,62 @@ const Dashboard = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-900 p-8 text-white shadow-2xl"
+        className="relative overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm"
       >
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-48 -mt-48" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-400/10 rounded-full blur-3xl -ml-48 -mb-48" />
+        {/* Classic Pattern Background */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `repeating-linear-gradient(45deg, #059669 0, #059669 1px, transparent 0, transparent 50%)`,
+            backgroundSize: '10px 10px'
+          }} />
+        </div>
         
-        <div className="relative z-10">
+        <div className="relative z-10 p-8 md:p-10">
           <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold mb-2">
-                Welcome back, Administrator
+            <div className="flex-1">
+              {/* Classic Badge */}
+              <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-1.5 rounded-full mb-4">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-sm font-semibold text-emerald-700">Active Dashboard</span>
+              </div>
+              
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3 tracking-tight">
+                Public Service Commission
               </h1>
-              <p className="text-emerald-100 text-lg max-w-2xl">
-                Manage recruitment processes, job requisitions, and administrative records from your centralized dashboard.
+              <p className="text-slate-600 text-base md:text-lg max-w-2xl leading-relaxed mb-6">
+                Azad Jammu & Kashmir - Administrative Dashboard for Recruitment Management
               </p>
               
-              <div className="flex items-center gap-6 mt-6">
-                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
-                  <Calendar className="w-4 h-4" />
-                  <span className="text-sm font-medium">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-2 rounded-lg">
+                  <Calendar className="w-4 h-4 text-slate-600" />
+                  <span className="text-sm font-medium text-slate-700">
                     {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
-                  <Activity className="w-4 h-4" />
-                  <span className="text-sm font-medium">System Status: Active</span>
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg">
+                  <Activity className="w-4 h-4 text-emerald-600" />
+                  <span className="text-sm font-semibold text-emerald-700">Administrator Access</span>
                 </div>
               </div>
             </div>
             
-            <motion.img 
-              src="/assets/img/favicon/Logo.PNG" 
-              alt="AJ&K PSC"
-              className="w-24 h-24 rounded-2xl bg-white/10 backdrop-blur-sm p-3 shadow-xl hidden md:block"
-              whileHover={{ scale: 1.05, rotate: 5 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            />
+            {/* Logo Section */}
+            <div className="hidden md:flex items-center justify-center">
+              <div className="relative">
+                <div className="absolute inset-0 bg-emerald-100 rounded-2xl blur-xl opacity-40" />
+                <img 
+                  src="/assets/img/favicon/Logo.PNG" 
+                  alt="AJ&K PSC"
+                  className="relative w-28 h-28 rounded-2xl bg-white border-4 border-slate-100 shadow-lg object-contain p-3"
+                />
+              </div>
+            </div>
           </div>
         </div>
+        
+        {/* Bottom Border Accent */}
+        <div className="h-1 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700" />
       </motion.div>
 
       {/* Stats Grid */}
@@ -158,15 +176,17 @@ const Dashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: index * 0.1 }}
           >
-            <Card className="relative overflow-hidden hover:shadow-xl transition-all duration-300 border-0 group">
-              <div className={`absolute top-0 right-0 w-32 h-32 ${stat.bgColor} opacity-20 rounded-full blur-3xl group-hover:opacity-30 transition-opacity -mr-16 -mt-16`} />
+            <Card className="relative overflow-hidden hover:shadow-lg transition-all duration-300 border border-slate-200 bg-white group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-50 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform" />
               
               <CardContent className="p-6 relative">
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform`}>
+                  <div className={`p-3 rounded-xl ${stat.bgColor} border border-slate-100 shadow-sm`}>
                     <stat.icon className={`w-6 h-6 ${stat.color}`} />
                   </div>
-                  <div className={`flex items-center gap-1 text-xs font-semibold ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${
+                    stat.trend === 'up' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
                     <ArrowUpRight className={`w-3 h-3 ${stat.trend === 'down' ? 'rotate-90' : ''}`} />
                     {stat.change}
                   </div>
@@ -174,8 +194,11 @@ const Dashboard = () => {
                 
                 <div className="space-y-1">
                   <div className="text-3xl font-bold text-slate-900">{stat.value}</div>
-                  <div className="text-sm text-slate-500 font-medium">{stat.label}</div>
+                  <div className="text-sm text-slate-600 font-medium">{stat.label}</div>
                 </div>
+                
+                {/* Bottom accent line */}
+                <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.trend === 'up' ? 'bg-green-500' : 'bg-red-500'} opacity-0 group-hover:opacity-100 transition-opacity`} />
               </CardContent>
             </Card>
           </motion.div>

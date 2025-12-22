@@ -119,19 +119,17 @@ const DispatrchSent = () => {
 
   return (
     <>
-            <div className="flex items-center gap-3">
-<Link to="/dashboard/dispatch/sent/add">
-  <button className='bg-emerald-600 text-white'>+ Add New</button>
-</Link>
-        </div>
-    
-
     <Box sx={{ p: 4, bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
-            <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold">List of dispatched</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-semibold">List of Dispatched</h2>
+        <Link to="/dashboard/dispatch/sent/add">
+          <button className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transform transition-all duration-200 ring-opacity-50 hover:ring-opacity-100">
+            + Add New
+          </button>
+        </Link>
       </div>
         
-      <Box sx={{ height: 600, width: '100%' }}>
+      <Box sx={{ height: 700, width: '100%' }}>
         <DataGrid
           rows={forms}
           columns={columns}
@@ -142,7 +140,18 @@ const DispatrchSent = () => {
           loading={loading}
           disableSelectionOnClick
           sx={{
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' },
+            '& .MuiDataGrid-columnHeaders': { 
+              backgroundColor: '#f5f5f5',
+              fontSize: '0.813rem',
+              fontWeight: 600
+            },
+            '& .MuiDataGrid-cell': {
+              fontSize: '0.813rem',
+              padding: '8px 12px'
+            },
+            '& .MuiDataGrid-row': {
+              maxHeight: 'none !important'
+            },
           }}
           components={{
             LoadingOverlay: () => (

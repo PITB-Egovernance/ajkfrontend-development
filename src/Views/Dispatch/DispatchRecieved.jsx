@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Button } from '../../components/ui';
 import { DataGrid } from '@mui/x-data-grid';
+import { Box } from '@mui/material';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -109,25 +110,22 @@ export default function DispatchReceived() {
   };
 
   const columns = [
-    { field: 'id', headerName: 'ID', width: 80 },
+    { field: 'id', headerName: 'ID', width: 70 },
     { field: 'ref', headerName: 'Diary Inward No.', width: 180 },
-    { field: 'from', headerName: 'From', flex: 1 },
-    { field: 'to', headerName: 'To', flex: 1 },
-    { field: 'subject', headerName: 'Subject', flex: 2 },
-    { field: 'date', headerName: 'Received Date', width: 140 },
-    { field: 'priority', headerName: 'Priority', width: 110 },
+    { field: 'from', headerName: 'From', flex: 1, minWidth: 150 },
+    { field: 'to', headerName: 'To', flex: 1, minWidth: 150 },
+    { field: 'subject', headerName: 'Subject', flex: 2, minWidth: 250 },
+    { field: 'date', headerName: 'Received Date', width: 130 },
+    { field: 'priority', headerName: 'Priority', width: 100 },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 220,
+      width: 120,
       sortable: false,
       renderCell: (params) => (
         <div className="flex gap-2 py-2">
           <Button variant="outline" size="sm" onClick={() => handleView(params.row)}>
             View
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => handleView(params.row)}>
-            Download
           </Button>
         </div>
       ),
@@ -137,14 +135,14 @@ export default function DispatchReceived() {
   const formatValue = (value) => (value ? value : 'N/A');
 
   return (
-    <div className="p-6">
+    <Box sx={{ p: 4, bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold">List of Received</h2>
-        <div className="flex items-center gap-3">
-          <Link to="/dashboard/dispatch/recieved-form">
-            <Button variant="outline">+ Add New</Button>
-          </Link>
-        </div>
+        <Link to="/dashboard/dispatch/recieved-form">
+          <button className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 ring-2 ring-emerald-500 ring-opacity-50 hover:ring-opacity-100">
+            + Add New
+          </button>
+        </Link>
       </div>
 
       <div className="mb-4">
@@ -157,21 +155,32 @@ export default function DispatchReceived() {
         />
       </div>
 
-      <Card>
-        <div style={{ height: 600, width: '100%' }}>
-          <DataGrid
-            rows={filteredRows}
-            columns={columns}
-            loading={loading}
-            rowCount={searchTerm ? filteredRows.length : rowCount}
-            pageSizeOptions={[10]}
-            paginationMode={searchTerm ? 'client' : 'server'}
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            disableRowSelectionOnClick
-          />
-        </div>
-      </Card>
+      <Box sx={{ height: 700, width: '100%' }}>
+        <DataGrid
+          rows={filteredRows}
+          columns={columns}
+          loading={loading}
+          rowCount={searchTerm ? filteredRows.length : rowCount}
+          pageSizeOptions={[10]}
+          paginationMode={searchTerm ? 'client' : 'server'}
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          disableRowSelectionOnClick
+          sx={{
+            '& .MuiDataGrid-columnHeaders': { 
+              fontSize: '0.813rem',
+              fontWeight: 600
+            },
+            '& .MuiDataGrid-cell': {
+              fontSize: '0.813rem',
+              padding: '8px 12px'
+            },
+            '& .MuiDataGrid-row': {
+              maxHeight: 'none !important'
+            },
+          }}
+        />
+      </Box>
 
       {/* Detailed Modal */}
       {openModal && (
@@ -329,6 +338,6 @@ export default function DispatchReceived() {
           </div>
         </div>
       )}
-    </div>
+    </Box>
   );
 }

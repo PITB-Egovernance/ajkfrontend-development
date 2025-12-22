@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { TextField, MenuItem } from '@mui/material';
 import { Briefcase, GraduationCap, UserCheck, FileText, ClipboardList } from 'lucide-react';
 import Config from '../../Config/Baseurl';
 import AuthService from '../../Services/AuthService';
@@ -1044,56 +1045,56 @@ const JobCreationForm = () => {
 // Helper Components
 const FormField = ({ label, name, type = 'text', value, onChange, error, required, placeholder }) => (
   <div className="col-md-6 form-group">
-    <label htmlFor={name}>
-      {label} {required && <span className="required">*</span>}
-    </label>
-    <input
+    <TextField
+      fullWidth
+      label={label}
       type={type}
-      className={`form-control ${error ? 'is-invalid' : ''}`}
-      id={name}
       name={name}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      required={required}
+      error={!!error}
+      helperText={error}
+      InputLabelProps={type === 'date' || type === 'time' ? { shrink: true } : undefined}
     />
-    {error && <div className="invalid-feedback">{error}</div>}
   </div>
 );
 
 const TextAreaField = ({ label, name, value, onChange, error, required }) => (
   <div className="col-md-6 form-group">
-    <label htmlFor={name}>
-      {label} {required && <span className="required">*</span>}
-    </label>
-    <textarea
-      className={`form-control ${error ? 'is-invalid' : ''}`}
-      id={name}
+    <TextField
+      fullWidth
+      label={label}
       name={name}
       value={value}
       onChange={onChange}
-      rows="3"
+      required={required}
+      error={!!error}
+      helperText={error}
+      multiline
+      rows={3}
     />
-    {error && <div className="invalid-feedback">{error}</div>}
   </div>
 );
 
 const SelectField = ({ label, name, value, onChange, error, options, required }) => (
   <div className="col-md-6 form-group">
-    <label htmlFor={name}>
-      {label} {required && <span className="required">*</span>}
-    </label>
-    <select
-      className={`form-select ${error ? 'is-invalid' : ''}`}
-      id={name}
+    <TextField
+      select
+      fullWidth
+      label={label}
       name={name}
       value={value}
       onChange={onChange}
+      required={required}
+      error={!!error}
+      helperText={error}
     >
       {options.map(opt => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
+        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
       ))}
-    </select>
-    {error && <div className="invalid-feedback">{error}</div>}
+    </TextField>
   </div>
 );
 

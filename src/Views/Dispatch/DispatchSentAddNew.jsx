@@ -11,6 +11,7 @@ import {
   Alert,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Config from '../../Config/Baseurl';
 import AuthService from '../../Services/AuthService';
 
@@ -55,17 +56,56 @@ const DispatchSentAddNew = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setError(''); // Clear error when user types
   };
 
   const handleFileChange = (e) => {
     const { name, files: fileList } = e.target;
-    setFiles((prev) => ({ ...prev, [name]: fileList[0] || null }));
+    const file = fileList[0] || null;
+    setFiles((prev) => ({ ...prev, [name]: file }));
+    
+    if (file) {
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${name.replace(/_/g, ' ')} is too large. Maximum 10MB allowed.`);
+        e.target.value = '';
+        return;
+      }
+      toast.success(`${file.name} uploaded successfully`);
+    }
+  };
+
+  const validateForm = () => {
+    const errors = [];
+
+    if (!formData.to.trim()) errors.push('"To" field is required');
+    if (!formData.from.trim()) errors.push('"From" field is required');
+    if (!formData.diary_outward_no.trim()) errors.push('"Diary Outward No." is required');
+    if (!formData.date_dispatch) errors.push('"Date Dispatched" is required');
+    if (!formData.subject.trim()) errors.push('"Subject" is required');
+    if (!files.scan_upload_document) errors.push('"Scanned Document" is required');
+
+    if (errors.length > 0) {
+      errors.forEach((error, index) => {
+        setTimeout(() => {
+          toast.error(error);
+        }, index * 150);
+      });
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
     setError('');
+    toast.loading('Submitting dispatched form...');
 
     const data = new FormData();
 
@@ -92,21 +132,33 @@ const DispatchSentAddNew = () => {
       });
 
       const result = await response.json();
+      toast.dismiss();
 
       if (response.ok && result.success) {
-        alert('Dispatched form submitted successfully!');
-        navigate('/dashboard/dispatch/sent');
+        toast.success('Dispatched form submitted successfully!');
+        setTimeout(() => {
+          navigate('/dashboard/dispatch/sent');
+        }, 1000);
       } else {
-        const errMsg =
-          result.message ||
-          Object.values(result.errors || {})
-            .flat()
-            .join('\n') ||
-          'Failed to submit form';
-        setError(errMsg);
+        const errors = result.errors || {};
+        if (Object.keys(errors).length > 0) {
+          Object.entries(errors).forEach(([field, messages], index) => {
+            setTimeout(() => {
+              const fieldName = field.replace(/_/g, ' ');
+              messages.forEach((msg) => {
+                toast.error(`${fieldName}: ${msg}`);
+              });
+            }, index * 150);
+          });
+        } else {
+          toast.error(result.message || 'Failed to submit form');
+        }
+        setError(result.message || 'Please check the form and try again.');
       }
     } catch (err) {
       console.error(err);
+      toast.dismiss();
+      toast.error('Network error. Please check your connection and try again.');
       setError('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
@@ -136,7 +188,7 @@ const DispatchSentAddNew = () => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="To *"
+              label="To"
               name="to"
               value={formData.to}
               onChange={handleChange}
@@ -146,7 +198,7 @@ const DispatchSentAddNew = () => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="From *"
+              label="From"
               name="from"
               value={formData.from}
               onChange={handleChange}
@@ -158,7 +210,7 @@ const DispatchSentAddNew = () => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Diary Outward No. *"
+              label="Diary Outward No."
               name="diary_outward_no"
               value={formData.diary_outward_no}
               onChange={handleChange}

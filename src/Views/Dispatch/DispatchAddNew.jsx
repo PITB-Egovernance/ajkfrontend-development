@@ -1,20 +1,36 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Card, Button } from '../../components/ui';
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Grid,
+  MenuItem,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
+import toast from 'react-hot-toast';
+import Config from '../../Config/Baseurl';
+import AuthService from '../../Services/AuthService';
 
 export default function DispatchAddNew() {
   const navigate = useNavigate();
-  const token = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150';
-  const BASE_URL = 'http://127.0.0.1:8000';
+
+  const API_BASE = Config.apiUrl;
+  const TOKEN = AuthService.getToken();
+  const API_KEY = Config.apiKey;
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
   const [formData, setFormData] = useState({
     to: '',
     from: '',
     diary_outward_no: '',
+    dispatch_no: '',
     date_received: '',
     time_received: '',
-    dispatch_no: '',
     priority: 'Normal',
     confidentiality_level: 'Normal',
     subject: '',
@@ -25,320 +41,457 @@ export default function DispatchAddNew() {
     consignment_no: '',
     assign_to_section_officer: '',
     archive_dispose: '',
+    no_pages: '',
+    status: 'Open',
   });
 
   const [files, setFiles] = useState({
+    scan_upload_document: null,
     proof_of_delivery: null,
     barcode_qr_code: null,
     attachments: null,
-    scan_upload_document: null,
   });
 
-  const handleInputChange = (e) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setError(''); // Clear error when user types
   };
 
   const handleFileChange = (e) => {
-    const { name } = e.target;
-    setFiles((prev) => ({ ...prev, [name]: e.target.files[0] }));
+    const { name, files: fileList } = e.target;
+    const file = fileList[0] || null;
+    setFiles((prev) => ({ ...prev, [name]: file }));
+    
+    if (file) {
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${name.replace(/_/g, ' ')} is too large. Maximum 10MB allowed.`);
+        e.target.value = '';
+        return;
+      }
+      toast.success(`${file.name} uploaded successfully`);
+    }
+  };
+
+  const validateForm = () => {
+    const errors = [];
+
+    if (!formData.to.trim()) errors.push('"To" field is required');
+    if (!formData.from.trim()) errors.push('"From" field is required');
+    if (!formData.diary_outward_no.trim()) errors.push('"Diary Inward No." is required');
+    if (!formData.date_received) errors.push('"Date Received" is required');
+    if (!formData.subject.trim()) errors.push('"Subject" is required');
+    if (!files.scan_upload_document) errors.push('"Scanned Document" is required');
+
+    if (errors.length > 0) {
+      errors.forEach((error, index) => {
+        setTimeout(() => {
+          toast.error(error);
+        }, index * 150);
+      });
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
+    setError('');
+    toast.loading('Submitting received form...');
 
     const data = new FormData();
 
-    // Append text fields
-    Object.keys(formData).forEach((key) => {
-      if (formData[key]) data.append(key, formData[key]);
+    // Append all text fields
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value) data.append(key, value);
     });
 
-    // Append files if selected
-    Object.keys(files).forEach((key) => {
-      if (files[key]) data.append(key, files[key]);
+    // Append files
+    Object.entries(files).forEach(([key, file]) => {
+      if (file) data.append(key, file);
     });
 
     try {
-      const response = await fetch(`${BASE_URL}/api/received-forms`, {
+      const response = await fetch(`${API_BASE}/received-forms`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${TOKEN}`,
           Accept: 'application/json',
-          // Do NOT set Content-Type; browser sets it with boundary for FormData
+          'X-API-KEY': API_KEY,
+          // Don't set Content-Type — browser sets it with boundary
         },
         body: data,
       });
 
       const result = await response.json();
+      toast.dismiss();
 
-      if (response.ok) {
-        if (result.success) {
-          alert('Received form submitted successfully!');
-          navigate('/dashboard/dispatch/received'); // Go back to list
-        } else {
-          alert(result.message || 'Something went wrong');
-          console.error(result);
-        }
+      if (response.ok && result.success) {
+        toast.success('Received form submitted successfully!');
+        setTimeout(() => {
+          navigate('/dashboard/dispatch/received');
+        }, 1000);
       } else {
-        let errorMsg = result.message || 'Error occurred';
-        if (result.errors) {
-          errorMsg = Object.keys(result.errors)
-            .map((key) => `${key}: ${result.errors[key].join(', ')}`)
-            .join('\n');
+        const errors = result.errors || {};
+        if (Object.keys(errors).length > 0) {
+          Object.entries(errors).forEach(([field, messages], index) => {
+            setTimeout(() => {
+              const fieldName = field.replace(/_/g, ' ');
+              messages.forEach((msg) => {
+                toast.error(`${fieldName}: ${msg}`);
+              });
+            }, index * 150);
+          });
+        } else {
+          toast.error(result.message || 'Failed to submit form');
         }
-        alert(errorMsg);
-        console.error(result);
+        setError(result.message || 'Please check the form and try again.');
       }
-    } catch (error) {
-      console.error(error);
-      alert('Failed to submit form. Check console for details.');
+    } catch (err) {
+      console.error(err);
+      toast.dismiss();
+      toast.error('Network error. Please check your connection and try again.');
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold">Add New Received Dispatch</h2>
+    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h5" fontWeight="bold">
+          Add New Received Dispatch
+        </Typography>
         <Link to="/dashboard/dispatch/received">
-          <Button variant="outline">← Back to List</Button>
+          <Button variant="outlined">← Back to List</Button>
         </Link>
-      </div>
+      </Box>
 
-      <Card className="p-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Row 1 */}
-            <div>
-              <label className="block text-sm font-medium mb-1">To *</label>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <Grid container spacing={3}>
+          {/* Row 1 */}
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="To"
+              name="to"
+              value={formData.to}
+              onChange={handleChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="From"
+              name="from"
+              value={formData.from}
+              onChange={handleChange}
+              required
+            />
+          </Grid>
+
+          {/* Row 2 */}
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Diary Inward No."
+              name="diary_outward_no"
+              value={formData.diary_outward_no}
+              onChange={handleChange}
+              placeholder="e.g. D.O.No-2025/145"
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Dispatch No."
+              name="dispatch_no"
+              value={formData.dispatch_no}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          {/* Row 3 */}
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Date Received"
+              name="date_received"
+              type="date"
+              value={formData.date_received}
+              onChange={handleChange}
+              InputLabelProps={{ shrink: true }}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Time Received"
+              name="time_received"
+              type="time"
+              value={formData.time_received}
+              onChange={handleChange}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+
+          {/* Priority & Confidentiality */}
+          <Grid item xs={12} sm={6}>
+            <TextField
+              select
+              fullWidth
+              label="Priority"
+              name="priority"
+              value={formData.priority}
+              onChange={handleChange}
+            >
+              <MenuItem value="Normal">Normal</MenuItem>
+              <MenuItem value="High">High</MenuItem>
+              <MenuItem value="Medium">Medium</MenuItem>
+              <MenuItem value="Low">Low</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              select
+              fullWidth
+              label="Confidentiality Level"
+              name="confidentiality_level"
+              value={formData.confidentiality_level}
+              onChange={handleChange}
+            >
+              <MenuItem value="Normal">Normal</MenuItem>
+              <MenuItem value="Confidential">Confidential</MenuItem>
+              <MenuItem value="Secret">Secret</MenuItem>
+              <MenuItem value="Top Secret">Top Secret</MenuItem>
+            </TextField>
+          </Grid>
+
+          {/* Subject */}
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Subject"
+              name="subject"
+              value={formData.subject}
+              onChange={handleChange}
+              required
+              multiline
+              rows={2}
+            />
+          </Grid>
+
+          {/* Summary */}
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Summary"
+              name="summary"
+              value={formData.summary}
+              onChange={handleChange}
+              multiline
+              rows={4}
+            />
+          </Grid>
+
+          {/* Other Fields */}
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Related Module"
+              name="related_module"
+              value={formData.related_module}
+              onChange={handleChange}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Department/Party Name"
+              name="department_party_name"
+              value={formData.department_party_name}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Dispatch Method Detail"
+              name="dispatch_method_detail"
+              value={formData.dispatch_method_detail}
+              onChange={handleChange}
+              placeholder="e.g. Courier - TCS"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="No. of Pages"
+              name="no_pages"
+              value={formData.no_pages}
+              onChange={handleChange}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              select
+              fullWidth
+              label="Status"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+            >
+              <MenuItem value="Open">Open</MenuItem>
+              <MenuItem value="In progress">In progress</MenuItem>
+              <MenuItem value="Closed">Closed</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Consignment No."
+              name="consignment_no"
+              value={formData.consignment_no}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Assign To Section/Officer"
+              name="assign_to_section_officer"
+              value={formData.assign_to_section_officer}
+              onChange={handleChange}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Archive/Dispose"
+              name="archive_dispose"
+              value={formData.archive_dispose}
+              onChange={handleChange}
+              placeholder="e.g. Archive after 5 years"
+            />
+          </Grid>
+
+          {/* File Uploads */}
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>
+              Attachments
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Button variant="outlined" component="label" fullWidth>
+              Upload Scanned Document / Letter *
               <input
-                type="text"
-                name="to"
+                type="file"
+                name="scan_upload_document"
+                hidden
                 required
-                value={formData.to}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">From *</label>
-              <input
-                type="text"
-                name="from"
-                required
-                value={formData.from}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Diary Inward No. *</label>
-              <input
-                type="text"
-                name="diary_outward_no"
-                required
-                value={formData.diary_outward_no}
-                onChange={handleInputChange}
-                placeholder="e.g. D.O.No-2025/145"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Row 2 */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Date Received *</label>
-              <input
-                type="date"
-                name="date_received"
-                required
-                value={formData.date_received}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Time Received</label>
-              <input
-                type="time"
-                name="time_received"
-                value={formData.time_received}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Dispatch No.</label>
-              <input
-                type="text"
-                name="dispatch_no"
-                value={formData.dispatch_no}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Priority & Confidentiality */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Priority</label>
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Normal">Normal</option>
-                <option value="High">High</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Confidentiality Level</label>
-              <select
-                name="confidentiality_level"
-                value={formData.confidentiality_level}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Normal">Normal</option>
-                <option value="Confidential">Confidential</option>
-                <option value="Secret">Secret</option>
-                <option value="Top Secret">Top Secret</option>
-              </select>
-            </div>
-
-            {/* Subject */}
-            <div className="md:col-span-3">
-              <label className="block text-sm font-medium mb-1">Subject *</label>
-              <input
-                type="text"
-                name="subject"
-                required
-                value={formData.subject}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Summary */}
-            <div className="md:col-span-3">
-              <label className="block text-sm font-medium mb-1">Summary</label>
-              <textarea
-                name="summary"
-                rows="4"
-                value={formData.summary}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Other fields */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Related Module</label>
-              <input
-                type="text"
-                name="related_module"
-                value={formData.related_module}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Department/Party Name</label>
-              <input
-                type="text"
-                name="department_party_name"
-                value={formData.department_party_name}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Dispatch Method Detail</label>
-              <input
-                type="text"
-                name="dispatch_method_detail"
-                value={formData.dispatch_method_detail}
-                onChange={handleInputChange}
-                placeholder="e.g. Courier - TCS"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Consignment No.</label>
-              <input
-                type="text"
-                name="consignment_no"
-                value={formData.consignment_no}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-1">Assign To Section/Officer</label>
-              <input
-                type="text"
-                name="assign_to_section_officer"
-                value={formData.assign_to_section_officer}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Archive/Dispose</label>
-              <input
-                type="text"
-                name="archive_dispose"
-                value={formData.archive_dispose}
-                onChange={handleInputChange}
-                placeholder="e.g. Archive after 5 years"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* File Uploads */}
-            <div className="md:col-span-3 space-y-4">
-              <h3 className="text-lg font-medium">Attachments</h3>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Proof of Delivery (PDF)</label>
-                <input type="file" name="proof_of_delivery" accept=".pdf" onChange={handleFileChange} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Barcode / QR Code (Image)</label>
-                <input type="file" name="barcode_qr_code" accept="image/*" onChange={handleFileChange} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Additional Attachments (PDF)</label>
-                <input type="file" name="attachments" accept=".pdf" onChange={handleFileChange} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Scanned Document / Letter *</label>
-                <input
-                  type="file"
-                  name="scan_upload_document"
-                  required
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={handleFileChange}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-4 mt-8">
-            <Link to="/dashboard/dispatch/received">
-              <Button type="button" variant="outline" disabled={loading}>
-                Cancel
-              </Button>
-            </Link>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Submitting...' : 'Submit Received Form'}
             </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+            {files.scan_upload_document && (
+              <Typography variant="caption" display="block" sx={{ mt: 1, color: 'success.main' }}>
+                ✓ {files.scan_upload_document.name}
+              </Typography>
+            )}
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Button variant="outlined" component="label" fullWidth>
+              Proof of Delivery (PDF)
+              <input
+                type="file"
+                name="proof_of_delivery"
+                hidden
+                accept=".pdf"
+                onChange={handleFileChange}
+              />
+            </Button>
+            {files.proof_of_delivery && (
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                {files.proof_of_delivery.name}
+              </Typography>
+            )}
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Button variant="outlined" component="label" fullWidth>
+              Barcode / QR Code (Image)
+              <input
+                type="file"
+                name="barcode_qr_code"
+                hidden
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+            </Button>
+            {files.barcode_qr_code && (
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                {files.barcode_qr_code.name}
+              </Typography>
+            )}
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Button variant="outlined" component="label" fullWidth>
+              Additional Attachments (PDF)
+              <input
+                type="file"
+                name="attachments"
+                hidden
+                accept=".pdf"
+                onChange={handleFileChange}
+              />
+            </Button>
+            {files.attachments && (
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                {files.attachments.name}
+              </Typography>
+            )}
+          </Grid>
+        </Grid>
+
+        <Box sx={{ mt: 5, textAlign: 'right', display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+          <Link to="/dashboard/dispatch/received">
+            <Button variant="outlined" disabled={loading}>
+              Cancel
+            </Button>
+          </Link>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={loading}
+            startIcon={loading && <CircularProgress size={20} />}
+          >
+            {loading ? 'Submitting...' : 'Submit Received Form'}
+          </Button>
+        </Box>
+      </form>
+    </Box>
   );
 }
