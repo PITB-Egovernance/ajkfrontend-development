@@ -260,13 +260,13 @@ const Sidebar = () => {
       <motion.aside
         initial={false}
         animate={{
-          x: 0,
+          x: isMobileOpen ? 0 : -320,
         }}
         className={cn(
-          "fixed left-0 top-0 h-screen w-80 z-50 transition-transform duration-300",
+          "fixed left-0 top-0 h-screen w-80 z-50",
           "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950",
           "border-r border-emerald-700/30 shadow-2xl",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          "lg:translate-x-0"
         )}
       >
         {/* Header */}

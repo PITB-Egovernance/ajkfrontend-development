@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Typography, Grid, Paper, Button, CircularProgress, Chip } from '@mui/material';
+import Config from '../../Config/Baseurl';
+import AuthService from '../../Services/AuthService';
 
 const RequisitionDetail = () => {
   const { id } = useParams();
@@ -8,8 +10,9 @@ const RequisitionDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_BASE = 'http://127.0.0.1:8000/api';
-  const TOKEN = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150';
+  const API_BASE = Config.apiUrl;
+  const TOKEN = AuthService.getToken();
+  const API_KEY = Config.apiKey;
 
   const fetchRequisition = async () => {
     setLoading(true);
@@ -20,6 +23,7 @@ const RequisitionDetail = () => {
           'Authorization': `Bearer ${TOKEN}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'X-API-KEY': API_KEY,
         },
       });
       if (!response.ok) throw new Error('Failed to fetch requisition details');

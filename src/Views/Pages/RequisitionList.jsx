@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Button, CircularProgress, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
+import Config from '../../Config/Baseurl';
+import AuthService from '../../Services/AuthService';
 
 const RequisitionList = () => {
   const [rows, setRows] = useState([]);
@@ -11,8 +13,9 @@ const RequisitionList = () => {
   const [total, setTotal] = useState(0);
   const pageSize = 10;
 
-  const API_BASE = 'http://127.0.0.1:8000/api';
-  const TOKEN = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150';
+  const API_BASE = Config.apiUrl;
+  const TOKEN = AuthService.getToken();
+  const API_KEY = Config.apiKey;
 
   const fetchRequisitions = async (pageNum = 0) => {
     setLoading(true);
@@ -22,6 +25,7 @@ const RequisitionList = () => {
         headers: {
           'Authorization': `Bearer ${TOKEN}`,
           'Accept': 'application/json',
+          'X-API-KEY': API_KEY,
         },
       });
       if (!response.ok) throw new Error('Failed to fetch requisitions');

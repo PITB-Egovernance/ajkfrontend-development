@@ -5,14 +5,14 @@ const Master = ({ Sidebar, Navbar, children }) => {
       {Sidebar}
 
       {/* Main content */}
-      <div className="flex-1 md:ml-72 transition-all duration-300">
+      <div className="flex-1 lg:ml-80 transition-all duration-300">
         {/* Navbar */}
         <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
           {Navbar}
         </div>
 
         {/* Page Content */}
-        <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+        <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
           {children}
         </main>
       </div>

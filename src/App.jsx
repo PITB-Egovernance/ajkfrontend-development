@@ -4,13 +4,13 @@ import Login from "./Views/Auth/Login/Login";
 import ProtectedRoute from "./Routes/ProtectedRoute";
 import Register from "./Views/Auth/Register/Register";
 import DashboardLayout from './Views/Layouts/DashboardLayout';
-import RequisitionForm from './Views/RequisitionForm/RequisitionForm';
 import RequisitionList from './Views/Pages/RequisitionList';
 import ApprovedRequisitions from './Views/Pages/ApprovedRequisitions';
 import AddNotes from './Views/Pages/AddNotes';
 import AdvertisementRecords from './Views/Pages/AdvertisementRecords';
 import AnnexAList from './Views/Pages/AnnexAList';
 import JobCreation from './Views/Pages/JobCreation';
+import JobCreationForm from './Views/JobCreation/JobCreationForm';
 import DispatchReceived from './Views/Dispatch/DispatchRecieved';
 import DispatchSent from './Views/Dispatch/DispatrchSent';
 import PscTable from './Views/Pages/PscTable';
@@ -38,7 +38,7 @@ function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="requisition-form" element={<RequisitionForm />} />
+          <Route path="job-creation-form" element={<JobCreationForm />} />
           <Route path="requisitions" element={<RequisitionList />} />
           <Route path="requisitions/:id" element={<RequisitionDetail />} />
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />

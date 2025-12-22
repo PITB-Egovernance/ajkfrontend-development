@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { CircularProgress, Chip, Link, Typography } from '@mui/material';
+import Config from '../../Config/Baseurl';
+import AuthService from '../../Services/AuthService';
 
 const PscTable = () => {
   const [rows, setRows] = useState([]);
@@ -15,20 +17,22 @@ const PscTable = () => {
     rejected: 0,
   });
 
-  const API_BASE = 'http://127.0.0.1:8000';
-  const TOKEN = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150'; // Your Laravel token
+  const API_BASE = Config.apiUrl; // Use configured API URL
+  const TOKEN = AuthService.getToken(); // Get token from AuthService
+  const API_KEY = Config.apiKey;
 
   const fetchRequisitions = async (pageNum = 1) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/psc-requisitions?page=${pageNum}`, {
+      const response = await fetch(`${API_BASE}/psc-requisitions?page=${pageNum}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Authorization': `Bearer ${TOKEN}`, // This is the key fix!
+          'Authorization': `Bearer ${TOKEN}`,
           'Content-Type': 'application/json',
+          'X-API-KEY': API_KEY,
         },
       });
 
@@ -83,7 +87,8 @@ const PscTable = () => {
 
   const renderFileLink = (path) => {
     if (!path) return <span className="text-gray-400 italic">No file</span>;
-    const fullUrl = `${API_BASE}/${path}`;
+    const baseUrl = Config.apiUrl.replace('/api', ''); // Get base URL without /api
+    const fullUrl = `${baseUrl}/${path}`;
     const fileName = path.split('/').pop();
     const shortName = fileName.length > 35 ? fileName.substring(0, 35) + '...' : fileName;
 

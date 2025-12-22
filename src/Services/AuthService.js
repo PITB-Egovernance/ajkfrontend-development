@@ -2,6 +2,7 @@
 
 import Config from "../Config/Baseurl";
 const API_URL = Config.apiUrl;
+const API_KEY = Config.apiKey;
 
 class AuthService {
   // ──────────────────────────────────────────────────────
@@ -13,6 +14,7 @@ class AuthService {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        "X-API-KEY": API_KEY,
       },
       body: JSON.stringify(data),
     });
@@ -38,6 +40,7 @@ class AuthService {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        "X-API-KEY": API_KEY,
       },
       body: JSON.stringify(data),
     });
@@ -60,12 +63,15 @@ class AuthService {
   static async generateCaptcha() {
     const response = await fetch(`${API_URL}/captcha-image`, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: { 
+        Accept: "application/json",
+        "X-API-KEY": API_KEY
+      },
     });
 
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || "Failed to load CAPTCHA");
-    return result; // expected: { image: "data:image/png;base64,...", token: "xxx" }
+    return result; // expected: { captcha_token: "xxx", captcha_image: "data:image/png;base64,..." }
   }
 
   static async validateCaptcha(data) {
@@ -74,6 +80,7 @@ class AuthService {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        "X-API-KEY": API_KEY
       },
       body: JSON.stringify(data),
     });
@@ -109,6 +116,7 @@ class AuthService {
     const headers = {
       "Content-Type": "application/json",
       Accept: "application/json",
+      "X-API-KEY": API_KEY,
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     };

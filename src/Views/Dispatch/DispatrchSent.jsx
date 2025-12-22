@@ -9,6 +9,8 @@ import {
   Grid,
   Chip,
 } from '@mui/material';
+import Config from '../../Config/Baseurl';
+import AuthService from '../../Services/AuthService';
 
 const DispatrchSent = () => {
   const [forms, setForms] = useState([]);
@@ -19,12 +21,14 @@ const DispatrchSent = () => {
   const [totalRows, setTotalRows] = useState(0);
   const [pageSize] = useState(10);
 
-  const API_BASE = 'http://127.0.0.1:8000/api';
-  const TOKEN = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150';
+  const API_BASE = Config.apiUrl;
+  const TOKEN = AuthService.getToken();
+  const API_KEY = Config.apiKey;
 
   const fetchHeaders = {
     Authorization: `Bearer ${TOKEN}`,
     Accept: 'application/json',
+    'X-API-KEY': API_KEY,
   };
 
   const fetchForms = async (pageIndex = 0) => {

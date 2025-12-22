@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
+import toast from 'react-hot-toast';
 import AuthService from '../../../Services/AuthService';
 import { Button, Input, Card } from '../../../components/ui';
 import Label from '../../../components/ui/Label';
@@ -42,7 +43,7 @@ export default function Auth() {
       setCaptcha({ token: response.captcha_token, image: response.captcha_image });
       setLoginData((s) => ({ ...s, captcha: '' }));
     } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to load CAPTCHA' });
+      toast.error('Failed to load CAPTCHA');
     } finally {
       setLoadingCaptcha(false);
     }
@@ -86,17 +87,19 @@ export default function Auth() {
     }
 
     setLoading(true);
+    const loadingToast = toast.loading('Signing in...');
+    
     try {
       const captchaRes = await AuthService.validateCaptcha({ captcha_token: captcha.token, captcha: loginData.captcha });
       if (!captchaRes.success) throw new Error(captchaRes.message || 'CAPTCHA failed');
 
       const loginRes = await AuthService.login({ cnic: loginData.cnic, password: loginData.password });
       localStorage.setItem('isLoggedIn', 'true');
-      setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
+      toast.success('Login successful! Redirecting...', { id: loadingToast });
 
       setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Login failed' });
+      toast.error(err.message || 'Login failed', { id: loadingToast });
       loadCaptcha();
     } finally {
       setLoading(false);
@@ -110,8 +113,8 @@ export default function Auth() {
       setErrors(e_);
       return;
     }
-
-    setLoading(true);
+const loadingToast = toast.loading('Creating account...');
+    
     try {
       const signupRes = await AuthService.register({
         username: signupData.username,
@@ -120,13 +123,13 @@ export default function Auth() {
         password_confirmation: signupData.password_confirmation,
       });
 
-      setMessage({ type: 'success', text: 'Registration successful! Redirecting to login...' });
+      toast.success('Registration successful! Redirecting to login...', { id: loadingToast });
       setTimeout(() => {
         setIsLogin(true);
         loadCaptcha();
       }, 1200);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Registration failed' });
+      toast.error(err.message || 'Registration failed', { id: loadingToast });
     } finally {
       setLoading(false);
     }
@@ -181,24 +184,6 @@ export default function Auth() {
 
           {/* Content */}
           <div className="px-8 py-8">
-            {/* Message */}
-            <AnimatePresence>
-              {message && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`mb-4 p-4 rounded-lg text-sm font-medium ${
-                    message.type === 'error'
-                      ? 'bg-red-50 text-red-700 border border-red-200'
-                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  }`}
-                >
-                  {message.text}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             {/* Forms */}
             <AnimatePresence mode="wait">
               {isLogin ? (
