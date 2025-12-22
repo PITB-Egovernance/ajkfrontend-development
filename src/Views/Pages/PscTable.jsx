@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { CircularProgress, Chip, Link, Typography } from '@mui/material';
+import { Chip, Link, Typography } from '@mui/material';
+import { DataGridLoader } from '../../components/ui/Loader';
 import Config from '../../Config/Baseurl';
 import AuthService from '../../Services/AuthService';
 
@@ -158,9 +159,7 @@ const PscTable = () => {
       {/* Data Table */}
       <div style={{ height: 600, width: '100%' }}>
         {loading ? (
-          <div className="flex justify-center items-center h-full">
-            <CircularProgress />
-          </div>
+          <DataGridLoader text="Loading PSC requisitions..." />
         ) : error ? (
           <div className="text-red-600 text-center py-10">
             <strong>Error:</strong> {error}
@@ -179,6 +178,9 @@ const PscTable = () => {
             onPageChange={(newPage) => setPage(newPage + 1)} // MUI pages are 0-indexed
             loading={loading}
             disableSelectionOnClick
+            slots={{
+              loadingOverlay: () => <DataGridLoader text="Loading PSC requisitions..." />,
+            }}
           />
         )}
       </div>

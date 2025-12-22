@@ -9,6 +9,7 @@ import {
   Grid,
   Chip,
 } from '@mui/material';
+import { DataGridLoader } from '../../components/ui/Loader';
 import Config from '../../Config/Baseurl';
 import AuthService from '../../Services/AuthService';
 
@@ -154,37 +155,7 @@ const DispatrchSent = () => {
             },
           }}
           components={{
-            LoadingOverlay: () => (
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                }}
-              >
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    border: '5px solid #f3f3f3',
-                    borderTop: '5px solid #2563eb',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                  }}
-                />
-                <Typography sx={{ mt: 2, color: 'text.secondary' }}>
-                  Loading dispatched forms...
-                </Typography>
-                <style jsx>{`
-                  @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                  }
-                `}</style>
-              </Box>
-            ),
+            LoadingOverlay: () => <DataGridLoader text="Loading dispatched forms..." />,
           }}
         />
       </Box>

@@ -7,7 +7,6 @@ import {
   Typography,
   Grid,
   MenuItem,
-  CircularProgress,
   Alert,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
@@ -488,7 +487,11 @@ const DispatchSentAddNew = () => {
             variant="contained"
             color="primary"
             disabled={loading}
-            startIcon={loading && <CircularProgress size={20} />}
+            startIcon={
+              loading && (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )
+            }
           >
             {loading ? 'Submitting...' : 'Submit Dispatched Form'}
           </Button>

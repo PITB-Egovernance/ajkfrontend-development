@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Typography, Grid, Paper, Button, CircularProgress, Chip } from '@mui/material';
+import { Typography, Grid, Paper, Button, Chip } from '@mui/material';
+import { InlineLoader } from '../../components/ui/Loader';
 import Config from '../../Config/Baseurl';
 import AuthService from '../../Services/AuthService';
 
@@ -60,7 +61,7 @@ const RequisitionDetail = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <CircularProgress />
+        <InlineLoader text="Loading requisition details..." variant="ring" size="lg" />
       </div>
     );
   }

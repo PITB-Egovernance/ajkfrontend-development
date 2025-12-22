@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, Button } from '../../components/ui';
 import { DataGrid } from '@mui/x-data-grid';
 import { Box } from '@mui/material';
+import { DataGridLoader, InlineLoader } from '../../components/ui/Loader';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -166,6 +167,9 @@ export default function DispatchReceived() {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           disableRowSelectionOnClick
+          slots={{
+            loadingOverlay: () => <DataGridLoader text="Loading received forms..." />,
+          }}
           sx={{
             '& .MuiDataGrid-columnHeaders': { 
               fontSize: '0.813rem',
@@ -203,7 +207,9 @@ export default function DispatchReceived() {
 
             <div id="dispatch-details-content" className="p-8 text-sm">
               {modalLoading ? (
-                <div className="text-center py-12">Loading details...</div>
+                <div className="py-12">
+                  <InlineLoader text="Loading details..." variant="dots" size="lg" />
+                </div>
               ) : (
                 detailedDispatch && (
                   <>

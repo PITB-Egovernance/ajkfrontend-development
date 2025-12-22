@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { Button, CircularProgress, Typography } from '@mui/material';
+import { Button, Typography } from '@mui/material';
+import { DataGridLoader, InlineLoader } from '../../components/ui/Loader';
 import { Link } from 'react-router-dom';
 import Config from '../../Config/Baseurl';
 import AuthService from '../../Services/AuthService';
@@ -87,9 +88,7 @@ const RequisitionList = () => {
 
       <div style={{ height: 600, width: '100%' }}>
         {loading ? (
-          <div className="flex justify-center items-center h-full">
-            <CircularProgress />
-          </div>
+          <InlineLoader text="Loading requisitions..." variant="pulse" size="lg" />
         ) : error ? (
           <div className="text-red-600 text-center py-8">
             Error: {error}
