@@ -6,8 +6,6 @@ import { Box } from '@mui/material';
 import { DataGridLoader, InlineLoader } from '../../components/ui/Loader';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
 
 export default function DispatchReceived() {
   const [rows, setRows] = useState([]);
@@ -21,13 +19,13 @@ export default function DispatchReceived() {
   const [modalLoading, setModalLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
 
-  const API_URL = Config.apiUrl;
-  const token  = AuthService.getToken();
+  const token = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150';
+  const BASE_URL = 'http://127.0.0.1:8000';
 
   const fetchReceivedForms = async (page = 1) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/received-forms?page=${page}`, {
+      const response = await fetch(`${BASE_URL}/api/received-forms?page=${page}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       });
       if (!response.ok) throw new Error('Network error');
@@ -62,7 +60,7 @@ export default function DispatchReceived() {
     setModalLoading(true);
     setOpenModal(true);
     try {
-      const response = await fetch(`${API_URL}/api/received-forms/${id}`, {
+      const response = await fetch(`${BASE_URL}/api/received-forms/${id}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       });
       if (!response.ok) throw new Error('Failed to fetch details');
@@ -158,17 +156,18 @@ export default function DispatchReceived() {
         />
       </div>
 
-      <Box sx={{ height: 700, width: '100%' }}>
+      <Box sx={{ width: '100%' }}>
         <DataGrid
           rows={filteredRows}
           columns={columns}
           loading={loading}
           rowCount={searchTerm ? filteredRows.length : rowCount}
-          pageSizeOptions={[10]}
+          pageSizeOptions={[10, 25, 50, 75, 100]}
           paginationMode={searchTerm ? 'client' : 'server'}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           disableRowSelectionOnClick
+          autoHeight
           slots={{
             loadingOverlay: () => <DataGridLoader text="Loading received forms..." />,
           }}
@@ -210,7 +209,7 @@ export default function DispatchReceived() {
             <div id="dispatch-details-content" className="p-8 text-sm">
               {modalLoading ? (
                 <div className="py-12">
-                  <InlineLoader text="Loading details..." variant="dots" size="lg" />
+                  <InlineLoader text="Loading details..." variant="ring" size="lg" />
                 </div>
               ) : (
                 detailedDispatch && (
@@ -314,7 +313,7 @@ export default function DispatchReceived() {
                           <strong>Scanned Document:</strong>
                           <br />
                           <a
-                            href={`${API_URL}/storage/${detailedDispatch.scan_upload_document}`}
+                            href={`${BASE_URL}/storage/${detailedDispatch.scan_upload_document}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-block mt-3 px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"

@@ -104,68 +104,6 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Hero Section */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm"
-      >
-        {/* Classic Pattern Background */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `repeating-linear-gradient(45deg, #059669 0, #059669 1px, transparent 0, transparent 50%)`,
-            backgroundSize: '10px 10px'
-          }} />
-        </div>
-        
-        <div className="relative z-10 p-8 md:p-10">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              {/* Classic Badge */}
-              <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-1.5 rounded-full mb-4">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-sm font-semibold text-emerald-700">Active Dashboard</span>
-              </div>
-              
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3 tracking-tight">
-                Public Service Commission
-              </h1>
-              <p className="text-slate-600 text-base md:text-lg max-w-2xl leading-relaxed mb-6">
-                Azad Jammu & Kashmir - Administrative Dashboard for Recruitment Management
-              </p>
-              
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-2 rounded-lg">
-                  <Calendar className="w-4 h-4 text-slate-600" />
-                  <span className="text-sm font-medium text-slate-700">
-                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg">
-                  <Activity className="w-4 h-4 text-emerald-600" />
-                  <span className="text-sm font-semibold text-emerald-700">Administrator Access</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Logo Section */}
-            <div className="hidden md:flex items-center justify-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-emerald-100 rounded-2xl blur-xl opacity-40" />
-                <img 
-                  src="/assets/img/favicon/Logo.PNG" 
-                  alt="AJ&K PSC"
-                  className="relative w-28 h-28 rounded-2xl bg-white border-4 border-slate-100 shadow-lg object-contain p-3"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Bottom Border Accent */}
-        <div className="h-1 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700" />
-      </motion.div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

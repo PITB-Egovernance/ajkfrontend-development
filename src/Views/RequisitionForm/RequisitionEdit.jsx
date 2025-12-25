@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Box, Stepper, Step, StepLabel, Button, Typography } from '@mui/material';
 import { InlineLoader } from '../../components/ui/Loader';
 import Step1JobDetails from './Steps/Step1JobDetails';
@@ -11,12 +11,11 @@ import toast from 'react-hot-toast';
 
 const steps = ['Job Details', 'Criteria', 'Eligibility'];
 
-const RequisitionForm = () => {
+const RequisitionEdit = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { id } = useParams();
   const [activeStep, setActiveStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [tempId, setTempId] = useState(searchParams.get('temp_id') || '');
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     step1: {},
     step2: {},
@@ -28,15 +27,13 @@ const RequisitionForm = () => {
   const API_KEY = Config.apiKey;
 
   useEffect(() => {
-    if (tempId) {
-      loadTempData();
-    }
-  }, [tempId]);
+    loadRequisitionData();
+  }, [id]);
 
-  const loadTempData = async () => {
+  const loadRequisitionData = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/requisition/form?temp_id=${tempId}`, {
+      const response = await fetch(`${API_BASE}/requisition/edit/${id}`, {
         headers: {
           'Authorization': `Bearer ${TOKEN}`,
           'Accept': 'application/json',
@@ -44,15 +41,55 @@ const RequisitionForm = () => {
         },
       });
       const result = await response.json();
+      
       if (result.status === 200) {
+        const req = result.data.requisition;
+        
         setFormData({
-          step1: result.data.step1 || {},
-          step2: result.data.step2 || {},
-          step3: result.data.step3 || {}
+          step1: {
+            designation: req.designation || '',
+            scale: req.scale || '',
+            quota_percentage: req.quota_percentage || '',
+            num_posts: req.num_posts || 1,
+            vacancy_date: req.vacancy_date || '',
+            test_type: req.test_type || '',
+            service_rules: req.service_rules || null,
+            syllabus: req.syllabus || null,
+          },
+          step2: {
+            academic_qualification: req.qualification?.academic_qualification || '',
+            equivalent_qualification: req.qualification?.equivalent_qualification || '',
+            authority_certificate: req.qualification?.authority_certificate || '',
+            degree_equivalence: req.qualification?.degree_equivalence || '',
+            any_other_qualification: req.qualification?.any_other_qualification || '',
+            training_institute: req.qualification?.training_institute || '',
+            experience_type: req.qualification?.experience_type || '',
+            experience_length: req.qualification?.experience_length || 0,
+            min_qualification: req.qualification?.min_qualification || '',
+          },
+          step3: {
+            min_age: req.eligibility?.min_age || 18,
+            max_age: req.eligibility?.max_age || 40,
+            age_relaxation: req.eligibility?.age_relaxation || '',
+            relaxation_reason: req.eligibility?.relaxation_reason || '',
+            relaxation_years: req.eligibility?.relaxation_years || '',
+            nationality: req.eligibility?.nationality || '',
+            domicile: req.eligibility?.domicile || '',
+            other_conditions: req.eligibility?.other_conditions || '',
+            gender_basis: req.eligibility?.gender_basis || '',
+            district: req.multiple_posts?.map(p => p.district) || [''],
+            quota: req.multiple_posts?.map(p => p.quota) || [''],
+            post: req.multiple_posts?.map(p => p.post) || [''],
+          }
         });
+      } else {
+        toast.error('Failed to load requisition data');
+        navigate('/dashboard/requisitions');
       }
     } catch (error) {
-      console.error('Error loading temp data:', error);
+      console.error('Error loading requisition:', error);
+      toast.error('Error loading requisition data');
+      navigate('/dashboard/requisitions');
     } finally {
       setLoading(false);
     }
@@ -79,13 +116,12 @@ const RequisitionForm = () => {
       if (!data.nationality) errors.nationality = 'Nationality is required';
       if (!data.domicile?.trim()) errors.domicile = 'Domicile is required';
       if (!data.gender_basis) errors.gender_basis = 'Gender is required';
-      if (!data.district || data.district.length === 0) errors.district = 'At least one district is required';
     }
     
     return errors;
   };
 
-  const saveStep = async (stepData) => {
+  const updateStep = async (stepData) => {
     const currentStepNumber = activeStep + 1;
     const errors = validateStep(activeStep, stepData);
     
@@ -96,46 +132,52 @@ const RequisitionForm = () => {
 
     setLoading(true);
     try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('step', currentStepNumber);
-      if (tempId) formDataToSend.append('temp_id', tempId);
+      let endpoint = '';
+      let method = 'PUT';
+      let body;
 
-      // Handle file uploads for step 1
       if (currentStepNumber === 1) {
+        endpoint = `${API_BASE}/requisition/${id}/update-job`;
+        const formDataToSend = new FormData();
+        formDataToSend.append('_method', 'PUT'); // Laravel method spoofing for multipart
         Object.keys(stepData).forEach(key => {
           if (stepData[key] instanceof File) {
             formDataToSend.append(key, stepData[key]);
-          } else if (stepData[key] !== null && stepData[key] !== undefined) {
+          } else if (stepData[key] !== null && stepData[key] !== undefined && stepData[key] !== '') {
             formDataToSend.append(key, stepData[key]);
           }
         });
-      } else {
-        // For step 2 and 3, send as JSON
-        Object.keys(stepData).forEach(key => {
-          if (Array.isArray(stepData[key])) {
-            stepData[key].forEach((item, index) => {
-              formDataToSend.append(`${key}[${index}]`, item);
-            });
-          } else {
-            formDataToSend.append(key, stepData[key]);
-          }
-        });
+        body = formDataToSend;
+        method = 'POST'; // Use POST with _method spoofing for file uploads
+      } else if (currentStepNumber === 2) {
+        endpoint = `${API_BASE}/requisition/${id}/update-criteria`;
+        body = JSON.stringify(stepData);
+      } else if (currentStepNumber === 3) {
+        endpoint = `${API_BASE}/requisition/${id}/update-eligibility`;
+        body = JSON.stringify(stepData);
       }
 
-      const response = await fetch(`${API_BASE}/requisition/store`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'X-API-KEY': API_KEY,
-        },
-        body: formDataToSend,
+      const headers = {
+        'Authorization': `Bearer ${TOKEN}`,
+        'X-API-KEY': API_KEY,
+      };
+
+      if (!(body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      const response = await fetch(endpoint, {
+        method: method,
+        headers: headers,
+        body: body,
       });
 
       const result = await response.json();
       
-      if (result.status === 200) {
-        if (result.temp_id) setTempId(result.temp_id);
-        toast.success(`Step ${currentStepNumber} saved successfully`);
+      console.log('Update response:', result); // Debug log
+      
+      if (result.status === 200 || response.ok) {
+        toast.success(`Step ${currentStepNumber} updated successfully`);
         
         // Update form data
         const stepKey = `step${currentStepNumber}`;
@@ -146,12 +188,13 @@ const RequisitionForm = () => {
         
         return true;
       } else {
-        toast.error(result.error || 'Failed to save step data');
+        console.error('Update failed:', result); // Debug log
+        toast.error(result.error || result.message || 'Failed to update step data');
         return false;
       }
     } catch (error) {
-      console.error('Error saving step:', error);
-      toast.error('Error saving step data');
+      console.error('Error updating step:', error);
+      toast.error('Error updating step data: ' + error.message);
       return false;
     } finally {
       setLoading(false);
@@ -159,11 +202,13 @@ const RequisitionForm = () => {
   };
 
   const handleNext = async (stepData) => {
-    const saved = await saveStep(stepData);
-    if (saved) {
+    const updated = await updateStep(stepData);
+    if (updated) {
       if (activeStep === steps.length - 1) {
-        // Navigate to preview
-        navigate(`/dashboard/requisitions/preview?temp_id=${tempId}`);
+        toast.success('All changes saved successfully!');
+        setTimeout(() => {
+          navigate('/dashboard/requisitions');
+        }, 1000);
       } else {
         setActiveStep(prev => prev + 1);
       }
@@ -185,7 +230,7 @@ const RequisitionForm = () => {
           <Step1JobDetails
             data={formData.step1}
             onNext={handleNext}
-            tempId={tempId}
+            isEdit={true}
           />
         );
       case 1:
@@ -202,6 +247,7 @@ const RequisitionForm = () => {
             data={formData.step3}
             onNext={handleNext}
             onBack={handleBack}
+            isEdit={true}
           />
         );
       default:
@@ -210,13 +256,13 @@ const RequisitionForm = () => {
   };
 
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-50 to-emerald-50 rounded-lg shadow-xl">
+    <div className="p-6 bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg shadow-xl">
       <div className="mb-6 text-center">
         <Typography variant="h4" className="font-bold text-gray-800 mb-2">
-          New Requisition Form
+          Edit Requisition
         </Typography>
         <Typography variant="body2" className="text-gray-600">
-          Fill in the details to create a new job requisition
+          Update requisition details - Requisition ID: #{id}
         </Typography>
       </div>
 
@@ -237,4 +283,4 @@ const RequisitionForm = () => {
   );
 };
 
-export default RequisitionForm;
+export default RequisitionEdit;

@@ -80,7 +80,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       icon: Send,
       submenu: [
         {
-          label: "Received",
+          label: "List of Received",
           path: "/dashboard/dispatch/received",
           icon: Package,
         },

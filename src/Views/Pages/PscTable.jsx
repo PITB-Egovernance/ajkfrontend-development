@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { Chip, Link, Typography } from '@mui/material';
+import { Chip, Link, Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
+import { MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { DataGridLoader } from '../../components/ui/Loader';
 import Config from '../../Config/Baseurl';
 import AuthService from '../../Services/AuthService';
+import toast from 'react-hot-toast';
 
 const PscTable = () => {
   const [rows, setRows] = useState([]);
@@ -11,6 +13,12 @@ const PscTable = () => {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [updatingRequisitionId, setUpdatingRequisitionId] = useState(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [updating, setUpdating] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -86,6 +94,84 @@ const PscTable = () => {
     fetchRequisitions(page);
   }, [page]);
 
+  const handleMenuOpen = (event, row) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedRow(row);
+    setUpdatingRequisitionId(row.id);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setSelectedRow(null);
+  };
+
+  const handleStatusUpdate = async (newStatus) => {
+    if (newStatus === 'rejected') {
+      setRejectModalOpen(true);
+      handleMenuClose();
+      return;
+    }
+
+    await updateStatus(newStatus, null);
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectionReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+    await updateStatus('rejected', rejectionReason);
+    setRejectModalOpen(false);
+    setRejectionReason('');
+  };
+
+  const updateStatus = async (status, reason = null) => {
+    if (!updatingRequisitionId) {
+      toast.error('No requisition selected');
+      return;
+    }
+
+    setUpdating(true);
+    handleMenuClose();
+
+    try {
+      const payload = { status };
+      if (reason) {
+        payload.rejection_reason = reason;
+      }
+
+      console.log('Updating status for requisition ID:', updatingRequisitionId);
+      console.log('Payload:', payload);
+
+      const response = await fetch(`${API_BASE}/psc-requisitions/${updatingRequisitionId}/status`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${TOKEN}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      console.log('Status update response:', result);
+
+      if (response.ok && result.success) {
+        toast.success(`Status updated to ${status.toUpperCase()}`);
+        fetchRequisitions(page); // Refresh the list
+        setUpdatingRequisitionId(null);
+      } else {
+        toast.error(result.message || 'Failed to update status');
+      }
+    } catch (error) {
+      toast.error('Error updating status: ' + error.message);
+      console.error('Status update error:', error);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const renderFileLink = (path) => {
     if (!path) return <span className="text-gray-400 italic">No file</span>;
     const baseUrl = Config.apiUrl.replace('/api', ''); // Get base URL without /api
@@ -125,6 +211,22 @@ const PscTable = () => {
         );
       },
     },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 80,
+      sortable: false,
+      renderCell: (params) => (
+        <IconButton
+          onClick={(e) => handleMenuOpen(e, params.row)}
+          size="small"
+          sx={{ color: 'text.secondary' }}
+          disabled={updating}
+        >
+          <MoreVertical size={20} />
+        </IconButton>
+      ),
+    },
   ];
 
   return (
@@ -157,7 +259,7 @@ const PscTable = () => {
       </div>
 
       {/* Data Table */}
-      <div style={{ height: 600, width: '100%' }}>
+      <div style={{ width: '100%' }}>
         {loading ? (
           <DataGridLoader text="Loading PSC requisitions..." />
         ) : error ? (
@@ -174,16 +276,92 @@ const PscTable = () => {
             paginationMode="server"
             rowCount={total}
             pageSize={10}
-            rowsPerPageOptions={[10]}
+            rowsPerPageOptions={[10, 25, 50, 75, 100]}
             onPageChange={(newPage) => setPage(newPage + 1)} // MUI pages are 0-indexed
             loading={loading}
             disableSelectionOnClick
+            autoHeight
             slots={{
               loadingOverlay: () => <DataGridLoader text="Loading PSC requisitions..." />,
             }}
           />
         )}
       </div>
+
+      {/* Status Update Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+      >
+        <MenuItem onClick={() => handleStatusUpdate('pending')} disabled={updating}>
+          <Clock size={18} style={{ marginRight: '8px' }} />
+          Set Pending
+        </MenuItem>
+        <MenuItem onClick={() => handleStatusUpdate('approved')} disabled={updating}>
+          <CheckCircle size={18} style={{ marginRight: '8px', color: '#22c55e' }} />
+          Approve
+        </MenuItem>
+        <MenuItem onClick={() => handleStatusUpdate('rejected')} disabled={updating} sx={{ color: 'error.main' }}>
+          <XCircle size={18} style={{ marginRight: '8px' }} />
+          Reject
+        </MenuItem>
+      </Menu>
+
+      {/* Rejection Reason Modal */}
+      <Dialog 
+        open={rejectModalOpen} 
+        onClose={() => {
+          setRejectModalOpen(false);
+          setRejectionReason('');
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Reject Requisition #{updatingRequisitionId || 'N/A'}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Rejection Reason"
+            fullWidth
+            multiline
+            rows={4}
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            placeholder="Please provide a reason for rejection..."
+            helperText={`${rejectionReason.length}/1000 characters`}
+            inputProps={{ maxLength: 1000 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setRejectModalOpen(false);
+              setRejectionReason('');
+            }}
+            disabled={updating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleRejectSubmit}
+            variant="contained"
+            color="error"
+            disabled={updating || !rejectionReason.trim()}
+          >
+            {updating ? 'Rejecting...' : 'Reject'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

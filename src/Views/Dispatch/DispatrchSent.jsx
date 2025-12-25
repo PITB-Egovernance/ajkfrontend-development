@@ -20,7 +20,7 @@ const DispatrchSent = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -130,16 +130,19 @@ const DispatrchSent = () => {
         </Link>
       </div>
         
-      <Box sx={{ height: 700, width: '100%' }}>
+      <Box sx={{ width: '100%' }}>
         <DataGrid
           rows={forms}
           columns={columns}
           pageSize={pageSize}
+          rowsPerPageOptions={[10, 25, 50, 75, 100]}
           rowCount={totalRows}
           paginationMode="server"
           onPageChange={(newPage) => setPage(newPage)}
+          onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
           loading={loading}
           disableSelectionOnClick
+          autoHeight
           sx={{
             '& .MuiDataGrid-columnHeaders': { 
               backgroundColor: '#f5f5f5',
