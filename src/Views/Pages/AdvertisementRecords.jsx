@@ -12,10 +12,10 @@ import {
   Clock,
   Filter
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import { Card, CardHeader, CardTitle, CardContent } from 'Components/ui/Card';
+import Button from 'Components/ui/Button';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const AdvertisementRecords = () => {
   const [advertisements, setAdvertisements] = useState([]);

@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Chip } from '@mui/material';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
-import { InlineLoader } from '../../components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
+import { InlineLoader } from 'Components/ui/Loader';
 
 const ApprovedRequisitions = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -31,8 +33,9 @@ const ApprovedRequisitions = () => {
       if (!res.ok) throw new Error('Failed to fetch approved requisitions');
       const result = await res.json();
       if (result.status === 200 && result.data && Array.isArray(result.data.data)) {
-        const mapped = result.data.data.map((item) => ({
-          id: item.id,
+        const mapped = result.data.data.map((item, index) => ({
+          id: item.hash_id || item.id || `approved-req-${pageNum}-${index}`,
+          hash_id: item.hash_id,
           designation: item.designation,
           scale: item.scale,
           quota_percentage: item.quota_percentage,
@@ -55,9 +58,9 @@ const ApprovedRequisitions = () => {
   };
 
   useEffect(() => {
-    fetchApproved(page);
+    fetchApproved(paginationModel.page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [paginationModel.page]);
 
   const columns = [
     { field: 'id', headerName: 'Ref', width: 90 },
@@ -99,16 +102,20 @@ const ApprovedRequisitions = () => {
           <DataGrid
             rows={rows}
             columns={columns}
-            pageSize={pageSize}
-            rowsPerPageOptions={[10, 25, 50, 75, 100]}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 25, 50, 75, 100]}
             pagination
             paginationMode="server"
             rowCount={total}
-            onPageChange={(newPage) => setPage(newPage)}
-            onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
             loading={loading}
             disableSelectionOnClick
             autoHeight
+            sx={{
+              '& .MuiDataGrid-row': {
+                minHeight: '52px !important',
+              },
+            }}
           />
         )}
       </div>

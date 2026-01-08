@@ -5,10 +5,10 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import Button from '../../components/ui/Button';
-import { InlineLoader } from '../../components/ui/Loader';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import Button from 'Components/ui/Button';
+import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const AnnexADetail = () => {
   const { id } = useParams();

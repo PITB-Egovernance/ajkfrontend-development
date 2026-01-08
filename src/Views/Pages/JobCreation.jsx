@@ -1,3 +1,3 @@
-import JobCreation from '../JobCreation/JobCreation';
+import JobCreation from 'Views/JobCreation/JobCreation';
 
 export default JobCreation;

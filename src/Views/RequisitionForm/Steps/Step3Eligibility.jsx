@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { TextField, MenuItem, Button, Grid, Typography, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
-import { Plus, X, Users, MapPin } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { TextField, MenuItem } from '@mui/material';
+import { Plus, X } from 'lucide-react';
 
 const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
   const [formData, setFormData] = useState({
@@ -66,24 +66,10 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <Paper elevation={0} sx={{ p: 3, mb: 3, backgroundColor: '#f8fafc', border: '2px solid #e2e8f0' }}>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-indigo-100 rounded-lg">
-            <Users className="text-indigo-600" size={24} />
-          </div>
-          <div>
-            <Typography variant="h6" className="font-semibold text-gray-800">
-              Eligibility Criteria
-            </Typography>
-            <Typography variant="caption" className="text-gray-600">
-              Define age, nationality, and domicile requirements
-            </Typography>
-          </div>
-        </div>
-      </Paper>
+      <h6 className="section-title">Eligibility Criteria</h6>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
+      <div className="row">
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -93,11 +79,10 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
             value={formData.min_age}
             onChange={handleChange}
             inputProps={{ min: 18 }}
-            size="small"
           />
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -107,11 +92,10 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
             value={formData.max_age}
             onChange={handleChange}
             inputProps={{ min: formData.min_age }}
-            size="small"
           />
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -120,16 +104,15 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
             name="age_relaxation"
             value={formData.age_relaxation}
             onChange={handleChange}
-            size="small"
           >
             <MenuItem value="Yes">Yes</MenuItem>
             <MenuItem value="No">No</MenuItem>
           </TextField>
-        </Grid>
+        </div>
 
         {showRelaxation && (
           <>
-            <Grid item xs={12} md={6}>
+            <div className="col-md-6 form-group">
               <TextField
                 fullWidth
                 select
@@ -137,15 +120,14 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
                 name="relaxation_reason"
                 value={formData.relaxation_reason}
                 onChange={handleChange}
-                size="small"
               >
                 <MenuItem value="Disability">Disability</MenuItem>
                 <MenuItem value="Government Employee">Government Employee</MenuItem>
                 <MenuItem value="Other">Other</MenuItem>
               </TextField>
-            </Grid>
+            </div>
 
-            <Grid item xs={12} md={6}>
+            <div className="col-md-6 form-group">
               <TextField
                 fullWidth
                 type="number"
@@ -154,13 +136,12 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
                 value={formData.relaxation_years}
                 onChange={handleChange}
                 inputProps={{ min: 0 }}
-                size="small"
               />
-            </Grid>
+            </div>
           </>
         )}
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -169,13 +150,12 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
             name="nationality"
             value={formData.nationality}
             onChange={handleChange}
-            size="small"
           >
             <MenuItem value="Pakistani/AJK">Pakistani/AJK</MenuItem>
           </TextField>
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -183,11 +163,10 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
             name="domicile"
             value={formData.domicile}
             onChange={handleChange}
-            size="small"
           />
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             label="Any Other Conditions"
@@ -196,11 +175,10 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
             onChange={handleChange}
             multiline
             rows={2}
-            size="small"
           />
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             select
@@ -208,125 +186,101 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
             name="gender_basis"
             value={formData.gender_basis}
             onChange={handleChange}
-            size="small"
           >
             <MenuItem value="Male">Male</MenuItem>
             <MenuItem value="Female">Female</MenuItem>
             <MenuItem value="Male/Female">Male or Female</MenuItem>
           </TextField>
-        </Grid>
-      </Grid>
-
-      <Paper elevation={0} sx={{ p: 3, mb: 2, mt: 2, backgroundColor: '#f8fafc', border: '2px solid #e2e8f0' }}>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-orange-100 rounded-lg">
-            <MapPin className="text-orange-600" size={24} />
-          </div>
-          <div>
-            <Typography variant="h6" className="font-semibold text-gray-800">
-              Quota Wise Post Distribution
-            </Typography>
-            <Typography variant="caption" className="text-gray-600">
-              Define district-wise quota and post allocation
-            </Typography>
-          </div>
         </div>
+      </div>
 
-        <Grid item xs={12}>
-          <Typography variant="h6" className="mb-3 font-semibold" sx={{ color: '#0B5E3C' }}>
-            Quota Wise Post
-          </Typography>
-          <TableContainer component={Paper}>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#234575' }}>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>District</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Quota (%)</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Posts</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '100px' }}>Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {formData.district.map((_, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <TextField
-                        fullWidth
-                        required
-                        size="small"
-                        value={formData.district[index]}
-                        onChange={(e) => handleArrayChange(index, 'district', e.target.value)}
-                        placeholder="Enter District"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        size="small"
-                        value={formData.quota[index]}
-                        onChange={(e) => handleArrayChange(index, 'quota', e.target.value)}
-                        placeholder="Quota %"
-                        inputProps={{ min: 0, max: 100 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        size="small"
-                        value={formData.post[index]}
-                        onChange={(e) => handleArrayChange(index, 'post', e.target.value)}
-                        placeholder="Posts"
-                        inputProps={{ min: 0 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <IconButton 
-                          onClick={() => addRow()} 
-                          size="small" 
-                          sx={{ color: '#059669' }}
-                        >
-                          <Plus size={20} />
-                        </IconButton>
-                        {formData.district.length > 1 && (
-                          <IconButton 
-                            onClick={() => removeRow(index)} 
-                            size="small" 
-                            sx={{ color: '#dc2626' }}
-                          >
-                            <X size={20} />
-                          </IconButton>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <Typography variant="caption" className="block mt-2">
-            Total Rows: {formData.district.length}
-          </Typography>
-        </Grid>
-      </Paper>
+      <h6 className="section-title" style={{ marginTop: '30px', marginBottom: '20px', fontSize: '1.05rem', fontWeight: '600' }}>Quota Wise Post Distribution</h6>
 
-      <div className="flex justify-between mt-6">
-        <Button
-          onClick={onBack}
-          variant="outlined"
-          sx={{ borderColor: '#059669', color: '#059669' }}
-        >
+      <div className="table-responsive" style={{ marginTop: '15px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', width: '100%' }}>
+        <table className="table table-bordered" style={{ marginBottom: 0, width: '100%' }}>
+          <thead style={{ backgroundColor: '#006622' }}>
+            <tr>
+              <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>District</th>
+              <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>Quota (%)</th>
+              <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>Posts</th>
+              <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem', width: '140px', textAlign: 'center' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {formData.district.map((_, index) => (
+              <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                  <TextField
+                    fullWidth
+                    required
+                    size="small"
+                    value={formData.district[index]}
+                    onChange={(e) => handleArrayChange(index, 'district', e.target.value)}
+                    placeholder="Enter District"
+                  />
+                </td>
+                <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    size="small"
+                    value={formData.quota[index]}
+                    onChange={(e) => handleArrayChange(index, 'quota', e.target.value)}
+                    placeholder="Quota %"
+                    inputProps={{ min: 0, max: 100 }}
+                  />
+                </td>
+                <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    size="small"
+                    value={formData.post[index]}
+                    onChange={(e) => handleArrayChange(index, 'post', e.target.value)}
+                    placeholder="Posts"
+                    inputProps={{ min: 0 }}
+                  />
+                </td>
+                <td style={{ padding: '12px 16px', verticalAlign: 'middle', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                    <button 
+                      type="button"
+                      onClick={() => addRow()} 
+                      className="btn btn-sm"
+                      style={{ backgroundColor: '#006622', color: 'white', padding: '6px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', fontWeight: '500' }}
+                      title="Add Row"
+                    >
+                      <Plus size={16} />
+                    </button>
+                    {formData.district.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => removeRow(index)} 
+                        className="btn btn-sm"
+                        style={{ backgroundColor: '#dc2626', color: 'white', padding: '6px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', fontWeight: '500' }}
+                        title="Remove Row"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: '12px', padding: '8px 12px', backgroundColor: '#f1f5f9', borderRadius: '6px', display: 'inline-block' }}>
+        <small style={{ color: '#475569', fontWeight: '500', fontSize: '0.85rem' }}>Total Entries: {formData.district.length}</small>
+      </div>
+
+      <div className="navigation-buttons">
+        <button type="button" className="btn btn-prev" onClick={onBack}>
           Previous
-        </Button>
-        <Button
-          type="submit"
-          variant="contained"
-          sx={{ backgroundColor: '#059669', '&:hover': { backgroundColor: '#047857' } }}
-        >
+        </button>
+        <button type="submit" className="btn btn-primary">
           Preview
-        </Button>
+        </button>
       </div>
     </form>
   );

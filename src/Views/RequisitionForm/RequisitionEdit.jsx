@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Stepper, Step, StepLabel, Button, Typography } from '@mui/material';
-import { InlineLoader } from '../../components/ui/Loader';
+import { InlineLoader } from 'Components/ui/Loader';
+import { Briefcase, GraduationCap, UserCheck } from 'lucide-react';
 import Step1JobDetails from './Steps/Step1JobDetails';
 import Step2Criteria from './Steps/Step2Criteria';
 import Step3Eligibility from './Steps/Step3Eligibility';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import toast from 'react-hot-toast';
+import './RequisitionForm.css';
 
-const steps = ['Job Details', 'Criteria', 'Eligibility'];
+const steps = [
+  { number: 0, icon: Briefcase, label: 'Job Details' },
+  { number: 1, icon: GraduationCap, label: 'Criteria' },
+  { number: 2, icon: UserCheck, label: 'Eligibility' }
+];
 
 const RequisitionEdit = () => {
   const navigate = useNavigate();
@@ -256,29 +261,37 @@ const RequisitionEdit = () => {
   };
 
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg shadow-xl">
-      <div className="mb-6 text-center">
-        <Typography variant="h4" className="font-bold text-gray-800 mb-2">
-          Edit Requisition
-        </Typography>
-        <Typography variant="body2" className="text-gray-600">
-          Update requisition details - Requisition ID: #{id}
-        </Typography>
+    <div className="requisition-form-container">
+      <div className="container">
+        <div className="app-header">Edit Requisition - ID: #{id}</div>
+
+        {/* Step Progress */}
+        <div className={`step-progress active-${activeStep}`}>
+          {steps.map(step => {
+            const IconComponent = step.icon;
+            return (
+              <div
+                key={step.number}
+                className={`step ${activeStep === step.number ? 'active' : ''} ${activeStep > step.number ? 'completed' : ''}`}
+                data-step={step.number}
+              >
+                <div className="step-circle">
+                  <IconComponent size={20} />
+                </div>
+                <div className="step-label">{step.label}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {loading ? (
+          <InlineLoader text="Loading form data..." variant="ring" size="lg" />
+        ) : (
+          <div className="form-step active">
+            {renderStepContent()}
+          </div>
+        )}
       </div>
-
-      <Box sx={{ width: '100%', mb: 4, backgroundColor: 'white', padding: 3, borderRadius: 2, boxShadow: 2 }}>
-        <Stepper activeStep={activeStep} alternativeLabel>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-      </Box>
-
-      <Box sx={{ mt: 4, backgroundColor: 'white', padding: 4, borderRadius: 2, boxShadow: 2 }}>
-        {renderStepContent()}
-      </Box>
     </div>
   );
 };

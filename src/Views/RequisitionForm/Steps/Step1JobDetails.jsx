@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { TextField, MenuItem, Button, Grid, Typography, Paper } from '@mui/material';
-import { Briefcase } from 'lucide-react';
+import { TextField, MenuItem } from '@mui/material';
 import toast from 'react-hot-toast';
 
 const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
@@ -52,24 +51,8 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <Paper elevation={0} sx={{ p: 3, mb: 3, backgroundColor: '#f8fafc', border: '2px solid #e2e8f0' }}>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-emerald-100 rounded-lg">
-            <Briefcase className="text-emerald-600" size={24} />
-          </div>
-          <div>
-            <Typography variant="h6" className="font-semibold text-gray-800">
-              Job Details
-            </Typography>
-            <Typography variant="caption" className="text-gray-600">
-              Enter the basic information about the position
-            </Typography>
-          </div>
-        </div>
-      </Paper>
-
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
+      <div className="row">
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -77,11 +60,10 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
             name="designation"
             value={formData.designation}
             onChange={handleChange}
-            size="small"
           />
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -89,11 +71,10 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
             name="scale"
             value={formData.scale}
             onChange={handleChange}
-            size="small"
           />
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -102,15 +83,14 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
             name="quota_percentage"
             value={formData.quota_percentage}
             onChange={handleChange}
-            size="small"
           >
             {[...Array(100)].map((_, i) => (
               <MenuItem key={i + 1} value={i + 1}>{i + 1}%</MenuItem>
             ))}
           </TextField>
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -120,11 +100,10 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
             value={formData.num_posts}
             onChange={handleChange}
             inputProps={{ min: 1 }}
-            size="small"
           />
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -133,12 +112,11 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
             value={formData.vacancy_date}
             onChange={handleChange}
             placeholder="Day-Month-Year (e.g., 09-September-2025)"
-            size="small"
             helperText="Format: DD-Month-YYYY"
           />
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
+        <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -147,67 +125,46 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
             name="test_type"
             value={formData.test_type}
             onChange={handleChange}
-            size="small"
           >
             <MenuItem value="MCQs Base">MCQs Base</MenuItem>
             <MenuItem value="Competitive Base">Competitive Base</MenuItem>
           </TextField>
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
-          <Typography variant="body2" className="mb-2">
-            Service Rules <span className="text-red-500">(PDF File Less than 2 MB)</span>
-          </Typography>
+        <div className="col-md-6 form-group">
+          <label>Service Rules <span className="required">*</span> <span style={{ color: '#dc3545', fontSize: '0.8em' }}>(PDF File Less than 2 MB)</span></label>
           <input
             type="file"
             name="service_rules"
             accept=".pdf"
             onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+            className="form-control"
           />
           {data.service_rules && typeof data.service_rules === 'string' && (
-            <Typography variant="caption" className="text-gray-600 mt-1">
-              Previous file: {data.service_rules.split('/').pop()}
-            </Typography>
+            <small className="text-muted d-block mt-1">Previous file: {data.service_rules.split('/').pop()}</small>
           )}
-        </Grid>
+        </div>
 
-        <Grid item xs={12} md={6}>
-          <Typography variant="body2" className="mb-2">
-            Approved Syllabus <span className="text-red-500">(PDF File Less than 2 MB)</span>
-          </Typography>
+        <div className="col-md-6 form-group">
+          <label>Approved Syllabus <span className="required">*</span> <span style={{ color: '#dc3545', fontSize: '0.8em' }}>(PDF File Less than 2 MB)</span></label>
           <input
             type="file"
             name="syllabus"
             accept=".pdf"
             onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+            className="form-control"
           />
           {data.syllabus && typeof data.syllabus === 'string' && (
-            <Typography variant="caption" className="text-gray-600 mt-1">
-              Previous file: {data.syllabus.split('/').pop()}
-            </Typography>
+            <small className="text-muted d-block mt-1">Previous file: {data.syllabus.split('/').pop()}</small>
           )}
-        </Grid>
-      </Grid>
+        </div>
+      </div>
 
-      <div className="flex justify-end mt-6">
-        <Button
-          type="submit"
-          variant="contained"
-          size="large"
-          sx={{ 
-            backgroundColor: '#059669', 
-            '&:hover': { backgroundColor: '#047857' },
-            paddingX: 4,
-            paddingY: 1.5,
-            fontSize: '1rem',
-            fontWeight: 600,
-            boxShadow: 3
-          }}
-        >
+      <div className="navigation-buttons">
+        <div></div>
+        <button type="submit" className="btn btn-next">
           {isEdit ? 'Update & Continue' : 'Save & Continue'}
-        </Button>
+        </button>
       </div>
     </form>
   );

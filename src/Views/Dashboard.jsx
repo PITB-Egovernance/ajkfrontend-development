@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent } from 'Components/ui/Card';
 import { 
   FileText, 
   Megaphone, 

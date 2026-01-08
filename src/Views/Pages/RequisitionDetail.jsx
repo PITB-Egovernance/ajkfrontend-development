@@ -5,9 +5,9 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { InlineLoader } from '../../components/ui/Loader';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const RequisitionDetail = () => {
   const { id } = useParams();

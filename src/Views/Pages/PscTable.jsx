@@ -2,17 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Chip, Link, Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
 import { MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { DataGridLoader } from '../../components/ui/Loader';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import toast from 'react-hot-toast';
 
 const PscTable = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [updatingRequisitionId, setUpdatingRequisitionId] = useState(null);
@@ -30,12 +33,12 @@ const PscTable = () => {
   const TOKEN = AuthService.getToken(); // Get token from AuthService
   const API_KEY = Config.apiKey;
 
-  const fetchRequisitions = async (pageNum = 1) => {
+  const fetchRequisitions = async (pageNum = 0, pageSize = 10) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/psc-requisitions?page=${pageNum}`, {
+      const response = await fetch(`${API_BASE}/psc-requisitions?page=${pageNum + 1}&per_page=${pageSize}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -56,7 +59,9 @@ const PscTable = () => {
 
       if (result.success && result.data) {
         const requisitions = result.data.data.map((item, index) => ({
-          id: item.id || (pageNum - 1) * 10 + index + 1, // Ensure unique ID
+          id: item.hash_id || item.id || `psc-${pageNum}-${index}`, // Use hash_id as primary ID
+          hash_id: item.hash_id,
+          designation: item.designation,
           requisition_form: item.requisition_form,
           annex_a_form: item.annex_a_form,
           other_attachment: item.other_attachment,
@@ -91,8 +96,9 @@ const PscTable = () => {
   };
 
   useEffect(() => {
-    fetchRequisitions(page);
-  }, [page]);
+    fetchRequisitions(paginationModel.page, paginationModel.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize]);
 
   const handleMenuOpen = (event, row) => {
     setAnchorEl(event.currentTarget);
@@ -140,9 +146,6 @@ const PscTable = () => {
         payload.rejection_reason = reason;
       }
 
-      console.log('Updating status for requisition ID:', updatingRequisitionId);
-      console.log('Payload:', payload);
-
       const response = await fetch(`${API_BASE}/psc-requisitions/${updatingRequisitionId}/status`, {
         method: 'POST',
         headers: {
@@ -155,11 +158,10 @@ const PscTable = () => {
       });
 
       const result = await response.json();
-      console.log('Status update response:', result);
 
       if (response.ok && result.success) {
         toast.success(`Status updated to ${status.toUpperCase()}`);
-        fetchRequisitions(page); // Refresh the list
+        fetchRequisitions(paginationModel.page); // Refresh the list
         setUpdatingRequisitionId(null);
       } else {
         toast.error(result.message || 'Failed to update status');
@@ -261,7 +263,7 @@ const PscTable = () => {
       {/* Data Table */}
       <div style={{ width: '100%' }}>
         {loading ? (
-          <DataGridLoader text="Loading PSC requisitions..." />
+          <InlineLoader text="Loading requisitions..." variant="ring" size="lg" />
         ) : error ? (
           <div className="text-red-600 text-center py-10">
             <strong>Error:</strong> {error}
@@ -275,14 +277,16 @@ const PscTable = () => {
             pagination
             paginationMode="server"
             rowCount={total}
-            pageSize={10}
-            rowsPerPageOptions={[10, 25, 50, 75, 100]}
-            onPageChange={(newPage) => setPage(newPage + 1)} // MUI pages are 0-indexed
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 25, 50, 75, 100]}
             loading={loading}
             disableSelectionOnClick
             autoHeight
-            slots={{
-              loadingOverlay: () => <DataGridLoader text="Loading PSC requisitions..." />,
+            sx={{
+              '& .MuiDataGrid-row': {
+                minHeight: '52px !important',
+              },
             }}
           />
         )}

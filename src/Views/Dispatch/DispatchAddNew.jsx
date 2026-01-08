@@ -10,8 +10,8 @@ import {
   Alert,
 } from '@mui/material';
 import toast from 'react-hot-toast';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 export default function DispatchAddNew() {
   const navigate = useNavigate();
@@ -164,8 +164,8 @@ export default function DispatchAddNew() {
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+   <Box className="p-8 max-w-[1200px] mx-auto bg-white rounded-lg shadow-md">
+      <Box className="flex justify-between items-center mb-4">
         <Typography variant="h5" fontWeight="bold">
           Add New Received Dispatch
         </Typography>

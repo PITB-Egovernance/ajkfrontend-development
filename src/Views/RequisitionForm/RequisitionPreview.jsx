@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Typography, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
-import { InlineLoader } from '../../components/ui/Loader';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import toast from 'react-hot-toast';
 
 const RequisitionPreview = () => {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import Config from '../../Config/Baseurl';
+import { useState, useEffect } from 'react';
+import Config from 'Config/Baseurl';
 import Step1 from './Steps/Step1';
 import Step2 from './Steps/Step2';
 import Step3 from './Steps/Step3';

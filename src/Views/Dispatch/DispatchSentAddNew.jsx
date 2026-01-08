@@ -11,8 +11,8 @@ import {
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const DispatchSentAddNew = () => {
   const navigate = useNavigate();
@@ -165,8 +165,9 @@ const DispatchSentAddNew = () => {
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+    <Box className="p-8 max-w-[1200px] mx-auto bg-white rounded-lg shadow-md">
+
+      <Box className="flex justify-between items-center mb-8">
         <Typography variant="h5" fontWeight="bold">
           Add New Dispatched Form
         </Typography>
@@ -476,7 +477,7 @@ const DispatchSentAddNew = () => {
           </Grid>
         </Grid>
 
-        <Box sx={{ mt: 5, textAlign: 'right', display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+        <Box className="mt-10 text-right flex gap-4 justify-end">
           <Link to="/dashboard/dispatch/sent">
             <Button variant="outlined" disabled={loading}>
               Cancel

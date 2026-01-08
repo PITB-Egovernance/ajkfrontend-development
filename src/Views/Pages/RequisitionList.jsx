@@ -2,24 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Checkbox, FormControlLabel } from '@mui/material';
 import { MoreVertical, Eye, Upload, Pencil, Trash2, X } from 'lucide-react';
-import { InlineLoader } from '../../components/ui/Loader';
+import { InlineLoader } from 'Components/ui/Loader';
 import { useNavigate } from 'react-router-dom';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import toast from 'react-hot-toast';
 
 const RequisitionList = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [uploadingJobId, setUploadingJobId] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
   const [uploadForm, setUploadForm] = useState({
     requisition_form: null,
     annex_a_form: null,
@@ -33,11 +35,11 @@ const RequisitionList = () => {
   const TOKEN = AuthService.getToken();
   const API_KEY = Config.apiKey;
 
-  const fetchRequisitions = async (pageNum = 0) => {
+  const fetchRequisitions = async (pageNum = 0, pageSize = 10) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/requisitions?page=${pageNum + 1}`, {
+      const response = await fetch(`${API_BASE}/requisitions?page=${pageNum + 1}&per_page=${pageSize}`, {
         headers: {
           'Authorization': `Bearer ${TOKEN}`,
           'Accept': 'application/json',
@@ -47,8 +49,9 @@ const RequisitionList = () => {
       if (!response.ok) throw new Error('Failed to fetch requisitions');
       const result = await response.json();
       if (result.status === 200) {
-        const requisitions = result.data.data.map((item) => ({
-          id: item.id,
+        const requisitions = result.data.data.map((item, index) => ({
+          id: item.hash_id || item.id || `temp-${index}-${Date.now()}`,
+          hash_id: item.hash_id,
           designation: item.designation,
           scale: item.scale,
           num_posts: item.num_posts,
@@ -67,9 +70,9 @@ const RequisitionList = () => {
   };
 
   useEffect(() => {
-    fetchRequisitions(page);
+    fetchRequisitions(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [paginationModel.page, paginationModel.pageSize]);
 
   const handleMenuOpen = (event, row) => {
     setAnchorEl(event.currentTarget);
@@ -186,7 +189,7 @@ const RequisitionList = () => {
       if (response.ok && result.status === 200) {
         toast.success('Files uploaded successfully!');
         handleCloseUploadModal();
-        fetchRequisitions(page);
+        fetchRequisitions(paginationModel.page);
       } else {
         toast.error(result.error || 'File upload failed');
       }
@@ -244,7 +247,7 @@ const RequisitionList = () => {
                 
                 if (result.status === 200) {
                   toast.success('Requisition deleted successfully');
-                  fetchRequisitions(page);
+                  fetchRequisitions(paginationModel.page);
                 } else {
                   toast.error(result.error || 'Failed to delete requisition');
                 }
@@ -328,7 +331,7 @@ const RequisitionList = () => {
         </button>
       </div>
 
-      <div style={{ width: '100%' }}>
+      <div style={{ width: '100%', height: 'auto' }}>
         {loading ? (
           <InlineLoader text="Loading requisitions..." variant="ring" size="lg" />
         ) : error ? (
@@ -339,16 +342,21 @@ const RequisitionList = () => {
           <DataGrid
             rows={rows}
             columns={columns}
-            pageSize={pageSize}
-            rowsPerPageOptions={[10, 25, 50, 75, 100]}
+            getRowId={(row) => row.id}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 25, 50, 75, 100]}
             pagination
             paginationMode="server"
             rowCount={total}
-            onPageChange={(newPage) => setPage(newPage)}
-            onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
             loading={loading}
             disableSelectionOnClick
             autoHeight
+            sx={{
+              '& .MuiDataGrid-row': {
+                minHeight: '52px !important',
+              },
+            }}
           />
         )}
       </div>

@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import AuthService from "../Services/AuthService";
+import AuthService from "Services/AuthService";
 
 /**
  * Public Route Component
