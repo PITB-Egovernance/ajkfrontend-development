@@ -9,18 +9,20 @@ import {
   Grid,
   Chip,
 } from '@mui/material';
-import { DataGridLoader } from '../../components/ui/Loader';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
-const DispatrchSent = () => {
+const DispatchSent = () => {
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [page, setPage] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
-  const [pageSize] = useState(10);
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -32,20 +34,20 @@ const DispatrchSent = () => {
     'X-API-KEY': API_KEY,
   };
 
-  const fetchForms = async (pageIndex = 0) => {
+  const fetchForms = async (pageIndex = 0, pageSize = 10) => {
     setLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE}/dispatched-forms?page=${pageIndex + 1}`,
+        `${API_BASE}/dispatched-forms?page=${pageIndex + 1}&per_page=${pageSize}`,
         { headers: fetchHeaders }
       );
 
       if (!response.ok) throw new Error('Failed to fetch');
 
       const result = await response.json();
-      const rows = result.data.data.map((item) => ({
+      const rows = result.data.data.map((item, index) => ({
         ...item,
-        id: item.id,
+        id: item.hash_id || item.id || `temp-${index}-${Date.now()}`,
       }));
 
       setForms(rows);
@@ -74,8 +76,9 @@ const DispatrchSent = () => {
   };
 
   useEffect(() => {
-    fetchForms(page);
-  }, [page]);
+    fetchForms(paginationModel.page, paginationModel.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize]);
 
   const columns = [
     { field: 'id', headerName: 'ID', width: 80 },
@@ -124,22 +127,25 @@ const DispatrchSent = () => {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold">List of Dispatched</h2>
         <Link to="/dashboard/dispatch/sent/add">
-          <button className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transform transition-all duration-200 ring-opacity-50 hover:ring-opacity-100">
+          <button className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
             + Add New
           </button>
         </Link>
       </div>
         
-      <Box sx={{ height: 700, width: '100%' }}>
+      <Box sx={{ width: '100%', height: 'auto' }}>
         <DataGrid
           rows={forms}
           columns={columns}
-          pageSize={pageSize}
+          getRowId={(row) => row.id}
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          pageSizeOptions={[10, 25, 50, 75, 100]}
           rowCount={totalRows}
           paginationMode="server"
-          onPageChange={(newPage) => setPage(newPage)}
           loading={loading}
           disableSelectionOnClick
+          autoHeight
           sx={{
             '& .MuiDataGrid-columnHeaders': { 
               backgroundColor: '#f5f5f5',
@@ -148,14 +154,14 @@ const DispatrchSent = () => {
             },
             '& .MuiDataGrid-cell': {
               fontSize: '0.813rem',
-              padding: '8px 12px'
+              padding: '8px 12px',
             },
             '& .MuiDataGrid-row': {
-              maxHeight: 'none !important'
+              minHeight: '52px !important',
             },
           }}
-          components={{
-            LoadingOverlay: () => <DataGridLoader text="Loading dispatched forms..." />,
+          slots={{
+            loadingOverlay: () => <InlineLoader text="Loading dispatched forms..." variant="ring" size="lg" />,
           }}
         />
       </Box>
@@ -310,4 +316,4 @@ const DispatrchSent = () => {
   );
 };
 
-export default DispatrchSent;
+export default DispatchSent;

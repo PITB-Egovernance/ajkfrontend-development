@@ -1,338 +1,408 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Link } from 'react-router-dom';
+import { Card, CardContent } from 'Components/ui/Card';
+import { useAuth } from 'context/AuthContext';
 import { 
   FileText, 
   Megaphone, 
   BookOpen, 
   Briefcase, 
-  TrendingUp, 
   Users, 
   Clock,
   CheckCircle2,
-  AlertCircle,
-  ArrowUpRight,
-  Calendar,
-  Activity
+  BarChart3,
+  PieChart,
+  Send,
+  Settings,
+  Plus,
+  Award,
+  ArrowRight,
+  TrendingUp
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart as RechartPieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Area,
+  AreaChart
+} from 'recharts';
 
 const Dashboard = () => {
-  const quickActions = [
-    { 
-      icon: FileText, 
-      title: 'Requisitions', 
-      desc: 'Create and review requisition forms',
-      count: '24',
-      trend: '+12%',
-      color: 'emerald',
-      bgGradient: 'from-emerald-50 to-teal-50',
-      iconBg: 'bg-emerald-100',
-      iconColor: 'text-emerald-600',
-      link: '/dashboard/requisitions'
-    },
-    { 
-      icon: Megaphone, 
-      title: 'Announcements', 
-      desc: 'Advertisement records and notices',
-      count: '8',
-      trend: '+3',
-      color: 'amber',
-      bgGradient: 'from-amber-50 to-orange-50',
-      iconBg: 'bg-amber-100',
-      iconColor: 'text-amber-600',
-      link: '/dashboard/advertisements'
-    },
-    { 
-      icon: BookOpen, 
-      title: 'Annexures', 
-      desc: 'Annex "A" lists and details',
-      count: '15',
-      trend: 'New',
-      color: 'indigo',
-      bgGradient: 'from-indigo-50 to-blue-50',
-      iconBg: 'bg-indigo-100',
-      iconColor: 'text-indigo-600',
-      link: '/dashboard/annex-a'
-    },
-  ];
+  const { user } = useAuth();
 
   const stats = [
     { 
       label: 'Total Jobs', 
       value: '142', 
-      change: '+12%',
       icon: Briefcase,
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-50',
-      trend: 'up'
+      bg: 'bg-emerald-50',
+      iconBg: 'bg-emerald-500'
     },
     { 
       label: 'Pending Approvals', 
       value: '23', 
-      change: '-5%',
       icon: Clock,
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50',
-      trend: 'down'
+      bg: 'bg-amber-50',
+      iconBg: 'bg-amber-500'
     },
     { 
       label: 'Active Requisitions', 
       value: '87', 
-      change: '+8%',
       icon: CheckCircle2,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      trend: 'up'
+      bg: 'bg-blue-50',
+      iconBg: 'bg-blue-500'
     },
     { 
       label: 'Total Applicants', 
       value: '1,245', 
-      change: '+18%',
       icon: Users,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-      trend: 'up'
+      bg: 'bg-purple-50',
+      iconBg: 'bg-purple-500'
     },
   ];
 
-  const recentActivity = [
-    { title: 'New job posting created', time: '2 hours ago', type: 'success' },
-    { title: 'Requisition #2024-45 approved', time: '4 hours ago', type: 'success' },
-    { title: 'Advertisement published', time: '5 hours ago', type: 'info' },
-    { title: 'Pending approval required', time: '6 hours ago', type: 'warning' },
+  // Monthly applications data for line chart
+  const monthlyApplicationsData = [
+    { month: 'Jan', applications: 65, approvals: 45 },
+    { month: 'Feb', applications: 78, approvals: 52 },
+    { month: 'Mar', applications: 90, approvals: 68 },
+    { month: 'Apr', applications: 81, approvals: 60 },
+    { month: 'May', applications: 95, approvals: 72 },
+    { month: 'Jun', applications: 110, approvals: 85 },
+  ];
+
+  // Department wise jobs data for bar chart
+  const departmentJobsData = [
+    { department: 'Education', jobs: 45, filled: 32 },
+    { department: 'Health', jobs: 38, filled: 28 },
+    { department: 'Admin', jobs: 28, filled: 22 },
+    { department: 'Finance', jobs: 18, filled: 15 },
+    { department: 'Technical', jobs: 22, filled: 16 },
+  ];
+
+  // Job status distribution for pie chart
+  const jobStatusData = [
+    { name: 'Active', value: 87, color: '#10b981' },
+    { name: 'Pending', value: 23, color: '#f59e0b' },
+    { name: 'Completed', value: 32, color: '#3b82f6' },
+  ];
+
+  // Application type distribution for pie chart
+  const applicationTypeData = [
+    { name: 'Teaching', value: 35, color: '#8b5cf6' },
+    { name: 'Medical', value: 28, color: '#ec4899' },
+    { name: 'Administrative', value: 22, color: '#06b6d4' },
+    { name: 'Technical', value: 15, color: '#f97316' },
+  ];
+
+  const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'];
+
+  const quickActions = [
+    { 
+      icon: FileText, 
+      title: 'Requisitions', 
+      link: '/dashboard/requisitions',
+      iconBg: 'bg-emerald-500',
+      count: '87 Active'
+    },
+    { 
+      icon: Megaphone, 
+      title: 'Advertisements', 
+      link: '/dashboard/advertisement-records',
+      iconBg: 'bg-amber-500',
+      count: '12 Published'
+    },
+    { 
+      icon: BookOpen, 
+      title: 'Annexures', 
+      link: '/dashboard/annex-a',
+      iconBg: 'bg-indigo-500',
+      count: '45 Records'
+    },
+  ];
+
+  const quickLinks = [
+    { label: 'Create Job', icon: Plus, link: '/dashboard/job-creation-form', iconBg: 'bg-emerald-500' },
+    { label: 'Dispatch', icon: Send, link: '/dashboard/dispatch/received', iconBg: 'bg-blue-500' },
+    { label: 'PSC Table', icon: BarChart3, link: '/dashboard/psc-table', iconBg: 'bg-purple-500' },
+    { label: 'Reports', icon: PieChart, link: '/dashboard/requisitions', iconBg: 'bg-amber-500' },
+    { label: 'Approvals', icon: Award, link: '/dashboard/approved-requisitions', iconBg: 'bg-rose-500' },
+    { label: 'Settings', icon: Settings, link: '/dashboard/settings', iconBg: 'bg-slate-500' },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm"
-      >
-        {/* Classic Pattern Background */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `repeating-linear-gradient(45deg, #059669 0, #059669 1px, transparent 0, transparent 50%)`,
-            backgroundSize: '10px 10px'
-          }} />
+    <div className="min-h-screen p-2">
+      <div className="max-w-8xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+            <p className="text-sm text-slate-500 mt-1">AJK Public Service Commission</p>
+          </div>
+          
+          <Link to="/dashboard/requisitions/create">
+            <button className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white rounded-lg font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200">
+              <Plus className="w-4 h-4" />
+              Add New
+            </button>
+          </Link>
         </div>
-        
-        <div className="relative z-10 p-8 md:p-10">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              {/* Classic Badge */}
-              <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-1.5 rounded-full mb-4">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-sm font-semibold text-emerald-700">Active Dashboard</span>
-              </div>
-              
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3 tracking-tight">
-                Public Service Commission
-              </h1>
-              <p className="text-slate-600 text-base md:text-lg max-w-2xl leading-relaxed mb-6">
-                Azad Jammu & Kashmir - Administrative Dashboard for Recruitment Management
-              </p>
-              
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-2 rounded-lg">
-                  <Calendar className="w-4 h-4 text-slate-600" />
-                  <span className="text-sm font-medium text-slate-700">
-                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                  </span>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat) => (
+            <Card key={stat.label} className="border border-slate-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-500 mb-1">{stat.label}</p>
+                    <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                  </div>
+                  <div className={`p-2.5 rounded-lg ${stat.iconBg}`}>
+                    <stat.icon className="w-5 h-5 text-white" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg">
-                  <Activity className="w-4 h-4 text-emerald-600" />
-                  <span className="text-sm font-semibold text-emerald-700">Administrator Access</span>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Featured Modules */}
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold text-slate-900">Featured Modules</h2>
             
-            {/* Logo Section */}
-            <div className="hidden md:flex items-center justify-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-emerald-100 rounded-2xl blur-xl opacity-40" />
-                <img 
-                  src="/assets/img/favicon/Logo.PNG" 
-                  alt="AJ&K PSC"
-                  className="relative w-28 h-28 rounded-2xl bg-white border-4 border-slate-100 shadow-lg object-contain p-3"
-                />
-              </div>
+            <div className="space-y-3">
+              {quickActions.map((action) => (
+                <Link key={action.title} to={action.link}>
+                  <Card className="border border-slate-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-lg ${action.iconBg}`}>
+                          <action.icon className="w-5 h-5 text-white" />
+                        </div>
+                        
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-slate-900 text-sm">{action.title}</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">{action.count}</p>
+                        </div>
+                        
+                        <ArrowRight className="w-4 h-4 text-slate-400" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Shortcuts */}
+          <div className="lg:col-span-2 space-y-4">
+            <h2 className="text-base font-semibold text-slate-900">Quick Shortcuts</h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {quickLinks.map((link) => (
+                <Link key={link.label} to={link.link}>
+                  <Card className="border border-slate-200">
+                    <CardContent className="p-4">
+                      <div className="flex flex-col items-center text-center">
+                        <div className={`p-3 rounded-lg ${link.iconBg} mb-3`}>
+                          <link.icon className="w-5 h-5 text-white" />
+                        </div>
+                        <p className="text-sm font-medium text-slate-700">{link.label}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
             </div>
           </div>
         </div>
-        
-        {/* Bottom Border Accent */}
-        <div className="h-1 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700" />
-      </motion.div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
-          >
-            <Card className="relative overflow-hidden hover:shadow-lg transition-all duration-300 border border-slate-200 bg-white group">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-50 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform" />
-              
-              <CardContent className="p-6 relative">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-xl ${stat.bgColor} border border-slate-100 shadow-sm`}>
-                    <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                  </div>
-                  <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${
-                    stat.trend === 'up' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}>
-                    <ArrowUpRight className={`w-3 h-3 ${stat.trend === 'down' ? 'rotate-90' : ''}`} />
-                    {stat.change}
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="text-3xl font-bold text-slate-900">{stat.value}</div>
-                  <div className="text-sm text-slate-600 font-medium">{stat.label}</div>
-                </div>
-                
-                {/* Bottom accent line */}
-                <div className={`absolute bottom-0 left-0 right-0 h-1 ${stat.trend === 'up' ? 'bg-green-500' : 'bg-red-500'} opacity-0 group-hover:opacity-100 transition-opacity`} />
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Quick Actions Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {quickActions.map((action, index) => (
-          <motion.div
-            key={action.title}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
-            whileHover={{ y: -8 }}
-          >
-            <Card className={`relative overflow-hidden border-0 bg-gradient-to-br ${action.bgGradient} hover:shadow-2xl transition-all duration-300 group cursor-pointer`}>
-              <div className="absolute top-0 right-0 w-40 h-40 bg-white/40 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-white/60 transition-all" />
-              
-              <CardContent className="p-6 relative">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-4 rounded-2xl ${action.iconBg} shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all`}>
-                    <action.icon className={`w-7 h-7 ${action.iconColor}`} />
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-2xl font-bold text-slate-800">{action.count}</span>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${action.iconBg} ${action.iconColor} mt-1`}>
-                      {action.trend}
-                    </span>
-                  </div>
-                </div>
-                
-                <h3 className="text-xl font-bold text-slate-900 mb-2">{action.title}</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">{action.desc}</p>
-                
-                <div className="mt-4 flex items-center text-sm font-semibold text-emerald-700 group-hover:text-emerald-800 transition-colors">
-                  View Details
-                  <ArrowUpRight className="w-4 h-4 ml-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Recent Activity & Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Activity className="w-5 h-5 text-emerald-600" />
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Monthly Applications Trend - Line Chart */}
+          <Card className="border border-slate-200">
             <CardContent className="p-6">
-              <div className="space-y-4">
-                {recentActivity.map((activity, index) => (
-                  <motion.div 
-                    key={index}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 + index * 0.1 }}
-                    className="flex items-start gap-3 group hover:bg-slate-50 p-3 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <div className={`p-2 rounded-lg ${
-                      activity.type === 'success' ? 'bg-green-100' : 
-                      activity.type === 'warning' ? 'bg-amber-100' : 
-                      'bg-blue-100'
-                    }`}>
-                      {activity.type === 'success' ? (
-                        <CheckCircle2 className="w-4 h-4 text-green-600" />
-                      ) : activity.type === 'warning' ? (
-                        <AlertCircle className="w-4 h-4 text-amber-600" />
-                      ) : (
-                        <TrendingUp className="w-4 h-4 text-blue-600" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900 group-hover:text-emerald-700 transition-colors">
-                        {activity.title}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-1">{activity.time}</p>
-                    </div>
-                  </motion.div>
-                ))}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Application Trends</h3>
+                  <p className="text-xs text-slate-500 mt-1">Monthly applications & approvals</p>
+                </div>
+                <TrendingUp className="w-5 h-5 text-emerald-500" />
               </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={monthlyApplicationsData}>
+                  <defs>
+                    <linearGradient id="colorApplications" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorApprovals" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#64748b" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '12px'
+                    }} 
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="applications" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorApplications)" 
+                    name="Applications"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="approvals" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorApprovals)" 
+                    name="Approvals"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
-        </motion.div>
 
-        {/* Quick Links */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
-                Quick Links
-              </CardTitle>
-            </CardHeader>
+          {/* Department Jobs - Bar Chart */}
+          <Card className="border border-slate-200">
             <CardContent className="p-6">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Create Job', icon: Briefcase, color: 'emerald' },
-                  { label: 'View Reports', icon: FileText, color: 'blue' },
-                  { label: 'Manage Users', icon: Users, color: 'purple' },
-                  { label: 'Settings', icon: Activity, color: 'slate' },
-                ].map((link, index) => (
-                  <motion.button
-                    key={link.label}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.6 + index * 0.1 }}
-                    className={`p-4 rounded-xl bg-${link.color}-50 hover:bg-${link.color}-100 transition-all group border border-${link.color}-100 hover:border-${link.color}-200`}
-                  >
-                    <link.icon className={`w-6 h-6 text-${link.color}-600 mx-auto mb-2 group-hover:scale-110 transition-transform`} />
-                    <p className={`text-xs font-semibold text-${link.color}-700`}>{link.label}</p>
-                  </motion.button>
-                ))}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Department-wise Jobs</h3>
+                  <p className="text-xs text-slate-500 mt-1">Total vs filled positions</p>
+                </div>
+                <BarChart3 className="w-5 h-5 text-blue-500" />
               </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={departmentJobsData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="department" tick={{ fontSize: 12 }} stroke="#64748b" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '12px'
+                    }} 
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Bar dataKey="jobs" fill="#3b82f6" name="Total Jobs" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="filled" fill="#10b981" name="Filled" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
-        </motion.div>
+
+          {/* Job Status Distribution - Pie Chart */}
+          <Card className="border border-slate-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Job Status Distribution</h3>
+                  <p className="text-xs text-slate-500 mt-1">Current job status breakdown</p>
+                </div>
+                <PieChart className="w-5 h-5 text-purple-500" />
+              </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <RechartPieChart>
+                  <Pie
+                    data={jobStatusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={90}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {jobStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '12px'
+                    }} 
+                  />
+                </RechartPieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Application Type Distribution - Pie Chart */}
+          <Card className="border border-slate-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Application Categories</h3>
+                  <p className="text-xs text-slate-500 mt-1">Distribution by job type</p>
+                </div>
+                <Users className="w-5 h-5 text-amber-500" />
+              </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <RechartPieChart>
+                  <Pie
+                    data={applicationTypeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    fill="#8884d8"
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {applicationTypeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '12px'
+                    }} 
+                  />
+                </RechartPieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+        </div>
+
       </div>
     </div>
   );

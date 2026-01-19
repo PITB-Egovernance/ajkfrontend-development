@@ -1,6 +1,6 @@
 // Services/AuthService.js  ← FINAL VERSION WITH CAPTCHA SUPPORT
 
-import Config from "../Config/Baseurl";
+import Config from "Config/Baseurl";
 const API_URL = Config.apiUrl;
 const API_KEY = Config.apiKey;
 
@@ -144,7 +144,6 @@ class AuthService {
   }
 
   static getToken() {
-    console.log('Token 2', localStorage.getItem("authToken"))
     return localStorage.getItem("authToken");
   }
 

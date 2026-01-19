@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Button } from '../../components/ui';
+import { Card, Button } from 'Components/ui';
 import { DataGrid } from '@mui/x-data-grid';
 import { Box } from '@mui/material';
-import { DataGridLoader, InlineLoader } from '../../components/ui/Loader';
+import { InlineLoader } from 'Components/ui/Loader';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import toast from 'react-hot-toast';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 export default function DispatchReceived() {
   const [rows, setRows] = useState([]);
@@ -19,30 +22,41 @@ export default function DispatchReceived() {
   const [modalLoading, setModalLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
 
-  const token = '14|FVsRVOq87eOsVRBze3yHsQOQixFv6uFgyv2IGPs7b18d2150';
-  const BASE_URL = 'http://127.0.0.1:8000';
+  const API_BASE = Config.apiUrl;
+  const TOKEN = AuthService.getToken();
+  const API_KEY = Config.apiKey;
 
-  const fetchReceivedForms = async (page = 1) => {
+  const fetchReceivedForms = async (page = 1, pageSize = 10) => {
     setLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/received-forms?page=${page}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      const response = await fetch(`${API_BASE}/received-forms?page=${page}&per_page=${pageSize}`, {
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`, 
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY
+        },
       });
       if (!response.ok) throw new Error('Network error');
 
       const result = await response.json();
       if (result.success) {
         const apiData = result.data;
-        const mappedRows = apiData.data.map((item) => ({
-          id: item.id,
-          ref: item.diary_outward_no || 'N/A',
-          from: item.from,
-          to: item.to,
-          subject: item.subject,
-          date: item.date_received,
-          priority: item.priority,
-          confidentiality: item.confidentiality_level,
-        }));
+        console.log('API Data sample:', apiData.data[0]); // Log first item to see structure
+        const mappedRows = apiData.data.map((item, index) => {
+          // Check for various ID fields the API might use
+          const realId = item.id || item.hash_id || item.diary_id;
+          return {
+            id: realId || `temp-${index}-${Date.now()}`,
+            originalId: realId, // Store original ID for API calls
+            ref: item.diary_outward_no || 'N/A',
+            from: item.from,
+            to: item.to,
+            subject: item.subject,
+            date: item.date_received,
+            priority: item.priority,
+            confidentiality: item.confidentiality_level,
+          };
+        });
 
         setRows(mappedRows);
         setFilteredRows(mappedRows);
@@ -50,7 +64,7 @@ export default function DispatchReceived() {
       }
     } catch (error) {
       console.error(error);
-      alert('Failed to load list');
+      toast.error('Failed to load received forms');
     } finally {
       setLoading(false);
     }
@@ -59,31 +73,55 @@ export default function DispatchReceived() {
   const fetchDispatchDetails = async (id) => {
     setModalLoading(true);
     setOpenModal(true);
+    console.log('Fetching details from:', `${API_BASE}/received-forms/${id}`);
     try {
-      const response = await fetch(`${BASE_URL}/api/received-forms/${id}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      const response = await fetch(`${API_BASE}/received-forms/${id}`, {
+        headers: { 
+          Authorization: `Bearer ${TOKEN}`, 
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY
+        },
       });
-      if (!response.ok) throw new Error('Failed to fetch details');
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', errorText);
+        throw new Error(`Failed to fetch details (${response.status})`);
+      }
 
       const result = await response.json();
+      console.log('API Result:', result);
+      
       if (result.success) {
         setDetailedDispatch(result.data);
+      } else {
+        toast.error(result.message || 'Failed to load details');
+        setOpenModal(false);
       }
     } catch (error) {
-      console.error(error);
-      alert('Failed to load details');
+      console.error('Fetch error:', error);
+      toast.error('Failed to load details. Please check console for more info.');
+      setOpenModal(false);
     } finally {
       setModalLoading(false);
     }
   };
 
   const handleView = (row) => {
-    fetchDispatchDetails(row.id);
+    const idToFetch = row.originalId || row.id;
+    console.log('Fetching details for ID:', idToFetch, 'Full row:', row);
+    if (!idToFetch || idToFetch.toString().startsWith('temp-')) {
+      toast.error('Invalid record ID. Please refresh the page and try again.');
+      return;
+    }
+    fetchDispatchDetails(idToFetch);
   };
 
   useEffect(() => {
-    fetchReceivedForms(paginationModel.page + 1);
-  }, [paginationModel.page]);
+    fetchReceivedForms(paginationModel.page + 1, paginationModel.pageSize);
+  }, [paginationModel.page, paginationModel.pageSize]);
 
   useEffect(() => {
     const lower = searchTerm.toLowerCase();
@@ -140,7 +178,7 @@ export default function DispatchReceived() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold">List of Received</h2>
         <Link to="/dashboard/dispatch/recieved-form">
-          <button className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 ring-2 ring-emerald-500 ring-opacity-50 hover:ring-opacity-100">
+          <button className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
             + Add New
           </button>
         </Link>
@@ -156,19 +194,21 @@ export default function DispatchReceived() {
         />
       </div>
 
-      <Box sx={{ height: 700, width: '100%' }}>
+      <Box sx={{ width: '100%', height: 'auto' }}>
         <DataGrid
           rows={filteredRows}
           columns={columns}
+          getRowId={(row) => row.id}
           loading={loading}
           rowCount={searchTerm ? filteredRows.length : rowCount}
-          pageSizeOptions={[10]}
+          pageSizeOptions={[10, 25, 50, 75, 100]}
           paginationMode={searchTerm ? 'client' : 'server'}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           disableRowSelectionOnClick
+          autoHeight
           slots={{
-            loadingOverlay: () => <DataGridLoader text="Loading received forms..." />,
+            loadingOverlay: () => <InlineLoader text="Loading received forms..." variant="ring" size="lg" />,
           }}
           sx={{
             '& .MuiDataGrid-columnHeaders': { 
@@ -177,10 +217,10 @@ export default function DispatchReceived() {
             },
             '& .MuiDataGrid-cell': {
               fontSize: '0.813rem',
-              padding: '8px 12px'
+              padding: '8px 12px',
             },
             '& .MuiDataGrid-row': {
-              maxHeight: 'none !important'
+              minHeight: '52px !important',
             },
           }}
         />
@@ -189,7 +229,7 @@ export default function DispatchReceived() {
       {/* Detailed Modal */}
       {openModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide">
             <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white">
               <h3 className="text-2xl font-bold">
                 Dispatch Details - {detailedDispatch?.diary_outward_no || 'Loading...'}
@@ -208,7 +248,7 @@ export default function DispatchReceived() {
             <div id="dispatch-details-content" className="p-8 text-sm">
               {modalLoading ? (
                 <div className="py-12">
-                  <InlineLoader text="Loading details..." variant="dots" size="lg" />
+                  <InlineLoader text="Loading details..." variant="ring" size="lg" />
                 </div>
               ) : (
                 detailedDispatch && (
@@ -312,10 +352,10 @@ export default function DispatchReceived() {
                           <strong>Scanned Document:</strong>
                           <br />
                           <a
-                            href={`${BASE_URL}/storage/${detailedDispatch.scan_upload_document}`}
+                            href={`${API_BASE}/storage/${detailedDispatch.scan_upload_document}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-block mt-3 px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            className="inline-block mt-3 px-5 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white rounded"
                           >
                             view pdf
                           </a>

@@ -10,8 +10,8 @@ import {
   Alert,
 } from '@mui/material';
 import toast from 'react-hot-toast';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 export default function DispatchAddNew() {
   const navigate = useNavigate();

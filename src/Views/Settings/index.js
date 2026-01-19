@@ -1,0 +1,9 @@
+export { default as Settings } from './Settings';
+export { default as OrganizationInformation } from './OrganizationInformation';
+export { default as OrganizationalHierarchy } from './OrganizationalHierarchy';
+export { default as DistrictsManagement } from './DistrictsManagement';
+export { default as TehsilsManagement } from './TehsilsManagement';
+export { default as DesignationsManagement } from './DesignationsManagement';
+export { default as GradesManagement } from './GradesManagement';
+export { default as CompaniesManagement } from './CompaniesManagement';
+export { default as ContractorsManagement } from './ContractorsManagement';

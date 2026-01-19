@@ -14,15 +14,29 @@ import {
   Package,
   Home,
   ChevronRight,
+  Settings,
 } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { cn } from "lib/utils";
+import { useSidebar } from "context/SidebarContext";
 
-const Sidebar = ({ isOpen, setIsOpen }) => {
-  const [openMenu, setOpenMenu] = useState("");
+const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
+  // Use context if available, fallback to props for backward compatibility
+  const sidebarContext = useSidebar();
+  const isOpen = propIsOpen !== undefined ? propIsOpen : sidebarContext.isOpen;
+  const setIsOpen = propSetIsOpen !== undefined ? propSetIsOpen : sidebarContext.setIsOpen;
+  const { openMenu, toggleMenu: contextToggleMenu } = sidebarContext;
+  
+  const [localOpenMenu, setLocalOpenMenu] = useState("");
   const location = useLocation();
 
+  // Use context menu state if available
+  const currentOpenMenu = openMenu !== undefined ? openMenu : localOpenMenu;
   const toggleMenu = (menu) => {
-    setOpenMenu(openMenu === menu ? "" : menu);
+    if (contextToggleMenu) {
+      contextToggleMenu(menu);
+    } else {
+      setLocalOpenMenu(currentOpenMenu === menu ? "" : menu);
+    }
   };
 
   const isActive = (path) => location.pathname === path;
@@ -40,7 +54,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       label: "Job Creation",
       icon: Briefcase,
       path: "/dashboard/job-creation-form",
-      badge: "New",
+      badge: null,
     },
     {
       id: "requisitions",
@@ -80,7 +94,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       icon: Send,
       submenu: [
         {
-          label: "Received",
+          label: "List of Received",
           path: "/dashboard/dispatch/received",
           icon: Package,
         },
@@ -98,16 +112,68 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       path: "/dashboard/psc-table",
       badge: null,
     },
+    {
+      id: "settings",
+      label: "Settings",
+      icon: Settings,
+      submenu: [
+        {
+          label: "Organization Info",
+          path: "/dashboard/settings/organization",
+          icon: Briefcase,
+        },
+        {
+          label: "Hierarchy",
+          path: "/dashboard/settings/hierarchy",
+          icon: ClipboardList,
+        },
+        {
+          label: "Districts",
+          path: "/dashboard/settings/districts",
+          icon: Package,
+        },
+        {
+          label: "Tehsils",
+          path: "/dashboard/settings/tehsils",
+          icon: Table,
+        },
+        {
+          label: "Designations",
+          path: "/dashboard/settings/designations",
+          icon: Briefcase,
+        },
+        {
+          label: "Grades",
+          path: "/dashboard/settings/grades",
+          icon: ClipboardList,
+        },
+        {
+          label: "Companies",
+          path: "/dashboard/settings/companies",
+          icon: Package,
+        },
+        {
+          label: "Contractors",
+          path: "/dashboard/settings/contractors",
+          icon: Table,
+        },
+      ],
+    },
   ];
 
   const NavItem = ({ item }) => {
     const hasSubmenu = item.submenu && item.submenu.length > 0;
-    const isMenuOpen = openMenu === item.id;
+    const isMenuOpen = currentOpenMenu === item.id;
     const active = isActive(item.path);
+    const [showHoverMenu, setShowHoverMenu] = useState(false);
 
     if (hasSubmenu) {
       return (
-        <div className="relative">
+        <div 
+          className="relative group"
+          onMouseEnter={() => !isOpen && setShowHoverMenu(true)}
+          onMouseLeave={() => !isOpen && setShowHoverMenu(false)}
+        >
           <button
             onClick={() => toggleMenu(item.id)}
             className={cn(
@@ -135,8 +201,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             )}
           </button>
 
+          {/* Submenu for expanded sidebar */}
           {isMenuOpen && isOpen && (
-            <div className="mt-1 ml-4 pl-4 border-l-2 border-emerald-700/50 space-y-1">
+            <div className="mt-1 space-y-1 overflow-hidden" style={{ height: 'auto' }}>
               {item.submenu.map((subItem) => (
                 <Link
                   key={subItem.path}
@@ -166,6 +233,51 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                   )}
                 </Link>
               ))}
+            </div>
+          )}
+
+          {/* Hover submenu for collapsed sidebar */}
+          {!isOpen && showHoverMenu && (
+            <div 
+              className="absolute left-full top-0 ml-2 min-w-[250px] z-50 animate-in fade-in slide-in-from-left-2 duration-200"
+              style={{ height: 'auto' }}
+            >
+              <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 rounded-xl shadow-2xl border border-emerald-700/30 py-2 px-2">
+                <div className="px-3 py-2 border-b border-emerald-700/30 mb-2">
+                  <span className="text-white font-semibold text-sm">{item.label}</span>
+                </div>
+                <div className="space-y-1">
+                  {item.submenu.map((subItem) => (
+                    <Link
+                      key={subItem.path}
+                      to={subItem.path}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
+                        isActive(subItem.path)
+                          ? "bg-white text-emerald-800 shadow-md font-semibold"
+                          : "text-emerald-200 hover:text-white hover:bg-white/5"
+                      )}
+                    >
+                      <subItem.icon
+                        size={16}
+                        className={cn(
+                          "flex-shrink-0",
+                          isActive(subItem.path)
+                            ? "text-emerald-700"
+                            : "text-emerald-400"
+                        )}
+                      />
+                      <span>{subItem.label}</span>
+                      {isActive(subItem.path) && (
+                        <ChevronRight
+                          size={14}
+                          className="ml-auto text-emerald-700"
+                        />
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -258,22 +370,17 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         <nav className={cn(
           "overflow-y-auto py-6 space-y-2 custom-scrollbar",
           isOpen ? "px-4" : "px-2",
-          "h-[calc(100vh-180px)]"
-        )}>
+          "h-[calc(100vh-120px)]"
+        )}
+        style={{ height: 'auto', maxHeight: 'calc(100vh - 120px)' }}
+        >
           {menuItems.map((item) => (
             <NavItem key={item.id} item={item} />
           ))}
         </nav>
-
-        {/* Footer */}
-        {isOpen && (
-          <div className="absolute bottom-0 left-0 right-0 p-4">
-            
-          </div>
-        )}
       </aside>
 
-      <style jsx>{`
+      <style jsx="true">{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }

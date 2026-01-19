@@ -1,22 +1,18 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { LogOut, User, Menu } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useAuth } from 'context/AuthContext';
 
-const Navbar = ({ user, toggleSidebar }) => {
+const Navbar = ({ toggleSidebar }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
 
-  const handleLogout = () => {
-    const logoutToast = toast.loading('Logging out...');
-    
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('isLoggedIn');
-    
-    toast.success('Logged out successfully!', { id: logoutToast });
-    
+  const handleLogout = async () => {
+    await logout();
     setTimeout(() => {
-      window.location.href = '/login';
-    }, 800);
+      navigate('/login', { replace: true });
+    }, 500);
   };
 
   return (
@@ -24,11 +20,16 @@ const Navbar = ({ user, toggleSidebar }) => {
       <div className="flex items-center gap-4 flex-1">
         <button
           onClick={toggleSidebar}
-          className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+          className="p-2 rounded-lg bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white transition-colors shadow-sm"
           aria-label="Toggle Sidebar"
         >
           <Menu size={20} />
         </button>
+        {user && (
+          <span className="text-sm text-slate-600 hidden sm:inline">
+            Welcome, <span className="font-medium text-slate-800">{user.username || user.name || 'User'}</span>
+          </span>
+        )}
       </div>
 
       {/* Right Side - User Dropdown */}
@@ -45,7 +46,7 @@ const Navbar = ({ user, toggleSidebar }) => {
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
               <Link
-                to="/profile"
+                to="/dashboard/profile"
                 onClick={() => setDropdownOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 text-slate-700 hover:bg-slate-50 transition"
               >

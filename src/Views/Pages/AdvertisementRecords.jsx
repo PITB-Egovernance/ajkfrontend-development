@@ -12,10 +12,10 @@ import {
   Clock,
   Filter
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import { Card, CardHeader, CardTitle, CardContent } from 'Components/ui/Card';
+import Button from 'Components/ui/Button';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const AdvertisementRecords = () => {
   const [advertisements, setAdvertisements] = useState([]);
@@ -108,26 +108,18 @@ const AdvertisementRecords = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-lg">
-              <Megaphone className="w-7 h-7 text-white" />
-            </div>
-            Advertisement Records
-          </h1>
+    <div className="p-6 bg-slate-50 min-h-screen">
+      <div className="max-w-8xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Advertisement Records</h1>
+            <p className="text-sm text-slate-500 mt-1">View and manage all advertisement records</p>
+          </div>
         </div>
-      </motion.div>
 
-      {/* Search Bar */}
-      <Card className="border-0 shadow-lg">
-        <CardContent className="p-6">
+        {/* Search Bar */}
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -136,54 +128,39 @@ const AdvertisementRecords = () => {
                 placeholder="Search by advertisement number or note..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                className="w-full pl-12 pr-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
             </div>
-            <Button variant="outline" className="gap-2">
-              <Filter className="w-4 h-4" />
-              Filters
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Advertisements Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
+        {/* Advertisements Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
                 <div className="h-4 bg-slate-200 rounded w-3/4 mb-4"></div>
                 <div className="h-3 bg-slate-200 rounded w-full mb-2"></div>
                 <div className="h-3 bg-slate-200 rounded w-2/3"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : filteredAdvertisements.length === 0 ? (
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-12 text-center">
+              </div>
+            ))}
+          </div>
+        ) : filteredAdvertisements.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <Megaphone className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-slate-900 mb-2">No Advertisements Found</h3>
             <p className="text-slate-500">Try adjusting your search criteria</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAdvertisements.map((ad, index) => (
-            <motion.div
-              key={ad.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-                <CardContent className="p-6">
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAdvertisements.map((ad) => (
+              <div key={ad.id} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <FileText className="w-5 h-5 text-amber-600" />
-                        <h3 className="font-bold text-lg text-slate-900 group-hover:text-amber-600 transition-colors">
+                        <FileText className="w-5 h-5 text-emerald-600" />
+                        <h3 className="font-bold text-lg text-slate-900">
                           {ad.adv_number}
                         </h3>
                       </div>
@@ -198,7 +175,7 @@ const AdvertisementRecords = () => {
                     </div>
                     <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                       new Date(ad.closing_date) > new Date() 
-                        ? 'bg-green-100 text-green-700' 
+                        ? 'bg-emerald-100 text-emerald-700' 
                         : 'bg-red-100 text-red-700'
                     }`}>
                       {new Date(ad.closing_date) > new Date() ? 'Active' : 'Closed'}
@@ -212,25 +189,22 @@ const AdvertisementRecords = () => {
                     </div>
                   )}
 
-                  <Button 
+                  <button 
                     onClick={() => viewAdvertisement(ad.id)}
-                    variant="outline"
-                    className="w-full gap-2 group-hover:bg-amber-50 group-hover:border-amber-300"
+                    className="w-full px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
                   >
                     <Eye className="w-4 h-4" />
                     View Details
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {/* Pagination */}
-      {!loading && pagination.last_page > 1 && (
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-4">
+        {/* Pagination */}
+        {!loading && pagination.last_page > 1 && (
+          <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm text-slate-600">
                 Showing {(pagination.current_page - 1) * pagination.per_page + 1} to{' '}
@@ -238,61 +212,59 @@ const AdvertisementRecords = () => {
                 {pagination.total} results
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
                   onClick={() => fetchAdvertisements(pagination.current_page - 1)}
                   disabled={pagination.current_page === 1}
-                  className="gap-1"
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   Previous
-                </Button>
+                </button>
                 <div className="flex items-center gap-1">
-                  {[...Array(pagination.last_page)].map((_, i) => (
-                    <Button
-                      key={i + 1}
-                      variant={pagination.current_page === i + 1 ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => fetchAdvertisements(i + 1)}
-                      className="w-10 h-10"
-                    >
-                      {i + 1}
-                    </Button>
-                  ))}
+                  {[...Array(Math.min(pagination.last_page, 5))].map((_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => fetchAdvertisements(pageNum)}
+                        className={`w-10 h-10 rounded-lg font-medium transition-all ${
+                          pagination.current_page === pageNum
+                            ? 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white'
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
                   onClick={() => fetchAdvertisements(pagination.current_page + 1)}
                   disabled={pagination.current_page === pagination.last_page}
-                  className="gap-1"
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
                 >
                   Next
                   <ChevronRight className="w-4 h-4" />
-                </Button>
+                </button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
       {/* Details Modal */}
       {showDetails && selectedAd && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDetails(false)}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div
             className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-gradient-to-br from-amber-500 to-orange-600 p-6 border-b z-10">
+            <div className="sticky top-0 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 p-6 border-b z-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Megaphone className="w-8 h-8 text-white" />
                   <div>
                     <h2 className="text-2xl font-bold text-white">{selectedAd.adv_number}</h2>
-                    <p className="text-amber-100 text-sm">Advertisement Details</p>
+                    <p className="text-emerald-100 text-sm">Advertisement Details</p>
                   </div>
                 </div>
                 <button
@@ -323,8 +295,8 @@ const AdvertisementRecords = () => {
               </div>
 
               {selectedAd.note && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="text-sm font-semibold text-amber-900 mb-2">Note</p>
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <p className="text-sm font-semibold text-emerald-900 mb-2">Note</p>
                   <p className="text-slate-700">{selectedAd.note}</p>
                 </div>
               )}
@@ -342,7 +314,7 @@ const AdvertisementRecords = () => {
                   <ul className="space-y-2">
                     {parseTermsConditions(selectedAd.terms_conditions).map((term, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm text-slate-700">
-                        <span className="text-amber-600 font-bold mt-1">•</span>
+                        <span className="text-emerald-600 font-bold mt-1">•</span>
                         <span>{term}</span>
                       </li>
                     ))}
@@ -357,9 +329,10 @@ const AdvertisementRecords = () => {
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

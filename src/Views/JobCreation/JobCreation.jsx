@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import Config from '../../Config/Baseurl';
+import { useState, useEffect } from 'react';
+import Config from 'Config/Baseurl';
 import Step1 from './Steps/Step1';
 import Step2 from './Steps/Step2';
 import Step3 from './Steps/Step3';
@@ -298,7 +298,7 @@ export default function JobCreation() {
               <div className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                   step === s 
-                    ? 'bg-emerald-600 text-white' 
+                    ? 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white' 
                     : step > s 
                     ? 'bg-emerald-100 text-emerald-600' 
                     : 'bg-gray-100 text-gray-400'
@@ -307,7 +307,7 @@ export default function JobCreation() {
                 </div>
                 {s < 5 && (
                   <div className={`flex-1 h-1 mx-2 ${
-                    step > s ? 'bg-emerald-600' : 'bg-gray-200'
+                    step > s ? 'bg-gradient-to-r from-emerald-900 to-emerald-950' : 'bg-gray-200'
                   }`}></div>
                 )}
               </div>
@@ -356,7 +356,7 @@ export default function JobCreation() {
                 <button
                   type="button"
                   onClick={next}
-                  className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+                  className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white rounded-lg transition"
                 >
                   Next Step →
                 </button>
@@ -368,7 +368,7 @@ export default function JobCreation() {
                   className={`px-8 py-2.5 rounded-lg transition ${
                     loading
                       ? 'bg-blue-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
+                      : 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950'
                   } text-white`}
                 >
                   {loading ? (

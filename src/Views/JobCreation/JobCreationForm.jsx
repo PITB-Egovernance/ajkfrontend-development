@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { TextField, MenuItem } from '@mui/material';
 import { Briefcase, GraduationCap, UserCheck, FileText, ClipboardList } from 'lucide-react';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import './JobCreationForm.css';
 
 const JobCreationForm = () => {
@@ -491,7 +491,7 @@ const JobCreationForm = () => {
   return (
     <div className="job-creation-container">
       <div className="container">
-        <div className="app-header">Job Creation Form</div>
+        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white py-3 px-5 rounded-t-lg text-center text-2xl font-bold">Job Creation Form</div>
 
         {/* Step Progress */}
         <div className={`step-progress active-${currentStep}`}>

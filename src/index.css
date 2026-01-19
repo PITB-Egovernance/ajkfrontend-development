@@ -4,7 +4,13 @@
 
 /* Custom global styles can be added below */
 @layer base {
-  /* Add base layer styles here */
+  html {
+    font-size: calc(16px * 0.7);
+  }
+  
+  body {
+    font-family: 'Poppins', sans-serif;
+  }
 }
 
 @layer components {
@@ -12,5 +18,13 @@
 }
 
 @layer utilities {
-  /* Add custom utility styles here */
+  /* Hidden scrollbar but scrolling works */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { 
@@ -17,12 +18,13 @@ import {
   Plus,
   AlertCircle
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import Config from '../../Config/Baseurl';
-import AuthService from '../../Services/AuthService';
+import { Card, CardHeader, CardTitle, CardContent } from 'Components/ui/Card';
+import Button from 'Components/ui/Button';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const AnnexAList = () => {
+  const navigate = useNavigate();
   const [annexAList, setAnnexAList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -33,7 +35,6 @@ const AnnexAList = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAnnex, setSelectedAnnex] = useState(null);
-  const [showDetails, setShowDetails] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editFormData, setEditFormData] = useState({});
@@ -75,31 +76,8 @@ const AnnexAList = () => {
     }
   };
 
-  const viewAnnexDetails = async (id) => {
-    const loadingToast = toast.loading('Loading details...');
-    try {
-      const response = await fetch(`${Config.apiUrl}/annex-a/${id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
-      });
-
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
-        setSelectedAnnex(result.data);
-        setShowDetails(true);
-        toast.success('Details loaded', { id: loadingToast });
-      } else {
-        toast.error(result.message || 'Failed to load details', { id: loadingToast });
-      }
-    } catch (error) {
-      toast.error('Error loading details', { id: loadingToast });
-    }
+  const viewAnnexDetails = (id) => {
+    navigate(`/dashboard/annex-a/${id}`);
   };
 
   const openEditModal = async (id) => {
@@ -414,118 +392,6 @@ const AnnexAList = () => {
           </CardContent>
         </Card>
       )}
-
-      {/* Details Modal */}
-      <AnimatePresence>
-        {showDetails && selectedAnnex && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDetails(false)}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="sticky top-0 bg-gradient-to-br from-indigo-500 to-blue-600 p-6 border-b z-10">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <BookOpen className="w-8 h-8 text-white" />
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">{selectedAnnex.name_with_father}</h2>
-                      <p className="text-indigo-100 text-sm">Annex A Details</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowDetails(false)}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                  >
-                    <X className="w-6 h-6 text-white" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-slate-50 rounded-xl">
-                    <p className="text-sm font-medium text-slate-500 mb-1">District of Domicile</p>
-                    <p className="text-lg font-semibold text-slate-900">{selectedAnnex.district_of_domicile}</p>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-xl">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Creation of Post</p>
-                    <p className="text-lg font-semibold text-slate-900">{selectedAnnex.creation_of_post}</p>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-xl">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Initial Appointment</p>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {new Date(selectedAnnex.date_initial_appointment).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-xl">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Last Extension</p>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {new Date(selectedAnnex.date_last_extension).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                  <p className="text-sm font-semibold text-blue-900 mb-3">Vacancy Reasons</p>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={selectedAnnex.vacant_due_to_retirement === 1} disabled className="w-4 h-4 rounded" />
-                      <span className="text-slate-700">Retirement</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={selectedAnnex.vacant_due_to_promotion === 1} disabled className="w-4 h-4 rounded" />
-                      <span className="text-slate-700">Promotion</span>
-                    </label>
-                  </div>
-                  {selectedAnnex.vacant_due_to_other && (
-                    <p className="mt-2 text-sm text-slate-600">Other: {selectedAnnex.vacant_due_to_other}</p>
-                  )}
-                </div>
-
-                {selectedAnnex.other_information && (
-                  <div className="p-4 bg-slate-50 rounded-xl">
-                    <p className="text-sm font-semibold text-slate-900 mb-2">Other Information</p>
-                    <p className="text-slate-700">{selectedAnnex.other_information}</p>
-                  </div>
-                )}
-
-                {selectedAnnex.job_detail && (
-                  <div className="p-4 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl">
-                    <p className="text-sm font-semibold text-indigo-900 mb-3">Job Detail Information</p>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-slate-600">Designation:</span>
-                        <span className="ml-2 font-medium text-slate-900">{selectedAnnex.job_detail.designation}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-600">Scale:</span>
-                        <span className="ml-2 font-medium text-slate-900">{selectedAnnex.job_detail.scale}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-600">No. of Posts:</span>
-                        <span className="ml-2 font-medium text-slate-900">{selectedAnnex.job_detail.num_posts}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-600">Status:</span>
-                        <span className={`ml-2 font-medium px-2 py-1 rounded ${
-                          selectedAnnex.job_detail.status === 'approved' ? 'bg-green-100 text-green-700' :
-                          selectedAnnex.job_detail.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                          'bg-amber-100 text-amber-700'
-                        }`}>
-                          {selectedAnnex.job_detail.status}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Edit Modal */}
       <AnimatePresence>
