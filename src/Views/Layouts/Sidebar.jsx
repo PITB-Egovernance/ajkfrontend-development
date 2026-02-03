@@ -331,7 +331,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <div className={cn("flex items-center", isOpen ? "gap-4" : "justify-center")}>
             <div className="relative flex-shrink-0">
               <img
-                src="/assets/img/favicon/Logo.PNG"
+                src="/assets/img/favicon/Logo.png"
                 alt="AJ&K PSC Logo"
                 className={cn(
                   "object-contain rounded-xl bg-white p-2 shadow-lg ring-2 ring-emerald-400/20",

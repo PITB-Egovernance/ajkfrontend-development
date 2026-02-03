@@ -174,7 +174,7 @@ const loadingToast = toast.loading('Creating account...');
           {/* Header */}
           <div className="px-8 py-6 border-b border-slate-200">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <img src="/assets/img/favicon/Logo.PNG" alt="logo" className="w-12 h-12 rounded-lg" />
+              <img src="/assets/img/favicon/Logo.png" alt="logo" className="w-12 h-12 rounded-lg" />
               <div>
                 <div className="font-bold text-emerald-700 text-lg">AJ&K PSC</div>
                 <div className="text-xs text-slate-500">Admin Portal</div>
