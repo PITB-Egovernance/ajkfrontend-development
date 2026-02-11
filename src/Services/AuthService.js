@@ -1,6 +1,6 @@
-// Services/AuthService.js  ← FINAL VERSION WITH CAPTCHA SUPPORT
+// services/authService.js  ← FINAL VERSION WITH CAPTCHA SUPPORT
 
-import Config from "Config/Baseurl";
+import Config from 'config/baseUrl';
 const API_URL = Config.apiUrl;
 const API_KEY = Config.apiKey;
 
@@ -61,7 +61,7 @@ class AuthService {
   // CAPTCHA – ADD THESE TWO METHODS BACK
   // ──────────────────────────────────────────────────────
   static async generateCaptcha() {
-    const response = await fetch(`${API_URL}/captcha-image`, {
+    const response = await fetch(`${API_URL}/captcha/image`, {
       method: "GET",
       headers: { 
         Accept: "application/json",
@@ -75,7 +75,7 @@ class AuthService {
   }
 
   static async validateCaptcha(data) {
-    const response = await fetch(`${API_URL}/captcha-validate`, {
+    const response = await fetch(`${API_URL}/captcha/validate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

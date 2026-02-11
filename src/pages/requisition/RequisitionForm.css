@@ -1,0 +1,339 @@
+.requisition-form-container {
+  --primary-color: #006622;
+  --secondary-color: #0B5E3C;
+  min-height: 100vh;
+  font-family: 'Roboto', sans-serif;
+  color: #1a2b3c;
+}
+
+.requisition-form-container .container {
+  max-width: 1200px;
+  background: white;
+  border-radius: 10px;
+  margin: 10px auto;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.requisition-form-container .app-header {
+  background: linear-gradient(to bottom right, #022c22 0%, #064e3b 50%, #022c22 100%);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 10px 10px 0 0;
+  margin: -20px -20px 20px -20px;
+  text-align: center;
+  font-size: 1.5em;
+  font-weight: 700;
+}
+
+.requisition-form-container .step-progress {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 15px 0;
+  position: relative;
+}
+
+.requisition-form-container .step-progress::before {
+  content: '';
+  position: absolute;
+  top: 42px;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: #e0e0e0;
+  z-index: 1;
+}
+
+.requisition-form-container .step-progress.active-0::before {
+  background: linear-gradient(to right, #064e3b 33%, #e0e0e0 33%);
+}
+
+.requisition-form-container .step-progress.active-1::before {
+  background: linear-gradient(to right, #064e3b 66%, #e0e0e0 66%);
+}
+
+.requisition-form-container .step-progress.active-2::before {
+  background: #064e3b;
+}
+
+.requisition-form-container .step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 33.33%;
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.requisition-form-container .step .step-circle {
+  width: 46px;
+  height: 46px;
+  line-height: 32px;
+  border-radius: 50%;
+  background: #e9ecef;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  border: 2px solid #e9ecef;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.requisition-form-container .step.active .step-circle {
+  background: linear-gradient(to bottom right, #022c22 0%, #064e3b 50%, #022c22 100%);
+  color: white;
+  border-color: #064e3b;
+}
+
+.requisition-form-container .step.completed .step-circle {
+  background: linear-gradient(to bottom right, #022c22 0%, #064e3b 50%, #022c22 100%);
+  color: white;
+  border-color: #064e3b;
+}
+
+.requisition-form-container .step .step-label {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #4b5563;
+  text-align: center;
+  font-weight: 500;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.requisition-form-container .step.active .step-label,
+.requisition-form-container .step.completed .step-label {
+  color: #064e3b;
+}
+
+.requisition-form-container .step:hover .step-circle {
+  transform: scale(1.1);
+}
+
+.requisition-form-container .form-control,
+.requisition-form-container .form-select {
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  padding: 8px 12px;
+  font-size: 0.9em;
+  line-height: 1.4;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.requisition-form-container .form-control:focus,
+.requisition-form-container .form-select:focus {
+  border-color: #064e3b;
+  box-shadow: 0 0 0 0.15rem rgba(6, 78, 59, 0.25);
+  outline: none;
+}
+
+.requisition-form-container .form-control.is-invalid,
+.requisition-form-container .form-select.is-invalid {
+  border-color: #dc3545;
+}
+
+.requisition-form-container .invalid-feedback {
+  font-size: 0.8em;
+  color: #dc3545;
+  display: block;
+  margin-top: 4px;
+}
+
+.requisition-form-container .btn-primary,
+.requisition-form-container .btn-next,
+.requisition-form-container .btn-prev {
+  background: linear-gradient(to bottom right, #022c22 0%, #064e3b 50%, #022c22 100%);
+  border: 1px solid #064e3b;
+  border-radius: 6px;
+  color: white;
+  padding: 10px 20px;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.requisition-form-container .btn-primary:hover,
+.requisition-form-container .btn-next:hover,
+.requisition-form-container .btn-prev:hover {
+  background: linear-gradient(to bottom right, #064e3b 0%, #022c22 50%, #064e3b 100%);
+  border-color: #064e3b;
+}
+
+.requisition-form-container .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.requisition-form-container .form-group {
+  margin-bottom: 15px;
+}
+
+.requisition-form-container .form-group label {
+  font-weight: 500;
+  color: #1a2b3c;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+  display: block;
+}
+
+.requisition-form-container .required {
+  color: red;
+  font-size: 20px;
+}
+
+.requisition-form-container .form-step {
+  display: none;
+}
+
+.requisition-form-container .form-step.active {
+  display: block;
+}
+
+.requisition-form-container .navigation-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.requisition-form-container .row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -15px;
+  margin-left: -15px;
+}
+
+.requisition-form-container .col-md-6 {
+  flex: 0 0 50%;
+  max-width: 50%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+.requisition-form-container .section-title {
+  color: var(--secondary-color);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 25px 0 20px;
+  padding: 12px 0;
+  position: relative;
+}
+
+.requisition-form-container .alert {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.requisition-form-container .alert-danger {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.requisition-form-container .alert-success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.requisition-form-container .radio-group,
+.requisition-form-container .checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 8px;
+}
+
+.requisition-form-container .radio-group label,
+.requisition-form-container .checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: normal;
+  cursor: pointer;
+  margin: 0;
+}
+
+.requisition-form-container .radio-group input[type="radio"],
+.requisition-form-container .checkbox-group input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.requisition-form-container select[multiple] {
+  min-height: 120px;
+}
+
+.requisition-form-container .table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.requisition-form-container .table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.requisition-form-container .table-bordered {
+  border: 1px solid #dee2e6;
+}
+
+.requisition-form-container .table-bordered th,
+.requisition-form-container .table-bordered td {
+  border: 1px solid #dee2e6;
+}
+
+@media (max-width: 768px) {
+  .requisition-form-container .container {
+    margin: 10px;
+    padding: 10px;
+  }
+
+  .requisition-form-container .app-header {
+    margin: -10px -10px 10px -10px;
+    padding: 10px;
+    font-size: 1.3em;
+  }
+
+  .requisition-form-container .step-progress {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+  }
+
+  .requisition-form-container .step {
+    width: 100%;
+    flex-direction: row;
+    margin-bottom: 15px;
+    padding-left: 15px;
+  }
+
+  .requisition-form-container .step .step-circle {
+    margin-right: 10px;
+    width: 36px;
+    height: 36px;
+    font-size: 0.9em;
+  }
+
+  .requisition-form-container .step .step-label {
+    text-align: left;
+    font-size: 0.8rem;
+    min-height: auto;
+  }
+
+  .requisition-form-container .col-md-6 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
