@@ -1,6 +1,6 @@
-const productionUrl = "https://admin-ajkpsc.punjab.gov.pk";
+const productionUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 const localUrl      = "http://localhost:3000";
-const apiUrl        = "http://127.0.0.1:8000/api";    
+const apiUrl        = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";    
 const apiKey        = "9kX7pL2mQ8rT5vY3nZ6bJ1hF4gD0eA9cU8iO2sV7tE5rW";
 
 

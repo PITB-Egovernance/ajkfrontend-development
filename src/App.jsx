@@ -1,37 +1,37 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import Dashboard from 'Views/Dashboard';
-import Login from "Views/Auth/Login/Login";
-import ProtectedRoute from "Routes/ProtectedRoute";
-import PublicRoute from "Routes/PublicRoute";
-import Register from "Views/Auth/Register/Register";
-import DashboardLayout from 'Views/Layouts/DashboardLayout';
-import Profile from 'Views/Profile/Profile';
-import RequisitionList from 'Views/Pages/RequisitionList';
-import RequisitionForm from 'Views/RequisitionForm/RequisitionForm';
-import RequisitionEdit from 'Views/RequisitionForm/RequisitionEdit';
-import RequisitionPreview from 'Views/RequisitionForm/RequisitionPreview';
-import ApprovedRequisitions from 'Views/Pages/ApprovedRequisitions';
-import AddNotes from 'Views/Pages/AddNotes';
-import AdvertisementRecords from 'Views/Pages/AdvertisementRecords';
-import AnnexAList from 'Views/Pages/AnnexAList';
-import AnnexADetail from 'Views/Pages/AnnexADetail';
-import JobCreation from 'Views/Pages/JobCreation';
-import JobCreationForm from 'Views/JobCreation/JobCreationForm';
-import DispatchReceived from 'Views/Dispatch/DispatchRecieved';
-import DispatchSent from 'Views/Dispatch/DispatchSent';
-import PscTable from 'Views/Pages/PscTable';
-import DispatchAddNew from "Views/Dispatch/DispatchAddNew";
-import DispatchSentAddNew from "Views/Dispatch/DispatchSentAddNew";
-import RequisitionDetail from "Views/Pages/RequisitionDetail";
-import Settings from 'Views/Settings/Settings';
-import OrganizationInformation from 'Views/Settings/OrganizationInformation';
-import OrganizationalHierarchy from 'Views/Settings/OrganizationalHierarchy';
-import DistrictsManagement from 'Views/Settings/DistrictsManagement';
-import TehsilsManagement from 'Views/Settings/TehsilsManagement';
-import DesignationsManagement from 'Views/Settings/DesignationsManagement';
-import GradesManagement from 'Views/Settings/GradesManagement';
-import CompaniesManagement from 'Views/Settings/CompaniesManagement';
-import ContractorsManagement from 'Views/Settings/ContractorsManagement';
+import Dashboard from 'pages/Dashboard';
+import Login from 'pages/auth/Login/Login';
+import ProtectedRoute from 'middlewares/ProtectedRoute';
+import PublicRoute from 'middlewares/PublicRoute';
+import Register from 'pages/auth/Register/Register';
+import DashboardLayout from 'components/layouts/DashboardLayout';
+import Profile from 'pages/profile/Profile';
+import RequisitionList from 'pages/RequisitionList';
+import RequisitionForm from 'pages/requisition/RequisitionForm';
+import RequisitionEdit from 'pages/requisition/RequisitionEdit';
+import RequisitionPreview from 'pages/requisition/RequisitionPreview';
+import ApprovedRequisitions from 'pages/ApprovedRequisitions';
+import AddNotes from 'pages/AddNotes';
+import AdvertisementRecords from 'pages/AdvertisementRecords';
+import AnnexAList from 'pages/AnnexAList';
+import AnnexADetail from 'pages/AnnexADetail';
+import JobCreation from 'pages/JobCreation';
+import JobCreationForm from 'pages/job-creation/JobCreationForm';
+import DispatchReceived from 'pages/dispatch/DispatchRecieved';
+import DispatchSent from 'pages/dispatch/DispatchSent';
+import PscTable from 'pages/PscTable';
+import DispatchAddNew from 'pages/dispatch/DispatchAddNew';
+import DispatchSentAddNew from 'pages/dispatch/DispatchSentAddNew';
+import RequisitionDetail from 'pages/RequisitionDetail';
+import Settings from 'pages/settings/Settings';
+import OrganizationInformation from 'pages/settings/OrganizationInformation';
+import OrganizationalHierarchy from 'pages/settings/OrganizationalHierarchy';
+import DistrictsManagement from 'pages/settings/DistrictsManagement';
+import TehsilsManagement from 'pages/settings/TehsilsManagement';
+import DesignationsManagement from 'pages/settings/DesignationsManagement';
+import GradesManagement from 'pages/settings/GradesManagement';
+import CompaniesManagement from 'pages/settings/CompaniesManagement';
+import ContractorsManagement from 'pages/settings/ContractorsManagement';
 
 
 function App() {
@@ -66,12 +66,12 @@ function App() {
           <Route path="annex-a" element={<AnnexAList />} />
           <Route path="annex-a/:id" element={<AnnexADetail />} />
           <Route path="job-creation" element={<JobCreation />} />
-            <Route path="dispatch/received" element={<DispatchReceived />} />
+          <Route path="dispatch/received" element={<DispatchReceived />} />
           <Route path="dispatch/recieved-form" element={<DispatchAddNew />} />
           <Route path="dispatch/sent" element={<DispatchSent />} />
           <Route path="dispatch/sent/add" element={<DispatchSentAddNew />} />
           <Route path="psc-table" element={<PscTable />} />
-          
+
           {/* Settings Routes */}
           <Route path="settings" element={<Settings />} />
           <Route path="settings/organization" element={<OrganizationInformation />} />

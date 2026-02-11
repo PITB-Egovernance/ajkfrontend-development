@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import AuthService from 'Services/AuthService';
+import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
 
 // Create the Auth Context
@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const result = await AuthService.login(credentials);
-      
+
       if (result.data?.user) {
         setUser(result.data.user);
         setIsAuthenticated(true);
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const result = await AuthService.register(userData);
-      
+
       if (result.data?.user) {
         setUser(result.data.user);
         setIsAuthenticated(true);
@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }) => {
       ...prev,
       ...userData
     }));
-    
+
     // Also update localStorage
     const currentUser = AuthService.getUser();
     if (currentUser) {
@@ -137,13 +137,13 @@ export const AuthProvider = ({ children }) => {
   const checkAuth = useCallback(() => {
     const token = AuthService.getToken();
     const storedUser = AuthService.getUser();
-    
+
     if (token && storedUser) {
       setUser(storedUser);
       setIsAuthenticated(true);
       return true;
     }
-    
+
     setUser(null);
     setIsAuthenticated(false);
     return false;

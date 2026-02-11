@@ -2,16 +2,16 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Pages
-import Login from "./Views/Auth/Login/Login";
-import Register from "./Views/Auth/Register/Register";
+import Login from "./pages/Auth/Login/Login";
+import Register from "./pages/Auth/Register/Register";
 
 // Protected Route
-import ProtectedRoute from "./Routes/ProtectedRoute";
+import ProtectedRoute from "./middlewares/ProtectedRoute";
 
 // Protected Pages (Create these if they don't exist)
-// import Dashboard from "./Views/Dashboard/Dashboard";
-// import Profile from "./Views/Profile/Profile";
-// import ForgotPassword from "./Views/Auth/ForgotPassword/ForgotPassword";
+// import Dashboard from "./pages/Dashboard/Dashboard";
+// import Profile from "./pages/Profile/Profile";
+// import ForgotPassword from "./pages/Auth/ForgotPassword/ForgotPassword";
 
 export default function AppRoutes() {
   return (
@@ -52,12 +52,12 @@ export default function AppRoutes() {
  * Protected Routes Setup Guide
  * 
  * 1. Create pages that should be protected:
- *    src/Views/Dashboard/Dashboard.jsx
- *    src/Views/Profile/Profile.jsx
+ *    src/pages/Dashboard/Dashboard.jsx
+ *    src/pages/Profile/Profile.jsx
  * 
  * 2. Import them:
- *    import Dashboard from "./Views/Dashboard/Dashboard";
- *    import Profile from "./Views/Profile/Profile";
+ *    import Dashboard from "./pages/Dashboard/Dashboard";
+ *    import Profile from "./pages/Profile/Profile";
  * 
  * 3. Wrap them in ProtectedRoute:
  *    <Route 
@@ -74,7 +74,7 @@ export default function AppRoutes() {
  * Example Protected Page:
  * 
  * import React from "react";
- * import AuthService from "../../../Services/AuthService";
+ * import AuthService from "../../../services/authService";
  * 
  * export default function Dashboard() {
  *   const user = AuthService.getUser();

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
 
 /**
