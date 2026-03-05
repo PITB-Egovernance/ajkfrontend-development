@@ -164,8 +164,8 @@ export default function DispatchAddNew() {
   };
 
   return (
-   <Box className="p-8 max-w-[1200px] mx-auto bg-white rounded-lg shadow-md">
-      <Box className="flex justify-between items-center mb-4">
+    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h5" fontWeight="bold">
           Add New Received Dispatch
         </Typography>

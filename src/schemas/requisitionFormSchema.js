@@ -27,23 +27,42 @@ export const requisitionFormSchema = {
       type: 'required',
       message: 'Vacancy date is required'
     },
-    test_type: {
-      type: 'required',
-      message: 'Test type is required'
-    }
+    // test_type: {
+    //   type: 'required',
+    //   message: 'Test type is required'
+    // }
   },
+  
   step2: {
     academic_qualification: {
       type: 'required',
       message: 'Academic qualification is required'
     },
-    equivalent_qualification: {
-      type: 'required',
-      message: 'Equivalent qualification is required'
-    },
+
     degree_equivalence: {
-      type: 'required',
-      message: 'Degree equivalence is required'
+      type: 'custom',
+      message: 'Degree equivalence is required when Equivalent Qualification is Yes',
+      validate: (value, formData) => {
+        if (formData.equivalent_qualification === 'Yes') {
+          return value && value.trim() !== ''
+            ? null
+            : 'Degree equivalence is required when Equivalent Qualification is Yes';
+        }
+        return null; // Not required when No
+      }
+    },
+
+    authority_certificate: {
+      type: 'custom',
+      message: 'Authority certificate is required when Equivalent Qualification is Yes',
+      validate: (value, formData) => {
+        if (formData.equivalent_qualification === 'Yes') {
+          return value && value.trim() !== ''
+            ? null
+            : 'Authority certificate is required when Equivalent Qualification is Yes';
+        }
+        return null;
+      }
     }
   },
   step3: {
@@ -75,10 +94,10 @@ export const requisitionFormSchema = {
       type: 'required',
       message: 'Domicile is required'
     },
-    gender_basis: {
-      type: 'required',
-      message: 'Gender is required'
-    },
+    // gender_basis: {
+    //   type: 'required',
+    //   message: 'Gender is required'
+    // },
     district: {
       type: 'array',
       message: 'At least one district is required',

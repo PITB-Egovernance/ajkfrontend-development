@@ -1,25 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { TextField, MenuItem } from '@mui/material';
 
-const Step2Criteria = ({ data, onNext, onBack }) => {
+const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
+
   const [formData, setFormData] = useState({
-    academic_qualification: data.academic_qualification || '',
-    equivalent_qualification: data.equivalent_qualification || '',
-    authority_certificate: data.authority_certificate || '',
-    degree_equivalence: data.degree_equivalence || '',
-    any_other_qualification: data.any_other_qualification || '',
-    training_institute: data.training_institute || '',
-    experience_type: data.experience_type || '',
-    experience_length: data.experience_length || 0,
-    min_qualification: data.min_qualification || '',
+    academic_qualification: '',
+    equivalent_qualification: '',
+    authority_certificate: '',
+    degree_equivalence: '',
+    any_other_qualification: '',
+    training_institute: '',
+    experience_type: '',
+    experience_length: 0,
+    min_qualification: '',
   });
 
-  const [showAuthority, setShowAuthority] = useState(data.equivalent_qualification === 'Yes');
+  const [showAuthority, setShowAuthority] = useState(false);
 
-  // Update form data when data prop changes (for edit mode)
   useEffect(() => {
     if (data && Object.keys(data).length > 0) {
-      console.log('🔄 Step2: Updating form with new data:', data);
       setFormData({
         academic_qualification: data.academic_qualification || '',
         equivalent_qualification: data.equivalent_qualification || '',
@@ -31,32 +30,71 @@ const Step2Criteria = ({ data, onNext, onBack }) => {
         experience_length: data.experience_length || 0,
         min_qualification: data.min_qualification || '',
       });
+
       setShowAuthority(data.equivalent_qualification === 'Yes');
     }
   }, [data]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'experience_length' ? parseInt(value) || 0 : value
+      [name]: name === 'experience_length'
+        ? parseInt(value) || 0
+        : value
     }));
 
     if (name === 'equivalent_qualification') {
-      setShowAuthority(value === 'Yes');
+
+      if (value === 'Yes') {
+        setShowAuthority(true);
+      } else {
+        setShowAuthority(false);
+
+        // Clear dependent fields
+        setFormData(prev => ({
+          ...prev,
+          authority_certificate: '',
+          degree_equivalence: ''
+        }));
+      }
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Academic always required
+    if (!formData.academic_qualification) {
+      alert('Academic Qualification is required');
+      return;
+    }
+
+    // Only when Yes
+    if (formData.equivalent_qualification === 'Yes') {
+
+      if (!formData.authority_certificate) {
+        alert('Authority Certificate is required when Equivalent Qualification is Yes');
+        return;
+      }
+
+      if (!formData.degree_equivalence) {
+        alert('Name Degree of Equivalence is required when Equivalent Qualification is Yes');
+        return;
+      }
+    }
+
     onNext(formData);
   };
 
   return (
     <form onSubmit={handleSubmit}>
+
       <h6 className="section-title">Qualification Required</h6>
 
       <div className="row">
+
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
@@ -67,6 +105,7 @@ const Step2Criteria = ({ data, onNext, onBack }) => {
             value={formData.academic_qualification}
             onChange={handleChange}
           >
+            <MenuItem value="">Select</MenuItem>
             <MenuItem value="Matric">Matric</MenuItem>
             <MenuItem value="Intermediate">Intermediate</MenuItem>
             <MenuItem value="Bachelor">Bachelor</MenuItem>
@@ -79,13 +118,13 @@ const Step2Criteria = ({ data, onNext, onBack }) => {
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
-            required
             select
             label="Equivalent Qualification"
             name="equivalent_qualification"
             value={formData.equivalent_qualification}
             onChange={handleChange}
           >
+            <MenuItem value="">Select</MenuItem>
             <MenuItem value="Yes">Yes</MenuItem>
             <MenuItem value="No">No</MenuItem>
           </TextField>
@@ -106,13 +145,17 @@ const Step2Criteria = ({ data, onNext, onBack }) => {
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
-            required
             select
-            label="Name Degree of Equivalence"
+            label={
+              formData.equivalent_qualification === 'Yes'
+                ? 'Name Degree of Equivalence *'
+                : 'Name Degree of Equivalence (Optional)'
+            }
             name="degree_equivalence"
             value={formData.degree_equivalence}
             onChange={handleChange}
           >
+            <MenuItem value="">Select</MenuItem>
             <MenuItem value="B.Sc">B.Sc</MenuItem>
             <MenuItem value="B.A">B.A</MenuItem>
             <MenuItem value="B.Com">B.Com</MenuItem>
@@ -132,7 +175,7 @@ const Step2Criteria = ({ data, onNext, onBack }) => {
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
-            label="Any Other Qualification under Rules"
+            label="Any Other Qualification under Rules (Optional)"
             name="any_other_qualification"
             value={formData.any_other_qualification}
             onChange={handleChange}
@@ -143,10 +186,11 @@ const Step2Criteria = ({ data, onNext, onBack }) => {
       <h6 className="section-title">Experience Required</h6>
 
       <div className="row">
+
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
-            label="Training with the name of Training Institute"
+            label="Training Institute Name (Optional)"
             name="training_institute"
             value={formData.training_institute}
             onChange={handleChange}
@@ -184,6 +228,7 @@ const Step2Criteria = ({ data, onNext, onBack }) => {
             value={formData.min_qualification}
             onChange={handleChange}
           >
+            <MenuItem value="">Select</MenuItem>
             <MenuItem value="Bachelor">Bachelor</MenuItem>
             <MenuItem value="Master">Master</MenuItem>
             <MenuItem value="PhD">PhD</MenuItem>
@@ -191,18 +236,20 @@ const Step2Criteria = ({ data, onNext, onBack }) => {
         </div>
       </div>
 
-      <small className="d-block mt-3 text-muted">
-        Note: Only those experience certificates shall be accepted which are in accordance with rule notification #AJKPSC/1-2017/1077-10AJKPSC.
-      </small>
-
       <div className="navigation-buttons">
         <button type="button" className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200" onClick={onBack}>
           Previous
         </button>
-        <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
-          Save & Continue
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => onSaveDraft?.(formData)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
+            Save Draft
+          </button>
+          <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
+            Next
+          </button>
+        </div>
       </div>
+
     </form>
   );
 };

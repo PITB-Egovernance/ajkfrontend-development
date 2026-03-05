@@ -75,8 +75,48 @@ export default function Auth() {
     return validateSignup(signupData);
   };
 
+  // const handleLogin = async (e) => {
+  //   e.preventDefault();
+  //   const e_ = validateLoginForm();
+  //   if (Object.keys(e_).length) {
+  //     setErrors(e_);
+  //     return;
+  //   }
+
+  //   setLoading(true);
+  //   const loadingToast = toast.loading('Loading...');
+
+  //     const captchaRes = await AuthService.validateCaptcha({ captcha_token: captcha.token, captcha: loginData.captcha });
+  //     if (!captchaRes.success) throw new Error(captchaRes.message || 'CAPTCHA failed');
+
+  //     const result = await login({ cnic: loginData.cnic, password: loginData.password, mobile: '03349394636'});
+
+  //     console.log('Resppnse Login', result)
+  //     // if (result.success) {
+  //     //   if (result.data.otp_required == true) {
+  //     //     toast.success("OTP sent to your registered contact");
+          
+  //     //     navigate("/two-factor", {
+  //     //       state: { userId: result.data.user_id }
+  //     //     });
+  //     //   }
+  //     // }else{
+  //     //   toast.error(result.message || 'Login failed', { id: loadingToast });
+  //     //   loadCaptcha();
+  //     //   setLoading(false);
+  //     // }
+  //     // if (result.success) {
+  //     //   toast.success('Login successful! Redirecting...', { id: loadingToast });
+  //     //   setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+  //     // } else {
+  //     //   throw new Error(result.error || 'Login failed');
+  //     // }
+   
+  // };
+
   const handleLogin = async (e) => {
     e.preventDefault();
+
     const e_ = validateLoginForm();
     if (Object.keys(e_).length) {
       setErrors(e_);
@@ -84,28 +124,44 @@ export default function Auth() {
     }
 
     setLoading(true);
-    const loadingToast = toast.loading('Signing in...');
+    const loadingToast = toast.loading("Signing in...");
 
     try {
-      const captchaRes = await AuthService.validateCaptcha({ captcha_token: captcha.token, captcha: loginData.captcha });
-      if (!captchaRes.success) throw new Error(captchaRes.message || 'CAPTCHA failed');
+      // 1️⃣ Validate CAPTCHA
+      const captchaRes = await AuthService.validateCaptcha({
+        captcha_token: captcha.token,
+        captcha: loginData.captcha,
+      });
 
-      const result = await login({ cnic: loginData.cnic, password: loginData.password });
-
-      if (result.success) {
-        toast.success('Login successful! Redirecting...', { id: loadingToast });
-        setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
-      } else {
-        throw new Error(result.error || 'Login failed');
+      if (!captchaRes.success) {
+        throw new Error(captchaRes.message || "CAPTCHA failed");
       }
+
+      // 2️⃣ Login
+      const result = await AuthService.login({
+        cnic: loginData.cnic,
+        password: loginData.password,
+        // mobile: "03349394636",
+      });
+
+      if (result.success && result.data?.otp_required) {
+        toast.success("OTP sent successfully", { id: loadingToast });
+
+        // Save userId temporarily
+        localStorage.setItem("otp_user_id", result.data.user_id);
+
+        navigate("/verify-otp");
+      } else {
+        throw new Error(result.message || "Unexpected login response");
+      }
+
     } catch (err) {
-      toast.error(err.message || 'Login failed', { id: loadingToast });
+      toast.error(err.message || "Login failed", { id: loadingToast });
       loadCaptcha();
     } finally {
       setLoading(false);
     }
   };
-
   const handleSignup = async (e) => {
     e.preventDefault();
     const e_ = validateSignupForm();
@@ -190,6 +246,20 @@ export default function Auth() {
                     />
                     {errors.cnic && <p className="text-red-600 text-xs mt-1">{errors.cnic}</p>}
                   </div>
+                  {/* <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Mobile Number</label>
+                    <Input
+                      id="login-mobile"
+                      name="mobile"
+                      placeholder="Enter your 11-digit CNIC"
+                      value={loginData.cnic}
+                      onChange={handleLoginChange}
+                      disabled={loading}
+                      error={errors.cnic}
+                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                    />
+                    {errors.cnic && <p className="text-red-600 text-xs mt-1">{errors.cnic}</p>}
+                  </div> */}
 
                   {/* Password Input */}
                   <div>
@@ -270,7 +340,7 @@ export default function Auth() {
                   </Button>
 
                   {/* Footer */}
-                  <div className="mt-4 pt-4 border-t border-slate-200">
+                  {/* <div className="mt-4 pt-4 border-t border-slate-200">
                     <p className="text-center text-slate-600 text-sm">
                       Don't have an account?{' '}
                       <button
@@ -284,7 +354,7 @@ export default function Auth() {
                         Sign up
                       </button>
                     </p>
-                  </div>
+                  </div>*/}
                 </form>
               </motion.div>
             ) : (

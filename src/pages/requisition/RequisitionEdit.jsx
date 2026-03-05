@@ -21,6 +21,7 @@ const RequisitionEdit = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [activeStep, setActiveStep] = useState(0);
+  const [districtOptions, setDistrictOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     step1: {},
@@ -33,9 +34,42 @@ const RequisitionEdit = () => {
   const API_KEY = Config.apiKey;
 
   useEffect(() => {
+    fetchDistricts();
     loadRequisitionData();
   }, [id]);
 
+  const fetchDistricts = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/districts`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Adjust if API is paginated
+        // const districts =
+        //   Array.isArray(result.data)
+        //     ? result.data
+        //     : result.data?.data || [];
+        setDistrictOptions(
+          result.data.data.map((d) => ({
+            id: d.hash_id,   // use hash_id as id
+            name: d.name
+          }))
+        );
+
+        // setDistrictOptions(districts);
+      }
+    } catch (error) {
+      console.error('Error fetching districts:', error);
+      toast.error('Failed to load districts');
+    }
+  };
   const loadRequisitionData = async () => {
     setLoading(true);
     console.log('📝 Loading requisition data for edit, ID:', id);
@@ -125,10 +159,10 @@ const RequisitionEdit = () => {
       if (!data.quota_percentage) errors.quota_percentage = 'Quota percentage is required';
       if (!data.num_posts || data.num_posts < 1) errors.num_posts = 'Number of posts is required';
       if (!data.vacancy_date?.trim()) errors.vacancy_date = 'Vacancy date is required';
-      if (!data.test_type) errors.test_type = 'Test type is required';
+      // if (!data.test_type) errors.test_type = 'Test type is required';
     } else if (step === 1) {
       if (!data.academic_qualification) errors.academic_qualification = 'Academic qualification is required';
-      if (!data.equivalent_qualification) errors.equivalent_qualification = 'Equivalent qualification is required';
+      // if (!data.equivalent_qualification) errors.equivalent_qualification = 'Equivalent qualification is required';
       if (!data.degree_equivalence) errors.degree_equivalence = 'Degree equivalence is required';
     } else if (step === 2) {
       if (!data.min_age || data.min_age < 18) errors.min_age = 'Minimum age must be at least 18';
@@ -323,6 +357,7 @@ const RequisitionEdit = () => {
             onNext={handleNext}
             onBack={handleBack}
             isEdit={true}
+            districtOptions={districtOptions}
           />
         );
       default:

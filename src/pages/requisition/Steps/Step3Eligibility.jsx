@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { TextField, MenuItem } from '@mui/material';
 import { Plus, X } from 'lucide-react';
 
-const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
+const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = [], isEdit = false }) => {
   const [formData, setFormData] = useState({
-    min_age: data.min_age || 18,
-    max_age: data.max_age || 40,
+    min_age: data.min_age || '',
+    max_age: data.max_age || '',
     age_relaxation: data.age_relaxation || '',
     relaxation_reason: data.relaxation_reason || '',
     relaxation_years: data.relaxation_years || '',
@@ -22,19 +22,32 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
 
   // Update form data when data prop changes (for edit mode)
   useEffect(() => {
+    
+    const normalizedDistricts = Array.isArray(data.district)
+      ? data.district.map(d =>
+          typeof d === 'object'
+            ? d.id || d.hash_id || ''
+            : String(d)
+        )
+      : [''];
+
+    const normalizedDomicile =
+      typeof data.domicile === 'object'
+        ? data.domicile.id || data.domicile.hash_id || ''
+        : data.domicile || '';
     if (data && Object.keys(data).length > 0) {
       console.log('🔄 Step3: Updating form with new data:', data);
       setFormData({
-        min_age: data.min_age || 18,
-        max_age: data.max_age || 40,
+        min_age: data.min_age || '',
+        max_age: data.max_age || '',
         age_relaxation: data.age_relaxation || '',
         relaxation_reason: data.relaxation_reason || '',
         relaxation_years: data.relaxation_years || '',
         nationality: data.nationality || '',
-        domicile: data.domicile || '',
+        domicile: String(normalizedDomicile),
         other_conditions: data.other_conditions || '',
         gender_basis: data.gender_basis || '',
-        district: data.district || [''],
+         district: normalizedDistricts.map(String),
         quota: data.quota || [''],
         post: data.post || [''],
       });
@@ -178,14 +191,36 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
         </div>
 
         <div className="col-md-6 form-group">
-          <TextField
+          {/* <TextField
             fullWidth
             required
             label="Domicile (Name Districts/Units)"
             name="domicile"
             value={formData.domicile}
             onChange={handleChange}
-          />
+          /> */}
+          <TextField
+            fullWidth
+            required
+            select
+            label="Select Domicile"
+            name="domicile"
+            value={formData.domicile || ''}
+            onChange={(e) =>
+              setFormData(prev => ({
+                ...prev,
+                domicile: e.target.value
+              }))
+            }
+          >
+            <MenuItem value="">Select District</MenuItem>
+
+            {districtOptions.map((district) => (
+              <MenuItem key={district.id} value={district.id}>
+                {district.name}
+              </MenuItem>
+            ))}
+          </TextField>
         </div>
 
         <div className="col-md-6 form-group">
@@ -211,7 +246,7 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
           >
             <MenuItem value="Male">Male</MenuItem>
             <MenuItem value="Female">Female</MenuItem>
-            <MenuItem value="Male/Female">Male or Female</MenuItem>
+            <MenuItem value="Male/Female">Male and Female</MenuItem>
           </TextField>
         </div>
       </div>
@@ -223,7 +258,7 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
           <thead style={{ backgroundColor: '#006622' }}>
             <tr>
               <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>District</th>
-              <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>Quota Type</th>
+              {/* <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>Quota Type</th> */}
               <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>Posts</th>
               <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem', width: '140px', textAlign: 'center' }}>Actions</th>
             </tr>
@@ -232,16 +267,28 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
             {formData.district.map((_, index) => (
               <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                 <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                  
                   <TextField
                     fullWidth
                     required
+                    select
+                    label="Select Districts"
                     size="small"
-                    value={formData.district[index]}
-                    onChange={(e) => handleArrayChange(index, 'district', e.target.value)}
-                    placeholder="Enter District"
-                  />
+                    value={formData.district[index] || ''}
+                    onChange={(e) =>
+                      handleArrayChange(index, 'district', e.target.value)
+                    }
+                  >
+                    <MenuItem value="">Select District</MenuItem>
+
+                    {districtOptions.map((district) => (
+                      <MenuItem key={district.id} value={district.id}>
+                        {district.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 </td>
-                <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                {/* <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
                   <TextField
                     fullWidth
                     required
@@ -252,13 +299,11 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
                     placeholder="Select Quota Type"
                   >
                     <MenuItem value="Open Merit">Open Merit</MenuItem>
-                    <MenuItem value="Women">Women</MenuItem>
+                    <MenuItem value="Women">Others</MenuItem>
                     <MenuItem value="Minority">Minority</MenuItem>
                     <MenuItem value="Disabled Persons">Disabled Persons</MenuItem>
-                    <MenuItem value="Ex-Servicemen">Ex-Servicemen</MenuItem>
-                    <MenuItem value="Sports">Sports</MenuItem>
                   </TextField>
-                </td>
+                </td> */}
                 <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
                   <TextField
                     fullWidth
@@ -308,9 +353,14 @@ const Step3Eligibility = ({ data, onNext, onBack, isEdit = false }) => {
         <button type="button" className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200" onClick={onBack}>
           Previous
         </button>
-        <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
-          Preview
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => onSaveDraft?.(formData)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
+            Save Draft
+          </button>
+          <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
+            Preview
+          </button>
+        </div>
       </div>
     </form>
   );

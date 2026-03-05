@@ -115,33 +115,35 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     {
       id: "settings",
       label: "Settings",
+      path: "/dashboard/settings",
       icon: Settings,
       submenu: [
-        {
-          label: "Organization Info",
-          path: "/dashboard/settings/organization",
-          icon: Briefcase,
-        },
-        {
-          label: "Hierarchy",
-          path: "/dashboard/settings/hierarchy",
-          icon: ClipboardList,
-        },
+        // {
+        //   label: "Organization Info",
+        //   path: "/dashboard/settings/organization",
+        //   icon: Briefcase,
+        // },
+        // {
+        //   label: "Hierarchy",
+        //   path: "/dashboard/settings/hierarchy",
+        //   icon: ClipboardList,
+        // },
         {
           label: "Districts",
           path: "/dashboard/settings/districts",
           icon: Package,
         },
         {
-          label: "Tehsils",
-          path: "/dashboard/settings/tehsils",
-          icon: Table,
-        },
-        {
           label: "Designations",
           path: "/dashboard/settings/designations",
           icon: Briefcase,
         },
+        // {
+        //   label: "Tehsils",
+        //   path: "/dashboard/settings/tehsils",
+        //   icon: Table,
+        // },
+       
         {
           label: "Grades",
           path: "/dashboard/settings/grades",
@@ -152,11 +154,11 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           path: "/dashboard/settings/companies",
           icon: Package,
         },
-        {
-          label: "Contractors",
-          path: "/dashboard/settings/contractors",
-          icon: Table,
-        },
+        // {
+        //   label: "Contractors",
+        //   path: "/dashboard/settings/contractors",
+        //   icon: Table,
+        // },
       ],
     },
   ];
@@ -344,7 +346,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           <div className={cn("flex items-center", isOpen ? "gap-4" : "justify-center")}>
             <div className="relative flex-shrink-0">
               <img
-                src="/assets/img/favicon/Logo.png"
+                src="/assets/img/favicon/Logo.PNG"
                 alt="AJ&K PSC Logo"
                 className={cn(
                   "object-contain rounded-xl bg-white p-2 shadow-lg ring-2 ring-emerald-400/20",

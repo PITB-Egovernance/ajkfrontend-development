@@ -191,8 +191,7 @@ export default function DispatchReceived() {
   const formatValue = (value) => (value ? value : 'N/A');
 
   return (
-    
-    <Box className="p-8 bg-white rounded-lg shadow-md">
+    <Box sx={{ p: 4, bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold">List of Received</h2>
         <Link to="/dashboard/dispatch/recieved-form">

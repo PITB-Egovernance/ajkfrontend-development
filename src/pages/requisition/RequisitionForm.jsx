@@ -20,8 +20,14 @@ const steps = [
 
 const RequisitionForm = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [activeStep, setActiveStep] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStepParam = Number(searchParams.get('step'));
+  const [districtOptions, setDistrictOptions] = useState([]);
+  const [activeStep, setActiveStep] = useState(
+    Number.isInteger(initialStepParam) && initialStepParam >= 1 && initialStepParam <= steps.length
+      ? initialStepParam - 1
+      : 0
+  );
   const [loading, setLoading] = useState(false);
   const [tempId, setTempId] = useState(searchParams.get('temp_id') || '');
   const [formData, setFormData] = useState({
@@ -35,10 +41,87 @@ const RequisitionForm = () => {
   const API_KEY = Config.apiKey;
 
   useEffect(() => {
+    fetchDistricts();
     if (tempId) {
       loadTempData();
     }
   }, [tempId]);
+
+
+  const fetchDistricts = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/districts`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Adjust if API is paginated
+        // const districts =
+        //   Array.isArray(result.data)
+        //     ? result.data
+        //     : result.data?.data || [];
+        setDistrictOptions(
+          result.data.data.map((d) => ({
+            id: d.hash_id,   // use hash_id as id
+            name: d.name
+          }))
+        );
+
+        // setDistrictOptions(districts);
+      }
+    } catch (error) {
+      console.error('Error fetching districts:', error);
+      toast.error('Failed to load districts');
+    }
+  };
+  const persistDraftMeta = (draftTempId, stepIndex) => {
+    if (!draftTempId) {
+      return;
+    }
+
+    try {
+      localStorage.setItem('requisitionDraftMeta', JSON.stringify({
+        temp_id: draftTempId,
+        step: stepIndex + 1,
+        updated_at: new Date().toISOString()
+      }));
+    } catch (error) {
+      console.warn('Could not persist draft metadata:', error);
+    }
+  };
+
+  const syncDraftUrl = (draftTempId, stepIndex) => {
+    if (!draftTempId) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('temp_id', draftTempId);
+    nextParams.set('step', String(stepIndex + 1));
+    setSearchParams(nextParams, { replace: true });
+    persistDraftMeta(draftTempId, stepIndex);
+  };
+
+  const isStepCompleted = (stepIndex, stepData) => {
+    const stepErrors = validateRequisitionStep(stepIndex, stepData || {});
+    return Object.keys(stepErrors).length === 0;
+  };
+
+  const getNextPendingStep = (draftData) => {
+    if (!isStepCompleted(0, draftData.step1)) {
+      return 0;
+    }
+    if (!isStepCompleted(1, draftData.step2)) {
+      return 1;
+    }
+    return 2;
+  };
 
   const loadTempData = async () => {
     setLoading(true);
@@ -63,11 +146,17 @@ const RequisitionForm = () => {
           step1Data.syllabus = step1Data.syllabus.length > 0 ? step1Data.syllabus[0] : null;
         }
 
-        setFormData({
+        const updatedFormData = {
           step1: step1Data,
           step2: result.data.step2 || {},
           step3: result.data.step3 || {}
-        });
+        };
+
+        setFormData(updatedFormData);
+
+        const nextStep = getNextPendingStep(updatedFormData);
+        setActiveStep(nextStep);
+        syncDraftUrl(tempId, nextStep);
       }
     } catch (error) {
       console.error('Error loading temp data:', error);
@@ -80,13 +169,22 @@ const RequisitionForm = () => {
     return validateRequisitionStep(step, data);
   };
 
-  const saveStep = async (stepData) => {
+  const saveStep = async (stepData, isDraft = false) => {
     const currentStepNumber = activeStep + 1;
     const errors = validateStep(activeStep, stepData);
 
-    if (Object.keys(errors).length > 0) {
-      Object.values(errors).forEach(error => toast.error(error));
-      return false;
+    // if (Object.keys(errors).length > 0) {
+    //   Object.values(errors).forEach(error => toast.error(error));
+    //   return { success: false, tempId };
+    // }
+
+    if (!isDraft) {
+      const errors = validateStep(activeStep, stepData);
+
+      if (Object.keys(errors).length > 0) {
+        Object.values(errors).forEach(error => toast.error(error));
+        return { success: false, tempId };
+      }
     }
 
     // CRITICAL: Pre-send validation for Step 1 to ensure service_rules and syllabus are never arrays
@@ -183,8 +281,43 @@ const RequisitionForm = () => {
           temp_id: tempId || '',
         };
 
+        if (currentStepNumber === 3) {
+          const districts = Array.isArray(stepData.district) ? stepData.district : [];
+          const quotas = Array.isArray(stepData.quota) ? stepData.quota : [];
+          const posts = Array.isArray(stepData.post) ? stepData.post : [];
+          const maxRows = Math.max(districts.length, quotas.length, posts.length);
+
+          const validRows = [];
+          for (let index = 0; index < maxRows; index++) {
+            const district = districts[index] ?? '';
+            const quota = quotas[index] ?? '';
+            const post = posts[index] ?? '';
+
+            const hasAnyValue = [district, quota, post].some(value => {
+              return value !== null && value !== undefined && String(value).trim() !== '';
+            });
+
+            if (hasAnyValue) {
+              validRows.push({ district, quota, post });
+            }
+          }
+
+          if (validRows.length > 0) {
+            jsonData.district = validRows.map(row => row.district);
+            jsonData.quota = validRows.map(row => row.quota);
+            jsonData.post = validRows.map(row => {
+              const num = Number(row.post);
+              return !isNaN(num) ? num : row.post;
+            });
+          }
+        }
+
         Object.keys(stepData).forEach(key => {
           const value = stepData[key];
+
+          if (currentStepNumber === 3 && ['district', 'quota', 'post'].includes(key)) {
+            return;
+          }
 
           if (value !== null && value !== undefined && value !== '') {
             if (Array.isArray(value)) {
@@ -262,26 +395,59 @@ const RequisitionForm = () => {
           }
 
           toast.error(`API Error: ${errorMsg}`);
-          return false;
+          return { success: false, tempId };
         }
       } catch (parseError) {
         console.error('❌ Failed to parse response:', parseError);
         toast.error('Failed to parse API response');
-        return false;
+        return { success: false, tempId };
       }
 
       if (result.success) {
+        // const resolvedTempId = result.data?.temp_id || tempId;
+        // if (result.data?.temp_id) {
+        //   setTempId(result.data.temp_id);
+        //   console.log('✅ Got new temp_id:', result.data.temp_id);
+        // }
+        // const currentStepLabel = steps.find(step => step.number === activeStep)?.label || `Step ${currentStepNumber}`;
+        // toast.success(`${currentStepLabel} saved successfully`, {
+        //   icon: <CheckCircle2 className="text-emerald-500" size={24} />,
+        //   style: {
+        //     fontWeight: '500',
+        //   }
+        // });
+
+        // // Update form data
+        // const stepKey = `step${currentStepNumber}`;
+        // setFormData(prev => ({
+        //   ...prev,
+        //   [stepKey]: stepData
+        // }));
+
+        // return { success: true, tempId: resolvedTempId };
+
+              
+        const resolvedTempId = result.data?.temp_id || tempId;
+
         if (result.data?.temp_id) {
           setTempId(result.data.temp_id);
           console.log('✅ Got new temp_id:', result.data.temp_id);
         }
-        const currentStepLabel = steps.find(step => step.number === activeStep)?.label || `Step ${currentStepNumber}`;
+
+        const currentStepLabel =
+          steps.find(step => step.number === activeStep)?.label ||
+          `Step ${currentStepNumber}`;
+
         toast.success(`${currentStepLabel} saved successfully`, {
           icon: <CheckCircle2 className="text-emerald-500" size={24} />,
-          style: {
-            fontWeight: '500',
-          }
+          style: { fontWeight: '500' }
         });
+
+        // ✅ REMOVE LOCAL DRAFT WHEN FINAL STEP SUBMITTED (Preview clicked)
+        if (currentStepNumber === 3 && !isDraft) {
+          localStorage.removeItem('requisitionDraftMeta');
+          console.log('🧹 Draft meta removed from localStorage (Final Submit)');
+        }
 
         // Update form data
         const stepKey = `step${currentStepNumber}`;
@@ -290,7 +456,8 @@ const RequisitionForm = () => {
           [stepKey]: stepData
         }));
 
-        return true;
+        return { success: true, tempId: resolvedTempId };
+
       } else {
         // Handle API errors
         console.error('❌ API returned error:', result);
@@ -312,31 +479,64 @@ const RequisitionForm = () => {
         }
 
         toast.error(errorMsg);
-        return false;
+        return { success: false, tempId };
       }
     } catch (error) {
       console.error('❌ Error saving step:', error);
       toast.error('Error saving step data: ' + error.message);
-      return false;
+      return { success: false, tempId };
     } finally {
       setLoading(false);
     }
   };
 
   const handleNext = async (stepData) => {
-    const saved = await saveStep(stepData);
-    if (saved) {
+    // const saveResult = await saveStep(stepData);
+    const saveResult = await saveStep(stepData, false);
+    if (saveResult.success) {
+      const resolvedTempId = saveResult.tempId || tempId;
       if (activeStep === steps.length - 1) {
         // Navigate to preview
-        navigate(`/dashboard/requisitions/preview?temp_id=${tempId}`);
+        // if (resolvedTempId) {
+        //   syncDraftUrl(resolvedTempId, activeStep);
+        // }
+        // navigate(`/dashboard/requisitions/preview?temp_id=${resolvedTempId || ''}`);
+        // / ✅ Remove draft from localStorage when going to Preview
+        localStorage.removeItem('requisitionDraftMeta');
+        console.log('🧹 Draft meta removed before navigating to Preview');
+
+        if (resolvedTempId) {
+          syncDraftUrl(resolvedTempId, activeStep);
+        }
+
+        navigate(`/dashboard/requisitions/preview?temp_id=${resolvedTempId || ''}`);
       } else {
-        setActiveStep(prev => prev + 1);
+        const nextStep = activeStep + 1;
+        setActiveStep(nextStep);
+        if (resolvedTempId) {
+          syncDraftUrl(resolvedTempId, nextStep);
+        }
+      }
+    }
+  };
+
+  const handleSaveDraft = async (stepData) => {
+    // const saveResult = await saveStep(stepData);
+    const saveResult = await saveStep(stepData, true);
+    if (saveResult.success) {
+      const resolvedTempId = saveResult.tempId || tempId;
+      if (resolvedTempId) {
+        syncDraftUrl(resolvedTempId, activeStep);
       }
     }
   };
 
   const handleBack = () => {
-    setActiveStep(prev => prev - 1);
+    const previousStep = Math.max(activeStep - 1, 0);
+    setActiveStep(previousStep);
+    if (tempId) {
+      syncDraftUrl(tempId, previousStep);
+    }
   };
 
   const renderStepContent = () => {
@@ -350,6 +550,7 @@ const RequisitionForm = () => {
           <Step1JobDetails
             data={formData.step1}
             onNext={handleNext}
+            onSaveDraft={handleSaveDraft}
             tempId={tempId}
           />
         );
@@ -359,6 +560,7 @@ const RequisitionForm = () => {
             data={formData.step2}
             onNext={handleNext}
             onBack={handleBack}
+            onSaveDraft={handleSaveDraft}
           />
         );
       case 2:
@@ -367,6 +569,8 @@ const RequisitionForm = () => {
             data={formData.step3}
             onNext={handleNext}
             onBack={handleBack}
+            onSaveDraft={handleSaveDraft}
+            districtOptions={districtOptions}
           />
         );
       default:

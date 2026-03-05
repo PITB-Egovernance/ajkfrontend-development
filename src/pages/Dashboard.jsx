@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from 'components/ui/Card';
 import { useAuth } from 'context/AuthContext';
@@ -39,6 +39,23 @@ import {
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const [draftMeta, setDraftMeta] = useState(null);
+
+  useEffect(() => {
+    try {
+      const rawDraftMeta = localStorage.getItem('requisitionDraftMeta');
+      if (!rawDraftMeta) {
+        return;
+      }
+
+      const parsedDraftMeta = JSON.parse(rawDraftMeta);
+      if (parsedDraftMeta?.temp_id) {
+        setDraftMeta(parsedDraftMeta);
+      }
+    } catch (error) {
+      console.warn('Unable to load draft metadata:', error);
+    }
+  }, []);
 
   const stats = [
     { 
@@ -149,13 +166,24 @@ const Dashboard = () => {
             <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
             <p className="text-sm text-slate-500 mt-1">AJK Public Service Commission</p>
           </div>
-          
-          <Link to="/dashboard/requisitions/create">
-            <button className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white rounded-lg font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200">
-              <Plus className="w-4 h-4" />
-              Add New
-            </button>
-          </Link>
+
+          <div className="flex items-center gap-3">
+            {draftMeta?.temp_id && (
+              <Link to={`/dashboard/requisitions/create?temp_id=${encodeURIComponent(draftMeta.temp_id)}&step=${draftMeta.step || 1}`}>
+                <button className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium flex items-center gap-2 transition-all duration-200">
+                  <ArrowRight className="w-4 h-4" />
+                  Resume Draft
+                </button>
+              </Link>
+            )}
+
+            <Link to="/dashboard/requisitions/create">
+              <button className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white rounded-lg font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200">
+                <Plus className="w-4 h-4" />
+                Add New
+              </button>
+            </Link>
+          </div>
         </div>
 
         {/* Stats Grid */}

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, MenuItem } from '@mui/material';
+import { TextField, MenuItem, InputAdornment } from '@mui/material';
 import toast from 'react-hot-toast';
 
-const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
+const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) => {
   const [formData, setFormData] = useState({
     designation: data.designation || '',
     scale: data.scale || '',
@@ -76,21 +76,25 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    // Defensive: Ensure service_rules and syllabus are never arrays before submission
+  const getCleanedFormData = () => {
     const cleanedFormData = { ...formData };
-    
+
     if (Array.isArray(cleanedFormData.service_rules)) {
       console.warn('⚠️ Step1: service_rules is an array, converting:', cleanedFormData.service_rules);
       cleanedFormData.service_rules = cleanedFormData.service_rules.length > 0 ? cleanedFormData.service_rules[0] : null;
     }
-    
+
     if (Array.isArray(cleanedFormData.syllabus)) {
       console.warn('⚠️ Step1: syllabus is an array, converting:', cleanedFormData.syllabus);
       cleanedFormData.syllabus = cleanedFormData.syllabus.length > 0 ? cleanedFormData.syllabus[0] : null;
     }
+
+    return cleanedFormData;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const cleanedFormData = getCleanedFormData();
     
     console.log('📋 Step1 Form Data being submitted:', {
       ...cleanedFormData,
@@ -99,6 +103,11 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
     });
     
     onNext(cleanedFormData);
+  };
+
+  const handleSaveDraftClick = () => {
+    const cleanedFormData = getCleanedFormData();
+    onSaveDraft?.(cleanedFormData);
   };
 
   return (
@@ -130,16 +139,16 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
           <TextField
             fullWidth
             required
-            select
             label="Percentage of Quota (Direct vs Promotion)"
             name="quota_percentage"
             value={formData.quota_percentage}
             onChange={handleChange}
-          >
-            {[...Array(100)].map((_, i) => (
-              <MenuItem key={i + 1} value={i + 1}>{i + 1}%</MenuItem>
-            ))}
-          </TextField>
+            type="number"
+            inputProps={{ min: 0, max: 100, step: 1 }}
+            InputProps={{
+              endAdornment: <InputAdornment position="end">%</InputAdornment>
+            }}
+          />
         </div>
 
         <div className="col-md-6 form-group">
@@ -168,7 +177,7 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
           />
         </div>
 
-        <div className="col-md-6 form-group">
+        {/* <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
@@ -181,10 +190,10 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
             <MenuItem value="MCQs Base">MCQs Base</MenuItem>
             <MenuItem value="Competitive Base">Competitive Base</MenuItem>
           </TextField>
-        </div>
+        </div> */}
 
         <div className="col-md-6 form-group">
-          <label>Service Rules <span className="required">*</span> <span style={{ color: '#dc3545', fontSize: '0.8em' }}>(PDF File Less than 2 MB)</span></label>
+          <label>Service Rules <span style={{ color: '#dc3545', fontSize: '0.8em' }}>(PDF File Less than 2 MB)</span></label>
           <input
             type="file"
             name="service_rules"
@@ -199,7 +208,7 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
         </div>
 
         <div className="col-md-6 form-group">
-          <label>Approved Syllabus <span className="required">*</span> <span style={{ color: '#dc3545', fontSize: '0.8em' }}>(PDF File Less than 2 MB)</span></label>
+          <label>Approved Syllabus <span style={{ color: '#dc3545', fontSize: '0.8em' }}>(PDF File Less than 2 MB)</span></label>
           <input
             type="file"
             name="syllabus"
@@ -216,9 +225,14 @@ const Step1JobDetails = ({ data, onNext, tempId, isEdit = false }) => {
 
       <div className="navigation-buttons">
         <div></div>
-        <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
-          {isEdit ? 'Update & Continue' : 'Save & Continue'}
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={handleSaveDraftClick} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
+            Save Draft
+          </button>
+          <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
+            Next
+          </button>
+        </div>
       </div>
     </form>
   );

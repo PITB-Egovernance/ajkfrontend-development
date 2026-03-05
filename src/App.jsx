@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import Dashboard from 'pages/Dashboard';
 import Login from 'pages/auth/Login/Login';
+import VerifyOtp from "pages/auth/OTP/VerifyOtp";
 import ProtectedRoute from 'middlewares/ProtectedRoute';
 import PublicRoute from 'middlewares/PublicRoute';
 import Register from 'pages/auth/Register/Register';
@@ -26,12 +27,13 @@ import RequisitionDetail from 'pages/RequisitionDetail';
 import Settings from 'pages/settings/Settings';
 import OrganizationInformation from 'pages/settings/OrganizationInformation';
 import OrganizationalHierarchy from 'pages/settings/OrganizationalHierarchy';
-import DistrictsManagement from 'pages/settings/DistrictsManagement';
+import DistrictsManagement from 'pages/settings/Districts/DistrictsManagement';
 import TehsilsManagement from 'pages/settings/TehsilsManagement';
-import DesignationsManagement from 'pages/settings/DesignationsManagement';
-import GradesManagement from 'pages/settings/GradesManagement';
-import CompaniesManagement from 'pages/settings/CompaniesManagement';
+import DesignationsManagement from 'pages/settings/Designation/DesignationsManagement';
+import GradesManagement from 'pages/settings/Grades/GradesManagement';
+import CompaniesManagement from 'pages/settings/Company/CompaniesManagement';
 import ContractorsManagement from 'pages/settings/ContractorsManagement';
+
 
 
 function App() {
@@ -42,6 +44,7 @@ function App() {
         <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/verify-otp" element={<PublicRoute><VerifyOtp /></PublicRoute>} />
 
         {/* Protected dashboard route with nested pages */}
         <Route
@@ -71,6 +74,7 @@ function App() {
           <Route path="dispatch/sent" element={<DispatchSent />} />
           <Route path="dispatch/sent/add" element={<DispatchSentAddNew />} />
           <Route path="psc-table" element={<PscTable />} />
+
           {/* Settings Routes */}
           <Route path="settings" element={<Settings />} />
           <Route path="settings/organization" element={<OrganizationInformation />} />

@@ -165,9 +165,8 @@ const DispatchSentAddNew = () => {
   };
 
   return (
-    <Box className="p-8 max-w-[1200px] mx-auto bg-white rounded-lg shadow-md">
-
-      <Box className="flex justify-between items-center mb-8">
+    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h5" fontWeight="bold">
           Add New Dispatched Form
         </Typography>
@@ -477,7 +476,7 @@ const DispatchSentAddNew = () => {
           </Grid>
         </Grid>
 
-        <Box className="mt-10 text-right flex gap-4 justify-end">
+        <Box sx={{ mt: 5, textAlign: 'right', display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
           <Link to="/dashboard/dispatch/sent">
             <Button variant="outlined" disabled={loading}>
               Cancel

@@ -16,20 +16,20 @@ const Settings = () => {
   const navigate = useNavigate();
 
   const settingsModules = [
-    {
-      icon: Building2,
-      title: 'Organization Information',
-      description: 'Manage profile and contact information',
-      iconBg: 'bg-emerald-500',
-      link: '/dashboard/settings/organization'
-    },
-    {
-      icon: Network,
-      title: 'Organizational Hierarchy',
-      description: 'Configure departments and structure',
-      iconBg: 'bg-blue-500',
-      link: '/dashboard/settings/hierarchy'
-    },
+    // {
+    //   icon: Building2,
+    //   title: 'Organization Information',
+    //   description: 'Manage profile and contact information',
+    //   iconBg: 'bg-emerald-500',
+    //   link: '/dashboard/settings/organization'
+    // },
+    // {
+    //   icon: Network,
+    //   title: 'Organizational Hierarchy',
+    //   description: 'Configure departments and structure',
+    //   iconBg: 'bg-blue-500',
+    //   link: '/dashboard/settings/hierarchy'
+    // },
     {
       icon: MapPin,
       title: 'Districts Management',
@@ -37,13 +37,13 @@ const Settings = () => {
       iconBg: 'bg-amber-500',
       link: '/dashboard/settings/districts'
     },
-    {
-      icon: Map,
-      title: 'Tehsils Management',
-      description: 'Manage tehsil data and districts',
-      iconBg: 'bg-purple-500',
-      link: '/dashboard/settings/tehsils'
-    },
+    // {
+    //   icon: Map,
+    //   title: 'Tehsils Management',
+    //   description: 'Manage tehsil data and districts',
+    //   iconBg: 'bg-purple-500',
+    //   link: '/dashboard/settings/tehsils'
+    // },
     {
       icon: Briefcase,
       title: 'Designations Management',
@@ -65,13 +65,13 @@ const Settings = () => {
       iconBg: 'bg-teal-500',
       link: '/dashboard/settings/companies'
     },
-    {
-      icon: Users,
-      title: 'Individual Contractors',
-      description: 'Manage freelance contractors',
-      iconBg: 'bg-violet-500',
-      link: '/dashboard/settings/contractors'
-    }
+    // {
+    //   icon: Users,
+    //   title: 'Individual Contractors',
+    //   description: 'Manage freelance contractors',
+    //   iconBg: 'bg-violet-500',
+    //   link: '/dashboard/settings/contractors'
+    // }
   ];
 
   return (

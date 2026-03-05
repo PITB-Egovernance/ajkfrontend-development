@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Checkbox, FormControlLabel } from '@mui/material';
 import { MoreVertical, Eye, Upload, Pencil, Trash2, X } from 'lucide-react';
@@ -8,6 +8,14 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
+
+const isDraftStatusValue = (status) => {
+  return (status || '').toLowerCase().includes('draft');
+};
+
+const hasDraftIdentity = (row) => {
+  return Boolean(row?.temp_id) || Boolean(row?.current_step);
+};
 
 const RequisitionList = () => {
   const [rows, setRows] = useState([]);
@@ -19,6 +27,8 @@ const RequisitionList = () => {
   const [uploadingJobId, setUploadingJobId] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+  const [localDraftMeta, setLocalDraftMeta] = useState(null);
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 10,
@@ -35,6 +45,22 @@ const RequisitionList = () => {
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
   const API_KEY = Config.apiKey;
+
+  useEffect(() => {
+    try {
+      const rawDraftMeta = localStorage.getItem('requisitionDraftMeta');
+      if (!rawDraftMeta) {
+        return;
+      }
+
+      const parsedDraftMeta = JSON.parse(rawDraftMeta);
+      if (parsedDraftMeta?.temp_id) {
+        setLocalDraftMeta(parsedDraftMeta);
+      }
+    } catch (error) {
+      console.warn('Unable to load local draft meta:', error);
+    }
+  }, []);
 
   const fetchRequisitions = async (pageNum = 0, pageSize = 10) => {
     setLoading(true);
@@ -68,12 +94,14 @@ const RequisitionList = () => {
       
       if (Array.isArray(dataArray) && dataArray.length > 0) {
         const requisitions = dataArray.map((item, index) => ({
-          id: item.hash_id || item.id || `temp-${index}-${Date.now()}`,
+          id: item.hash_id || item.id || item.temp_id || item.tempId || `temp-${index}-${Date.now()}`,
           hash_id: item.hash_id,
+          temp_id: item.temp_id || item.tempId || item.tempID || item.draft_temp_id || '',
+          current_step: item.current_step || item.step || item.currentStep || null,
           designation: item.designation,
           scale: item.scale,
           num_posts: item.num_posts,
-          status: item.status || 'Pending',
+          status: item.status || (item.temp_id ? 'Draft' : 'Pending'),
         }));
         setRows(requisitions);
         setTotal(total);
@@ -304,6 +332,60 @@ const RequisitionList = () => {
     return 'bg-gray-100 text-gray-700';
   };
 
+  const isDraftStatus = (status) => {
+    return isDraftStatusValue(status);
+  };
+
+  const isDraftRow = (row) => {
+    return hasDraftIdentity(row) || isDraftStatusValue(row?.status);
+  };
+
+  const draftRows = useMemo(() => {
+    return rows.filter(row => isDraftRow(row));
+  }, [rows]);
+
+  const hasLocalOnlyDraft = useMemo(() => {
+    if (!localDraftMeta?.temp_id) {
+      return false;
+    }
+
+    return !draftRows.some(row => {
+      const rowDraftId = row.temp_id || row.hash_id || row.id;
+      return rowDraftId === localDraftMeta.temp_id;
+    });
+  }, [draftRows, localDraftMeta]);
+
+  const draftCount = draftRows.length + (hasLocalOnlyDraft ? 1 : 0);
+
+  const displayedRows = activeTab === 'drafts' ? draftRows : rows;
+
+  const handleResumeLocalDraft = () => {
+    if (!localDraftMeta?.temp_id) {
+      return;
+    }
+
+    navigate(`/dashboard/requisitions/create?temp_id=${encodeURIComponent(localDraftMeta.temp_id)}&step=${localDraftMeta.step || 1}`);
+  };
+
+  const handleResumeDraft = () => {
+    if (!selectedRow) {
+      handleMenuClose();
+      return;
+    }
+
+    const draftId = selectedRow.temp_id || selectedRow.hash_id || selectedRow.id;
+
+    if (!draftId) {
+      toast.error('Draft identifier is missing');
+      handleMenuClose();
+      return;
+    }
+
+    const stepQuery = selectedRow.current_step ? `&step=${selectedRow.current_step}` : '';
+    navigate(`/dashboard/requisitions/create?temp_id=${encodeURIComponent(draftId)}${stepQuery}`);
+    handleMenuClose();
+  };
+
   const columns = [
     { field: 'id', headerName: 'Ref', width: 100 },
     { field: 'designation', headerName: 'Designation', flex: 1 },
@@ -352,6 +434,37 @@ const RequisitionList = () => {
           </button>
         </div>
 
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === 'all' ? 'bg-emerald-900 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setActiveTab('drafts')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${activeTab === 'drafts' ? 'bg-emerald-900 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+          >
+            Drafts
+            <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'drafts' ? 'bg-white text-emerald-900' : 'bg-slate-700 text-white'}`}>{draftCount}</span>
+          </button>
+        </div>
+
+        {activeTab === 'drafts' && hasLocalOnlyDraft && (
+          <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-emerald-900">My Saved Draft</p>
+              <p className="text-xs text-emerald-700 mt-1">Draft ID: {localDraftMeta.temp_id} • Step {localDraftMeta.step || 1}</p>
+            </div>
+            <button
+              onClick={handleResumeLocalDraft}
+              className="px-4 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              Resume
+            </button>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-sm">
           <div style={{ width: '100%', height: 'auto' }}>
             {loading ? (
@@ -362,15 +475,15 @@ const RequisitionList = () => {
               </div>
             ) : (
               <DataGrid
-                rows={rows}
+                rows={displayedRows}
                 columns={columns}
                 getRowId={(row) => row.id}
                 paginationModel={paginationModel}
                 onPaginationModelChange={setPaginationModel}
                 pageSizeOptions={[10, 25, 50, 75, 100]}
                 pagination
-                paginationMode="server"
-            rowCount={total}
+                paginationMode={activeTab === 'drafts' ? 'client' : 'server'}
+            rowCount={activeTab === 'drafts' ? displayedRows.length : total}
             loading={loading}
             disableSelectionOnClick
             autoHeight
@@ -406,6 +519,12 @@ const RequisitionList = () => {
           <Upload size={18} style={{ marginRight: '8px' }} />
           Upload
         </MenuItem>
+        {selectedRow && isDraftRow(selectedRow) && (
+          <MenuItem onClick={handleResumeDraft}>
+            <Pencil size={18} style={{ marginRight: '8px' }} />
+            Resume Draft
+          </MenuItem>
+        )}
         <MenuItem onClick={handleEdit}>
           <Pencil size={18} style={{ marginRight: '8px' }} />
           Edit

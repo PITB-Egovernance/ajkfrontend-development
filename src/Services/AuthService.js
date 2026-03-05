@@ -1,6 +1,7 @@
 // services/authService.js  ← FINAL VERSION WITH CAPTCHA SUPPORT
 
 import Config from 'config/baseUrl';
+import { Result } from 'postcss';
 const API_URL = Config.apiUrl;
 const API_KEY = Config.apiKey;
 
@@ -35,6 +36,7 @@ class AuthService {
   // Login
   // ──────────────────────────────────────────────────────
   static async login(data) {
+    console.log("login Data", data)
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: {
@@ -45,6 +47,7 @@ class AuthService {
       body: JSON.stringify(data),
     });
 
+    console.log("RESULT", response)
     const result = await response.json();
     if (!response.ok) {
       const error = new Error(result.message || "Login failed");
@@ -53,7 +56,35 @@ class AuthService {
       throw error;
     }
 
-    this._saveAuth(result);
+    // this._saveAuth(result);
+    return result;
+  }
+
+  static async verifyOtp(data) {
+    const response = await fetch(`${API_URL}/verify-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-API-KEY": API_KEY,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    console.log("OTP RESPONSE:", result);
+
+    if (!response.ok) {
+      const error = new Error(result.message || "OTP verification failed");
+      error.status = response.status;
+      error.errors = result.errors || {};
+      throw error;
+    }
+
+    if (result.success) {
+      this._saveAuth(result);
+    }
+
     return result;
   }
 
@@ -136,8 +167,7 @@ class AuthService {
   // Helpers
   // ──────────────────────────────────────────────────────
   static _saveAuth(result) {
-   
-    if (result.data.token) {
+    if (result.data?.token) {
       localStorage.setItem("authToken", result.data.token);
       localStorage.setItem("user", JSON.stringify(result.data.user));
     }

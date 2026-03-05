@@ -16,10 +16,13 @@ const RequisitionPreview = () => {
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [districtOptions, setDistrictOptions] = useState([]);
   const [previewData, setPreviewData] = useState({
     step1: {},
     step2: {},
-    step3: {}
+    step3: {},
+    serviceRule:{},
+    syllabus:{},
   });
 
   const API_BASE = Config.apiUrl;
@@ -27,6 +30,7 @@ const RequisitionPreview = () => {
   const API_KEY = Config.apiKey;
 
   useEffect(() => {
+      fetchDistricts();
     if (!tempId) {
       toast.error('No temporary data found');
       navigate('/dashboard/requisitions');
@@ -58,6 +62,38 @@ const RequisitionPreview = () => {
     }
   };
 
+
+  const fetchDistricts = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/districts`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setDistrictOptions(
+          result.data.data.map((d) => ({
+            id: String(d.hash_id),
+            name: d.name
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to load districts for preview');
+    }
+  };
+
+
+  const getDistrictName = (id) => {
+    const found = districtOptions.find(d => String(d.id) === String(id));
+    return found ? found.name : id;
+  };
+
   const loadPreviewData = async () => {
     setLoading(true);
     console.log('📊 Loading preview data...');
@@ -71,25 +107,28 @@ const RequisitionPreview = () => {
       if (result.status === 200 || result.success) {
         const data = result.data || result;
         console.log('✅ Preview data loaded successfully');
-        console.log('Step 1 data:', data.step1);
-        console.log('Step 2 data:', data.step2);
-        console.log('Step 3 data:', data.step3);
+        console.log('Step 1 data:', data.step1_basic_info);
+        console.log('Step 2 data:', data.step2_qualifications);
+        console.log('Step 3 data:', data.step3_eligibility);
+        console.log('Step Files:', data.step1_files);
 
 
         // Defensive: Ensure service_rules and syllabus are strings, not arrays
-        const step1Data = data.step1 || {};
+        const step1Data = data.step1_basic_info || {};
+        const servicerule = data.step1_files.service_rules.url || {};
+        const slb = data.step1_files.syllabus.url || {};
         let needsRepair = false;
 
-        if (step1Data.service_rules && Array.isArray(step1Data.service_rules)) {
-          console.warn('⚠️ service_rules is an array, converting to string:', step1Data.service_rules);
-          step1Data.service_rules = step1Data.service_rules.length > 0 ? step1Data.service_rules[0] : null;
-          needsRepair = true;
-        }
-        if (step1Data.syllabus && Array.isArray(step1Data.syllabus)) {
-          console.warn('⚠️ syllabus is an array, converting to string:', step1Data.syllabus);
-          step1Data.syllabus = step1Data.syllabus.length > 0 ? step1Data.syllabus[0] : null;
-          needsRepair = true;
-        }
+        // if (data.step1_files.service_rules && Array.isArray(data.step1_files.service_rules)) {
+        //   console.warn('⚠️ service_rules is an array, converting to string:', data.step1_files.service_rules);
+        //   data.step1_files.service_rules = data.step1_files.service_rules.length > 0 ? data.step1_files.service_rules[0] : null;
+        //   needsRepair = true;
+        // }
+        // if (data.step1_files.syllabus && Array.isArray(data.step1_files.syllabus)) {
+        //   console.warn('⚠️ syllabus is an array, converting to string:', data.step1_files.syllabus);
+        //   data.step1_files.syllabus = data.step1_files.syllabus.length > 0 ? data.step1_files.syllabus[0] : null;
+        //   needsRepair = true;
+        // }
 
         if (needsRepair) {
           repairBackendData(step1Data);
@@ -98,7 +137,9 @@ const RequisitionPreview = () => {
         setPreviewData({
           step1: step1Data,
           step2: data.step2 || {},
-          step3: data.step3 || {}
+          step3: data.step3 || {},
+          serviceRule: servicerule || {},
+          syllabus: slb || {},
         });
       } else {
         const errorMsg = result.error || result.message || 'Failed to load preview data';
@@ -179,7 +220,7 @@ const RequisitionPreview = () => {
     );
   }
 
-  const { step1, step2, step3 } = previewData;
+  const { step1, step2, step3, serviceRule,syllabus } = previewData;
 
   return (
     <div className="p-6 bg-white rounded-lg shadow">
@@ -216,15 +257,15 @@ const RequisitionPreview = () => {
                   <TableCell sx={{ fontWeight: 'bold' }}>Date of Vacancy</TableCell>
                   <TableCell>{step1.vacancy_date || 'N/A'}</TableCell>
                 </TableRow>
-                <TableRow>
+                {/* <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Test Type</TableCell>
                   <TableCell>{step1.test_type || 'N/A'}</TableCell>
-                </TableRow>
+                </TableRow> */}
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Service Rules</TableCell>
                   <TableCell>
-                    {step1.service_rules ? (
-                      <a href={`${API_BASE.replace('/api', '')}/${step1.service_rules}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                    {serviceRule ? (
+                      <a href={`${serviceRule}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
                         View PDF
                       </a>
                     ) : 'N/A'}
@@ -233,8 +274,8 @@ const RequisitionPreview = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Syllabus</TableCell>
                   <TableCell>
-                    {step1.syllabus ? (
-                      <a href={`${API_BASE.replace('/api', '')}/${step1.syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                    {syllabus ? (
+                      <a href={`${syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
                         View PDF
                       </a>
                     ) : 'N/A'}
@@ -332,7 +373,7 @@ const RequisitionPreview = () => {
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Domicile</TableCell>
-                  <TableCell>{step3.domicile || 'N/A'}</TableCell>
+                  <TableCell>{getDistrictName(step3.domicile) || 'N/A'}</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Other Conditions</TableCell>
@@ -345,10 +386,12 @@ const RequisitionPreview = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>District/Unit</TableCell>
                   <TableCell>
-                    {step3.district && Array.isArray(step3.district)
-                      ? step3.district.join(', ')
-                      : step3.district || 'N/A'}
+                   
+                    {Array.isArray(step3.district)
+                      ? step3.district.map(d => getDistrictName(d)).join(', ')
+                      : getDistrictName(step3.district) || 'N/A'}
                   </TableCell>
+                  
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Quota</TableCell>
