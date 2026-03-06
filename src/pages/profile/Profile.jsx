@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { TextField } from '@mui/material';
 import { useAuth } from 'context/AuthContext';
 import toast from 'react-hot-toast';
-import Button from 'components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from 'components/ui/Card';
+import Button from 'Components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from 'Components/ui/Card';
 import { User, Mail, Phone, MapPin, Save, Lock, ArrowLeft } from 'lucide-react';
 
 const Profile = () => {

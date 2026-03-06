@@ -9,9 +9,9 @@ import {
   Grid,
   Chip,
 } from '@mui/material';
-import { InlineLoader } from 'components/ui/Loader';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const DispatchSent = () => {
   const [forms, setForms] = useState([]);

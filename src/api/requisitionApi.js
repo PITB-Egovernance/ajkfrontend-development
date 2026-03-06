@@ -1,5 +1,5 @@
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const API_BASE = Config.apiUrl;
 const API_KEY = Config.apiKey;

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Link, Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
 import { MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { InlineLoader } from 'components/ui/Loader';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import toast from 'react-hot-toast';
 
 const PscTable = () => {

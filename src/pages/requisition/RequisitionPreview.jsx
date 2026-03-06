@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Typography, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
-import { InlineLoader } from 'components/ui/Loader';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from 'components/ui/Dialog';
+import { InlineLoader } from 'Components/ui/Loader';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from 'Components/ui/Dialog';
 import { CheckCircle2 } from 'lucide-react';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
 

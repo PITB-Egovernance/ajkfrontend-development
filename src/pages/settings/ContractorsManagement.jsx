@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TextField, MenuItem } from '@mui/material';
-import { Card, CardContent } from 'components/ui/Card';
-import Button from 'components/ui/Button';
+import { Card, CardContent } from 'Components/ui/Card';
+import Button from 'Components/ui/Button';
 import { 
   Users, 
   Plus, 
@@ -23,8 +23,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const ContractorsManagement = () => {
   const navigate = useNavigate();

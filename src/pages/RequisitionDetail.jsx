@@ -5,9 +5,9 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { InlineLoader } from 'components/ui/Loader';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import RequisitionApi from 'api/requisitionApi';
 
 const RequisitionDetail = () => {

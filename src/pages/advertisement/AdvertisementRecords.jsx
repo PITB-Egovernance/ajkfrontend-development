@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { DataGrid } from '@mui/x-data-grid';
 import toast from 'react-hot-toast';
 import { 
   Megaphone, 
@@ -12,12 +14,13 @@ import {
   Clock,
   Filter
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
-import Button from 'components/ui/Button';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { Card, CardHeader, CardTitle, CardContent } from 'Components/ui/Card';
+import Button from 'Components/ui/Button';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const AdvertisementRecords = () => {
+  const location = useLocation();
   const [advertisements, setAdvertisements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -33,6 +36,25 @@ const AdvertisementRecords = () => {
   useEffect(() => {
     fetchAdvertisements(1);
   }, []);
+
+  useEffect(() => {
+    if (location.state?.created) {
+      toast.success(`Advertisement ${location.state.created} created successfully`);
+      try {
+        if (location.state?.note) {
+          const notesRaw = localStorage.getItem('advertisement_notes_cache');
+          const notesCache = notesRaw ? JSON.parse(notesRaw) : {};
+          notesCache[location.state.created] = location.state.note;
+          localStorage.setItem('advertisement_notes_cache', JSON.stringify(notesCache));
+          setAdvertisements(prev => prev.map(ad => 
+            ad.adv_number === location.state.created 
+              ? { ...ad, note: ad.note || location.state.note }
+              : ad
+          ));
+        }
+      } catch {}
+    }
+  }, [location.state]);
 
   const fetchAdvertisements = async (page = 1) => {
     setLoading(true);
@@ -50,7 +72,20 @@ const AdvertisementRecords = () => {
       const result = await response.json();
       
       if (response.ok && result.success) {
-        setAdvertisements(result.data.data);
+        let ads = result.data.data;
+        try {
+          const notesRaw = localStorage.getItem('advertisement_notes_cache');
+          const notesCache = notesRaw ? JSON.parse(notesRaw) : {};
+          ads = ads.map(ad => {
+            const key = (ad.adv_number || '').trim();
+            const cachedNote = key ? notesCache[key] : undefined;
+            return {
+              ...ad,
+              note: ad.note || cachedNote || ad.notes || ad.ad_note || ad.note
+            };
+          });
+        } catch {}
+        setAdvertisements(ads);
         setPagination({
           current_page: result.data.current_page,
           last_page: result.data.last_page,
@@ -83,7 +118,15 @@ const AdvertisementRecords = () => {
       const result = await response.json();
       
       if (response.ok && result.success) {
-        setSelectedAd(result.data);
+        let data = result.data;
+        try {
+          const notesRaw = localStorage.getItem('advertisement_notes_cache');
+          const notesCache = notesRaw ? JSON.parse(notesRaw) : {};
+          if (!data.note && notesCache[data.adv_number]) {
+            data = { ...data, note: notesCache[data.adv_number] };
+          }
+        } catch {}
+        setSelectedAd(data);
         setShowDetails(true);
         toast.success('Details loaded', { id: loadingToast });
       } else {
@@ -100,12 +143,61 @@ const AdvertisementRecords = () => {
   );
 
   const parseTermsConditions = (termsString) => {
+    if (Array.isArray(termsString)) return termsString;
     try {
       return JSON.parse(termsString);
     } catch {
       return [];
     }
   };
+
+  const columns = [
+    { field: 'adv_number', headerName: 'Adv #', flex: 1, minWidth: 180 },
+    {
+      field: 'adv_date',
+      headerName: 'Adv Date',
+      width: 140,
+      valueGetter: (params) => new Date(params.value),
+      valueFormatter: (params) =>
+        params.value instanceof Date
+          ? params.value.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+          : params.value
+    },
+    {
+      field: 'closing_date',
+      headerName: 'Closing Date',
+      width: 140,
+      valueGetter: (params) => new Date(params.value),
+      valueFormatter: (params) =>
+        params.value instanceof Date
+          ? params.value.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+          : params.value
+    },
+    { field: 'note', headerName: 'Note', flex: 1, minWidth: 200 },
+    { field: 'important_notes', headerName: 'Important Notes', flex: 1.5, minWidth: 260 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 120,
+      valueGetter: (params) => (new Date(params.row.closing_date) > new Date() ? 'Active' : 'Closed')
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 140,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => (
+        <button
+          onClick={() => viewAdvertisement(params.row.id)}
+          className="px-3 py-1.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-md transition-all duration-200 flex items-center justify-center gap-2"
+        >
+          <Eye className="w-4 h-4" />
+          View
+        </button>
+      )
+    }
+  ];
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
@@ -134,73 +226,32 @@ const AdvertisementRecords = () => {
           </div>
         </div>
 
-        {/* Advertisements Grid */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
-                <div className="h-4 bg-slate-200 rounded w-3/4 mb-4"></div>
-                <div className="h-3 bg-slate-200 rounded w-full mb-2"></div>
-                <div className="h-3 bg-slate-200 rounded w-2/3"></div>
-              </div>
-            ))}
-          </div>
-        ) : filteredAdvertisements.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <Megaphone className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">No Advertisements Found</h3>
-            <p className="text-slate-500">Try adjusting your search criteria</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAdvertisements.map((ad) => (
-              <div key={ad.id} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <FileText className="w-5 h-5 text-emerald-600" />
-                        <h3 className="font-bold text-lg text-slate-900">
-                          {ad.adv_number}
-                        </h3>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(ad.adv_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <Clock className="w-4 h-4" />
-                        <span>Closes: {new Date(ad.closing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                      </div>
-                    </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      new Date(ad.closing_date) > new Date() 
-                        ? 'bg-emerald-100 text-emerald-700' 
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {new Date(ad.closing_date) > new Date() ? 'Active' : 'Closed'}
-                    </div>
-                  </div>
-
-                  {ad.note && (
-                    <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-                      <p className="text-sm text-slate-600 font-medium">Note:</p>
-                      <p className="text-sm text-slate-800 mt-1">{ad.note}</p>
-                    </div>
-                  )}
-
-                  <button 
-                    onClick={() => viewAdvertisement(ad.hash_id)}
-                    className="w-full px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View Details
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Advertisements Table */}
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          {loading ? (
+            <div className="text-slate-500">Loading...</div>
+          ) : filteredAdvertisements.length === 0 ? (
+            <div className="text-center text-slate-600 py-8">No Advertisements Found</div>
+          ) : (
+            <DataGrid
+              rows={filteredAdvertisements.map((ad, i) => ({
+                id: ad.hash_id || ad.id || `ad-${i}`,
+                adv_number: ad.adv_number,
+                adv_date: ad.adv_date,
+                closing_date: ad.closing_date,
+                note: ad.note || ad.notes || ad.ad_note,
+                important_notes: ad.important_notes
+              }))}
+              columns={columns}
+              autoHeight
+              pageSizeOptions={[10, 25, 50]}
+              disableRowSelectionOnClick
+              sx={{
+                '& .MuiDataGrid-row': { minHeight: '52px !important' }
+              }}
+            />
+          )}
+        </div>
 
         {/* Pagination */}
         {!loading && pagination.last_page > 1 && (
@@ -294,10 +345,10 @@ const AdvertisementRecords = () => {
                 </div>
               </div>
 
-              {selectedAd.note && (
+                  {(selectedAd.note || selectedAd.notes || selectedAd.ad_note) && (
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                   <p className="text-sm font-semibold text-emerald-900 mb-2">Note</p>
-                  <p className="text-slate-700">{selectedAd.note}</p>
+                      <p className="text-slate-700">{selectedAd.note || selectedAd.notes || selectedAd.ad_note}</p>
                 </div>
               )}
 

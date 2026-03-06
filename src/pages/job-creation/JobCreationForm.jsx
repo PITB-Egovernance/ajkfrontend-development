@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { TextField, MenuItem } from '@mui/material';
 import { Briefcase, GraduationCap, UserCheck, FileText, ClipboardList } from 'lucide-react';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import { validateJobCreationStep } from 'schemas';
 import './JobCreationForm.css';
 

@@ -10,14 +10,14 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
-import { Card, CardContent } from "components/ui/Card";
-import Button from "components/ui/Button";
+import { Card, CardContent } from "Components/ui/Card";
+import Button from "Components/ui/Button";
 import { Plus, ArrowLeft, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import Config from "config/baseUrl";
-import AuthService from "services/authService";
-import { InlineLoader } from "components/ui/Loader";
+import Config from "Config/Baseurl";
+import AuthService from "Services/AuthService";
+import { InlineLoader } from "Components/ui/Loader";
 
 const GradesManagement = () => {
   const navigate = useNavigate();

@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DataGrid } from '@mui/x-data-grid';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
-import { InlineLoader } from 'components/ui/Loader';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
+import { InlineLoader } from 'Components/ui/Loader';
 
 const ApprovedRequisitions = () => {
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [total, setTotal] = useState(0);
+  const [selectionModel, setSelectionModel] = useState([]);
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 10,
@@ -33,6 +36,15 @@ const ApprovedRequisitions = () => {
 
       // Fetch from psc/requisitions endpoint
       const pscRes = await fetch(`${API_BASE}/psc/requisitions`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-API-KEY': API_KEY,
+          'Authorization': `Bearer ${TOKEN}`,
+        },
+      });
+      
+      // Fetch existing advertisements to exclude already advertised jobs
+      const adsListRes = await fetch(`${API_BASE}/advertisements`, {
         headers: {
           'Accept': 'application/json',
           'X-API-KEY': API_KEY,
@@ -88,6 +100,40 @@ const ApprovedRequisitions = () => {
           totalCount += uniquePscApproved.length;
         }
       }
+      
+      // Exclude jobs already included in advertisements
+      if (adsListRes.ok) {
+        const listResult = await adsListRes.json();
+        if (listResult?.data?.data && Array.isArray(listResult.data.data)) {
+          const included = new Set();
+          listResult.data.data.forEach(ad => {
+            if (Array.isArray(ad.job_details)) {
+              ad.job_details.forEach(j => {
+                if (j?.hash_id) included.add(j.hash_id);
+                else if (j?.id) included.add(j.id);
+                else if (j?.job_id) included.add(j.job_id);
+              });
+            }
+          });
+          allJobs = allJobs.filter(j => {
+            const key = j.hash_id || j.id;
+            return key ? !included.has(key) : true;
+          });
+          totalCount = allJobs.length;
+        }
+      }
+      
+      try {
+        const localAdvertisedRaw = localStorage.getItem('advertised_job_ids');
+        const localAdvertised = localAdvertisedRaw ? new Set(JSON.parse(localAdvertisedRaw)) : new Set();
+        if (localAdvertised.size > 0) {
+          allJobs = allJobs.filter(j => {
+            const key = j.hash_id || j.id;
+            return key ? !localAdvertised.has(key) : true;
+          });
+          totalCount = allJobs.length;
+        }
+      } catch {}
 
       setRows(allJobs);
       setTotal(totalCount);
@@ -135,8 +181,24 @@ const ApprovedRequisitions = () => {
 
   return (
     <div className="p-6 bg-white rounded-lg shadow">
-      <h3 className="text-lg font-semibold">Approved Requisitions</h3>
-      <p className="text-slate-500">Approved requisitions list.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Approved Requisitions</h3>
+          <p className="text-slate-500">Approved requisitions list.</p>
+        </div>
+        {selectionModel.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              const idsParam = encodeURIComponent(JSON.stringify(selectionModel));
+              navigate(`/dashboard/advertisements/create?ids=${idsParam}`);
+            }}
+            className="w-fit px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+          >
+            + Create Advertisement
+          </button>
+        )}
+      </div>
 
       <div style={{ width: '100%' }} className="mt-4">
         {loading ? (
@@ -155,10 +217,28 @@ const ApprovedRequisitions = () => {
             rowCount={total}
             loading={loading}
             disableSelectionOnClick
+            checkboxSelection
+            rowSelectionModel={selectionModel}
+            onRowSelectionModelChange={(newSelection) => setSelectionModel(newSelection)}
             autoHeight
             sx={{
               '& .MuiDataGrid-row': {
                 minHeight: '52px !important',
+              },
+              '& .MuiDataGrid-checkboxInput svg': {
+                color: '#064e3b',
+              },
+              '& .MuiDataGrid-checkboxInput:hover svg': {
+                color: '#065f46',
+              },
+              '& .MuiDataGrid-checkboxInput.Mui-checked svg': {
+                color: '#064e3b',
+              },
+              '& .MuiCheckbox-root .MuiSvgIcon-root': {
+                color: '#064e3b',
+              },
+              '& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root': {
+                color: '#064e3b',
               },
             }}
           />

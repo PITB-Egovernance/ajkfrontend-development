@@ -5,7 +5,7 @@ import VerifyOtp from "pages/auth/OTP/VerifyOtp";
 import ProtectedRoute from 'middlewares/ProtectedRoute';
 import PublicRoute from 'middlewares/PublicRoute';
 import Register from 'pages/auth/Register/Register';
-import DashboardLayout from 'components/layouts/DashboardLayout';
+import DashboardLayout from 'Components/layouts/DashboardLayout';
 import Profile from 'pages/profile/Profile';
 import RequisitionList from 'pages/RequisitionList';
 import RequisitionForm from 'pages/requisition/RequisitionForm';
@@ -13,7 +13,8 @@ import RequisitionEdit from 'pages/requisition/RequisitionEdit';
 import RequisitionPreview from 'pages/requisition/RequisitionPreview';
 import ApprovedRequisitions from 'pages/ApprovedRequisitions';
 import AddNotes from 'pages/AddNotes';
-import AdvertisementRecords from 'pages/AdvertisementRecords';
+import AdvertisementRecords from 'pages/advertisement/AdvertisementRecords';
+import AdvertisementCreateForm from 'pages/advertisement/AdvertisementCreateForm';
 import AnnexAList from 'pages/AnnexAList';
 import AnnexADetail from 'pages/AnnexADetail';
 import JobCreation from 'pages/JobCreation';
@@ -66,6 +67,7 @@ function App() {
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
           <Route path="add-notes" element={<AddNotes />} />
           <Route path="advertisement-records" element={<AdvertisementRecords />} />
+          <Route path="advertisements/create" element={<AdvertisementCreateForm />} />
           <Route path="annex-a" element={<AnnexAList />} />
           <Route path="annex-a/:id" element={<AnnexADetail />} />
           <Route path="job-creation" element={<JobCreation />} />

@@ -4,10 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import Lottie from 'lottie-react';
 import toast from 'react-hot-toast';
-import AuthService from 'services/authService';
+import AuthService from 'Services/AuthService';
 import { useAuth } from 'context/AuthContext';
-import { Button, Input, Card } from 'components/ui';
-import Label from 'components/ui/Label';
+import { Button, Input, Card } from 'Components/ui';
+import Label from 'Components/ui/Label';
 import { validateLogin, validateSignup } from 'schemas';
 
 export default function Auth() {

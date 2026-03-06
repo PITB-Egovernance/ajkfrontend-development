@@ -1,6 +1,6 @@
 // services/authService.js  ← FINAL VERSION WITH CAPTCHA SUPPORT
 
-import Config from 'config/baseUrl';
+import Config from 'Config/Baseurl';
 import { Result } from 'postcss';
 const API_URL = Config.apiUrl;
 const API_KEY = Config.apiKey;

@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Checkbox, FormControlLabel } from '@mui/material';
 import { MoreVertical, Eye, Upload, Pencil, Trash2, X } from 'lucide-react';
-import { InlineLoader } from 'components/ui/Loader';
+import { InlineLoader } from 'Components/ui/Loader';
 import { useNavigate } from 'react-router-dom';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
 

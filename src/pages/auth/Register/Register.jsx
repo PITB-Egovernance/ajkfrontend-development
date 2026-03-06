@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
-import AuthService from 'services/authService';
-import { Button, Input, Card } from 'components/ui';
-import Label from 'components/ui/Label';
+import AuthService from 'Services/AuthService';
+import { Button, Input, Card } from 'Components/ui';
+import Label from 'Components/ui/Label';
 import { validateSignup } from 'schemas';
 
 export default function Register() {

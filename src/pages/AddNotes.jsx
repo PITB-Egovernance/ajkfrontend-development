@@ -11,8 +11,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { TextField } from '@mui/material';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 
 const AddNotes = () => {
   const [loading, setLoading] = useState(false);

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { InlineLoader } from 'components/ui/Loader';
+import { InlineLoader } from 'Components/ui/Loader';
 import { Briefcase, GraduationCap, UserCheck, CheckCircle2 } from 'lucide-react';
 import Step1JobDetails from './Steps/Step1JobDetails';
 import Step2Criteria from './Steps/Step2Criteria';
 import Step3Eligibility from './Steps/Step3Eligibility';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import Config from 'Config/Baseurl';
+import AuthService from 'Services/AuthService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
 import './RequisitionForm.css';
