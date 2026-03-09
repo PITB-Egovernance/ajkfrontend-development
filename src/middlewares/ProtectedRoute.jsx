@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "context/AuthContext";
+import { getDefaultDashboardPath, getUserRole, hasAnyRole } from "utils/roleUtils";
 
 /**
  * Protected Route Component
@@ -10,8 +11,8 @@ import { useAuth } from "context/AuthContext";
  * Usage:
  * <Route element={<ProtectedRoute><Dashboard /></ProtectedRoute>} path="/dashboard" />
  */
-export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+export default function ProtectedRoute({ children, allowedRoles = [] }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Show nothing while checking auth state
   if (isLoading) {
@@ -22,5 +23,16 @@ export default function ProtectedRoute({ children }) {
     );
   }
 
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const userRole = getUserRole(user);
+  const isRoleAllowed = hasAnyRole(userRole, allowedRoles);
+
+  if (!isRoleAllowed) {
+    return <Navigate to={getDefaultDashboardPath(userRole)} replace />;
+  }
+
+  return children;
 }

@@ -34,6 +34,10 @@ import DesignationsManagement from 'pages/settings/Designation/DesignationsManag
 import GradesManagement from 'pages/settings/Grades/GradesManagement';
 import CompaniesManagement from 'pages/settings/Company/CompaniesManagement';
 import ContractorsManagement from 'pages/settings/ContractorsManagement';
+import DirectorApprovals from 'pages/approvals/DirectorApprovals';
+import SecretaryApprovals from 'pages/approvals/SecretaryApprovals';
+import ChairmanApprovals from 'pages/approvals/ChairmanApprovals';
+import AdminWorkflowTracking from 'pages/approvals/AdminWorkflowTracking';
 
 
 
@@ -66,8 +70,54 @@ function App() {
           <Route path="requisitions/:id" element={<RequisitionDetail />} />
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
           <Route path="add-notes" element={<AddNotes />} />
-          <Route path="advertisement-records" element={<AdvertisementRecords />} />
-          <Route path="advertisements/create" element={<AdvertisementCreateForm />} />
+          <Route
+            path="advertisement-records"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdvertisementRecords />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="approvals/director"
+            element={
+              <ProtectedRoute allowedRoles={['director']}>
+                <DirectorApprovals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="approvals/secretary"
+            element={
+              <ProtectedRoute allowedRoles={['secretary']}>
+                <SecretaryApprovals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="approvals/chairman"
+            element={
+              <ProtectedRoute allowedRoles={['chairman']}>
+                <ChairmanApprovals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="workflow-tracking"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminWorkflowTracking />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="advertisements/create"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdvertisementCreateForm />
+              </ProtectedRoute>
+            }
+          />
           <Route path="annex-a" element={<AnnexAList />} />
           <Route path="annex-a/:id" element={<AnnexADetail />} />
           <Route path="job-creation" element={<JobCreation />} />

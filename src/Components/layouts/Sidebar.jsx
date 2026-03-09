@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
+import { useAuth } from "context/AuthContext";
+import { getUserRole } from "utils/roleUtils";
 
 const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   // Use context if available, fallback to props for backward compatibility
@@ -25,6 +27,8 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   const isOpen = propIsOpen !== undefined ? propIsOpen : sidebarContext.isOpen;
   const setIsOpen = propSetIsOpen !== undefined ? propSetIsOpen : sidebarContext.setIsOpen;
   const { openMenu, toggleMenu: contextToggleMenu } = sidebarContext;
+  const { user } = useAuth();
+  const userRole = getUserRole(user);
   
   const [localOpenMenu, setLocalOpenMenu] = useState("");
   const location = useLocation();
@@ -113,6 +117,34 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       badge: null,
     },
     {
+      id: "approvals-director",
+      label: "Director Approvals",
+      icon: CheckCircle,
+      path: "/dashboard/approvals/director",
+      roles: ["director"],
+    },
+    {
+      id: "approvals-secretary",
+      label: "Secretary Approvals",
+      icon: CheckCircle,
+      path: "/dashboard/approvals/secretary",
+      roles: ["secretary"],
+    },
+    {
+      id: "approvals-chairman",
+      label: "Chairman Approvals",
+      icon: CheckCircle,
+      path: "/dashboard/approvals/chairman",
+      roles: ["chairman"],
+    },
+    {
+      id: "workflow-tracking",
+      label: "Workflow Tracking",
+      icon: CheckCircle,
+      path: "/dashboard/workflow-tracking",
+      roles: ["admin"],
+    },
+    {
       id: "settings",
       label: "Settings",
       path: "/dashboard/settings",
@@ -162,6 +194,12 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       ],
     },
   ];
+
+  const allowedMenuItems = menuItems.filter((item) => {
+    if (!item.roles || item.roles.length === 0) return true;
+    if (!userRole) return false;
+    return item.roles.includes(userRole);
+  });
 
   const NavItem = ({ item }) => {
     const hasSubmenu = item.submenu && item.submenu.length > 0;
@@ -376,7 +414,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
         )}
         style={{ height: 'auto', maxHeight: 'calc(100vh - 120px)' }}
         >
-          {menuItems.map((item) => (
+          {allowedMenuItems.map((item) => (
             <NavItem key={item.id} item={item} />
           ))}
         </nav>

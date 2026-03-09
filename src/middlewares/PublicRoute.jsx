@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "context/AuthContext";
+import { getDefaultDashboardPath, getUserRole } from "utils/roleUtils";
 
 /**
  * Public Route Component
@@ -12,7 +13,7 @@ import { useAuth } from "context/AuthContext";
  * <Route element={<PublicRoute><Login /></PublicRoute>} path="/login" />
  */
 export default function PublicRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Show nothing while checking auth state
   if (isLoading) {
@@ -23,5 +24,10 @@ export default function PublicRoute({ children }) {
     );
   }
 
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
+  if (isAuthenticated) {
+    const userRole = getUserRole(user);
+    return <Navigate to={getDefaultDashboardPath(userRole)} replace />;
+  }
+
+  return children;
 }
