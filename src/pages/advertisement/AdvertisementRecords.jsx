@@ -71,8 +71,16 @@ const AdvertisementRecords = () => {
 
       const result = await response.json();
       
-      if (response.ok && result.success) {
-        let ads = result.data.data;
+      const isSuccess = result?.success !== false;
+      const apiData = result?.data;
+      const adsList = Array.isArray(apiData?.data)
+        ? apiData.data
+        : Array.isArray(apiData)
+          ? apiData
+          : [];
+
+      if (response.ok && isSuccess) {
+        let ads = adsList;
         try {
           const notesRaw = localStorage.getItem('advertisement_notes_cache');
           const notesCache = notesRaw ? JSON.parse(notesRaw) : {};
@@ -87,10 +95,10 @@ const AdvertisementRecords = () => {
         } catch {}
         setAdvertisements(ads);
         setPagination({
-          current_page: result.data.current_page,
-          last_page: result.data.last_page,
-          total: result.data.total,
-          per_page: result.data.per_page,
+          current_page: apiData?.current_page || 1,
+          last_page: apiData?.last_page || 1,
+          total: apiData?.total || ads.length,
+          per_page: apiData?.per_page || 10,
         });
       } else {
         toast.error(result.message || 'Failed to fetch advertisements');

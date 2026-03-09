@@ -196,9 +196,9 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   ];
 
   const allowedMenuItems = menuItems.filter((item) => {
-    if (!item.roles || item.roles.length === 0) return true;
+    if (userRole === 'admin') return true;
     if (!userRole) return false;
-    return item.roles.includes(userRole);
+    return Array.isArray(item.roles) && item.roles.includes(userRole);
   });
 
   const NavItem = ({ item }) => {

@@ -70,14 +70,7 @@ function App() {
           <Route path="requisitions/:id" element={<RequisitionDetail />} />
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
           <Route path="add-notes" element={<AddNotes />} />
-          <Route
-            path="advertisement-records"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdvertisementRecords />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="advertisement-records" element={<AdvertisementRecords />} />
           <Route
             path="approvals/director"
             element={

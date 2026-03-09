@@ -5,10 +5,42 @@ import { Eye, EyeOff } from 'lucide-react';
 import Lottie from 'lottie-react';
 import toast from 'react-hot-toast';
 import AuthService from 'Services/AuthService';
+import ApprovalWorkflowService from 'Services/ApprovalWorkflowService';
 import { useAuth } from 'context/AuthContext';
-import { Button, Input, Card } from 'Components/ui';
-import Label from 'Components/ui/Label';
+import { Button, Input } from 'Components/ui';
 import { validateLogin, validateSignup } from 'schemas';
+import { getDefaultDashboardPath } from 'utils/roleUtils';
+
+const DEMO_ACCOUNTS = [
+  {
+    role: 'admin',
+    label: 'Admin',
+    username: 'Demo Admin',
+    cnic: '1111111111111',
+    password: 'demo@123',
+  },
+  {
+    role: 'director',
+    label: 'Director',
+    username: 'Demo Director',
+    cnic: '2222222222222',
+    password: 'demo@123',
+  },
+  {
+    role: 'secretary',
+    label: 'Secretary',
+    username: 'Demo Secretary',
+    cnic: '3333333333333',
+    password: 'demo@123',
+  },
+  {
+    role: 'chairman',
+    label: 'Chairman',
+    username: 'Demo Chairman',
+    cnic: '4444444444444',
+    password: 'demo@123',
+  },
+];
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -197,6 +229,32 @@ export default function Auth() {
     }
   };
 
+  const handleDemoLogin = (role) => {
+    const account = DEMO_ACCOUNTS.find((item) => item.role === role);
+    if (!account) {
+      toast.error('Demo account not found');
+      return;
+    }
+
+    const demoUser = {
+      id: `demo-${account.role}`,
+      username: account.username,
+      name: account.username,
+      cnic: account.cnic,
+      role: account.role,
+      role_name: account.role,
+    };
+
+    ApprovalWorkflowService.seedDemoData(true);
+    localStorage.setItem('authToken', `demo-token-${account.role}`);
+    localStorage.setItem('user', JSON.stringify(demoUser));
+    localStorage.removeItem('otp_user_id');
+    login(demoUser);
+
+    toast.success(`Logged in as ${account.label} (Demo)`);
+    navigate(getDefaultDashboardPath(account.role), { replace: true });
+  };
+
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Auth Forms */}
@@ -338,6 +396,25 @@ export default function Auth() {
                       'Sign In'
                     )}
                   </Button>
+
+                  <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-xs font-semibold text-emerald-900">Demo Login Accounts</p>
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      {DEMO_ACCOUNTS.map((account) => (
+                        <button
+                          key={account.role}
+                          type="button"
+                          onClick={() => handleDemoLogin(account.role)}
+                          className="px-2.5 py-2 rounded-md bg-white border border-emerald-300 text-emerald-900 text-xs font-medium hover:bg-emerald-100 transition-colors"
+                        >
+                          {account.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-2">
+                      Password for all demo accounts: <span className="font-semibold">demo@123</span>
+                    </p>
+                  </div>
 
                   {/* Footer */}
                   {/* <div className="mt-4 pt-4 border-t border-slate-200">

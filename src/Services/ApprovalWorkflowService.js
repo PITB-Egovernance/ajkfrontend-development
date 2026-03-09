@@ -6,6 +6,114 @@ const API_BASE = Config.apiUrl;
 
 const STAGES = ['director', 'secretary', 'chairman'];
 
+const DEMO_CASES = [
+  {
+    id: 'demo-1001',
+    referenceNo: 'ADV-2026-001',
+    title: 'Assistant Director (BS-17) - General Recruitment',
+    submittedAt: '2026-03-01T09:10:00.000Z',
+    currentStage: 'director',
+    workflowStatus: 'in_progress',
+    finalDecision: null,
+    steps: {
+      director: { status: 'pending', remarks: '', actedAt: null, actedBy: null },
+      secretary: { status: 'pending', remarks: '', actedAt: null, actedBy: null },
+      chairman: { status: 'pending', remarks: '', actedAt: null, actedBy: null },
+    },
+  },
+  {
+    id: 'demo-1002',
+    referenceNo: 'ADV-2026-002',
+    title: 'Assistant Professor - Physics',
+    submittedAt: '2026-03-02T10:20:00.000Z',
+    currentStage: 'secretary',
+    workflowStatus: 'in_progress',
+    finalDecision: null,
+    steps: {
+      director: {
+        status: 'accepted',
+        remarks: 'Initial scrutiny complete and endorsed.',
+        actedAt: '2026-03-03T08:30:00.000Z',
+        actedBy: 'Director Recruitment',
+      },
+      secretary: { status: 'pending', remarks: '', actedAt: null, actedBy: null },
+      chairman: { status: 'pending', remarks: '', actedAt: null, actedBy: null },
+    },
+  },
+  {
+    id: 'demo-1003',
+    referenceNo: 'ADV-2026-003',
+    title: 'Inspector (BS-16) - Competitive Batch',
+    submittedAt: '2026-03-03T11:35:00.000Z',
+    currentStage: 'chairman',
+    workflowStatus: 'in_progress',
+    finalDecision: null,
+    steps: {
+      director: {
+        status: 'accepted',
+        remarks: 'Eligible applications finalized for next approval.',
+        actedAt: '2026-03-04T09:15:00.000Z',
+        actedBy: 'Director Recruitment',
+      },
+      secretary: {
+        status: 'accepted',
+        remarks: 'Administrative concurrence granted.',
+        actedAt: '2026-03-05T12:40:00.000Z',
+        actedBy: 'Secretary PSC',
+      },
+      chairman: { status: 'pending', remarks: '', actedAt: null, actedBy: null },
+    },
+  },
+  {
+    id: 'demo-1004',
+    referenceNo: 'ADV-2026-004',
+    title: 'Lecturer (Contract) - Computer Science',
+    submittedAt: '2026-02-20T08:00:00.000Z',
+    currentStage: 'completed',
+    workflowStatus: 'approved',
+    finalDecision: 'approved',
+    steps: {
+      director: {
+        status: 'accepted',
+        remarks: 'Recommended for onward process.',
+        actedAt: '2026-02-22T10:00:00.000Z',
+        actedBy: 'Director Recruitment',
+      },
+      secretary: {
+        status: 'accepted',
+        remarks: 'Budget and policy checks complete.',
+        actedAt: '2026-02-24T14:30:00.000Z',
+        actedBy: 'Secretary PSC',
+      },
+      chairman: {
+        status: 'accepted',
+        remarks: 'Final approval granted.',
+        actedAt: '2026-02-26T16:20:00.000Z',
+        actedBy: 'Chairman PSC',
+      },
+    },
+  },
+  {
+    id: 'demo-1005',
+    referenceNo: 'ADV-2026-005',
+    title: 'Data Entry Operator - Special Drive',
+    submittedAt: '2026-02-18T09:45:00.000Z',
+    currentStage: 'completed',
+    workflowStatus: 'rejected',
+    finalDecision: 'rejected',
+    steps: {
+      director: {
+        status: 'rejected',
+        remarks: 'Incomplete requisition documents received.',
+        actedAt: '2026-02-19T13:10:00.000Z',
+        actedBy: 'Director Recruitment',
+      },
+      secretary: { status: 'pending', remarks: '', actedAt: null, actedBy: null },
+      chairman: { status: 'pending', remarks: '', actedAt: null, actedBy: null },
+    },
+  },
+];
+
 const nowIso = () => new Date().toISOString();
 
 const getHeaders = () => ({
@@ -137,6 +245,17 @@ const applyActionToCase = (workflowCase, { stage, action, remarks, actorName }) 
 };
 
 class ApprovalWorkflowService {
+  static seedDemoData(overwrite = true) {
+    const existing = parseStoredCases();
+    if (!overwrite && existing.length > 0) {
+      return existing;
+    }
+
+    const cases = DEMO_CASES.map((item) => ({ ...item }));
+    persistCases(cases);
+    return cases;
+  }
+
   static async ensureSeeded() {
     const existing = parseStoredCases();
     if (existing.length > 0) return existing;
