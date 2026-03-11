@@ -195,9 +195,12 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     },
   ];
 
+  const RESTRICTED_ROLES = ['director', 'secretary', 'chairman'];
+
   const allowedMenuItems = menuItems.filter((item) => {
-    if (userRole === 'admin') return true;
-    if (!userRole) return false;
+    // Admin or unknown role sees everything (backward compatible)
+    if (!userRole || !RESTRICTED_ROLES.includes(userRole)) return true;
+    // Restricted roles only see items explicitly tagged for them
     return Array.isArray(item.roles) && item.roles.includes(userRole);
   });
 
