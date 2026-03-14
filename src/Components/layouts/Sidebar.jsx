@@ -117,27 +117,6 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       badge: null,
     },
     {
-      id: "approvals-director",
-      label: "Director Approvals",
-      icon: CheckCircle,
-      path: "/dashboard/approvals/director",
-      roles: ["director"],
-    },
-    {
-      id: "approvals-secretary",
-      label: "Secretary Approvals",
-      icon: CheckCircle,
-      path: "/dashboard/approvals/secretary",
-      roles: ["secretary"],
-    },
-    {
-      id: "approvals-chairman",
-      label: "Chairman Approvals",
-      icon: CheckCircle,
-      path: "/dashboard/approvals/chairman",
-      roles: ["chairman"],
-    },
-    {
       id: "workflow-tracking",
       label: "Workflow Tracking",
       icon: CheckCircle,

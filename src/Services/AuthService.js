@@ -1,7 +1,6 @@
 // services/authService.js  ← FINAL VERSION WITH CAPTCHA SUPPORT
 
 import Config from 'Config/Baseurl';
-import { Result } from 'postcss';
 const API_URL = Config.apiUrl;
 const API_KEY = Config.apiKey;
 
@@ -36,7 +35,6 @@ class AuthService {
   // Login
   // ──────────────────────────────────────────────────────
   static async login(data) {
-    console.log("login Data", data)
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: {
@@ -47,7 +45,6 @@ class AuthService {
       body: JSON.stringify(data),
     });
 
-    console.log("RESULT", response)
     const result = await response.json();
     if (!response.ok) {
       const error = new Error(result.message || "Login failed");
@@ -56,7 +53,7 @@ class AuthService {
       throw error;
     }
 
-    // this._saveAuth(result);
+    this._saveAuth(result);
     return result;
   }
 
@@ -72,7 +69,6 @@ class AuthService {
     });
 
     const result = await response.json();
-    console.log("OTP RESPONSE:", result);
 
     if (!response.ok) {
       const error = new Error(result.message || "OTP verification failed");
@@ -94,7 +90,7 @@ class AuthService {
   static async generateCaptcha() {
     const response = await fetch(`${API_URL}/captcha/image`, {
       method: "GET",
-      headers: { 
+      headers: {
         Accept: "application/json",
         "X-API-KEY": API_KEY
       },
@@ -167,9 +163,23 @@ class AuthService {
   // Helpers
   // ──────────────────────────────────────────────────────
   static _saveAuth(result) {
-    if (result.data?.token) {
-      localStorage.setItem("authToken", result.data.token);
-      localStorage.setItem("user", JSON.stringify(result.data.user));
+    const data = result?.data || {};
+    const token =
+      data?.token ||
+      data?.access_token ||
+      data?.authToken ||
+      result?.token ||
+      result?.access_token ||
+      null;
+
+    const user = data?.user || result?.user || null;
+
+    if (token) {
+      localStorage.setItem("authToken", token);
+    }
+
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
     }
   }
 
