@@ -1,10 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
+import { Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from 'Components/ui/Card';
 import Button from 'Components/ui/Button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from 'Components/ui/tooltip';
 import StatusBadge from 'Components/workflow/StatusBadge';
+import WorkflowTimelineDialog from 'Components/workflow/WorkflowTimelineDialog';
 import ApprovalWorkflowService from 'Services/ApprovalWorkflowService';
 import toast from 'react-hot-toast';
+
+const formatDate = (value) => {
+  if (!value) return 'N/A';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+};
 
 const POLL_INTERVAL_MS = 10000;
 const STATUS_TABS = [
@@ -22,10 +31,7 @@ const STAGE_TABS = [
   { key: 'completed', label: 'Completed' },
 ];
 
-const stageValue = (steps, stage, field) => {
-  if (!steps || !steps[stage]) return 'N/A';
-  return steps[stage][field] || 'N/A';
-};
+
 
 const AdminWorkflowTracking = () => {
   const [rows, setRows] = useState([]);
@@ -33,6 +39,8 @@ const AdminWorkflowTracking = () => {
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [stageFilter, setStageFilter] = useState('all');
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
   const loadData = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -41,11 +49,15 @@ const AdminWorkflowTracking = () => {
       setRows(
         (data || []).map((item, idx) => ({
           id: item.id || item.hash_id || `admin-wf-${idx}`,
+          hashId: item.hash_id || item.id || null,
           referenceNo: item.referenceNo || item.application_no || item.adv_number || `APP-${idx + 1}`,
+          title: item.title || item.note || item.subject || item.important_notes || 'Recruitment application',
+          submittedAt: item.submittedAt || item.created_at || item.adv_date || null,
           currentStage: item.currentStage || item.current_stage || 'director',
           workflowStatus: item.workflowStatus || item.workflow_status || 'pending',
           finalDecision: item.finalDecision || item.final_decision || 'pending',
           steps: item.steps || {},
+          raw: item.raw || item,
         }))
       );
       setLastUpdatedAt(new Date());
@@ -82,71 +94,75 @@ const AdminWorkflowTracking = () => {
     };
   }, [loadData]);
 
+  const handleViewTimeline = useCallback((record) => {
+    setSelectedRecord(record);
+    setViewDialogOpen(true);
+  }, []);
+
   const columns = useMemo(
     () => [
-      { field: 'referenceNo', headerName: 'Application #', minWidth: 170, flex: 1 },
+      {
+        field: 'referenceNo',
+        headerName: 'Advertisement #',
+        minWidth: 160,
+        flex: 1,
+      },
+      {
+        field: 'title',
+        headerName: 'Advertisement Title',
+        minWidth: 220,
+        flex: 1.6,
+      },
+      {
+        field: 'submittedAt',
+        headerName: 'Adv. Date',
+        minWidth: 120,
+        valueFormatter: (params) => formatDate(params?.value),
+      },
       {
         field: 'currentStage',
         headerName: 'Current Stage',
-        minWidth: 130,
+        minWidth: 150,
         renderCell: (params) => <StatusBadge value={params.value} />,
       },
       {
         field: 'workflowStatus',
         headerName: 'Status',
-        minWidth: 130,
+        minWidth: 140,
         renderCell: (params) => <StatusBadge value={params.value} />,
-      },
-      {
-        field: 'directorDecision',
-        headerName: 'Director',
-        minWidth: 130,
-        valueGetter: (params) => stageValue(params.row.steps, 'director', 'status'),
-        renderCell: (params) => <StatusBadge value={params.value} />,
-      },
-      {
-        field: 'secretaryDecision',
-        headerName: 'Secretary',
-        minWidth: 130,
-        valueGetter: (params) => stageValue(params.row.steps, 'secretary', 'status'),
-        renderCell: (params) => <StatusBadge value={params.value} />,
-      },
-      {
-        field: 'chairmanDecision',
-        headerName: 'Chairman',
-        minWidth: 130,
-        valueGetter: (params) => stageValue(params.row.steps, 'chairman', 'status'),
-        renderCell: (params) => <StatusBadge value={params.value} />,
-      },
-      {
-        field: 'directorRemarks',
-        headerName: 'Director Remarks',
-        minWidth: 180,
-        flex: 1,
-        valueGetter: (params) => stageValue(params.row.steps, 'director', 'remarks'),
-      },
-      {
-        field: 'secretaryRemarks',
-        headerName: 'Secretary Remarks',
-        minWidth: 180,
-        flex: 1,
-        valueGetter: (params) => stageValue(params.row.steps, 'secretary', 'remarks'),
-      },
-      {
-        field: 'chairmanRemarks',
-        headerName: 'Chairman Remarks',
-        minWidth: 180,
-        flex: 1,
-        valueGetter: (params) => stageValue(params.row.steps, 'chairman', 'remarks'),
       },
       {
         field: 'finalDecision',
         headerName: 'Final Decision',
-        minWidth: 140,
+        minWidth: 150,
         renderCell: (params) => <StatusBadge value={params.value} />,
       },
+      {
+        field: 'actions',
+        headerName: 'Actions',
+        minWidth: 100,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => (
+          <TooltipProvider delayDuration={180}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => handleViewTimeline(params.row)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:text-emerald-700 hover:shadow"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span className="sr-only">View timeline</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">View workflow timeline</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ),
+      },
     ],
-    []
+    [handleViewTimeline]
   );
 
   const filteredRows = useMemo(() => {
@@ -222,6 +238,15 @@ const AdminWorkflowTracking = () => {
           />
         </CardContent>
       </Card>
+
+      <WorkflowTimelineDialog
+        open={viewDialogOpen}
+        onOpenChange={(open) => {
+          setViewDialogOpen(open);
+          if (!open) setSelectedRecord(null);
+        }}
+        record={selectedRecord}
+      />
     </div>
   );
 };
