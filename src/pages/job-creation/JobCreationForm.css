@@ -220,11 +220,20 @@
   margin-left: -15px;
 }
 
+.job-creation-container .col-md-6,
+.job-creation-container .col-md-12 {
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
 .job-creation-container .col-md-6 {
   flex: 0 0 50%;
   max-width: 50%;
-  padding-right: 15px;
-  padding-left: 15px;
+}
+
+.job-creation-container .col-md-12 {
+  flex: 0 0 100%;
+  max-width: 100%;
 }
 
 .job-creation-container .section-title {

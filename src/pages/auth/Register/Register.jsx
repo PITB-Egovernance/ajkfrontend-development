@@ -14,8 +14,10 @@ export default function Register() {
   const [formData, setFormData] = useState({
     username: "",
     cnic: "",
+    mobile: "",
     password: "",
     password_confirmation: "",
+    role: "admin", // Default role
   });
 
   const [errors, setErrors] = useState({});
@@ -28,7 +30,7 @@ export default function Register() {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: name === 'cnic' ? value.replace(/\D/g, "").slice(0, 13) : value
+      [name]: (name === 'cnic' || name === 'mobile') ? value.replace(/\D/g, "").slice(0, name === 'cnic' ? 13 : 11) : value
     });
     // Clear error for this field when user starts typing
     if (errors[name]) {
@@ -61,6 +63,7 @@ export default function Register() {
       setFormData({
         username: "",
         cnic: "",
+        mobile: "",
         password: "",
         password_confirmation: "",
       });
@@ -178,6 +181,45 @@ export default function Register() {
                 />
                 {errors.cnic && (
                   <p className="text-red-600 text-xs mt-1">{errors.cnic}</p>
+                )}
+              </div>
+
+              {/* Mobile */}
+              <div>
+                <Label htmlFor="mobile">Mobile Number</Label>
+                <Input
+                  id="mobile"
+                  name="mobile"
+                  placeholder="03XXXXXXXXX"
+                  maxLength="11"
+                  value={formData.mobile}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  error={errors.mobile}
+                />
+                {errors.mobile && (
+                  <p className="text-red-600 text-xs mt-1">{errors.mobile}</p>
+                )}
+              </div>
+
+              {/* Role Selector */}
+              <div>
+                <Label htmlFor="role">Role</Label>
+                <select
+                  id="role"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                  disabled={loading}
+                >
+                  <option value="admin">Admin</option>
+                  <option value="director">Director</option>
+                  <option value="secretary">Secretary</option>
+                  <option value="chairman">Chairman</option>
+                </select>
+                {errors.role && (
+                  <p className="text-red-600 text-xs mt-1">{errors.role}</p>
                 )}
               </div>
 

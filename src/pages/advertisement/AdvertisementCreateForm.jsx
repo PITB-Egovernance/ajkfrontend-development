@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { TextField } from "@mui/material";
+import { TextField, MenuItem } from "@mui/material";
 import { FileText, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import Config from "Config/Baseurl";
@@ -22,9 +22,12 @@ const AdvertisementCreateForm = () => {
   });
   const [advNumber, setAdvNumber] = useState("");
   const [closingDate, setClosingDate] = useState("");
+  const [advertisementFee, setAdvertisementFee] = useState("");
   const [note, setNote] = useState("");
   const [importantNotes, setImportantNotes] = useState("");
   const [termsConditions, setTermsConditions] = useState([""]);
+  const [jobConfigs, setJobConfigs] = useState({});
+  const [jobTitles, setJobTitles] = useState({});
 
   const selectedIds = useMemo(() => {
     const raw = searchParams.get("ids");
@@ -112,6 +115,108 @@ const AdvertisementCreateForm = () => {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!selectedIds.length) return;
+
+    // Initialize config state for all selected IDs
+    setJobConfigs((prev) => {
+      const next = { ...prev };
+      selectedIds.forEach((id) => {
+        if (!next[id]) {
+          next[id] = { fee: "", testType: "" };
+        }
+      });
+      return next;
+    });
+
+    // Attempt to fetch job designations
+    const fetchTitles = async () => {
+      try {
+        const adsRes = await fetch(
+          `${Config.apiUrl}/advertisements/approved-requisitions`,
+          {
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${AuthService.getToken()}`,
+              "X-API-KEY": Config.apiKey,
+            },
+          },
+        );
+        const pscRes = await fetch(`${Config.apiUrl}/psc/requisitions`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            "X-API-KEY": Config.apiKey,
+          },
+        });
+
+        // Also fetch from ViewAllRequisitions just in case
+        const allRes = await fetch(`${Config.apiUrl}/requisitions`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            "X-API-KEY": Config.apiKey,
+          },
+        });
+
+        let allJobs = [];
+        if (adsRes.ok) {
+          const adsResult = await adsRes.json();
+          const adsJobs =
+            adsResult?.data?.jobs?.data || adsResult?.data?.jobs || [];
+          if (Array.isArray(adsJobs)) allJobs = [...allJobs, ...adsJobs];
+        }
+        if (pscRes.ok) {
+          const pscResult = await pscRes.json();
+          const pscJobs = pscResult?.data?.data || pscResult?.data || [];
+          if (Array.isArray(pscJobs)) allJobs = [...allJobs, ...pscJobs];
+        }
+        if (allRes.ok) {
+          const allResult = await allRes.json();
+          const moreJobs = allResult?.data?.data || allResult?.data || [];
+          if (Array.isArray(moreJobs)) allJobs = [...allJobs, ...moreJobs];
+        }
+
+        const titlesMap = {};
+        allJobs.forEach((j) => {
+          const id = j.hash_id || j.id;
+          if (id && selectedIds.includes(String(id))) {
+            titlesMap[String(id)] = j.designation;
+          }
+        });
+
+        // 🟢 NEW: Fetch missing single jobs if they weren't in any lists
+        const missingIds = selectedIds.filter((id) => !titlesMap[id]);
+        if (missingIds.length > 0) {
+          const individualFetches = missingIds.map(async (id) => {
+            try {
+              const res = await fetch(`${Config.apiUrl}/requisitions/${id}`, {
+                headers: {
+                  Accept: "application/json",
+                  Authorization: `Bearer ${AuthService.getToken()}`,
+                  "X-API-KEY": Config.apiKey,
+                },
+              });
+              const result = await res.json();
+              if (res.ok && result?.success) {
+                const job = result.data || result;
+                if (job.designation) {
+                  titlesMap[id] = job.designation;
+                }
+              }
+            } catch (err) {}
+          });
+          await Promise.all(individualFetches);
+        }
+
+        setJobTitles((prev) => ({ ...prev, ...titlesMap }));
+      } catch (err) {
+        console.error("Error fetching job titles:", err);
+      }
+    };
+    fetchTitles();
+  }, [selectedIds]);
+
   const addTerm = () => setTermsConditions((prev) => [...prev, ""]);
   const removeTerm = (idx) =>
     setTermsConditions((prev) => prev.filter((_, i) => i !== idx));
@@ -170,7 +275,7 @@ const AdvertisementCreateForm = () => {
             const raw = localStorage.getItem("advertised_job_ids");
             const prev = raw ? JSON.parse(raw) : [];
             const merged = Array.from(
-              new Set([...(prev || []), ...selectedIds])
+              new Set([...(prev || []), ...selectedIds]),
             );
             localStorage.setItem("advertised_job_ids", JSON.stringify(merged));
 
@@ -180,7 +285,7 @@ const AdvertisementCreateForm = () => {
               notesCache[advNum] = note.trim();
               localStorage.setItem(
                 "advertisement_notes_cache",
-                JSON.stringify(notesCache)
+                JSON.stringify(notesCache),
               );
             }
           } catch {}
@@ -201,8 +306,19 @@ const AdvertisementCreateForm = () => {
       fd.append("adv_date", advDate);
       fd.append("adv_number", advNumber);
       fd.append("closing_date", closingDate);
+      fd.append("advertisement_fee", advertisementFee || "");
       fd.append("note", note || "");
       fd.append("important_notes", importantNotes || "");
+
+      // Append per-job configs securely
+      const feesPayload = {};
+      const testTypesPayload = {};
+      Object.keys(jobConfigs).forEach((jobId) => {
+        feesPayload[jobId] = jobConfigs[jobId].fee || "";
+        testTypesPayload[jobId] = jobConfigs[jobId].testType || "";
+      });
+      fd.append("job_fees", JSON.stringify(feesPayload));
+      fd.append("job_test_types", JSON.stringify(testTypesPayload));
       filteredTerms.forEach((t) => fd.append("terms_conditions[]", t));
 
       const resp = await fetch(`${Config.apiUrl}/advertisements/store`, {
@@ -230,8 +346,11 @@ const AdvertisementCreateForm = () => {
         fd2.append("adv_date", advDate);
         fd2.append("adv_number", String(nextAdv).trim());
         fd2.append("closing_date", closingDate);
+        fd2.append("advertisement_fee", advertisementFee || "");
         fd2.append("note", note || "");
         fd2.append("important_notes", importantNotes || "");
+        fd2.append("job_fees", JSON.stringify(feesPayload));
+        fd2.append("job_test_types", JSON.stringify(testTypesPayload));
         filteredTerms.forEach((t) => fd2.append("terms_conditions[]", t));
         const resp2 = await fetch(`${Config.apiUrl}/advertisements/store`, {
           method: "POST",
@@ -268,6 +387,9 @@ const AdvertisementCreateForm = () => {
 
   const fieldSx = {
     "& .MuiOutlinedInput-root": {
+      minHeight: 56,
+    },
+    "& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)": {
       height: 56,
     },
     "& .MuiOutlinedInput-input": {
@@ -285,7 +407,11 @@ const AdvertisementCreateForm = () => {
 
         <div className="form-container">
           <form onSubmit={handleSubmit} className="card-body">
-            <h6 className="section-title">Advertisement Information</h6>
+            <div className="row">
+              <div className="col-md-12">
+                <h6 className="section-title">Advertisement Information</h6>
+              </div>
+            </div>
 
             <div className="row">
               <div className="col-md-6 form-group">
@@ -370,13 +496,101 @@ const AdvertisementCreateForm = () => {
               </div>
             </div>
 
-            <h6 className="section-title">Important Notes</h6>
             <div className="row">
-              <div className="col-md-6 form-group">
+              <div className="col-md-12">
+                <h6 className="section-title">Requisition Specific Details</h6>
+              </div>
+            </div>
+            {selectedIds.map((jobId) => {
+              const designation = jobTitles[jobId];
+              return (
+                <div
+                  key={jobId}
+                  style={{
+                    marginBottom: 24,
+                    padding: "16px",
+                    border: "1px solid #e0e0e0",
+                    borderRadius: 8,
+                  }}
+                >
+                  <h6
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#111827",
+                      marginBottom: 16,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    {designation ? (
+                      designation
+                    ) : (
+                      <span
+                        style={{
+                          color: "#6b7280",
+                          fontWeight: 400,
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Loading designation for {jobId}...
+                      </span>
+                    )}
+                  </h6>
+                  <div className="row">
+                    <div className="col-md-6 form-group">
+                      <TextField
+                        select
+                        fullWidth
+                        label="Test Type"
+                        value={jobConfigs[jobId]?.testType || ""}
+                        onChange={(e) =>
+                          setJobConfigs((prev) => ({
+                            ...prev,
+                            [jobId]: {
+                              ...prev[jobId],
+                              testType: e.target.value,
+                            },
+                          }))
+                        }
+                        sx={fieldSx}
+                      >
+                        <MenuItem value="MCQs">MCQs</MenuItem>
+                        <MenuItem value="Written Exam">Written Exam</MenuItem>
+                      </TextField>
+                    </div>
+                    <div className="col-md-6 form-group">
+                      <TextField
+                        fullWidth
+                        label="Application Fee"
+                        type="number"
+                        value={jobConfigs[jobId]?.fee || ""}
+                        onChange={(e) =>
+                          setJobConfigs((prev) => ({
+                            ...prev,
+                            [jobId]: { ...prev[jobId], fee: e.target.value },
+                          }))
+                        }
+                        placeholder="Fee amount"
+                        sx={fieldSx}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="row">
+              <div className="col-md-12">
+                <h6 className="section-title">Important Notes</h6>
+              </div>
+            </div>
+            <div className="row">
+              <div className="col-md-12 form-group">
                 <TextField
                   fullWidth
                   multiline
-                  minRows={3}
                   maxRows={12}
                   label="Important Notes"
                   value={importantNotes}
@@ -392,9 +606,13 @@ const AdvertisementCreateForm = () => {
               </div>
             </div>
 
-            <h6 className="section-title">Terms & Conditions</h6>
             <div className="row">
-              <div className="col-md-6">
+              <div className="col-md-12">
+                <h6 className="section-title">Terms & Conditions</h6>
+              </div>
+            </div>
+            <div className="row">
+              <div className="col-md-12">
                 {termsConditions.map((term, idx) => (
                   <div
                     key={idx}
@@ -408,7 +626,6 @@ const AdvertisementCreateForm = () => {
                     <TextField
                       fullWidth
                       multiline
-                      minRows={3}
                       maxRows={12}
                       label={`Term ${idx + 1}`}
                       value={term}
@@ -418,9 +635,10 @@ const AdvertisementCreateForm = () => {
                     {termsConditions.length > 1 && (
                       <button
                         type="button"
-                        className="btn btn-prev"
+                        className="btn btn-prev flex justify-center items-center"
                         onClick={() => removeTerm(idx)}
                         title="Remove"
+                        style={{ height: 56, padding: "0 16px" }}
                       >
                         <Trash2 size={16} />
                       </button>

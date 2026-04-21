@@ -15,6 +15,7 @@ import ApprovedRequisitions from 'pages/ApprovedRequisitions';
 import AddNotes from 'pages/AddNotes';
 import AdvertisementRecords from 'pages/advertisement/AdvertisementRecords';
 import AdvertisementCreateForm from 'pages/advertisement/AdvertisementCreateForm';
+import AdvertisementEditForm from 'pages/advertisement/AdvertisementEditForm';
 import AnnexAList from 'pages/AnnexAList';
 import AnnexADetail from 'pages/AnnexADetail';
 import JobCreation from 'pages/JobCreation';
@@ -108,6 +109,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdvertisementCreateForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="advertisements/edit/:id"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdvertisementEditForm />
               </ProtectedRoute>
             }
           />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DataGrid } from '@mui/x-data-grid';
 import toast from 'react-hot-toast';
@@ -12,15 +12,86 @@ import {
   ChevronRight,
   FileText,
   Clock,
-  Filter
+  Filter,
+  MoreVertical,
+  Pencil,
+  Trash2
 } from 'lucide-react';
+
 import { Card, CardHeader, CardTitle, CardContent } from 'Components/ui/Card';
 import Button from 'Components/ui/Button';
 import Config from 'Config/Baseurl';
 import AuthService from 'Services/AuthService';
+import { Menu, MenuItem, IconButton } from '@mui/material';
+
+const ActionCell = ({ ad, onView, onEdit, onDelete }) => {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleClick = (event) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = (event) => {
+    if (event) event.stopPropagation();
+    setAnchorEl(null);
+  };
+
+  return (
+    <div className="flex justify-center items-center h-full w-full">
+      <IconButton 
+        onClick={handleClick}
+        size="small"
+        sx={{ color: '#334155' }}
+      >
+        <MoreVertical className="w-5 h-5" />
+      </IconButton>
+      
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        onClick={(e) => e.stopPropagation()}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
+            mt: 1.5,
+            minWidth: 120,
+            '& .MuiMenuItem-root': {
+              fontSize: '14px',
+              color: '#334155',
+              display: 'flex',
+              gap: '8px',
+              padding: '10px 16px',
+            },
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem onClick={(e) => { handleClose(e); onView(ad.id); }}>
+          <Eye className="w-4 h-4" /> View
+        </MenuItem>
+        <MenuItem onClick={(e) => { handleClose(e); onEdit(ad.id); }}>
+          <Pencil className="w-4 h-4" /> Edit
+        </MenuItem>
+        <MenuItem 
+          onClick={(e) => { handleClose(e); onDelete(ad.id); }}
+          sx={{ color: '#ef4444 !important' }}
+        >
+          <Trash2 className="w-4 h-4" /> Delete
+        </MenuItem>
+      </Menu>
+    </div>
+  );
+};
 
 const AdvertisementRecords = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [advertisements, setAdvertisements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -145,6 +216,40 @@ const AdvertisementRecords = () => {
     }
   };
 
+  const editAdvertisement = (id) => {
+    navigate(`/dashboard/advertisements/edit/${id}`);
+  };
+
+  const deleteAdvertisement = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this advertisement? This action cannot be undone.')) {
+      return;
+    }
+
+    const loadingToast = toast.loading('Deleting advertisement...');
+    try {
+      const response = await fetch(`${Config.apiUrl}/advertisements/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${AuthService.getToken()}`,
+          'X-API-KEY': Config.apiKey,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        toast.success(result.message || 'Advertisement deleted successfully', { id: loadingToast });
+        fetchAdvertisements(pagination.current_page);
+      } else {
+        toast.error(result.message || 'Failed to delete advertisement', { id: loadingToast });
+      }
+    } catch (error) {
+      toast.error('Error deleting advertisement', { id: loadingToast });
+    }
+  };
+
   const filteredAdvertisements = advertisements.filter(ad =>
     ad.adv_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     ad.note?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -182,6 +287,12 @@ const AdvertisementRecords = () => {
           : params.value
     },
     { field: 'note', headerName: 'Note', flex: 1, minWidth: 200 },
+    { 
+      field: 'advertisement_fee', 
+      headerName: 'Fee (Rs.)', 
+      width: 120,
+      valueFormatter: (params) => params.value ? `Rs. ${params.value}` : 'N/A'
+    },
     { field: 'important_notes', headerName: 'Important Notes', flex: 1.5, minWidth: 260 },
     {
       field: 'status',
@@ -192,17 +303,16 @@ const AdvertisementRecords = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 140,
+      width: 100,
       sortable: false,
       filterable: false,
       renderCell: (params) => (
-        <button
-          onClick={() => viewAdvertisement(params.row.id)}
-          className="px-3 py-1.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-md transition-all duration-200 flex items-center justify-center gap-2"
-        >
-          <Eye className="w-4 h-4" />
-          View
-        </button>
+        <ActionCell 
+          ad={params.row} 
+          onView={viewAdvertisement} 
+          onEdit={editAdvertisement} 
+          onDelete={deleteAdvertisement}
+        />
       )
     }
   ];
@@ -247,6 +357,7 @@ const AdvertisementRecords = () => {
                 adv_number: ad.adv_number,
                 adv_date: ad.adv_date,
                 closing_date: ad.closing_date,
+                advertisement_fee: ad.advertisement_fee,
                 note: ad.note || ad.notes || ad.ad_note,
                 important_notes: ad.important_notes
               }))}
@@ -338,55 +449,142 @@ const AdvertisementRecords = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <p className="text-sm font-medium text-slate-500 mb-1">Advertisement Date</p>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {new Date(selectedAd.adv_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </p>
+              {/* Core Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center gap-4 transition-all hover:bg-emerald-50">
+                  <div className="p-3 bg-white rounded-xl shadow-sm">
+                    <Calendar className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-emerald-900/50 uppercase tracking-wider mb-0.5">Advertisement Date</p>
+                    <p className="text-lg font-bold text-slate-900">
+                      {new Date(selectedAd.adv_date).toLocaleDateString('en-US', { 
+                        year: 'numeric', month: 'long', day: 'numeric' 
+                      })}
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <p className="text-sm font-medium text-slate-500 mb-1">Closing Date</p>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {new Date(selectedAd.closing_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </p>
+
+                <div className="p-4 bg-red-50/50 border border-red-100 rounded-2xl flex items-center gap-4 transition-all hover:bg-red-50">
+                  <div className="p-3 bg-white rounded-xl shadow-sm">
+                    <Clock className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-red-900/50 uppercase tracking-wider mb-0.5">Closing Date</p>
+                    <p className="text-lg font-bold text-slate-900">
+                      {new Date(selectedAd.closing_date).toLocaleDateString('en-US', { 
+                        year: 'numeric', month: 'long', day: 'numeric' 
+                      })}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-                  {(selectedAd.note || selectedAd.notes || selectedAd.ad_note) && (
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-                  <p className="text-sm font-semibold text-emerald-900 mb-2">Note</p>
-                      <p className="text-slate-700">{selectedAd.note || selectedAd.notes || selectedAd.ad_note}</p>
+              {/* Advertisement Note (Specific) */}
+              {selectedAd.note && (
+                <div className="p-5 bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <FileText className="w-5 h-5 text-emerald-600" />
+                    <h3 className="font-bold text-slate-800">Advertisement Note</h3>
+                  </div>
+                  <p className="text-slate-600 leading-relaxed text-sm">{selectedAd.note}</p>
                 </div>
               )}
 
-              {selectedAd.important_notes && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                  <p className="text-sm font-semibold text-blue-900 mb-2">Important Notes</p>
-                  <p className="text-slate-700">{selectedAd.important_notes}</p>
+              {/* Job Details Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1">
+                  <Megaphone className="w-5 h-5 text-emerald-600" />
+                  <h3 className="text-lg font-bold text-slate-900 text-center">Requisition Specific Details</h3>
                 </div>
-              )}
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {selectedAd.job_details?.map((job, idx) => (
+                    <div key={idx} className="group relative bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-emerald-300 transition-all shadow-sm hover:shadow-md">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <div className="p-5">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-700 font-bold shrink-0">
+                               {idx + 1}
+                            </div>
+                            <div>
+                               <h4 className="font-bold text-slate-900 text-lg">
+                                 {job.designation || job.title || 'Requisition Details'}
+                               </h4>
+                               <p className="text-xs font-medium text-slate-400 font-bold">
+                                 Ref: {job.hash_id || job.id}
+                               </p>
+                            </div>
+                          </div>
+                        </div>
 
-              {selectedAd.terms_conditions && (
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <p className="text-sm font-semibold text-slate-900 mb-3">Terms & Conditions</p>
-                  <ul className="space-y-2">
-                    {parseTermsConditions(selectedAd.terms_conditions).map((term, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm text-slate-700">
-                        <span className="text-emerald-600 font-bold mt-1">•</span>
-                        <span>{term}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                               <span className="text-emerald-600 font-bold">Rs.</span>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Application Fee</p>
+                              <p className="font-bold text-slate-900">
+                                {job.pivot?.fee ? `Rs. ${job.pivot.fee}` : 'No fee'}
+                              </p>
+                            </div>
+                          </div>
 
-              {selectedAd.job_details && selectedAd.job_details.length > 0 && (
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <p className="text-sm font-semibold text-slate-900 mb-3">Job Details ({selectedAd.job_details.length})</p>
-                  <p className="text-slate-600 text-sm">Associated job postings available</p>
+                          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                               <FileText className="w-4 h-4 text-emerald-600" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Test Type</p>
+                              <p className="font-bold text-slate-900 capitalize">
+                                {job.pivot?.test_type || 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+
+              {/* Footer Notes & Terms */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                {/* Important Notes */}
+                {selectedAd.important_notes && (
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2 underline px-1">
+                      Important Notes
+                    </h3>
+                    <div className="p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-sm text-slate-600 leading-relaxed italic">
+                      {selectedAd.important_notes}
+                    </div>
+                  </div>
+                )}
+
+                {/* Terms & Conditions */}
+                {selectedAd.terms_conditions && (
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2 underline px-1">
+                      Terms & Conditions
+                    </h3>
+                    <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                      <ul className="space-y-3">
+                        {parseTermsConditions(selectedAd.terms_conditions).map((term, index) => (
+                          <li key={index} className="flex items-start gap-3 text-sm text-slate-600 group">
+                            <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center shrink-0 mt-0.5 transition-colors group-hover:bg-emerald-600">
+                              <span className="text-[10px] text-emerald-700 font-bold group-hover:text-white">{index + 1}</span>
+                            </div>
+                            <span className="leading-normal">{term}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
