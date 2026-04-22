@@ -3,9 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { TextField, MenuItem } from "@mui/material";
 import { Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
-import Config from "Config/Baseurl";
-import AuthService from "Services/AuthService";
-import "../job-creation/JobCreationForm.css";
+import AdvertisementApi from "../../api/advertisementApi";
 
 const AdvertisementEditForm = () => {
   const { id } = useParams();
@@ -28,16 +26,8 @@ const AdvertisementEditForm = () => {
   useEffect(() => {
     const fetchAdvertisement = async () => {
       try {
-        const response = await fetch(`${Config.apiUrl}/advertisements/${id}`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            "X-API-KEY": Config.apiKey,
-          },
-        });
-        const result = await response.json();
-        if (response.ok && result.success) {
+        const result = await AdvertisementApi.getById(id);
+        if (result.success) {
           const data = result.data;
           setAdvDate(data.adv_date?.split("T")[0] || "");
           setAdvNumber(data.adv_number || "");
@@ -134,27 +124,16 @@ const AdvertisementEditForm = () => {
         job_test_types: JSON.stringify(testTypesPayload)
       };
 
-      const resp = await fetch(`${Config.apiUrl}/advertisements/${id}/update`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          "X-API-KEY": Config.apiKey,
-        },
-        body: JSON.stringify(payload),
-      });
-      
-      const result = await resp.json().catch(() => ({}));
+      const result = await AdvertisementApi.update(id, payload);
 
-      if (resp.ok && result?.success !== false) {
+      if (result.success) {
         toast.success("Advertisement updated successfully", { id: loadingToast });
         navigate("/dashboard/advertisement-records");
-      } else {
-        setFieldErrors(result?.errors || {});
-        throw new Error(result?.message || "Failed to update advertisement");
       }
     } catch (err) {
+      if (err.errors) {
+          setFieldErrors(err.errors);
+      }
       toast.error(err.message || "Failed to update advertisement", {
         id: loadingToast,
       });
@@ -297,45 +276,53 @@ const AdvertisementEditForm = () => {
                       >
                         {designation}
                       </h6>
-                      <div className="row">
-                        <div className="col-md-6 form-group">
-                          <TextField
-                            fullWidth
-                            label="Application Fee"
-                            type="number"
-                            value={jobConfigs[jobId]?.fee || ""}
-                            onChange={(e) =>
-                              setJobConfigs((prev) => ({
-                                ...prev,
-                                [jobId]: { ...prev[jobId], fee: e.target.value },
-                              }))
-                            }
-                            placeholder="Fee amount"
-                            sx={fieldSx}
-                          />
+                        <div className="row">
+                          <div className="col-md-6 form-group">
+                            <TextField
+                              select
+                              fullWidth
+                              label="Test Type"
+                              value={jobConfigs[jobId]?.testType || ""}
+                              onChange={(e) => {
+                                const newType = e.target.value;
+                                let newFee = "";
+                                if (newType === "1") newFee = "505";
+                                else if (newType === "2") newFee = "1010";
+
+                                setJobConfigs((prev) => ({
+                                  ...prev,
+                                  [jobId]: {
+                                    ...prev[jobId],
+                                    testType: newType,
+                                    fee: newFee
+                                  },
+                                }));
+                              }}
+                              sx={fieldSx}
+                            >
+                              <MenuItem value="1">MCQs</MenuItem>
+                              <MenuItem value="2">Written Exam</MenuItem>
+                            </TextField>
+                          </div>
+                          <div className="col-md-6 form-group">
+                            <TextField
+                              fullWidth
+                              label="Application Fee"
+                              type="number"
+                              value={jobConfigs[jobId]?.fee || ""}
+                              InputProps={{
+                                readOnly: true,
+                              }}
+                              placeholder="Fee auto-filled"
+                              sx={{
+                                ...fieldSx,
+                                "& .MuiInputBase-input": {
+                                  backgroundColor: "#f8fafc",
+                                }
+                              }}
+                            />
+                          </div>
                         </div>
-                        <div className="col-md-6 form-group">
-                          <TextField
-                            select
-                            fullWidth
-                            label="Test Type"
-                            value={jobConfigs[jobId]?.testType || ""}
-                            onChange={(e) =>
-                              setJobConfigs((prev) => ({
-                                ...prev,
-                                [jobId]: {
-                                  ...prev[jobId],
-                                  testType: e.target.value,
-                                },
-                              }))
-                            }
-                            sx={fieldSx}
-                          >
-                            <MenuItem value="MCQs">MCQs</MenuItem>
-                            <MenuItem value="Written Exam">Written Exam</MenuItem>
-                          </TextField>
-                        </div>
-                      </div>
                     </div>
                   );
                 })}

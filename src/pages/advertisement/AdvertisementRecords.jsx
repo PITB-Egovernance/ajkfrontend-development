@@ -20,8 +20,7 @@ import {
 
 import { Card, CardHeader, CardTitle, CardContent } from 'Components/ui/Card';
 import Button from 'Components/ui/Button';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import AdvertisementApi from '../../api/advertisementApi';
 import { Menu, MenuItem, IconButton } from '@mui/material';
 
 const ActionCell = ({ ad, onView, onEdit, onDelete }) => {
@@ -130,19 +129,8 @@ const AdvertisementRecords = () => {
   const fetchAdvertisements = async (page = 1) => {
     setLoading(true);
     try {
-      const response = await fetch(`${Config.apiUrl}/advertisements`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
-      });
-
-      const result = await response.json();
+      const result = await AdvertisementApi.getAll(page);
       
-      const isSuccess = result?.success !== false;
       const apiData = result?.data;
       const adsList = Array.isArray(apiData?.data)
         ? apiData.data
@@ -150,7 +138,7 @@ const AdvertisementRecords = () => {
           ? apiData
           : [];
 
-      if (response.ok && isSuccess) {
+      if (result.success) {
         let ads = adsList;
         try {
           const notesRaw = localStorage.getItem('advertisement_notes_cache');
@@ -175,7 +163,7 @@ const AdvertisementRecords = () => {
         toast.error(result.message || 'Failed to fetch advertisements');
       }
     } catch (error) {
-      toast.error('Error loading advertisements');
+      toast.error(error.message || 'Error loading advertisements');
     } finally {
       setLoading(false);
     }
@@ -184,19 +172,9 @@ const AdvertisementRecords = () => {
   const viewAdvertisement = async (id) => {
     const loadingToast = toast.loading('Loading details...');
     try {
-      const response = await fetch(`${Config.apiUrl}/advertisements/${id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
-      });
-
-      const result = await response.json();
+      const result = await AdvertisementApi.getById(id);
       
-      if (response.ok && result.success) {
+      if (result.success) {
         let data = result.data;
         try {
           const notesRaw = localStorage.getItem('advertisement_notes_cache');
@@ -212,7 +190,7 @@ const AdvertisementRecords = () => {
         toast.error(result.message || 'Failed to load details', { id: loadingToast });
       }
     } catch (error) {
-      toast.error('Error loading details', { id: loadingToast });
+      toast.error(error.message || 'Error loading details', { id: loadingToast });
     }
   };
 
@@ -227,26 +205,16 @@ const AdvertisementRecords = () => {
 
     const loadingToast = toast.loading('Deleting advertisement...');
     try {
-      const response = await fetch(`${Config.apiUrl}/advertisements/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
-      });
+      const result = await AdvertisementApi.delete(id);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         toast.success(result.message || 'Advertisement deleted successfully', { id: loadingToast });
         fetchAdvertisements(pagination.current_page);
       } else {
         toast.error(result.message || 'Failed to delete advertisement', { id: loadingToast });
       }
     } catch (error) {
-      toast.error('Error deleting advertisement', { id: loadingToast });
+      toast.error(error.message || 'Error deleting advertisement', { id: loadingToast });
     }
   };
 
@@ -539,7 +507,11 @@ const AdvertisementRecords = () => {
                             <div>
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Test Type</p>
                               <p className="font-bold text-slate-900 capitalize">
-                                {job.pivot?.test_type || 'N/A'}
+                                {job.pivot?.test_type === "1" || job.pivot?.test_type === 1 
+                                  ? "MCQs" 
+                                  : job.pivot?.test_type === "2" || job.pivot?.test_type === 2 
+                                    ? "Written Exam" 
+                                    : job.pivot?.test_type || 'N/A'}
                               </p>
                             </div>
                           </div>

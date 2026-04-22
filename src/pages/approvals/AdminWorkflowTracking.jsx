@@ -232,7 +232,7 @@ const AdminWorkflowTracking = () => {
             columns={columns}
             loading={loading}
             autoHeight
-            pageSizeOptions={[10, 25, 50]}
+            pageSizeOptions={[10, 25, 50, 100]}
             disableRowSelectionOnClick
             sx={{ '& .MuiDataGrid-row': { minHeight: '52px !important' } }}
           />

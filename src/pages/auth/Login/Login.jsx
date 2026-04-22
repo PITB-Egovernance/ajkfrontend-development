@@ -126,29 +126,17 @@ export default function Auth() {
     const loadingToast = toast.loading("Signing in...");
 
     try {
-      // 1️⃣ Validate CAPTCHA
-      const captchaRes = await AuthService.validateCaptcha({
+      // Combined Login with CAPTCHA
+      const result = await AuthService.login({
+        cnic: loginData.cnic,
+        password: loginData.password,
         captcha_token: captcha.token,
         captcha: loginData.captcha,
       });
 
-      if (!captchaRes.success) {
-        throw new Error(captchaRes.message || "CAPTCHA failed");
-      }
-
-      // 2️⃣ Login
-      const result = await AuthService.login({
-        cnic: loginData.cnic,
-        password: loginData.password,
-        // mobile: "03349394636",
-      });
-
       if (result.success && result.data?.otp_required) {
         toast.success("OTP sent successfully", { id: loadingToast });
-
-        // Save userId temporarily
         localStorage.setItem("otp_user_id", result.data.user_id);
-
         navigate("/verify-otp");
       } else {
         throw new Error(result.message || "Unexpected login response");

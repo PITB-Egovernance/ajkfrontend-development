@@ -49,6 +49,7 @@ const RequisitionForm = () => {
 
 
   const fetchDistricts = async () => {
+    console.log('🔍 Fetching districts...');
     try {
       const response = await fetch(`${API_BASE}/settings/districts`, {
         headers: {
@@ -58,26 +59,32 @@ const RequisitionForm = () => {
         },
       });
 
+      console.log('📥 Districts Response Status:', response.status);
       const result = await response.json();
+      console.log('📥 Districts API result:', result);
 
       if (result.success) {
-        // Adjust if API is paginated
-        // const districts =
-        //   Array.isArray(result.data)
-        //     ? result.data
-        //     : result.data?.data || [];
+        // Handle both paginated and non-paginated responses
+        const districtsArray = 
+          Array.isArray(result.data) 
+            ? result.data 
+            : (result.data?.data || []);
+            
+        console.log(`✅ Loaded ${districtsArray.length} districts`);
+        
         setDistrictOptions(
-          result.data.data.map((d) => ({
-            id: d.hash_id,   // use hash_id as id
+          districtsArray.map((d) => ({
+            id: d.hash_id || d.id,
             name: d.name
           }))
         );
-
-        // setDistrictOptions(districts);
+      } else {
+        console.error('❌ Failed to load districts:', result.message || 'Unknown error');
+        toast.error(result.message || 'Failed to load districts');
       }
     } catch (error) {
-      console.error('Error fetching districts:', error);
-      toast.error('Failed to load districts');
+      console.error('❌ Error fetching districts:', error);
+      // Don't show toast for 500 errors if it's already handled by a global or if it's expected during dev
     }
   };
   const persistDraftMeta = (draftTempId, stepIndex) => {
@@ -124,6 +131,7 @@ const RequisitionForm = () => {
   };
 
   const loadTempData = async () => {
+    console.log(`🔍 Loading temp data for ID: ${tempId}...`);
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/requisitions/form?temp_id=${tempId}`, {
@@ -133,16 +141,27 @@ const RequisitionForm = () => {
           'X-API-KEY': API_KEY,
         },
       });
-      const result = await response.json();
+      
+      console.log('📥 Temp Data Response Status:', response.status);
+      
+      const responseText = await response.text();
+      let result;
+      
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('❌ Failed to parse temp data JSON:', responseText.substring(0, 200));
+        throw new Error('Server returned invalid data format');
+      }
+      
       if (result.success && result.data) {
+        console.log('✅ Temp data loaded successfully');
         // Defensive: Ensure service_rules and syllabus in step1 are strings, not arrays
         const step1Data = result.data.step1 || {};
         if (step1Data.service_rules && Array.isArray(step1Data.service_rules)) {
-          console.warn('⚠️ service_rules is an array, converting to string:', step1Data.service_rules);
           step1Data.service_rules = step1Data.service_rules.length > 0 ? step1Data.service_rules[0] : null;
         }
         if (step1Data.syllabus && Array.isArray(step1Data.syllabus)) {
-          console.warn('⚠️ syllabus is an array, converting to string:', step1Data.syllabus);
           step1Data.syllabus = step1Data.syllabus.length > 0 ? step1Data.syllabus[0] : null;
         }
 
@@ -155,13 +174,18 @@ const RequisitionForm = () => {
         setFormData(updatedFormData);
 
         const nextStep = getNextPendingStep(updatedFormData);
+        console.log(`➡️ Resuming from step: ${nextStep + 1}`);
         setActiveStep(nextStep);
         syncDraftUrl(tempId, nextStep);
+      } else {
+        console.warn('⚠️ No data found for temp_id or request failed:', result.message);
       }
     } catch (error) {
-      console.error('Error loading temp data:', error);
+      console.error('❌ Error loading temp data:', error);
+      toast.error('Failed to resume your draft');
     } finally {
       setLoading(false);
+      console.log('🏁 Loading state cleared');
     }
   };
 

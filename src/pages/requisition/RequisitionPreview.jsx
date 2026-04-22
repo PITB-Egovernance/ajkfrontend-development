@@ -76,9 +76,15 @@ const RequisitionPreview = () => {
       const result = await response.json();
 
       if (result.success) {
+        // Handle both paginated and non-paginated responses
+        const districtsArray = 
+          Array.isArray(result.data) 
+            ? result.data 
+            : (result.data?.data || []);
+            
         setDistrictOptions(
-          result.data.data.map((d) => ({
-            id: String(d.hash_id),
+          districtsArray.map((d) => ({
+            id: String(d.hash_id || d.id),
             name: d.name
           }))
         );
@@ -136,10 +142,15 @@ const RequisitionPreview = () => {
 
         setPreviewData({
           step1: step1Data,
-          step2: data.step2 || {},
-          step3: data.step3 || {},
-          serviceRule: servicerule || {},
-          syllabus: slb || {},
+          step2: data.step2_qualifications || {},
+          step3: {
+            ...(data.step3_eligibility || {}),
+            district: data.step3_district_quota?.districts || [],
+            quota: data.step3_district_quota?.quotas || [],
+            post: data.step3_district_quota?.posts || [],
+          },
+          serviceRule: servicerule || null,
+          syllabus: slb || null,
         });
       } else {
         const errorMsg = result.error || result.message || 'Failed to load preview data';

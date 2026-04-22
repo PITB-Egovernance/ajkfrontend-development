@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Outlet } from 'react-router-dom';
 import Layout from './Master';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 
+const MemoizedSidebar = memo(Sidebar);
+const MemoizedNavbar = memo(Navbar);
+
 const DashboardLayout = () => {
   return (
-    <Layout Sidebar={<Sidebar />} Navbar={<Navbar />}>
+    <Layout Sidebar={<MemoizedSidebar />} Navbar={<MemoizedNavbar />}>
       <Outlet />
     </Layout>
   );
 };
 
-export default DashboardLayout;
+export default memo(DashboardLayout);

@@ -47,9 +47,17 @@ class AuthService {
 
     const result = await response.json();
     if (!response.ok) {
+      // If it's a validation error, we want to extract the message
       const error = new Error(result.message || "Login failed");
       error.status = response.status;
       error.errors = result.errors || {};
+      
+      // Specifically for CAPTCHA or Credential errors from Laravel
+      if (result.errors) {
+        const firstError = Object.values(result.errors)[0][0];
+        error.message = firstError;
+      }
+      
       throw error;
     }
 

@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { TextField, MenuItem } from "@mui/material";
 import { FileText, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
-import Config from "Config/Baseurl";
-import AuthService from "Services/AuthService";
+import AdvertisementApi from "../../api/advertisementApi";
+import RequisitionApi from "../../api/requisitionApi";
 import "../job-creation/JobCreationForm.css";
 
 const AdvertisementCreateForm = () => {
@@ -36,31 +36,18 @@ const AdvertisementCreateForm = () => {
       if (raw.startsWith("[")) {
         return JSON.parse(raw);
       }
-      return raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      return raw.split(",").map((s) => s.trim()).filter(Boolean);
     } catch {
-      return raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      return raw.split(",").map((s) => s.trim()).filter(Boolean);
     }
   }, [searchParams]);
 
   const computeNextAdvNumber = async () => {
     try {
-      const resp = await fetch(`${Config.apiUrl}/advertisements`, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          "X-API-KEY": Config.apiKey,
-        },
-      });
-      const result = await resp.json();
+      const result = await AdvertisementApi.getAll();
       const yy = String(new Date().getFullYear()).slice(-2);
       let next = 1;
-      if (resp.ok && result?.success && Array.isArray(result?.data?.data)) {
+      if (result?.success && Array.isArray(result?.data?.data)) {
         const nums = result.data.data
           .map((ad) => ad.adv_number)
           .filter((v) => typeof v === "string")
@@ -85,26 +72,16 @@ const AdvertisementCreateForm = () => {
 
   const fetchAdvertisementNotes = async () => {
     try {
-      const response = await fetch(`${Config.apiUrl}/advertisements/notes`, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          "X-API-KEY": Config.apiKey,
-        },
-      });
-      const result = await response.json();
-      if (response.ok) {
+      const result = await AdvertisementApi.getNotes();
+      if (result.success) {
         setImportantNotes(result.important_notes || "");
-        const tc =
-          result.terms_conditions &&
-          Array.isArray(result.terms_conditions) &&
-          result.terms_conditions.length
+        const tc = Array.isArray(result.terms_conditions) && result.terms_conditions.length
             ? result.terms_conditions
             : [""];
         setTermsConditions(tc);
       }
-    } catch {
-      // keep defaults
+    } catch (err) {
+        console.error("Error fetching notes:", err);
     }
   };
 
@@ -112,13 +89,13 @@ const AdvertisementCreateForm = () => {
     (async () => {
       const n = await computeNextAdvNumber();
       setAdvNumber(n);
+      fetchAdvertisementNotes();
     })();
   }, []);
 
   useEffect(() => {
     if (!selectedIds.length) return;
 
-    // Initialize config state for all selected IDs
     setJobConfigs((prev) => {
       const next = { ...prev };
       selectedIds.forEach((id) => {
@@ -129,50 +106,17 @@ const AdvertisementCreateForm = () => {
       return next;
     });
 
-    // Attempt to fetch job designations
     const fetchTitles = async () => {
       try {
-        const adsRes = await fetch(
-          `${Config.apiUrl}/advertisements/approved-requisitions`,
-          {
-            headers: {
-              Accept: "application/json",
-              Authorization: `Bearer ${AuthService.getToken()}`,
-              "X-API-KEY": Config.apiKey,
-            },
-          },
-        );
-        const pscRes = await fetch(`${Config.apiUrl}/psc/requisitions`, {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            "X-API-KEY": Config.apiKey,
-          },
-        });
-
-        // Also fetch from ViewAllRequisitions just in case
-        const allRes = await fetch(`${Config.apiUrl}/requisitions`, {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            "X-API-KEY": Config.apiKey,
-          },
-        });
+        const adsResult = await AdvertisementApi.getApprovedRequisitions();
+        const allResult = await RequisitionApi.getAll(1, 100);
 
         let allJobs = [];
-        if (adsRes.ok) {
-          const adsResult = await adsRes.json();
-          const adsJobs =
-            adsResult?.data?.jobs?.data || adsResult?.data?.jobs || [];
+        if (adsResult?.success) {
+          const adsJobs = adsResult?.data?.jobs?.data || adsResult?.data?.jobs || [];
           if (Array.isArray(adsJobs)) allJobs = [...allJobs, ...adsJobs];
         }
-        if (pscRes.ok) {
-          const pscResult = await pscRes.json();
-          const pscJobs = pscResult?.data?.data || pscResult?.data || [];
-          if (Array.isArray(pscJobs)) allJobs = [...allJobs, ...pscJobs];
-        }
-        if (allRes.ok) {
-          const allResult = await allRes.json();
+        if (allResult?.success) {
           const moreJobs = allResult?.data?.data || allResult?.data || [];
           if (Array.isArray(moreJobs)) allJobs = [...allJobs, ...moreJobs];
         }
@@ -185,20 +129,12 @@ const AdvertisementCreateForm = () => {
           }
         });
 
-        // 🟢 NEW: Fetch missing single jobs if they weren't in any lists
         const missingIds = selectedIds.filter((id) => !titlesMap[id]);
         if (missingIds.length > 0) {
           const individualFetches = missingIds.map(async (id) => {
             try {
-              const res = await fetch(`${Config.apiUrl}/requisitions/${id}`, {
-                headers: {
-                  Accept: "application/json",
-                  Authorization: `Bearer ${AuthService.getToken()}`,
-                  "X-API-KEY": Config.apiKey,
-                },
-              });
-              const result = await res.json();
-              if (res.ok && result?.success) {
+              const result = await RequisitionApi.getById(id);
+              if (result?.success) {
                 const job = result.data || result;
                 if (job.designation) {
                   titlesMap[id] = job.designation;
@@ -239,67 +175,18 @@ const AdvertisementCreateForm = () => {
       return;
     }
     if (!selectedIds || selectedIds.length === 0) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        job_ids: ["Please select at least one requisition"],
-      }));
       toast.error("Please select at least one requisition");
       return;
     }
     const filteredTerms = termsConditions.filter((t) => t.trim().length > 0);
     if (filteredTerms.length === 0) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        terms_conditions: ["Please add at least one term & condition"],
-      }));
       toast.error("Please add at least one term & condition");
       return;
     }
+
     setLoading(true);
     const loadingToast = toast.loading("Saving advertisement...");
-    const verifyAndNavigate = async (advNum) => {
-      try {
-        const verify = await fetch(`${Config.apiUrl}/advertisements`, {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            "X-API-KEY": Config.apiKey,
-          },
-        });
-        const verifyResult = await verify.json().catch(() => ({}));
-        const createdExists = Array.isArray(verifyResult?.data?.data)
-          ? verifyResult.data.data.some((ad) => ad?.adv_number === advNum)
-          : false;
-        if (createdExists) {
-          try {
-            const raw = localStorage.getItem("advertised_job_ids");
-            const prev = raw ? JSON.parse(raw) : [];
-            const merged = Array.from(
-              new Set([...(prev || []), ...selectedIds]),
-            );
-            localStorage.setItem("advertised_job_ids", JSON.stringify(merged));
-
-            const notesRaw = localStorage.getItem("advertisement_notes_cache");
-            const notesCache = notesRaw ? JSON.parse(notesRaw) : {};
-            if ((note || "").trim().length > 0) {
-              notesCache[advNum] = note.trim();
-              localStorage.setItem(
-                "advertisement_notes_cache",
-                JSON.stringify(notesCache),
-              );
-            }
-          } catch {}
-          toast.success("Advertisement created", { id: loadingToast });
-          navigate("/dashboard/advertisement-records", {
-            state: { created: advNum, note },
-          });
-          return true;
-        }
-      } catch {
-        // ignore
-      }
-      return false;
-    };
+    
     try {
       const fd = new FormData();
       fd.append("job_ids", (selectedIds || []).join(","));
@@ -310,73 +197,33 @@ const AdvertisementCreateForm = () => {
       fd.append("note", note || "");
       fd.append("important_notes", importantNotes || "");
 
-      // Append per-job configs securely
       const feesPayload = {};
       const testTypesPayload = {};
       Object.keys(jobConfigs).forEach((jobId) => {
         feesPayload[jobId] = jobConfigs[jobId].fee || "";
         testTypesPayload[jobId] = jobConfigs[jobId].testType || "";
       });
+
       fd.append("job_fees", JSON.stringify(feesPayload));
       fd.append("job_test_types", JSON.stringify(testTypesPayload));
       filteredTerms.forEach((t) => fd.append("terms_conditions[]", t));
 
-      const resp = await fetch(`${Config.apiUrl}/advertisements/store`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          "X-API-KEY": Config.apiKey,
-        },
-        body: fd,
-      });
-      const result = await resp.json().catch(() => ({}));
+      const result = await AdvertisementApi.create(fd);
 
-      if (resp.ok && result?.success !== false) {
-        const ok = await verifyAndNavigate(advNumber);
-        if (ok) return;
-      }
-
-      if (resp.status === 422 && result?.errors?.adv_number) {
-        setFieldErrors(result.errors);
-        const nextAdv = await computeNextAdvNumber();
-        setAdvNumber(nextAdv);
-        const fd2 = new FormData();
-        fd2.append("job_ids", (selectedIds || []).join(","));
-        fd2.append("adv_date", advDate);
-        fd2.append("adv_number", String(nextAdv).trim());
-        fd2.append("closing_date", closingDate);
-        fd2.append("advertisement_fee", advertisementFee || "");
-        fd2.append("note", note || "");
-        fd2.append("important_notes", importantNotes || "");
-        fd2.append("job_fees", JSON.stringify(feesPayload));
-        fd2.append("job_test_types", JSON.stringify(testTypesPayload));
-        filteredTerms.forEach((t) => fd2.append("terms_conditions[]", t));
-        const resp2 = await fetch(`${Config.apiUrl}/advertisements/store`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            "X-API-KEY": Config.apiKey,
-          },
-          body: fd2,
+      if (result.success) {
+        toast.success("Advertisement created", { id: loadingToast });
+        navigate("/dashboard/advertisement-records", {
+          state: { created: advNumber, note },
         });
-        const result2 = await resp2.json().catch(() => ({}));
-        if (resp2.ok && result2?.success !== false) {
-          const ok2 = await verifyAndNavigate(nextAdv);
-          if (ok2) return;
-        }
-        setFieldErrors(result2.errors || {});
-        throw new Error(result2?.message || "Failed to create advertisement");
       }
-
-      // Fallback: Even on non-422 errors (e.g., 500), verify if created and proceed
-      const okFallback = await verifyAndNavigate(advNumber);
-      if (okFallback) return;
-
-      setFieldErrors(result?.errors || {});
-      throw new Error(result?.message || "Failed to create advertisement");
     } catch (err) {
+      if (err.errors) {
+          setFieldErrors(err.errors);
+          if (err.errors.adv_number) {
+              const nextAdv = await computeNextAdvNumber();
+              setAdvNumber(nextAdv);
+          }
+      }
       toast.error(err.message || "Failed to create advertisement", {
         id: loadingToast,
       });
@@ -545,19 +392,25 @@ const AdvertisementCreateForm = () => {
                         fullWidth
                         label="Test Type"
                         value={jobConfigs[jobId]?.testType || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const newType = e.target.value;
+                          let newFee = "";
+                          if (newType === "1") newFee = "505";
+                          else if (newType === "2") newFee = "1010";
+                          
                           setJobConfigs((prev) => ({
                             ...prev,
                             [jobId]: {
                               ...prev[jobId],
-                              testType: e.target.value,
+                              testType: newType,
+                              fee: newFee
                             },
-                          }))
-                        }
+                          }));
+                        }}
                         sx={fieldSx}
                       >
-                        <MenuItem value="MCQs">MCQs</MenuItem>
-                        <MenuItem value="Written Exam">Written Exam</MenuItem>
+                        <MenuItem value="1">MCQs</MenuItem>
+                        <MenuItem value="2">Written Exam</MenuItem>
                       </TextField>
                     </div>
                     <div className="col-md-6 form-group">
@@ -566,14 +419,16 @@ const AdvertisementCreateForm = () => {
                         label="Application Fee"
                         type="number"
                         value={jobConfigs[jobId]?.fee || ""}
-                        onChange={(e) =>
-                          setJobConfigs((prev) => ({
-                            ...prev,
-                            [jobId]: { ...prev[jobId], fee: e.target.value },
-                          }))
-                        }
-                        placeholder="Fee amount"
-                        sx={fieldSx}
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                        placeholder="Fee auto-filled"
+                        sx={{
+                          ...fieldSx,
+                          "& .MuiInputBase-input": {
+                            backgroundColor: "#f8fafc",
+                          }
+                        }}
                       />
                     </div>
                   </div>

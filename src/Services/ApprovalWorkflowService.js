@@ -374,7 +374,7 @@ class ApprovalWorkflowService {
   }
 
   static async getApprovalHistory(hashId) {
-    const response = await fetch(`${API_BASE}/approval-history/${hashId}`, {
+    const response = await fetch(`${API_BASE}/requisitions/${hashId}/approval-history`, {
       method: 'GET',
       headers: getHeaders(false),
     });
