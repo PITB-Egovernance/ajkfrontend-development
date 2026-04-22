@@ -71,7 +71,14 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           icon: FileText,
         },
         {
-          label: "Approved",
+          id: "psc-table",
+          label: "Submitted Requisitions",
+          icon: Table,
+          path: "/dashboard/psc-table",
+          badge: null,
+        },
+        {
+          label: "Job Pool",
           path: "/dashboard/approved-requisitions",
           icon: CheckCircle,
         },
@@ -109,13 +116,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
         },
       ],
     },
-    {
-      id: "psc-table",
-      label: "PSC Table",
-      icon: Table,
-      path: "/dashboard/psc-table",
-      badge: null,
-    },
+    
     {
       id: "workflow-tracking",
       label: "Workflow Tracking",
