@@ -73,25 +73,32 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           icon: FileText,
         },
         {
-          label: "Approved",
+          id: "psc-table",
+          label: "Submitted Requisitions",
+          icon: Table,
+          path: "/dashboard/psc-table",
+          badge: null,
+        },
+        {
+          label: "Job Pool",
           path: "/dashboard/approved-requisitions",
           icon: CheckCircle,
         },
-        {
-          label: "Add Notes",
-          path: "/dashboard/add-notes",
-          icon: StickyNote,
-        },
+        // {
+        //   label: "Add Notes",
+        //   path: "/dashboard/add-notes",
+        //   icon: StickyNote,
+        // },
         {
           label: "Advertisements",
           path: "/dashboard/advertisement-records",
           icon: Megaphone,
         },
-        {
-          label: 'Annex "A"',
-          path: "/dashboard/annex-a",
-          icon: BookOpen,
-        },
+        // {
+        //   label: 'Annex "A"',
+        //   path: "/dashboard/annex-a",
+        //   icon: BookOpen,
+        // },
       ],
     },
     {
@@ -111,13 +118,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
         },
       ],
     },
-    {
-      id: "psc-table",
-      label: "PSC Table",
-      icon: Table,
-      path: "/dashboard/psc-table",
-      badge: null,
-    },
+    
     {
       id: "workflow-tracking",
       label: "Workflow Tracking",
