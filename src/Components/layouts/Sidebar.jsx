@@ -15,6 +15,8 @@ import {
   Home,
   ChevronRight,
   Settings,
+  MapPin,
+  Map,
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
@@ -164,6 +166,16 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           label: "Companies",
           path: "/dashboard/settings/companies",
           icon: Package,
+        },
+        {
+          label: "Exam City",
+          path: "/dashboard/settings/exam-cities",
+          icon: Map,
+        },
+        {
+          label: "Exam Center",
+          path: "/dashboard/settings/exam-centers",
+          icon: MapPin,
         },
         // {
         //   label: "Contractors",

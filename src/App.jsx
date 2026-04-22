@@ -38,6 +38,8 @@ const DesignationsManagement = lazy(() => import('pages/settings/Designation/Des
 const GradesManagement = lazy(() => import('pages/settings/Grades/GradesManagement'));
 const CompaniesManagement = lazy(() => import('pages/settings/Company/CompaniesManagement'));
 const ContractorsManagement = lazy(() => import('pages/settings/ContractorsManagement'));
+const ExamCentersManagement = lazy(() => import('pages/settings/ExamCenters/ExamCentersManagement'));
+const ExamCitiesManagement = lazy(() => import('pages/settings/ExamCities/ExamCitiesManagement'));
 const DirectorApprovals = lazy(() => import('pages/approvals/DirectorApprovals'));
 const SecretaryApprovals = lazy(() => import('pages/approvals/SecretaryApprovals'));
 const ChairmanApprovals = lazy(() => import('pages/approvals/ChairmanApprovals'));
@@ -148,6 +150,8 @@ function App() {
             <Route path="settings/grades" element={<GradesManagement />} />
             <Route path="settings/companies" element={<CompaniesManagement />} />
             <Route path="settings/contractors" element={<ContractorsManagement />} />
+            <Route path="settings/exam-cities" element={<ExamCitiesManagement />} />
+            <Route path="settings/exam-centers" element={<ExamCentersManagement />} />
           </Route>
         </Routes>
       </Suspense>

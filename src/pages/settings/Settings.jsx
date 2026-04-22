@@ -65,6 +65,20 @@ const Settings = () => {
       iconBg: 'bg-teal-500',
       link: '/dashboard/settings/companies'
     },
+    {
+      icon: Map,
+      title: 'Exam City',
+      description: 'Manage exam cities and locations',
+      iconBg: 'bg-indigo-500',
+      link: '/dashboard/settings/exam-cities'
+    },
+    {
+      icon: MapPin,
+      title: 'Exam Center',
+      description: 'Manage exam centers and capacity',
+      iconBg: 'bg-rose-500',
+      link: '/dashboard/settings/exam-centers'
+    },
     // {
     //   icon: Users,
     //   title: 'Individual Contractors',
