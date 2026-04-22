@@ -82,21 +82,21 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           path: "/dashboard/approved-requisitions",
           icon: CheckCircle,
         },
-        {
-          label: "Add Notes",
-          path: "/dashboard/add-notes",
-          icon: StickyNote,
-        },
+        // {
+        //   label: "Add Notes",
+        //   path: "/dashboard/add-notes",
+        //   icon: StickyNote,
+        // },
         {
           label: "Advertisements",
           path: "/dashboard/advertisement-records",
           icon: Megaphone,
         },
-        {
-          label: 'Annex "A"',
-          path: "/dashboard/annex-a",
-          icon: BookOpen,
-        },
+        // {
+        //   label: 'Annex "A"',
+        //   path: "/dashboard/annex-a",
+        //   icon: BookOpen,
+        // },
       ],
     },
     {
