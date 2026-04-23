@@ -13,7 +13,7 @@ import { getDefaultDashboardPath, getUserRole } from "utils/roleUtils";
  * <Route element={<PublicRoute><Login /></PublicRoute>} path="/login" />
  */
 export default function PublicRoute({ children }) {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading,user } = useAuth();
 
   // Show nothing while checking auth state
   if (isLoading) {

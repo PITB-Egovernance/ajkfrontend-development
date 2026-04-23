@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Link, Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
 import { MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { InlineLoader } from 'Components/ui/Loader';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import { InlineLoader } from 'components/ui/Loader';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
 
 const PscTable = () => {
@@ -160,7 +160,7 @@ const PscTable = () => {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        toast.success(`Status updated to ${status.toUpperCase()}`);
+        toast.success(`Status Updated to ${status.toUpperCase()}`);
         fetchRequisitions(paginationModel.page); // Refresh the list
         setUpdatingRequisitionId(null);
       } else {
@@ -176,8 +176,8 @@ const PscTable = () => {
 
   const renderFileLink = (path) => {
     if (!path) return <span className="text-gray-400 italic">No file</span>;
-    const baseUrl = Config.apiUrl.replace('/api', ''); // Get base URL without /api
-    const fullUrl = `${baseUrl}/${path}`;
+    const rootUrl = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
+    const fullUrl = `${rootUrl}/${path}`;
     const fileName = path.split('/').pop();
     const shortName = fileName.length > 35 ? fileName.substring(0, 35) + '...' : fileName;
 
@@ -236,14 +236,14 @@ const PscTable = () => {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <Typography variant="h6" className="font-semibold mb-2">
-        PSC Requisitions
+        Submitted Requisitions (PSC)
       </Typography>
       <Typography variant="body2" className="text-slate-500 mb-6">
         All submitted requisitions with document links and status.
       </Typography>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 mt-3">
         <div className="bg-blue-50 p-4 rounded-lg text-center">
           <Typography variant="h5" className="font-bold text-blue-700">{stats.total}</Typography>
           <Typography variant="caption" className="text-gray-600">Total</Typography>

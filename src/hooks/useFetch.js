@@ -1,23 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
 
-// Simple global cache for fetched data
-const FETCH_CACHE = new Map();
-const CACHE_TTL = 300000; // 5 minutes in milliseconds
-
 /**
- * Custom hook for fetching data with automatic state management and caching
+ * Custom hook for fetching data with automatic state management
+ * Ideal for GET requests that need to be called on component mount or on dependency changes
  * 
  * @param {string} endpoint - API endpoint to fetch from
  * @param {Object} options - Configuration options
  * @param {boolean} options.immediate - Whether to fetch immediately on mount (default: true)
  * @param {boolean} options.showErrorToast - Show error toast on failure (default: true)
  * @param {Object} options.params - URL query parameters
- * @param {boolean} options.useCache - Whether to use the global cache (default: true)
  * @param {Function} options.onSuccess - Callback on successful fetch
  * @param {Function} options.onError - Callback on error
+ * @param {Array} options.dependencies - Dependencies that trigger refetch
  * @returns {Object} - Fetch state and methods
  */
 const useFetch = (endpoint, options = {}) => {
@@ -25,9 +22,9 @@ const useFetch = (endpoint, options = {}) => {
     immediate = true,
     showErrorToast = true,
     params = {},
-    useCache = true,
     onSuccess,
     onError
+    // Note: dependencies can be passed for manual refetch triggers via refetch()
   } = options;
 
   const [data, setData] = useState(null);
@@ -51,27 +48,13 @@ const useFetch = (endpoint, options = {}) => {
   }, [API_BASE]);
 
   // Fetch function
-  const fetchData = useCallback(async (customParams = {}, forceRefresh = false) => {
-    const finalParams = { ...params, ...customParams };
-    const url = buildUrl(endpoint, finalParams);
-    
-    // Check cache first
-    if (useCache && !forceRefresh && FETCH_CACHE.has(url)) {
-      const cached = FETCH_CACHE.get(url);
-      if (Date.now() - cached.timestamp < CACHE_TTL) {
-        setData(cached.data);
-        setLastFetchTime(new Date(cached.timestamp));
-        setLoading(false);
-        if (onSuccess) onSuccess(cached.data);
-        return { success: true, data: cached.data, fromCache: true };
-      }
-    }
-
+  const fetchData = useCallback(async (customParams = {}) => {
     setLoading(true);
     setError(null);
 
     try {
       const token = AuthService.getToken();
+      const url = buildUrl(endpoint, { ...params, ...customParams });
 
       const response = await fetch(url, {
         method: 'GET',
@@ -90,13 +73,7 @@ const useFetch = (endpoint, options = {}) => {
 
       if (isMounted.current) {
         setData(result);
-        const now = Date.now();
-        setLastFetchTime(new Date(now));
-        
-        // Update cache
-        if (useCache) {
-          FETCH_CACHE.set(url, { data: result, timestamp: now });
-        }
+        setLastFetchTime(new Date());
         
         if (onSuccess) {
           onSuccess(result);
@@ -123,11 +100,11 @@ const useFetch = (endpoint, options = {}) => {
         setLoading(false);
       }
     }
-  }, [endpoint, params, API_KEY, buildUrl, showErrorToast, onSuccess, onError, useCache]);
+  }, [endpoint, params, API_KEY, buildUrl, showErrorToast, onSuccess, onError]);
 
-  // Refetch function - bypasses cache
+  // Refetch function
   const refetch = useCallback((customParams = {}) => {
-    return fetchData(customParams, true);
+    return fetchData(customParams);
   }, [fetchData]);
 
   // Reset state
@@ -140,7 +117,6 @@ const useFetch = (endpoint, options = {}) => {
 
   // Initial fetch
   useEffect(() => {
-    isMounted.current = true;
     if (immediate) {
       fetchData();
     }
@@ -172,5 +148,3 @@ const useFetch = (endpoint, options = {}) => {
 };
 
 export default useFetch;
-export const clearFetchCache = () => FETCH_CACHE.clear();
-export const removeFromCache = (url) => FETCH_CACHE.delete(url);

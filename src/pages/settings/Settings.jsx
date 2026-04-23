@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent } from 'Components/ui/Card';
+import { Card, CardContent } from 'components/ui/Card';
 import { 
   Building2, 
   Network, 
@@ -64,20 +64,6 @@ const Settings = () => {
       description: 'Manage vendors and service providers',
       iconBg: 'bg-teal-500',
       link: '/dashboard/settings/companies'
-    },
-    {
-      icon: Map,
-      title: 'Exam City',
-      description: 'Manage exam cities and locations',
-      iconBg: 'bg-indigo-500',
-      link: '/dashboard/settings/exam-cities'
-    },
-    {
-      icon: MapPin,
-      title: 'Exam Center',
-      description: 'Manage exam centers and capacity',
-      iconBg: 'bg-rose-500',
-      link: '/dashboard/settings/exam-centers'
     },
     // {
     //   icon: Users,

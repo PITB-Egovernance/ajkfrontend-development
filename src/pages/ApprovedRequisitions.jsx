@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DataGrid } from '@mui/x-data-grid';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
-import { InlineLoader } from 'Components/ui/Loader';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
+import { InlineLoader } from 'components/ui/Loader';
 
 const ApprovedRequisitions = () => {
   const navigate = useNavigate();
@@ -195,7 +195,7 @@ const ApprovedRequisitions = () => {
             }}
             className="w-fit px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
           >
-            + Create Advertisement
+            Add Advertisement
           </button>
         )}
       </div>

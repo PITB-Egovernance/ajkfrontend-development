@@ -96,7 +96,10 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onNext(formData);
+    onNext({
+      ...formData,
+      other_conditions: formData.other_conditions || 'N/A',
+    });
   };
 
   return (

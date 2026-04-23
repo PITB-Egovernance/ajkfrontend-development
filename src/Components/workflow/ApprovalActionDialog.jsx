@@ -6,8 +6,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from 'Components/ui/Dialog';
-import Button from 'Components/ui/Button';
+} from 'components/ui/Dialog';
+import Button from 'components/ui/Button';
 
 const ApprovalActionDialog = ({ open, onOpenChange, record, action, onSubmit, submitting }) => {
   const [remarks, setRemarks] = useState('');

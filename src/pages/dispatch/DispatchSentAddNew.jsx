@@ -11,8 +11,8 @@ import {
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 const DispatchSentAddNew = () => {
   const navigate = useNavigate();

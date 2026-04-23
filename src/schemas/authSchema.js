@@ -36,18 +36,6 @@ export const authSchema = {
       lengthMessage: 'CNIC must be exactly 13 digits',
       patternMessage: 'Valid CNIC required (13 digits)'
     },
-    mobile: {
-      type: 'required',
-      length: 11,
-      pattern: /^\d{11}$/,
-      message: 'Mobile number required',
-      lengthMessage: 'Mobile must be exactly 11 digits',
-      patternMessage: 'Valid mobile number required (11 digits)'
-    },
-    role: {
-      type: 'required',
-      message: 'Role required'
-    },
     password: {
       type: 'required',
       minLength: 6,
@@ -96,18 +84,6 @@ export const authSchema = {
       message: 'Valid CNIC required (13 digits)',
       lengthMessage: 'CNIC must be exactly 13 digits',
       patternMessage: 'Valid CNIC required (13 digits)'
-    },
-    mobile: {
-      type: 'required',
-      length: 11,
-      pattern: /^\d{11}$/,
-      message: 'Mobile number required',
-      lengthMessage: 'Mobile must be exactly 11 digits',
-      patternMessage: 'Valid mobile number required (11 digits)'
-    },
-    role: {
-      type: 'required',
-      message: 'Role required'
     },
     password: {
       type: 'required',

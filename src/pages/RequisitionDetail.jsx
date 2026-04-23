@@ -5,9 +5,9 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { InlineLoader } from 'Components/ui/Loader';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import { InlineLoader } from 'components/ui/Loader';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 
 const RequisitionDetail = () => {
@@ -15,6 +15,7 @@ const RequisitionDetail = () => {
   const navigate = useNavigate();
   const [requisition, setRequisition] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [districtOptions, setDistrictOptions] = useState([]);
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -22,9 +23,34 @@ const RequisitionDetail = () => {
 
   useEffect(() => {
     fetchRequisition();
+    fetchDistricts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const fetchDistricts = async () => {
+  try {
+    const response = await fetch(`${API_BASE}/settings/districts`, {
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        Accept: "application/json",
+        "X-API-KEY": API_KEY,
+      },
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      setDistrictOptions(
+        result.data.data.map((d) => ({
+          id: d.hash_id,
+          name: d.name,
+        }))
+      );
+    }
+  } catch (error) {
+    console.error("Error fetching districts:", error);
+  }
+};
   const fetchRequisition = async () => {
     setLoading(true);
     try {
@@ -32,6 +58,7 @@ const RequisitionDetail = () => {
       
       // Handle API response format
       const responseData = result.data || result;
+      console.log('Response requyisition detail', responseData)
       const data = responseData.requisition || responseData;
       
       if (result.success || result.status === 200 || data) {
@@ -54,7 +81,21 @@ const RequisitionDetail = () => {
     return `${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`;
   };
 
+  // const getDistrictName = (hashId) => {
+  //   console.log('hashid',districtOptions)
+  //   const district = districtOptions.find((d) => d.id === hashId);
+  //   return district ? district.name : "N/A";
+  // };
+
+  const getDistrictName = (hashId) => {
+    if (!hashId || districtOptions.length === 0) return "N/A";
+
+    const district = districtOptions.find((d) => d.id === hashId);
+    return district ? district.name : "N/A";
+  };
+
   const exportToPDF = () => {
+    console.log('Requisitions data export', requisition.hash_id)
     if (!requisition) {
       toast.error('No requisition data to export');
       return;
@@ -109,8 +150,8 @@ const RequisitionDetail = () => {
           '(i) Designation or nomenclature of the Post(s)\n(ii) Scale of the Post\n(iii) Department & Class of Service\n(iv) Percentage of quota fixed\n(v) Number of posts to be filled\n(vi) Date(s) of occurrence of vacancy(s)',
           `(i) ${requisition.designation || 'N/A'}\n(ii) ${requisition.scale || 'N/A'}\n(iii) ${requisition.department?.name || 'N/A'}\n(iv) ${requisition.quota_percentage || 'N/A'}%\n(v) ${requisition.num_posts || 'N/A'}\n(vi) Details in Annex "A"`
         ],
-        ['2', 'Service Rules for the Post(s) to be filled', 'Service Rules'],
-        ['3', 'Approved syllabus for the Post(s) to be filled', 'Attached as Annex "B"'],
+        ['2', 'Service Rules for the Post(s) to be filled',`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}` ],
+        ['3', 'Approved syllabus for the Post(s) to be filled', `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`],
         [
           '4',
           'Qualification Required:\n(i) Academic\n(ii) Equivalent qualification authority\n(iii) Name degree of equivalence\n(iv) Any other Qualification\n(v) Training with institute name',
@@ -127,7 +168,11 @@ const RequisitionDetail = () => {
           `(i) ${requisition.eligibility?.min_age || 'N/A'}\n(ii) ${requisition.eligibility?.max_age || 'N/A'}\n(iii) ${requisition.eligibility?.age_relaxation || 'N/A'}`
         ],
         ['7', 'Nationality', requisition.eligibility?.nationality || 'N/A'],
-        ['8', 'Domicile (Name Districts/Units)', requisition.eligibility?.domicile || 'N/A'],
+        ['8', 'Domicile (Name Districts/Units)',Array.isArray(requisition?.eligibility?.domicile)
+    ? requisition.eligibility.domicile
+        .map(id => getDistrictName(id))
+        .join(', ')
+    : getDistrictName(requisition?.eligibility?.domicile)],
         ['10', 'Any other condition of qualification', requisition.eligibility?.other_conditions || 'N/A'],
         ['11', 'Gender Specific/Quota basis/Open Merit', requisition.eligibility?.gender_basis || 'N/A']
       ];
@@ -160,8 +205,13 @@ const RequisitionDetail = () => {
         doc.text('9. Detail of District wise quota for the posts:', marginLeft, yPosition);
         yPosition += 4;
 
+        // const districtData = requisition.multiple_posts.map(post => [
+        //   post.district || 'N/A',
+        //   post.quota || 'N/A',
+        //   post.post || 'N/A'
+        // ]);
         const districtData = requisition.multiple_posts.map(post => [
-          post.district || 'N/A',
+          getDistrictName(post.district),
           post.quota || 'N/A',
           post.post || 'N/A'
         ]);
@@ -225,7 +275,7 @@ const RequisitionDetail = () => {
       yPosition += 4;
       doc.text('Stamp: ______________________', pageWidth - 70, yPosition);
 
-      doc.save(`Requisition_Detail_${requisition.id}_${Date.now()}.pdf`);
+      doc.save(`Requisition_Detail_${requisition.hash_id}_${Date.now()}.pdf`);
       toast.success('PDF exported successfully!');
     } catch (error) {
       toast.error('Failed to export PDF: ' + error.message);
@@ -314,13 +364,17 @@ const RequisitionDetail = () => {
             <tr>
               <th style={styles.number}>2</th>
               <td style={styles.tableCell}>Service Rules for the Post(s) to be filled</td>
-              <td style={styles.tableCell}>Service Rules<span className=""></span></td>
+              <td style={styles.tableCell}><a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                        View Service Rules
+                      </a></td>
             </tr>
 
             <tr>
               <th style={styles.number}>3</th>
               <td style={styles.tableCell}>Approved syllabus for the Post(s) to be filled</td>
-              <td style={styles.tableCell}>Attached as Annex "B"</td>
+              <td style={styles.tableCell}><a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                        View Syllabus
+                      </a></td>
             </tr>
 
             <tr>
@@ -387,7 +441,11 @@ const RequisitionDetail = () => {
             <tr>
               <th style={styles.number}>8</th>
               <td style={styles.tableCell}>Domicile (Name Districts/Units)</td>
-              <td style={styles.tableCell}>{requisition.eligibility?.domicile || 'N/A'}<span className=""></span></td>
+              <td style={styles.tableCell}>{Array.isArray(requisition?.eligibility?.domicile)
+  ? requisition.eligibility.domicile
+      .map(id => getDistrictName(id))
+      .join(', ')
+  : getDistrictName(requisition?.eligibility?.domicile)}<span className=""></span></td>
             </tr>
 
             <tr>
@@ -407,7 +465,9 @@ const RequisitionDetail = () => {
                     <tbody>
                       {requisition.multiple_posts.map((post, index) => (
                         <tr key={index}>
-                          <td style={styles.subTableCell}>{post.district}</td>
+                         <td style={styles.subTableCell}>
+                            {getDistrictName(post.district)}
+                          </td>
                           <td style={styles.subTableCell}>{post.quota}</td>
                           <td style={styles.subTableCell}>{post.post}</td>
                         </tr>

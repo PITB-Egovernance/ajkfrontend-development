@@ -1,6 +1,6 @@
 // services/authService.js  ← FINAL VERSION WITH CAPTCHA SUPPORT
 
-import Config from 'Config/Baseurl';
+import Config from 'config/baseUrl';
 const API_URL = Config.apiUrl;
 const API_KEY = Config.apiKey;
 

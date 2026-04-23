@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import toast from 'react-hot-toast';
-import { Card, CardContent, CardHeader, CardTitle } from 'Components/ui/Card';
-import Button from 'Components/ui/Button';
-import ApprovalWorkflowService from 'Services/ApprovalWorkflowService';
+import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/Card';
+import Button from 'components/ui/Button';
+import ApprovalWorkflowService from 'services/ApprovalWorkflowService';
 import { useAuth } from 'context/AuthContext';
-import StatusBadge from 'Components/workflow/StatusBadge';
-import ApprovalActionDialog from 'Components/workflow/ApprovalActionDialog';
+import StatusBadge from 'components/workflow/StatusBadge';
+import ApprovalActionDialog from 'components/workflow/ApprovalActionDialog';
 
 const TABS = {
   CURRENT: 'current',

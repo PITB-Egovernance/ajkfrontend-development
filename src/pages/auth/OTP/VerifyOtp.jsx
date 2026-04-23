@@ -1,9 +1,9 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import AuthService from "Services/AuthService";
+import AuthService from "services/authService";
 import { useAuth } from "context/AuthContext";
-import { Button } from "Components/ui";
+import { Button } from "components/ui";
 
 export default function VerifyOtp() {
   const { login } = useAuth();

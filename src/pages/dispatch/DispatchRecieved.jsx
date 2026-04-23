@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Button } from 'Components/ui';
+import { Card, Button } from 'components/ui';
 import { DataGrid } from '@mui/x-data-grid';
 import { Box } from '@mui/material';
-import { InlineLoader } from 'Components/ui/Loader';
+import { InlineLoader } from 'components/ui/Loader';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 export default function DispatchReceived() {
   const [rows, setRows] = useState([]);

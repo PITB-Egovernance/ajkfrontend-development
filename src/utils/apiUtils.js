@@ -3,7 +3,7 @@
  * Helper functions for API requests and HTTP operations
  */
 
-import Config from 'Config/Baseurl';
+import Config from 'config/baseUrl';
 
 const API_URL = Config.apiUrl;
 const API_KEY = Config.apiKey;

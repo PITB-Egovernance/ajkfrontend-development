@@ -11,34 +11,49 @@ import {
   Trash2,
 } from 'lucide-react';
 import { TextField } from '@mui/material';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
-
-import useFetch from 'hooks/useFetch';
-import advertisementApi from 'api/advertisementApi';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 const AddNotes = () => {
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [advertisementNotes, setAdvertisementNotes] = useState({
     important_notes: '',
     terms_conditions: [''],
   });
 
-  const { data: fetchedData, loading, refresh } = useFetch('/advertisements/notes', {
-    useCache: true,
-  });
+  const fetchAdvertisementNotes = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${Config.apiUrl}/advertisements/notes`, {
+        headers: {
+          Authorization: `Bearer ${AuthService.getToken()}`,
+          'X-API-KEY': Config.apiKey,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setAdvertisementNotes({
+          important_notes: result.important_notes || '',
+          terms_conditions:
+            result.terms_conditions?.length > 0
+              ? result.terms_conditions
+              : [''],
+        });
+      } else {
+        toast.error('Failed to load notes', { duration: 3000 });
+      }
+    } catch {
+      toast.error('Failed to load notes', { duration: 3000 });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (fetchedData) {
-      setAdvertisementNotes({
-        important_notes: fetchedData.important_notes || '',
-        terms_conditions:
-          fetchedData.terms_conditions?.length > 0
-            ? fetchedData.terms_conditions
-            : [''],
-      });
-    }
-  }, [fetchedData]);
+    fetchAdvertisementNotes();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,34 +69,42 @@ const AddNotes = () => {
       return;
     }
 
-    setSubmitting(true);
+    setLoading(true);
     const toastId = toast.loading('Saving...', { duration: 3000 });
 
     try {
-      const result = await advertisementApi.saveNotes({
-        important_notes: advertisementNotes.important_notes.trim(),
-        terms_conditions: terms,
+      const response = await fetch(`${Config.apiUrl}/advertisements/notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${AuthService.getToken()}`,
+          'X-API-KEY': Config.apiKey,
+        },
+        body: JSON.stringify({
+          important_notes: advertisementNotes.important_notes.trim(),
+          terms_conditions: terms,
+        }),
       });
 
-      if (result.success) {
+      if (response.ok) {
         toast.success('Notes saved successfully', {
           id: toastId,
           duration: 3000,
         });
-        refresh(true); // Force refresh cache
+        fetchAdvertisementNotes();
       } else {
-        toast.error(result.message || 'Failed to save notes', {
+        toast.error('Failed to save notes', {
           id: toastId,
           duration: 3000,
         });
       }
-    } catch (error) {
-      toast.error(error.message || 'Error saving notes', {
+    } catch {
+      toast.error('Error saving notes', {
         id: toastId,
         duration: 3000,
       });
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -148,7 +171,7 @@ const AddNotes = () => {
         </div>
 
         {/* Form */}
-          <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white rounded-lg shadow-sm">
           <div className="bg-emerald-950 px-6 py-4 rounded-t-lg">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               <FileText className="w-5 h-5" />
@@ -156,11 +179,6 @@ const AddNotes = () => {
             </h2>
           </div>
 
-          {loading ? (
-             <div className="p-12 flex justify-center items-center">
-               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-900"></div>
-             </div>
-          ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             {/* Important Notes */}
             <div>
@@ -234,10 +252,10 @@ const AddNotes = () => {
             <div className="border-t pt-6 flex gap-3">
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={loading}
                 className="flex-1 bg-emerald-900 text-white py-3 rounded-lg flex justify-center items-center gap-2"
               >
-                {submitting ? 'Saving...' : <><Save size={16} /> Save Notes</>}
+                {loading ? 'Saving...' : <><Save size={16} /> Save Notes</>}
               </button>
 
               <button
@@ -254,7 +272,6 @@ const AddNotes = () => {
               </button>
             </div>
           </form>
-          )}
         </div>
       </div>
     </div>

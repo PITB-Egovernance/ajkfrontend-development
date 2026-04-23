@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Typography, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
-import { InlineLoader } from 'Components/ui/Loader';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from 'Components/ui/Dialog';
+import { InlineLoader } from 'components/ui/Loader';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from 'components/ui/Dialog';
 import { CheckCircle2 } from 'lucide-react';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
 
@@ -21,6 +21,7 @@ const RequisitionPreview = () => {
     step1: {},
     step2: {},
     step3: {},
+    step4:{},
     serviceRule:{},
     syllabus:{},
   });
@@ -76,15 +77,9 @@ const RequisitionPreview = () => {
       const result = await response.json();
 
       if (result.success) {
-        // Handle both paginated and non-paginated responses
-        const districtsArray = 
-          Array.isArray(result.data) 
-            ? result.data 
-            : (result.data?.data || []);
-            
         setDistrictOptions(
-          districtsArray.map((d) => ({
-            id: String(d.hash_id || d.id),
+          result.data.data.map((d) => ({
+            id: String(d.hash_id),
             name: d.name
           }))
         );
@@ -116,7 +111,8 @@ const RequisitionPreview = () => {
         console.log('Step 1 data:', data.step1_basic_info);
         console.log('Step 2 data:', data.step2_qualifications);
         console.log('Step 3 data:', data.step3_eligibility);
-        console.log('Step Files:', data.step1_files);
+        console.log('Step Files:', data.step1_files.syllabus.url);
+        console.log('District Quota:', data.step3_district_quota);
 
 
         // Defensive: Ensure service_rules and syllabus are strings, not arrays
@@ -143,14 +139,10 @@ const RequisitionPreview = () => {
         setPreviewData({
           step1: step1Data,
           step2: data.step2_qualifications || {},
-          step3: {
-            ...(data.step3_eligibility || {}),
-            district: data.step3_district_quota?.districts || [],
-            quota: data.step3_district_quota?.quotas || [],
-            post: data.step3_district_quota?.posts || [],
-          },
-          serviceRule: servicerule || null,
-          syllabus: slb || null,
+          step3: data.step3_eligibility || {},
+          step4: data.step3_district_quota || {},
+          serviceRule: servicerule || {},
+          syllabus: slb || {},
         });
       } else {
         const errorMsg = result.error || result.message || 'Failed to load preview data';
@@ -231,7 +223,7 @@ const RequisitionPreview = () => {
     );
   }
 
-  const { step1, step2, step3, serviceRule,syllabus } = previewData;
+  const { step1, step2, step3,step4, serviceRule,syllabus } = previewData;
 
   return (
     <div className="p-6 bg-white rounded-lg shadow">
@@ -279,7 +271,7 @@ const RequisitionPreview = () => {
                       <a href={`${serviceRule}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
                         View PDF
                       </a>
-                    ) : 'N/A'}
+                    ) : 'No service rule file uploaded yet'}
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -289,7 +281,7 @@ const RequisitionPreview = () => {
                       <a href={`${syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
                         View PDF
                       </a>
-                    ) : 'N/A'}
+                    ) : 'No syllabus file uploaded yet'}
                   </TableCell>
                 </TableRow>
               </TableBody>
@@ -398,26 +390,26 @@ const RequisitionPreview = () => {
                   <TableCell sx={{ fontWeight: 'bold' }}>District/Unit</TableCell>
                   <TableCell>
                    
-                    {Array.isArray(step3.district)
-                      ? step3.district.map(d => getDistrictName(d)).join(', ')
-                      : getDistrictName(step3.district) || 'N/A'}
+                    {Array.isArray(step4.districts)
+                      ? step4.districts.map(d => getDistrictName(d)).join(', ')
+                      : getDistrictName(step4.districts) || 'N/A'}
                   </TableCell>
                   
                 </TableRow>
-                <TableRow>
+                {/* <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Quota</TableCell>
                   <TableCell>
-                    {step3.quota && Array.isArray(step3.quota)
-                      ? step3.quota.join(', ')
-                      : step3.quota || 'N/A'}
+                    {step4.quotas && Array.isArray(step4.quotas)
+                      ? step4.quotas.join(', ')
+                      : step4.quotas || 'N/A'}
                   </TableCell>
-                </TableRow>
+                </TableRow> */}
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Posts</TableCell>
                   <TableCell>
-                    {step3.post && Array.isArray(step3.post)
-                      ? step3.post.join(', ')
-                      : step3.post || 'N/A'}
+                    {step4.posts && Array.isArray(step4.posts)
+                      ? step4.posts.join(', ')
+                      : step4.posts || 'N/A'}
                   </TableCell>
                 </TableRow>
               </TableBody>

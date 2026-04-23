@@ -1,5 +1,5 @@
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 const API_BASE = Config.apiUrl;
 const ROLE_ACTION_CACHE_KEY = 'role_approval_actions_cache_v1';
@@ -374,7 +374,7 @@ class ApprovalWorkflowService {
   }
 
   static async getApprovalHistory(hashId) {
-    const response = await fetch(`${API_BASE}/requisitions/${hashId}/approval-history`, {
+    const response = await fetch(`${API_BASE}/approval-history/${hashId}`, {
       method: 'GET',
       headers: getHeaders(false),
     });

@@ -12,7 +12,7 @@ import { getDefaultDashboardPath, getUserRole, hasAnyRole } from "utils/roleUtil
  * <Route element={<ProtectedRoute><Dashboard /></ProtectedRoute>} path="/dashboard" />
  */
 export default function ProtectedRoute({ children, allowedRoles = [] }) {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading,user } = useAuth();
 
   // Show nothing while checking auth state
   if (isLoading) {

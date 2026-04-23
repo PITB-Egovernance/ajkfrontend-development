@@ -10,8 +10,8 @@ import {
   DialogContent,
   DialogActions
 } from "@mui/material";
-import { Card, CardContent } from "Components/ui/Card";
-import Button from "Components/ui/Button";
+import { Card, CardContent } from "components/ui/Card";
+import Button from "components/ui/Button";
 import {
   Plus,
   ArrowLeft,
@@ -20,9 +20,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import Config from "Config/Baseurl";
-import AuthService from "Services/AuthService";
-import { PageLoader, InlineLoader } from "Components/ui/Loader";
+import Config from "config/baseUrl";
+import AuthService from "services/authService";
+import { PageLoader, InlineLoader } from "components/ui/Loader";
 
 const ExamCitiesManagement = () => {
   const navigate = useNavigate();

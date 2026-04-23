@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Checkbox, FormControlLabel } from '@mui/material';
 import { MoreVertical, Eye, Upload, Pencil, Trash2, X } from 'lucide-react';
-import { InlineLoader } from 'Components/ui/Loader';
+import { InlineLoader } from 'components/ui/Loader';
 import { useNavigate } from 'react-router-dom';
-import Config from 'Config/Baseurl';
-import AuthService from 'Services/AuthService';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
 
@@ -91,7 +91,7 @@ const RequisitionList = () => {
       const data = result.data || result;
       const dataArray = Array.isArray(data) ? data : (data.data || []);
       const total = result.meta?.total || result.total || (Array.isArray(dataArray) ? dataArray.length : 0);
-      
+      console.log('Data Array', dataArray)
       if (Array.isArray(dataArray) && dataArray.length > 0) {
         const requisitions = dataArray.map((item, index) => ({
           id: item.hash_id || item.id || item.temp_id || item.tempId || `temp-${index}-${Date.now()}`,
@@ -188,71 +188,161 @@ const RequisitionList = () => {
     }
   };
 
+  // const handleUploadSubmit = async () => {
+  //   if (!uploadingJobId) {
+  //     toast.error('No requisition selected');
+  //     return;
+  //   }
+
+  //   if (!uploadForm.requisition_form) {
+  //     toast.error('Requisition form is required');
+  //     return;
+  //   }
+
+  //   if (!uploadForm.confirm_upload) {
+  //     toast.error('Please confirm the upload');
+  //     return;
+  //   }
+
+  //   setUploading(true);
+
+  //   try {
+  //     const formData = new FormData();
+  //     formData.append('job_id', uploadingJobId);
+  //     formData.append('requisition_form', uploadForm.requisition_form);
+      
+  //     if (uploadForm.annex_a_form) {
+  //       formData.append('annex_a_form', uploadForm.annex_a_form);
+  //     }
+      
+  //     if (uploadForm.other_attachment) {
+  //       formData.append('other_attachment', uploadForm.other_attachment);
+  //     }
+      
+  //     formData.append('confirm_upload', uploadForm.confirm_upload ? '1' : '0');
+      
+  //     if (uploadForm.remarks) {
+  //       formData.append('remarks', uploadForm.remarks);
+  //     }
+
+  //     console.log('Uploading files for job_id:', uploadingJobId);
+
+  //     const response = await fetch(`${API_BASE}/requisitions/upload`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Authorization': `Bearer ${TOKEN}`,
+  //         'X-API-KEY': API_KEY,
+  //         'Accept':'application/json'
+  //       },
+  //       body: formData
+  //     });
+
+  //     const result = await response.json();
+  //     console.log('Upload response:', result);
+
+  //     if (result.success) {
+  //       toast.success(result.message || 'Files uploaded successfully!');
+  //       handleCloseUploadModal();
+  //       fetchRequisitions(paginationModel.page, paginationModel.pageSize);
+  //     } else {
+  //       toast.error(result.message || result.error || 'File upload failed');
+  //     }
+  //   } catch (error) {
+  //     toast.error('Error uploading files: ' + error.message);
+  //     console.error('Upload error:', error);
+  //   } finally {
+  //     setUploading(false);
+  //   }
+  // };
+
   const handleUploadSubmit = async () => {
-    if (!uploadingJobId) {
-      toast.error('No requisition selected');
-      return;
+  if (!uploadingJobId) {
+    toast.error("No requisition selected");
+    return;
+  }
+
+  if (!uploadForm.requisition_form) {
+    toast.error("Requisition form is required");
+    return;
+  }
+
+  if (!uploadForm.confirm_upload) {
+    toast.error("Please confirm the upload");
+    return;
+  }
+
+  setUploading(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("job_id", uploadingJobId);
+    formData.append("requisition_form", uploadForm.requisition_form);
+
+    if (uploadForm.annex_a_form) {
+      formData.append("annex_a_form", uploadForm.annex_a_form);
     }
 
-    if (!uploadForm.requisition_form) {
-      toast.error('Requisition form is required');
-      return;
+    if (uploadForm.other_attachment) {
+      formData.append("other_attachment", uploadForm.other_attachment);
     }
 
-    if (!uploadForm.confirm_upload) {
-      toast.error('Please confirm the upload');
-      return;
+    formData.append("confirm_upload", uploadForm.confirm_upload ? "1" : "0");
+
+    if (uploadForm.remarks) {
+      formData.append("remarks", uploadForm.remarks);
     }
 
-    setUploading(true);
+    console.log("Uploading files for job_id:", uploadingJobId);
 
+    const response = await fetch(`${API_BASE}/requisitions/upload`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        "X-API-KEY": API_KEY,
+        Accept: "application/json",
+      },
+      body: formData,
+    });
+
+    // 🔹 Try to safely parse JSON
+    let result = null;
     try {
-      const formData = new FormData();
-      formData.append('job_id', uploadingJobId);
-      formData.append('requisition_form', uploadForm.requisition_form);
-      
-      if (uploadForm.annex_a_form) {
-        formData.append('annex_a_form', uploadForm.annex_a_form);
-      }
-      
-      if (uploadForm.other_attachment) {
-        formData.append('other_attachment', uploadForm.other_attachment);
-      }
-      
-      formData.append('confirm_upload', uploadForm.confirm_upload ? '1' : '0');
-      
-      if (uploadForm.remarks) {
-        formData.append('remarks', uploadForm.remarks);
-      }
-
-      console.log('Uploading files for job_id:', uploadingJobId);
-
-      const response = await fetch(`${API_BASE}/requisitions/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'X-API-KEY': API_KEY,
-        },
-        body: formData
-      });
-
-      const result = await response.json();
-      console.log('Upload response:', result);
-
-      if (response.ok && result.success) {
-        toast.success(result.message || 'Files uploaded successfully!');
-        handleCloseUploadModal();
-        fetchRequisitions(paginationModel.page, paginationModel.pageSize);
-      } else {
-        toast.error(result.message || result.error || 'File upload failed');
-      }
-    } catch (error) {
-      toast.error('Error uploading files: ' + error.message);
-      console.error('Upload error:', error);
-    } finally {
-      setUploading(false);
+      result = await response.json();
+    } catch {
+      throw new Error("Invalid server response");
     }
-  };
+
+    // console.log("Upload response:", result);
+
+    // 🔹 Handle HTTP errors
+    if (!response.ok) {
+      throw new Error(result?.message || "Server returned an error");
+    }
+
+    // 🔹 Success
+    if (result.success || result.status === 200) {
+      toast.success(result.message || "Files uploaded successfully!");
+
+      handleCloseUploadModal();
+      navigate('/dashboard/psc-table')
+    } else {
+      toast.error(result.message || result.error || "Upload failed");
+    }
+
+  } catch (error) {
+    console.error("Upload error:", error);
+
+    // 🔹 Network error
+    if (error.name === "TypeError") {
+      toast.error("Network error. Please check internet connection.");
+    } else {
+      toast.error(error.message || "File upload failed");
+    }
+
+  } finally {
+    setUploading(false);
+  }
+};
 
   const handleEdit = () => {
     if (selectedRow) {
@@ -397,10 +487,16 @@ const RequisitionList = () => {
       width: 120,
       renderCell: (params) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(params.value)}`}>
-          {params.value}
-        </span>
-      ),
-    },
+          {params.value === "approved"
+          ? "APPROVED"
+          : params.value === "pending"
+          ? "PENDING"
+          : params.value === "rejected"
+          ? "REJECTED"
+          : params.value}
+              </span>
+            ),
+        },
     {
       field: 'actions',
       headerName: 'Actions',

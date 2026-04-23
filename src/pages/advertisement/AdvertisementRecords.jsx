@@ -18,8 +18,8 @@ import {
   Trash2
 } from 'lucide-react';
 
-import { Card, CardHeader, CardTitle, CardContent } from 'Components/ui/Card';
-import Button from 'Components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
+import Button from 'components/ui/Button';
 import AdvertisementApi from '../../api/advertisementApi';
 import { Menu, MenuItem, IconButton } from '@mui/material';
 
