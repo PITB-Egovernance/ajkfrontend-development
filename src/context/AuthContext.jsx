@@ -191,6 +191,7 @@
 // export default AuthContext;
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import AuthService from "services/authService";
 
 const AuthContext = createContext();
 
@@ -219,6 +220,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const register = async (payload) => {
+    try {
+      const response = await AuthService.register(payload);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: error?.message || "Registration failed", errors: error?.errors };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -226,6 +236,7 @@ export function AuthProvider({ children }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        register,
         logout,
       }}
     >

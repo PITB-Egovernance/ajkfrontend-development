@@ -40,6 +40,8 @@ import ChairmanApprovals from 'pages/approvals/ChairmanApprovals';
 import AdminWorkflowTracking from 'pages/approvals/AdminWorkflowTracking';
 import ExamCentersManagement from 'pages/settings/ExamCenters/ExamCentersManagement';
 import ExamCitiesManagement from 'pages/settings/ExamCities/ExamCitiesManagement';
+import ApplicationsList from 'pages/applications/ApplicationsList';
+import ApplicationDetail from 'pages/applications/ApplicationDetail';
 
 
 function App() {
@@ -112,6 +114,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="applications" element={<ApplicationsList />} />
+          <Route path="applications/:id" element={<ApplicationDetail />} />
           <Route path="annex-a" element={<AnnexAList />} />
           <Route path="annex-a/:id" element={<AnnexADetail />} />
           <Route path="job-creation" element={<JobCreation />} />

@@ -63,6 +63,13 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       badge: null,
     },
     {
+      id: "applications",
+      label: "Candidates Jobs Applications",
+      icon: ClipboardList,
+      path: "/dashboard/applications",
+      badge: null,
+    },
+    {
       id: "requisitions",
       label: "Requisitions",
       icon: ClipboardList,

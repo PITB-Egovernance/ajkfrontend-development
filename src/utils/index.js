@@ -132,3 +132,11 @@ export {
   intersection,
   default as arrayUtils
 } from './arrayUtils';
+
+// Application OCR utilities
+export {
+  getApplicationOcrBatch,
+  getApplicationOcrBatchLabel,
+  getApplicationOcrBatchPillClass,
+  formatApplicationDocumentType,
+} from './applicationOcrUtils';
