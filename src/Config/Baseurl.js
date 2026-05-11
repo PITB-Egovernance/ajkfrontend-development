@@ -2,9 +2,9 @@ const productionUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 const localUrl      = "http://localhost:3000";
 const apiUrl        = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 // const apiUrl        = "http://localhost:8000/api/v1";
-const candidateApiUrl = "http://localhost:8001/api/candidate";
+const candidateApiUrl = "https://api-candidate-ajkpsc.punjab.gov.pk/api/candidate";
 const apiKey        = "9kX7pL2mQ8rT5vY3nZ6bJ1hF4gD0eA9cU8iO2sV7tE5rW";
-const candidateApiKey = "admin-secret-key-123";
+const candidateApiKey = "9kX7pL2mQ8rT5vY3nZ6bJ1hF4gD0eA9cU8iO2sV7tE5rW";
 
 
 const Config = {
