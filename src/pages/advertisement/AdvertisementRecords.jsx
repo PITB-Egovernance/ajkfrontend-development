@@ -414,6 +414,7 @@ const AdvertisementRecords = () => {
               columns={columns}
               autoHeight
               pageSizeOptions={[10, 25, 50]}
+              initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
               disableRowSelectionOnClick
               sx={{
                 '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },

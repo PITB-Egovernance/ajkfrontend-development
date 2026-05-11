@@ -187,19 +187,19 @@ const AdvertisementDetail = () => {
 
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex flex-col items-end">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Closing Date</p>
-              <p className="text-sm font-black text-slate-700 flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Closing Date</span>
+              <div className="text-sm font-black text-slate-700 flex items-center gap-2">
                 <div className="p-1.5 bg-red-50 rounded-lg"><Clock size={14} className="text-red-600" /></div>
                 {formatDate(advertisement.closing_date)}
-              </p>
+              </div>
             </div>
             <div className="w-px h-10 bg-slate-200 hidden md:block"></div>
             <div className="flex flex-col items-end">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Adv. Date</p>
-              <p className="text-sm font-black text-slate-700 flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Adv. Date</span>
+              <div className="text-sm font-black text-slate-700 flex items-center gap-2">
                 <div className="p-1.5 bg-emerald-50 rounded-lg"><Calendar size={14} className="text-emerald-700" /></div>
                 {formatDate(advertisement.adv_date)}
-              </p>
+              </div>
             </div>
           </div>
         </div>

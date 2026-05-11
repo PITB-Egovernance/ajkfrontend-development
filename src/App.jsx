@@ -15,6 +15,8 @@ import ApprovedRequisitions from 'pages/ApprovedRequisitions';
 import AddNotes from 'pages/AddNotes';
 import AdvertisementRecords from 'pages/advertisement/AdvertisementRecords';
 import AdvertisementCreateForm from 'pages/advertisement/AdvertisementCreateForm';
+import AdvertisementDetail from 'pages/advertisement/AdvertisementDetail';
+import AdvertisementEditForm from 'pages/advertisement/AdvertisementEditForm';
 import AnnexAList from 'pages/AnnexAList';
 import AnnexADetail from 'pages/AnnexADetail';
 import JobCreation from 'pages/JobCreation';
@@ -84,6 +86,8 @@ function App() {
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
           <Route path="add-notes" element={<AddNotes />} />
           <Route path="advertisement-records" element={<AdvertisementRecords />} />
+          <Route path="advertisements/view/:id" element={<AdvertisementDetail />} />
+          <Route path="advertisements/edit/:id" element={<AdvertisementEditForm />} />
           <Route
             path="approvals/director"
             element={
