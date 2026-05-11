@@ -56,6 +56,11 @@ const CitiesManagement = () => {
   const API_BASE = Config.apiUrl;
   const API_KEY  = Config.apiKey;
 
+  // City→district mapping cache (backend doesn't return district_id yet)
+  const DISTRICT_MAP_KEY = 'ajk_city_district_map';
+  const loadDistrictMap  = () => { try { return JSON.parse(localStorage.getItem(DISTRICT_MAP_KEY) || '{}'); } catch { return {}; } };
+  const saveDistrictMap  = (map) => { try { localStorage.setItem(DISTRICT_MAP_KEY, JSON.stringify(map)); } catch {} };
+
   const getHeaders = (json = true) => {
     const h = { Authorization: `Bearer ${AuthService.getToken()}`, Accept: "application/json", "X-API-KEY": API_KEY };
     if (json) h["Content-Type"] = "application/json";
@@ -87,16 +92,20 @@ const CitiesManagement = () => {
       const res    = await fetch(`${API_BASE}/settings/cities?per_page=1000`, { headers: getHeaders() });
       const result = await res.json();
       if (result.status === 200 || result.success) {
-        const data = result.data?.data ?? result.data ?? [];
-        setAllRows(data.map((item, i) => ({
-          id: item.hash_id || item.id,
-          sr_no: i + 1,
-          hash_id: item.hash_id,
-          city: item.city || item.name,
-          district_id: item.district_id || item.district?.hash_id || null,
-          created_at: item.created_at,
-          status: item.status ?? "active",
-        })));
+        const data     = result.data?.data ?? result.data ?? [];
+        const distMap  = loadDistrictMap(); // merge backend response with cached mapping
+        setAllRows(data.map((item, i) => {
+          const hid = item.hash_id || item.id;
+          return {
+            id:          hid,
+            sr_no:       i + 1,
+            hash_id:     item.hash_id,
+            city:        item.city || item.name,
+            district_id: item.district_id || item.district?.hash_id || distMap[hid] || null,
+            created_at:  item.created_at,
+            status:      item.status ?? "active",
+          };
+        }));
       } else {
         toast.error(result.message || "Failed to load cities");
         setAllRows([]);
@@ -234,8 +243,22 @@ const CitiesManagement = () => {
       if (formData.district_id) payload.district_id = formData.district_id;
       const res = await fetch(url, { method: isUpdate ? "PUT" : "POST", headers: getHeaders(), body: JSON.stringify(payload) });
       const r   = await res.json();
-      if (r.status === 200 || r.status === 201 || r.success) { toast.success(isUpdate ? "Updated" : "Created"); setOpenModal(false); fetchCities(); }
-      else toast.error(r.message || "Operation failed");
+      if (r.status === 200 || r.status === 201 || r.success) {
+        // Cache district mapping since backend doesn't return district_id in list response
+        if (formData.district_id) {
+          const savedHashId = r.data?.hash_id || editingCity?.hash_id;
+          if (savedHashId) {
+            const map = loadDistrictMap();
+            map[savedHashId] = formData.district_id;
+            saveDistrictMap(map);
+          }
+        }
+        toast.success(isUpdate ? "Updated" : "Created");
+        setOpenModal(false);
+        fetchCities();
+      } else {
+        toast.error(r.message || "Operation failed");
+      }
     } catch { toast.error("Operation failed"); }
     finally { setSaving(false); }
   };
@@ -243,16 +266,17 @@ const CitiesManagement = () => {
   const handleToggleStatus = async (row, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     try {
-      const res = await fetch(`${API_BASE}/settings/cities/${row.hash_id}/update`, {
+      const res = await fetch(`${API_BASE}/settings/cities/${row.hash_id || row.id}/update`, {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify({
-          city: row.city,
-          status: newStatus,
+          city:        row.city,
+          district_id: row.district_id || undefined,
+          status:      newStatus,
         }),
       });
       const r = await res.json();
-      if (r.status === 200 || r.success) {
+      if (res.ok || r.status === 200 || r.success) {
         toast.success(`City marked as ${newStatus}`);
         fetchCities();
       } else toast.error(r.message || "Status update failed");

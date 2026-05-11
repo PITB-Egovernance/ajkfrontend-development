@@ -247,30 +247,13 @@ const CompaniesManagement = () => {
   const handleToggleStatus = async (row) => {
     const newStatus = row.status === "active" ? "inactive" : "active";
     try {
-      const response = await fetch(
-        `${API_BASE}/settings/company/${row.hash_id}/update`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            "X-API-KEY": API_KEY,
-          },
-          body: JSON.stringify({
-            company_name: row.name,
-            type: row.type || "Other",
-            contact_person: row.contact_person || "",
-            contact_number: row.contact_number || "",
-            email: row.email || "",
-            address: row.address || "",
-            ntn: row.ntn || "",
-            status: newStatus,
-          }),
-        }
-      );
-      const result = await response.json();
-      if (result.success === true) {
+      const res    = await fetch(`${API_BASE}/settings/company/${row.hash_id || row.id}/update`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json", Accept: "application/json", "X-API-KEY": API_KEY },
+        body: JSON.stringify({ company_name: row.name, type: row.type || "Other", contact_person: row.contact_person || "", contact_number: row.contact_number || "", email: row.email || "", address: row.address || "", ntn: row.ntn || "", status: newStatus }),
+      });
+      const result = await res.json();
+      if (res.ok || result.success === true || result.status === 200) {
         toast.success(`Company marked as ${newStatus}`);
         fetchCompanies(paginationModel.page, paginationModel.pageSize);
       } else {

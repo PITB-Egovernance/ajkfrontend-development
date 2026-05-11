@@ -8,6 +8,15 @@
  */
 
 import { useState, useEffect } from 'react';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
+
+const LIVE_API = Config.productionUrl;
+const liveHeaders = () => ({
+  Authorization: `Bearer ${AuthService.getToken()}`,
+  Accept: 'application/json',
+  'X-API-KEY': Config.apiKey,
+});
 
 export const KEYS = {
   qualifications: 'ajk_qualifications',
@@ -54,7 +63,42 @@ export const useLocalSettings = () => {
   const [degrees,        setDegrees]        = useState(() => load(KEYS.degrees)        || DEFAULTS.degrees);
   const [groups,         setGroups]         = useState(() => load(KEYS.groups)         || DEFAULTS.groups);
 
+  // Fetch live qualifications and degrees from production backend on mount.
+  // Falls back to localStorage if the API is unreachable.
   useEffect(() => {
+    const fetchLive = async () => {
+      try {
+        const [qRes, dRes] = await Promise.all([
+          fetch(`${LIVE_API}/settings/qualifications`, { headers: liveHeaders() }),
+          fetch(`${LIVE_API}/settings/degrees`,        { headers: liveHeaders() }),
+        ]);
+        const [qData, dData] = await Promise.all([qRes.json(), dRes.json()]);
+
+        if (qData.success || qData.status === 200) {
+          const quals = (qData.data?.data ?? qData.data ?? []).map((item) => ({
+            id:     item.hash_id || item.id,
+            name:   item.qualification_name || item.name,
+            status: item.status ?? 'active',
+          }));
+          setQualifications(quals);
+          save(KEYS.qualifications, quals);
+        }
+
+        if (dData.success || dData.status === 200) {
+          const degs = (dData.data?.data ?? dData.data ?? []).map((item) => ({
+            id:               item.hash_id || item.id,
+            name:             item.degree_name || item.name,
+            qualification_id: item.degree_group || '',  // group acts as qualifier
+            status:           item.status ?? 'active',
+          }));
+          setDegrees(degs);
+          save(KEYS.degrees, degs);
+        }
+      } catch { /* network unavailable — use cached localStorage data */ }
+    };
+
+    fetchLive();
+
     const sync = () => {
       setQualifications(load(KEYS.qualifications) || []);
       setDegrees(load(KEYS.degrees) || []);

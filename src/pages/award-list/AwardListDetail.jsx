@@ -392,7 +392,7 @@ export default function AwardListDetail() {
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
             disableRowSelectionOnClick
             density="compact"
-            sx={{ bgcolor: 'background.paper', borderRadius: 2 }}
+            sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
           />
         </Box>
       )}
@@ -406,7 +406,7 @@ export default function AwardListDetail() {
             initialState={{ pagination: { paginationModel: { pageSize: 15 } } }}
             disableRowSelectionOnClick
             density="compact"
-            sx={{ bgcolor: 'background.paper', borderRadius: 2 }}
+            sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
           />
         </Box>
       )}

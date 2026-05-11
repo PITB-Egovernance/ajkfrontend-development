@@ -9,8 +9,17 @@ import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, Trash2, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { localSettingsApi, DEFAULTS } from 'hooks/useLocalSettings';
+import { localSettingsApi } from 'hooks/useLocalSettings';
 import { InlineLoader } from 'components/ui/Loader';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
+
+const API_BASE = Config.productionUrl;
+const getApiHeaders = () => ({
+  Authorization: `Bearer ${AuthService.getToken()}`,
+  Accept: 'application/json',
+  'X-API-KEY': Config.apiKey,
+});
 
 const KEY  = 'groups';
 const QKEY = 'qualifications';
@@ -40,30 +49,53 @@ const QualificationGroupsManagement = () => {
   const [search,         setSearch]         = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const load = () => {
+  const load = async () => {
     setLoading(true);
-    const quals   = localSettingsApi.getAll(QKEY);
-    const degs    = localSettingsApi.getAll(DKEY);
-    const groups  = localSettingsApi.getAll(KEY);
+    try {
+      // Qualifications and degrees come from the live API
+      const [qRes, dRes] = await Promise.all([
+        fetch(`${API_BASE}/settings/qualifications`, { headers: getApiHeaders() }),
+        fetch(`${API_BASE}/settings/degrees`,        { headers: getApiHeaders() }),
+      ]);
+      const [qData, dData] = await Promise.all([qRes.json(), dRes.json()]);
 
-    setQualifications(quals.filter((q) => q.status === 'active'));
-    setAllDegrees(degs.filter((d) => d.status === 'active'));
+      const quals = ((qData.data?.data ?? qData.data ?? []))
+        .filter((q) => (q.status ?? 'active') === 'active')
+        .map((q) => ({ id: q.hash_id || q.id, name: q.qualification_name || q.name, status: q.status ?? 'active' }));
 
-    setRows(groups.map((g, i) => {
-      const qual = quals.find((q) => q.id === g.qualification_id);
-      const degsInGroup = degs.filter((d) => g.degree_ids.includes(d.id));
-      return {
-        ...g,
-        sr_no:              i + 1,
-        qualification_name: qual?.name ?? '—',
-        degree_count:       g.degree_ids.length,
-        degree_names:       degsInGroup.map((d) => d.name),
-      };
-    }));
-    setLoading(false);
+      const degs = ((dData.data?.data ?? dData.data ?? []))
+        .filter((d) => (d.status ?? 'active') === 'active')
+        .map((d) => ({
+          id:               d.hash_id || d.id,
+          name:             d.degree_name || d.name,
+          qualification_id: d.degree_group || '',
+          status:           d.status ?? 'active',
+        }));
+
+      setQualifications(quals);
+      setAllDegrees(degs);
+
+      // Groups remain in localStorage (no backend API yet)
+      const groups = localSettingsApi.getAll(KEY);
+      setRows(groups.map((g, i) => {
+        const qual        = quals.find((q) => q.id === g.qualification_id);
+        const degsInGroup = degs.filter((d) => g.degree_ids.includes(d.id));
+        return {
+          ...g,
+          sr_no:              i + 1,
+          qualification_name: qual?.name ?? '—',
+          degree_count:       g.degree_ids.length,
+          degree_names:       degsInGroup.map((d) => d.name),
+        };
+      }));
+    } catch {
+      toast.error('Failed to load qualification data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line
 
   // When qualification changes in form → filter degrees
   useEffect(() => {
@@ -180,15 +212,6 @@ const QualificationGroupsManagement = () => {
               sx={{ fontSize: '0.65rem', height: 20, bgcolor: '#f1f5f9', color: '#475569' }} />
           )}
         </div>
-      ),
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 100,
-      renderCell: (p) => (
-        <Switch checked={p.value === 'active'} onChange={() => handleToggle(p.row)}
-          size="small" color={p.value === 'active' ? 'success' : 'error'} />
       ),
     },
     {

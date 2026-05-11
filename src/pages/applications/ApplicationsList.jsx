@@ -404,7 +404,7 @@ const ApplicationsList = () => {
               sx={{
                 border: 'none',
                 '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
-                '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600, fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' },
+                '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
                 '& .MuiDataGrid-columnHeader':     { padding: '0 8px' },
                 '& .MuiDataGrid-columnSeparator':  { color: '#cbd5e1', '&:hover': { color: '#10b981' } },
                 '& .MuiDataGrid-cell':             { padding: '0 8px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', fontSize: '0.875rem', color: '#334155' },

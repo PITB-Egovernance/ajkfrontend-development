@@ -5,24 +5,29 @@ import {
   DialogContent, DialogActions, Switch,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
-import { Plus, ArrowLeft, MoreVertical, GraduationCap, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, Trash2, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { localSettingsApi } from 'hooks/useLocalSettings';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 
-const KEY = 'qualifications';
+const API_BASE = Config.productionUrl;
+
+const getHeaders = () => ({
+  Authorization: `Bearer ${AuthService.getToken()}`,
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  'X-API-KEY': Config.apiKey,
+});
 
 const gridSx = {
   border: 'none',
-  '& .MuiDataGrid-columnHeaders':           { backgroundColor: '#f8fafc' },
-  '& .MuiDataGrid-columnHeaderTitle':       { fontWeight: 'bold' },
-  '& .MuiDataGrid-row':                     { minHeight: '52px !important' },
-  '& .MuiDataGrid-checkboxInput svg':       { color: '#064e3b' },
-  '& .MuiCheckbox-root .MuiSvgIcon-root':   { color: '#064e3b' },
-  '& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root': { color: '#064e3b' },
-  '& .MuiDataGrid-row.Mui-selected':        { backgroundColor: '#ecfdf5' },
-  '& .MuiDataGrid-row.Mui-selected:hover':  { backgroundColor: '#d1fae5' },
+  '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc' },
+  '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+  '& .MuiDataGrid-row':              { minHeight: '52px !important' },
+  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: '#ecfdf5' },
+  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: '#d1fae5' },
 };
 
 const QualificationsManagement = () => {
@@ -33,17 +38,32 @@ const QualificationsManagement = () => {
   const [open,     setOpen]     = useState(false);
   const [editing,  setEditing]  = useState(null);
   const [formName, setFormName] = useState('');
+  const [saving,   setSaving]   = useState(false);
   const [search,   setSearch]   = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const load = () => {
+  const fetchAll = async () => {
     setLoading(true);
-    const data = localSettingsApi.getAll(KEY);
-    setRows(data.map((item, i) => ({ ...item, sr_no: i + 1 })));
-    setLoading(false);
+    try {
+      const res    = await fetch(`${API_BASE}/settings/qualifications`, { headers: getHeaders() });
+      const result = await res.json();
+      if (result.success || result.status === 200) {
+        const data = result.data?.data ?? result.data ?? [];
+        setRows(data.map((item, i) => ({
+          id:       item.hash_id || item.id,
+          sr_no:    i + 1,
+          hash_id:  item.hash_id,
+          name:     item.qualification_name || item.name,
+          status:   item.status ?? 'active',
+        })));
+      } else {
+        toast.error(result.message || 'Failed to load qualifications');
+      }
+    } catch { toast.error('Server error'); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { fetchAll(); }, []);
 
   const activeCount   = rows.filter((r) => r.status === 'active').length;
   const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
@@ -55,55 +75,68 @@ const QualificationsManagement = () => {
   const openAdd  = () => { setEditing(null); setFormName(''); setOpen(true); };
   const openEdit = (row) => { setEditing(row); setFormName(row.name); setOpen(true); };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formName.trim()) { toast.error('Qualification name is required'); return; }
-
-    // Duplicate check
-    const duplicate = rows.find(
-      (r) => r.name.toLowerCase() === formName.trim().toLowerCase() && r.id !== editing?.id
-    );
-    if (duplicate) { toast.error('Qualification already exists'); return; }
-
-    if (editing) {
-      localSettingsApi.update(KEY, { ...editing, name: formName.trim() });
-      toast.success('Updated successfully');
-    } else {
-      localSettingsApi.add(KEY, { name: formName.trim(), status: 'active' });
-      toast.success('Qualification added');
-    }
-    setOpen(false);
-    load();
+    setSaving(true);
+    try {
+      const isUpdate = !!editing;
+      const url    = isUpdate
+        ? `${API_BASE}/settings/qualifications/${editing.hash_id}/update`
+        : `${API_BASE}/settings/qualifications/store`;
+      const res    = await fetch(url, {
+        method: isUpdate ? 'PUT' : 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ qualification_name: formName.trim() }),
+      });
+      const result = await res.json();
+      if (result.success || result.status === 200 || result.status === 201) {
+        toast.success(isUpdate ? 'Updated successfully' : 'Qualification added');
+        setOpen(false);
+        fetchAll();
+      } else {
+        toast.error(result.message || 'Operation failed');
+      }
+    } catch { toast.error('Server error'); }
+    finally { setSaving(false); }
   };
 
-  const handleDelete = (row) => {
+  const handleDelete = async (row) => {
     if (!window.confirm(`Delete qualification "${row.name}"?`)) return;
-    localSettingsApi.remove(KEY, row.id);
-    toast.success('Deleted');
-    load();
+    try {
+      const res    = await fetch(`${API_BASE}/settings/qualifications/${row.hash_id}/delete`, {
+        method: 'DELETE', headers: getHeaders(),
+      });
+      const result = await res.json();
+      if (result.success || result.status === 200) {
+        toast.success('Deleted');
+        fetchAll();
+      } else {
+        toast.error(result.message || 'Delete failed');
+      }
+    } catch { toast.error('Server error'); }
   };
 
-  const handleToggle = (row) => {
-    localSettingsApi.toggle(KEY, row.id);
-    load();
+  const handleToggle = async (row) => {
+    const newStatus = row.status === 'active' ? 'inactive' : 'active';
+    try {
+      const res    = await fetch(`${API_BASE}/settings/qualifications/${row.hash_id || row.id}/update`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ qualification_name: row.name, status: newStatus }),
+      });
+      const result = await res.json();
+      if (res.ok || result.success || result.status === 200) {
+        toast.success(`Marked as ${newStatus}`);
+        fetchAll();
+      } else {
+        toast.error(result.message || 'Status update failed');
+      }
+    } catch { toast.error('Server error'); }
   };
 
   const columns = [
     { field: 'sr_no', headerName: '#',             width: 60 },
-    { field: 'name',  headerName: 'Qualification', flex: 1 },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      renderCell: (p) => (
-        <Switch
-          checked={p.value === 'active'}
-          onChange={() => handleToggle(p.row)}
-          size="small"
-          color={p.value === 'active' ? 'success' : 'error'}
-          inputProps={{ 'aria-label': 'toggle status' }}
-        />
-      ),
-    },
+    { field: 'name',  headerName: 'Qualification',  flex: 1 },
     {
       field: 'actions',
       headerName: 'Actions',
@@ -112,10 +145,10 @@ const QualificationsManagement = () => {
       renderCell: (p) => (
         <div className="flex gap-1">
           <IconButton size="small" onClick={() => openEdit(p.row)}>
-            <MoreVertical size={16} />
+            <GraduationCap size={15} />
           </IconButton>
           <IconButton size="small" onClick={() => handleDelete(p.row)} sx={{ color: 'red' }}>
-            <Trash2 size={16} />
+            <Trash2 size={15} />
           </IconButton>
         </div>
       ),
@@ -128,7 +161,6 @@ const QualificationsManagement = () => {
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-sm p-6">
 
-        {/* HEADER */}
         <div className="flex justify-between items-start mb-6">
           <div>
             <button onClick={() => navigate('/dashboard/settings')}
@@ -136,9 +168,7 @@ const QualificationsManagement = () => {
               <ArrowLeft size={14} /> Back to Settings
             </button>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <GraduationCap size={22} className="text-emerald-700" />
-              </div>
+              <div className="p-2 bg-emerald-100 rounded-lg"><GraduationCap size={22} className="text-emerald-700" /></div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Qualifications</h1>
                 <p className="text-sm text-slate-500">Manage academic qualification levels</p>
@@ -151,7 +181,6 @@ const QualificationsManagement = () => {
           </button>
         </div>
 
-        {/* STATS */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{rows.length}</h2></CardContent>
@@ -164,40 +193,29 @@ const QualificationsManagement = () => {
           </Card>
         </div>
 
-        {/* SEARCH */}
         <div className="mb-4">
           <TextField size="small" placeholder="Search qualifications..."
             value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 320 }} />
         </div>
 
-        {/* GRID */}
-        <DataGrid
-          rows={filtered} columns={columns} getRowId={(r) => r.id}
+        <DataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={gridSx}
-        />
+          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={gridSx} />
 
-        {/* MODAL */}
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
-          <DialogTitle className="font-bold">
-            {editing ? 'Edit Qualification' : 'Add Qualification'}
-          </DialogTitle>
+          <DialogTitle className="font-bold">{editing ? 'Edit Qualification' : 'Add Qualification'}</DialogTitle>
           <DialogContent>
-            <TextField
-              fullWidth autoFocus label="Qualification Name" margin="normal" size="small"
+            <TextField fullWidth autoFocus label="Qualification Name" margin="normal" size="small"
               value={formName} onChange={(e) => setFormName(e.target.value)}
-              placeholder="e.g. Bachelor's"
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            />
+              placeholder="e.g. Bachelor's Degree"
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} />
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
-            <button onClick={() => setOpen(false)}
-              className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">
-              Cancel
-            </button>
-            <button onClick={handleSubmit}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white font-medium rounded-lg text-sm">
-              {editing ? 'Update' : 'Add'}
+            <button onClick={() => setOpen(false)} disabled={saving}
+              className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">Cancel</button>
+            <button onClick={handleSubmit} disabled={saving}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white font-medium rounded-lg text-sm disabled:opacity-60">
+              {saving ? 'Saving…' : editing ? 'Update' : 'Add'}
             </button>
           </DialogActions>
         </Dialog>

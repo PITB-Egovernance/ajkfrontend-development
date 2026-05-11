@@ -315,7 +315,7 @@ const ExamCentersManagement = () => {
   const handleToggleStatus = async (row, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     try {
-      const res = await fetch(`${API_BASE}/settings/exam-centers/${row.hash_id}/update`, {
+      const res = await fetch(`${API_BASE}/settings/exam-centers/${row.hash_id || row.id}/update`, {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify({
@@ -326,7 +326,7 @@ const ExamCentersManagement = () => {
         }),
       });
       const r = await res.json();
-      if (r.status === 200 || r.success) {
+      if (res.ok || r.status === 200 || r.success) {
         toast.success(`Center marked as ${newStatus}`);
         fetchCenters();
       } else toast.error(r.message || "Status update failed");
@@ -342,24 +342,17 @@ const ExamCentersManagement = () => {
       headerName: "District",
       width: 170,
       renderCell: (p) => {
-        const name = getDistrictName(p.value);
+        // Exam centers have no district_id of their own.
+        // Resolve via: row.city (name) → cities[] → district_id → districts[] → name
+        const cityObj    = cities.find((c) => c.city === p.row.city);
+        const districtId = cityObj?.district_id || p.value;
+        const name       = getDistrictName(districtId);
         return name
           ? <span className="text-slate-700 text-sm">{name}</span>
           : <span className="text-slate-400 text-xs">—</span>;
       },
     },
     { field: "capacity",  headerName: "Capacity",    width: 100, renderCell: (p) => <span className="font-semibold text-slate-700">{Number(p.value).toLocaleString()}</span> },
-    { field: "status",    headerName: "Status",      width: 100,
-      renderCell: (p) => (
-        <Switch
-          checked={p.value === "active"}
-          onChange={() => handleToggleStatus(p.row, p.value)}
-          inputProps={{ "aria-label": "toggle center status" }}
-          size="small"
-          color={p.value === "active" ? "success" : "error"}
-        />
-      ),
-    },
     { field: "actions",   headerName: "Actions",     width: 75, sortable: false,
       renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> },
   ];

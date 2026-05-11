@@ -230,7 +230,7 @@ const RoleApprovalInbox = ({ stage, title }) => {
             loading={loading}
             pageSizeOptions={[10, 25, 50]}
             disableRowSelectionOnClick
-            sx={{ '& .MuiDataGrid-row': { minHeight: '52px !important' } }}
+            sx={{ '& .MuiDataGrid-row': { minHeight: '52px !important' }, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
           />
         </CardContent>
       </Card>

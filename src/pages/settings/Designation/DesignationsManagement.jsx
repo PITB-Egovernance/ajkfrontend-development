@@ -265,7 +265,6 @@ const DesignationsManagement = () => {
       ? `${API_BASE}/settings/designations/${editingDesignation.hash_id}/update`
       : `${API_BASE}/settings/designations/create`;
 
-      console.log('Grades', formData.grade_id)
     const response = await fetch(url, {
       method: "POST", // ✅ FORCE POST (Laravel standard)
       headers: {
@@ -344,22 +343,13 @@ const DesignationsManagement = () => {
   const handleToggleStatus = async (row, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     try {
-      const response = await fetch(`${API_BASE}/settings/designations/${row.hash_id}/update`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json",
-          "X-API-KEY": API_KEY,
-        },
-        body: JSON.stringify({
-          name: row.name,
-          grade_id: row.grade_id,
-          type: row.type,
-          status: newStatus,
-        }),
+      const res    = await fetch(`${API_BASE}/settings/designations/${row.hash_id || row.id}/update`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json", Accept: "application/json", "X-API-KEY": API_KEY },
+        body: JSON.stringify({ name: row.name, grade_id: row.grade_id, type: "Internal", status: newStatus }),
       });
-      const result = await response.json();
-      if (result.status === 200 || result.success) {
+      const result = await res.json();
+      if (res.ok || result.status === 200 || result.success) {
         toast.success(`Designation marked as ${newStatus}`);
         fetchDesignations(paginationModel.page, paginationModel.pageSize);
       } else {

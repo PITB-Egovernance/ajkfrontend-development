@@ -35,7 +35,8 @@ const getHeaders = () => ({
 
 const gridSx = {
   border: "none",
-  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaders":    { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
   "& .MuiDataGrid-row": { minHeight: "52px !important" },
   "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
   "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },

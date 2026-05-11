@@ -38,7 +38,8 @@ const gridSx = {
 const GradesManagement = () => {
   const navigate = useNavigate();
 
-  const API_BASE = Config.apiUrl;
+  // Use productionUrl explicitly — avoids stale apiUrl in cached bundles
+  const API_BASE = Config.productionUrl;
   const TOKEN = AuthService.getToken();
   const API_KEY = Config.apiKey;
 
@@ -173,6 +174,56 @@ const GradesManagement = () => {
     fetchGrades(paginationModel.page, paginationModel.pageSize);
   }, [paginationModel.page, paginationModel.pageSize]);
 
+  // ── Workaround for live backend unique-name bug ──────────────────────────
+  // The live UpdateGradeRequest ignores null instead of the grade's own ID,
+  // so submitting the same name fails the unique check. When the name hasn't
+  // changed we do a two-step update: rename to a temp unique name first, then
+  // rename back with the desired status. Both steps have a unique name → pass.
+  const LIVE = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
+  const gradeHeaders = () => ({
+    Authorization:  `Bearer ${AuthService.getToken()}`,
+    "Content-Type": "application/json",
+    Accept:         "application/json",
+    "X-API-KEY":    "9kX7pL2mQ8rT5vY3nZ6bJ1hF4gD0eA9cU8iO2sV7tE5rW",
+  });
+
+  const updateGradeOnLive = async (hashId, finalName, finalStatus, originalName) => {
+    const url      = `${LIVE}/settings/grades/${hashId}/update`;
+    const nameUnchanged = finalName.trim() === (originalName || "").trim();
+
+    if (nameUnchanged) {
+      // Step 1: rename to guaranteed-unique temp name
+      const tempName = `${finalName.trim()}_${Date.now()}`;
+      const r1 = await fetch(url, {
+        method: "PUT", headers: gradeHeaders(),
+        body: JSON.stringify({ name: tempName, status: finalStatus }),
+      });
+      if (!r1.ok) {
+        const e = await r1.json();
+        throw new Error(e.message || "Step-1 rename failed");
+      }
+      // Step 2: rename back to original with desired status (now truly unique)
+      const r2 = await fetch(url, {
+        method: "PUT", headers: gradeHeaders(),
+        body: JSON.stringify({ name: finalName.trim(), status: finalStatus }),
+      });
+      if (!r2.ok) {
+        const e = await r2.json();
+        throw new Error(e.message || "Step-2 restore failed");
+      }
+      return await r2.json();
+    }
+
+    // Name changed → single step (new name is unique)
+    const res    = await fetch(url, {
+      method: "PUT", headers: gradeHeaders(),
+      body: JSON.stringify({ name: finalName.trim(), status: finalStatus }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.message || "Update failed");
+    return result;
+  };
+
   /* ================= ADD / UPDATE ================= */
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
@@ -183,38 +234,36 @@ const GradesManagement = () => {
     setLoading(true);
 
     try {
-      
       const isUpdate = !!editingGrade;
-      // console.log('iS uPDATE', isUpdate)
-      const url = isUpdate
-        ? `${API_BASE}/settings/grades/${editingGrade.hash_id}/update`
-        : `${API_BASE}/settings/grades/create`;
 
-        console.log('Url', url)
-      const response = await fetch(url, {
-         method: isUpdate ? "PUT" : "POST",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json",
-          "X-API-KEY": API_KEY,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const result = await response.json();
-
-      if (result.status === 200 || result.success === true) {
-        toast.success(
-          isUpdate ? "Grade updated successfully" : "Grade created successfully"
+      if (isUpdate) {
+        await updateGradeOnLive(
+          editingGrade.hash_id || editingGrade.id,
+          formData.name,
+          formData.status || 'active',
+          editingGrade.name,   // original name for comparison
         );
+        toast.success("Grade updated successfully");
         setOpenModal(false);
         setEditingGrade(null);
         fetchGrades(paginationModel.page, paginationModel.pageSize);
       } else {
-        toast.error(result.message || "Operation failed");
+        // Create — no unique issue, just POST
+        const res    = await fetch(`${LIVE}/settings/grades/create`, {
+          method: "POST", headers: gradeHeaders(),
+          body: JSON.stringify({ name: formData.name.trim(), status: formData.status || 'active' }),
+        });
+        const result = await res.json();
+        if (res.ok || result.status === 201 || result.success) {
+          toast.success("Grade created successfully");
+          setOpenModal(false);
+          fetchGrades(paginationModel.page, paginationModel.pageSize);
+        } else {
+          toast.error(result.message || "Failed to create grade");
+        }
       }
-    } catch {
-      toast.error("Server error");
+    } catch (err) {
+      toast.error(err.message || "Server error");
     } finally {
       setLoading(false);
     }
@@ -253,27 +302,17 @@ const GradesManagement = () => {
   const handleToggleStatus = async (row, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     try {
-      const response = await fetch(`${API_BASE}/settings/grades/${row.hash_id}/update`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json",
-          "X-API-KEY": API_KEY,
-        },
-        body: JSON.stringify({
-          name: row.name,
-          status: newStatus,
-        }),
-      });
-      const result = await response.json();
-      if (result.status === 200 || result.success) {
-        toast.success(`Grade marked as ${newStatus}`);
-        fetchGrades(paginationModel.page, paginationModel.pageSize);
-      } else {
-        toast.error(result.message || "Status update failed");
-      }
-    } catch {
-      toast.error("Status update failed");
+      // Use two-step workaround: name stays same → triggers unique bug on live backend
+      await updateGradeOnLive(
+        row.hash_id || row.id,
+        row.name,
+        newStatus,
+        row.name,   // same name → triggers two-step update
+      );
+      toast.success(`Grade marked as ${newStatus}`);
+      fetchGrades(paginationModel.page, paginationModel.pageSize);
+    } catch (err) {
+      toast.error(err.message || "Status update failed");
     }
   };
 

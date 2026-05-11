@@ -242,7 +242,7 @@ export default function AwardList() {
           pageSizeOptions={[15, 25, 50, 100]}
           disableRowSelectionOnClick
           density="compact"
-          sx={{ bgcolor: 'background.paper', borderRadius: 2 }}
+          sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
         />
       </Box>
 

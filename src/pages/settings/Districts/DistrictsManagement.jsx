@@ -302,21 +302,13 @@ const DistrictsManagement = () => {
   const handleToggleStatus = async (row, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     try {
-      const response = await fetch(`${API_BASE}/settings/districts/${row.hash_id}/update`, {
+      const res    = await fetch(`${API_BASE}/settings/districts/${row.hash_id || row.id}/update`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json",
-          "X-API-KEY": API_KEY,
-        },
-        body: JSON.stringify({
-          name: row.name,
-          code: row.code,
-          status: newStatus,
-        }),
+        headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json", "X-API-KEY": API_KEY },
+        body: JSON.stringify({ name: row.name, code: String(row.code || ''), status: newStatus }),
       });
-      const result = await response.json();
-      if (result.status === 200 || result.success) {
+      const result = await res.json();
+      if (res.ok || result.status === 200 || result.success) {
         toast.success(`District marked as ${newStatus}`);
         fetchDistricts(paginationModel.page, paginationModel.pageSize);
       } else {

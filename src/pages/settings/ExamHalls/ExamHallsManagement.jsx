@@ -20,7 +20,8 @@ import { InlineLoader } from "components/ui/Loader";
 
 const gridSx = {
   border: "none",
-  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaders":    { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
   "& .MuiDataGrid-row": { minHeight: "52px !important" },
   "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
   "& .MuiDataGrid-checkboxInput:hover svg":        { color: "#065f46" },
@@ -209,13 +210,6 @@ const ExamHallsManagement = () => {
     { field: "floor",       headerName: "Floor",      width: 120 },
     { field: "capacity",    headerName: "Capacity",   width: 110,
       renderCell: (p) => <span className="font-semibold text-slate-700">{Number(p.value).toLocaleString()}</span> },
-    { field: "status",      headerName: "Status",     width: 100,
-      renderCell: (p) => (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${p.value === "inactive" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
-          {p.value ?? "active"}
-        </span>
-      ),
-    },
     { field: "actions", headerName: "Actions", width: 75, sortable: false,
       renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> },
   ];
