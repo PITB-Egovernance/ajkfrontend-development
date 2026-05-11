@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield } from 'lucide-react';
+import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
 import Button from 'components/ui/Button';
 import ApplicationApi from 'api/applicationApi';
@@ -25,10 +25,15 @@ const ApplicationDetail = () => {
       const response = await ApplicationApi.getById(id);
       const rawData = response.data?.application || response.application || response.data || response;
       
+      // Use admin-overlaid status if present, otherwise mask "submitted" as blank
+      const effectiveStatus = (rawData._admin_status !== null && rawData._admin_status !== undefined)
+        ? rawData._admin_status
+        : (rawData.status === 'submitted' || !rawData.status ? '' : rawData.status);
+
       const mappedApp = {
         id: rawData.hash_id || rawData.id,
         application_number: rawData.application_number,
-        status: rawData.status || 'submitted',
+        status: effectiveStatus,
         created_at: rawData.submitted_at || rawData.created_at,
         job: {
           title: rawData.job_post?.post_title || rawData.job?.title || 'N/A',
@@ -61,6 +66,7 @@ const ApplicationDetail = () => {
         documents: rawData.candidate?.documents || rawData.documents || [],
         eligibility_summary: rawData.eligibility_summary || null,
         payment_summary: rawData.payment_summary || rawData.payment || null,
+        preferred_exam_cities: rawData.preferred_exam_cities || [],
       };
 
       setApplication(mappedApp);
@@ -75,7 +81,7 @@ const ApplicationDetail = () => {
   const handleStatusUpdate = async (status) => {
     try {
       setApplication(prev => ({ ...prev, status }));
-      await ApplicationApi.updateStatus(id, status);
+      await ApplicationApi.updateStatus(application.application_number, status);
       toast.success(`Application marked as ${status}`);
     } catch (error) {
       toast.error('Failed to update status');
@@ -85,7 +91,7 @@ const ApplicationDetail = () => {
 
   const getStatusBadge = (status) => {
     const lowerStatus = status?.toLowerCase() || '';
-    if (lowerStatus === 'pending') return <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">Pending</span>;
+    if (!lowerStatus) return <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-sm font-semibold">Unreviewed</span>;
     if (lowerStatus === 'shortlisted') return <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">Shortlisted</span>;
     if (lowerStatus === 'interview') return <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">Interview</span>;
     if (lowerStatus === 'rejected') return <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">Rejected</span>;
@@ -122,18 +128,19 @@ const ApplicationDetail = () => {
 
   if (!application) return <div className="text-center py-8 text-slate-600">No application found.</div>;
 
-  const { profile, education, experiences, certifications, skills, disability, gov_service, documents, job, eligibility_summary, payment_summary } = application;
+  const { profile, education, experiences, certifications, skills, disability, gov_service, documents, job, eligibility_summary, payment_summary, preferred_exam_cities } = application;
   const calculatedAge = calculateAgeFromDob(profile?.dob);
 
   const tabs = [
-    { id: 'overview', label: 'Personal Info', icon: User },
-    { id: 'education', label: 'Education', icon: GraduationCap },
-    { id: 'experience', label: 'Experience', icon: Briefcase },
+    { id: 'overview',     label: 'Personal Info',    icon: User },
+    { id: 'exam_cities',  label: 'Exam Preferences', icon: MapPin },
+    { id: 'education',    label: 'Education',        icon: GraduationCap },
+    { id: 'experience',   label: 'Experience',       icon: Briefcase },
     { id: 'certifications', label: 'Certifications', icon: Award },
-    { id: 'skills', label: 'Skills', icon: Zap },
-    { id: 'disability', label: 'Disability', icon: HeartPulse },
-    { id: 'gov_service', label: 'Gov. Service', icon: Shield },
-    { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'skills',       label: 'Skills',           icon: Zap },
+    { id: 'disability',   label: 'Disability',       icon: HeartPulse },
+    { id: 'gov_service',  label: 'Gov. Service',     icon: Shield },
+    { id: 'documents',    label: 'Documents',        icon: FileText },
   ];
 
   const renderTabContent = () => {
@@ -172,6 +179,58 @@ const ApplicationDetail = () => {
               </div>
             )}
 
+          </div>
+        );
+
+      case 'exam_cities':
+        return (
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-800 border-b pb-3 mb-4">
+              Exam City Preferences
+            </h3>
+            <p className="text-sm text-slate-500 mb-5">
+              Cities selected by the candidate in order of preference. Roll number center allocation respects this priority order.
+            </p>
+            {preferred_exam_cities && preferred_exam_cities.length > 0 ? (
+              <div className="space-y-3">
+                {preferred_exam_cities.map((city, idx) => (
+                  <div
+                    key={city.hash_id || idx}
+                    className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg bg-slate-50"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                      idx === 0 ? 'bg-emerald-600 text-white' :
+                      idx === 1 ? 'bg-blue-600 text-white' :
+                      'bg-slate-400 text-white'
+                    }`}>
+                      {idx + 1}
+                    </div>
+                    <div className="flex items-center gap-2 flex-1">
+                      <MapPin size={16} className="text-slate-400 flex-shrink-0" />
+                      <span className="font-semibold text-slate-800">{city.city}</span>
+                      {idx === 0 && (
+                        <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full">
+                          1st Choice
+                        </span>
+                      )}
+                    </div>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border capitalize ${
+                      city.status === 'active'
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : 'bg-slate-100 text-slate-500 border-slate-200'
+                    }`}>
+                      {city.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center bg-amber-50 border border-amber-200 rounded-lg">
+                <MapPin size={28} className="text-amber-400 mx-auto mb-2" />
+                <p className="text-amber-800 font-medium text-sm">No exam city preference selected by candidate.</p>
+                <p className="text-amber-600 text-xs mt-1">Center will be auto-assigned during roll number allocation.</p>
+              </div>
+            )}
           </div>
         );
 
@@ -318,10 +377,25 @@ const ApplicationDetail = () => {
                   <HeartPulse size={20} className="text-emerald-600" />
                   <h4 className="font-semibold">Declared Disabled</h4>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div><p className="text-xs text-slate-500 uppercase font-medium">Nature of Disability</p><p className="font-medium text-slate-800">{disability.nature_of_disability}</p></div>
-                  <div><p className="text-xs text-slate-500 uppercase font-medium">Certificate No</p><p className="font-medium text-slate-800">{disability.certificate_number}</p></div>
-                  <div><p className="text-xs text-slate-500 uppercase font-medium">Scribe Required</p><p className="font-medium text-slate-800">{disability.scribe_required ? 'Yes' : 'No'}</p></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase font-medium">Disability Type</p>
+                    <p className="font-medium text-slate-800 capitalize">{disability.disability_type || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase font-medium">Details</p>
+                    <p className="font-medium text-slate-800 capitalize">{disability.disability_details || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase font-medium">Assistance Required</p>
+                    <p className="font-medium text-slate-800 capitalize">{disability.assistance_required || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase font-medium">Scribe Required</p>
+                    <p className={`font-medium ${disability.scribe_required ? 'text-emerald-700' : 'text-slate-800'}`}>
+                      {disability.scribe_required ? 'Yes' : 'No'}
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : <p className="text-slate-500 text-sm">Candidate has not declared any disability.</p>}

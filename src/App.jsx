@@ -39,9 +39,19 @@ import SecretaryApprovals from 'pages/approvals/SecretaryApprovals';
 import ChairmanApprovals from 'pages/approvals/ChairmanApprovals';
 import AdminWorkflowTracking from 'pages/approvals/AdminWorkflowTracking';
 import ExamCentersManagement from 'pages/settings/ExamCenters/ExamCentersManagement';
-import ExamCitiesManagement from 'pages/settings/ExamCities/ExamCitiesManagement';
+import ExamCitiesManagement from 'pages/settings/Cities/CitiesManagement';
+import ExamHallsManagement from 'pages/settings/ExamHalls/ExamHallsManagement';
+import QualificationsManagement from 'pages/settings/Qualifications/QualificationsManagement';
+import DegreesManagement from 'pages/settings/Degrees/DegreesManagement';
+import QualificationGroupsManagement from 'pages/settings/QualificationGroups/QualificationGroupsManagement';
+import DepartmentsManagement from 'pages/settings/Departments/DepartmentsManagement';
 import ApplicationsList from 'pages/applications/ApplicationsList';
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
+import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
+import CenterAllocation from 'pages/roll-numbers/CenterAllocation';
+import RollSlipGeneration from 'pages/roll-numbers/RollSlipGeneration';
+import AwardList from 'pages/award-list/AwardList';
+import AwardListDetail from 'pages/award-list/AwardListDetail';
 
 
 function App() {
@@ -135,8 +145,22 @@ function App() {
           <Route path="settings/grades" element={<GradesManagement />} />
           <Route path="settings/companies" element={<CompaniesManagement />} />
           <Route path="settings/contractors" element={<ContractorsManagement />} />
-          <Route path="settings/exam-cities" element={<ExamCitiesManagement />} />
+          <Route path="settings/cities" element={<ExamCitiesManagement />} />
           <Route path="settings/exam-centers" element={<ExamCentersManagement />} />
+          <Route path="settings/exam-halls" element={<ExamHallsManagement />} />
+          <Route path="settings/qualifications" element={<QualificationsManagement />} />
+          <Route path="settings/degrees" element={<DegreesManagement />} />
+          <Route path="settings/qualification-groups" element={<QualificationGroupsManagement />} />
+          <Route path="settings/departments" element={<DepartmentsManagement />} />
+
+          {/* Roll Number Management Routes */}
+          <Route path="roll-numbers" element={<RollNumberManagement />} />
+          <Route path="roll-numbers/:advertisementId/center-allocation" element={<CenterAllocation />} />
+          <Route path="roll-numbers/:advertisementId/slip-generation" element={<RollSlipGeneration />} />
+
+          {/* Award List Routes */}
+          <Route path="award-lists" element={<AwardList />} />
+          <Route path="award-lists/:id" element={<AwardListDetail />} />
         </Route>
       </Routes>
     </Router>

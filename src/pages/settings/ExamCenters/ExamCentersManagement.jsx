@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import {
   TextField,
@@ -8,445 +8,500 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
-import {
-  Plus,
-  ArrowLeft,
-  MoreVertical
-} from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical, Building2, Upload, Trash2, CheckCircle, XCircle, Filter, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
-import { PageLoader, InlineLoader } from "components/ui/Loader";
+import { InlineLoader } from "components/ui/Loader";
+import AdvancedFilter from "components/tables/AdvancedFilter";
+
+/* ── shared DataGrid sx matching ApprovedRequisitions ── */
+const gridSx = {
+  border: "none",
+  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
+  "& .MuiDataGrid-row": { minHeight: "52px !important" },
+  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
+  "& .MuiDataGrid-checkboxInput:hover svg":        { color: "#065f46" },
+  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
+  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
+  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
+  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
+  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
+};
+
+const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`px-4 py-2 font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm ${className}`}
+  >
+    <Icon size={15} /> {label}
+  </button>
+);
 
 const ExamCentersManagement = () => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const importRef = useRef(null);
 
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
+  const API_KEY  = Config.apiKey;
 
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
+  const getHeaders = (json = true) => {
+    const h = { Authorization: `Bearer ${AuthService.getToken()}`, Accept: "application/json", "X-API-KEY": API_KEY };
+    if (json) h["Content-Type"] = "application/json";
+    return h;
+  };
 
+  const [allRows,   setAllRows]   = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [saving,    setSaving]    = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [cities,    setCities]    = useState([]);   // full city objects with district_id
+  const [districts, setDistricts] = useState([]);   // for name lookup
   const [searchTerm, setSearchTerm] = useState("");
-
-  const [paginationModel, setPaginationModel] = useState({
-    page: 0,
-    pageSize: 15,
+  const [filters, setFilters] = useState({
+    name: '',
+    city: '',
+    status: ''
   });
 
-  const [anchorEl, setAnchorEl] = useState(null);
+  const filterConfig = [
+    {
+      name: 'name',
+      label: 'Center Name',
+      type: 'text',
+      placeholder: 'Filter by center name'
+    },
+    {
+      name: 'city',
+      label: 'City',
+      type: 'select',
+      options: cities.map(c => ({ value: c.city || c.name, label: c.city || c.name }))
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      name: '',
+      city: '',
+      status: ''
+    });
+  };
+
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+  const [selectionModel,  setSelectionModel]  = useState([]);
+  const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
-
-  const [openModal, setOpenModal] = useState(false);
+  const [openModal,   setOpenModal]   = useState(false);
   const [editingCenter, setEditingCenter] = useState(null);
-  const [cities, setCities] = useState([]);
+  const [formData, setFormData] = useState({ name: "", city: "", capacity: "", district_id: "", district_name: "" });
 
-  const [formData, setFormData] = useState({
-    name: "",
-    city: "",
-    capacity: "",
-  });
-
-  /* ===============================
-     FETCH EXAM CENTERS
-  =============================== */
-  const fetchExamCenters = async (page = 0, pageSize = 15) => {
+  /* ── FETCH ALL (client-side search needs full dataset) ── */
+  const fetchCenters = async () => {
     setLoading(true);
     try {
-      // Note: Endpoint pattern assumed based on Districts
-      const response = await fetch(
-        `${API_BASE}/settings/exam-centers?page=${page + 1}&per_page=${pageSize}`,
-        {
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            Accept: "application/json",
-            "X-API-KEY": API_KEY,
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (result.status === 200) {
-        const data = result.data.data || [];
-
-        const formatted = data.map((item, index) => ({
-          id: item.hash_id || item.id,
-          sr_no: page * pageSize + index + 1,
-          hash_id: item.hash_id,
-          name: item.name,
-          city: item.city,
-          capacity: item.capacity,
-          created_at: item.created_at,
-          status: item.status ?? "active",
-        }));
-
-        setRows(formatted);
-        setTotal(result.data.total || formatted.length);
+      const res    = await fetch(`${API_BASE}/settings/exam-centers?per_page=1000`, { headers: getHeaders() });
+      const result = await res.json();
+      if (result.status === 200 || result.success) {
+        const data = result.data?.data ?? result.data ?? [];
+        setAllRows(data.map((item, i) => ({
+          id:          item.hash_id || item.id,
+          sr_no:       i + 1,
+          hash_id:     item.hash_id,
+          name:        item.name,
+          city:        item.city,
+          district_id: item.district_id || null,
+          capacity:    item.capacity,
+          created_at:  item.created_at,
+          status:      item.status ?? "active",
+        })));
       } else {
-        // Fallback for now if API doesn't exist yet
-        setRows([]);
-        setTotal(0);
-        // toast.error("Failed to load exam centers");
+        toast.error(result.message || "Failed to load exam centers");
+        setAllRows([]);
       }
-    } catch {
-      // toast.error("Server error");
-      setRows([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
+    } catch { toast.error("Server error"); setAllRows([]); }
+    finally { setLoading(false); }
   };
 
+  // Fetch full city list (includes district_id if set via Cities Management)
   const fetchCities = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/exam-cities`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
-      });
-      const result = await response.json();
-      if (result.status === 200) {
-        setCities(result.data.data || []);
+      const res    = await fetch(`${API_BASE}/settings/cities?per_page=1000`, { headers: getHeaders() });
+      const result = await res.json();
+      if (result.status === 200 || result.success) {
+        const data = result.data?.data ?? result.data ?? [];
+        setCities(data.map((c) => ({
+          hash_id:     c.hash_id || c.id,
+          city:        c.city || c.name,
+          district_id: c.district_id || null,
+        })));
       }
-    } catch {
-      // toast.error("Failed to load cities");
+    } catch {}
+  };
+
+  const fetchDistricts = async () => {
+    try {
+      const res    = await fetch(`${API_BASE}/settings/districts?per_page=1000`, { headers: getHeaders() });
+      const result = await res.json();
+      if (result.status === 200 || result.success)
+        setDistricts(result.data?.data ?? result.data ?? []);
+    } catch {}
+  };
+
+  useEffect(() => { Promise.all([fetchCenters(), fetchCities(), fetchDistricts()]); }, []); // eslint-disable-line
+
+  // Resolve district name from a district_id
+  const getDistrictName = (districtId) => {
+    if (!districtId) return null;
+    const d = districts.find((d) => (d.hash_id || d.id) === districtId);
+    return d?.name ?? null;
+  };
+
+  // When city selection changes → auto-populate district
+  const handleCityChange = (cityName) => {
+    const cityObj    = cities.find((c) => c.city === cityName);
+    const districtId = cityObj?.district_id ?? "";
+    setFormData((p) => ({
+      ...p,
+      city:          cityName,
+      district_id:   districtId,
+      district_name: districtId ? (getDistrictName(districtId) ?? "") : "",
+    }));
+  };
+
+  /* ── CLIENT-SIDE SEARCH ── */
+  const filteredRows = allRows.filter((row) => {
+    // Basic search term filter
+    const q = searchTerm.toLowerCase();
+    const searchMatch = !searchTerm.trim() || 
+      row.name?.toLowerCase().includes(q) ||
+      row.city?.toLowerCase().includes(q) ||
+      String(row.capacity).includes(q);
+    
+    if (!searchMatch) return false;
+
+    // Advanced filters
+    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) {
+      return false;
     }
-  };
+    
+    if (filters.city && row.city !== filters.city) {
+      return false;
+    }
 
-  useEffect(() => {
-    fetchExamCenters(paginationModel.page, paginationModel.pageSize);
-    fetchCities();
-    // eslint-disable-next-line
-  }, [paginationModel.page, paginationModel.pageSize]);
+    if (filters.status && row.status !== filters.status) {
+      return false;
+    }
+    
+    return true;
+  });
 
-  /* ===============================
-     ACTION MENU
-  =============================== */
-  const handleMenuOpen = (event, row) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedRow(row);
-  };
+  const total        = allRows.length;
+  const activeCount  = allRows.filter((r) => (r.status ?? "active") === "active").length;
+  const inactiveCount= allRows.filter((r) => r.status === "inactive").length;
+  const totalCapacity= allRows.reduce((s, r) => s + (Number(r.capacity) || 0), 0);
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedRow(null);
+  /* ── MENU ── */
+  const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
+  const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
+  const openAdd = () => {
+    setEditingCenter(null);
+    setFormData({ name: "", city: "", capacity: "", district_id: "", district_name: "" });
+    setOpenModal(true);
   };
 
   const handleEdit = () => {
+    const distId   = selectedRow.district_id || "";
+    const distName = distId ? (getDistrictName(distId) ?? "") : "";
     setEditingCenter(selectedRow);
     setFormData({
-      name: selectedRow.name,
-      city: selectedRow.city,
-      capacity: String(selectedRow.capacity),
+      name:          selectedRow.name,
+      city:          selectedRow.city,
+      capacity:      String(selectedRow.capacity ?? ""),
+      district_id:   distId,
+      district_name: distName,
     });
     setOpenModal(true);
     handleMenuClose();
   };
 
+  /* ── SINGLE DELETE ── */
   const handleDelete = async () => {
-    if (!selectedRow) return;
-    handleMenuClose();
-
-    if (!window.confirm("Delete this exam center?")) return;
-
+    if (!selectedRow) return; handleMenuClose();
+    if (!window.confirm(`Delete "${selectedRow.name}"?`)) return;
     try {
-      const response = await fetch(
-        `${API_BASE}/settings/exam-centers/${selectedRow.hash_id}/delete`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            "X-API-KEY": API_KEY,
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (result.status === 200) {
-        toast.success("Deleted successfully");
-        fetchExamCenters(paginationModel.page, paginationModel.pageSize);
-      }
-    } catch {
-      toast.error("Delete failed");
-    }
+      const res = await fetch(`${API_BASE}/settings/exam-centers/${selectedRow.hash_id}/delete`, { method: "DELETE", headers: getHeaders(false) });
+      const r   = await res.json();
+      if (r.status === 200 || r.success) { toast.success("Deleted"); setSelectionModel((p) => p.filter((id) => id !== selectedRow.hash_id)); fetchCenters(); }
+      else toast.error(r.message || "Delete failed");
+    } catch { toast.error("Delete failed"); }
   };
 
-  /* ===============================
-     ADD / UPDATE
-  =============================== */
+  /* ── BULK ACTIONS ── */
+  const bulkAction = async (url, method, body, successMsg) => {
+    try {
+      const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
+      const r   = await res.json();
+      if (r.status === 200 || r.success) { toast.success(r.success || successMsg); setSelectionModel([]); fetchCenters(); }
+      else toast.error(r.message || "Action failed");
+    } catch { toast.error("Action failed"); }
+  };
+
+  const handleBulkDelete = () => {
+    if (!selectionModel.length) return;
+    if (!window.confirm(`Delete ${selectionModel.length} center(s)?`)) return;
+    bulkAction(`${API_BASE}/settings/exam-centers/bulk-delete`, "DELETE", { hashes: selectionModel }, "Deleted");
+  };
+  const handleBulkStatus = (status) => {
+    if (!selectionModel.length) return;
+    bulkAction(`${API_BASE}/settings/exam-centers/bulk-status`, "PUT", { hashes: selectionModel, status }, `Marked as ${status}`);
+  };
+
+  /* ── SAVE ── */
   const handleSubmit = async () => {
-    if (!formData.name.trim()) {
-      toast.error("Center name required");
-      return;
-    }
-
-    if (!formData.city.trim()) {
-      toast.error("City required");
-      return;
-    }
-
-    if (!formData.capacity.trim()) {
-      toast.error("Capacity required");
-      return;
-    }
-
-    setLoading(true);
-
+    if (!formData.name.trim())    { toast.error("Center name is required"); return; }
+    if (!formData.city.trim())    { toast.error("City is required"); return; }
+    if (!formData.capacity || Number(formData.capacity) <= 0) { toast.error("Valid capacity required"); return; }
+    setSaving(true);
     try {
       const isUpdate = !!editingCenter;
-
-      const url = isUpdate
-        ? `${API_BASE}/settings/exam-centers/${editingCenter.hash_id}/update`
-        : `${API_BASE}/settings/exam-centers/create`;
-
-      const response = await fetch(url, {
-        method: isUpdate ? "PUT" : "POST",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "X-API-KEY": API_KEY,
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          city: formData.city,
-          capacity: formData.capacity,
-          status: "active",
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!isUpdate && result.status === 201) {
-        toast.success("Created successfully");
-      }
-
-      if (isUpdate && result.status === 200) {
-        toast.success("Updated successfully");
-      }
-
-      setOpenModal(false);
-      fetchExamCenters(paginationModel.page, paginationModel.pageSize);
-    } catch {
-      toast.error("Operation failed");
-    } finally {
-      setLoading(false);
-    }
+      const url = isUpdate ? `${API_BASE}/settings/exam-centers/${editingCenter.hash_id}/update` : `${API_BASE}/settings/exam-centers/store`;
+      const res = await fetch(url, { method: isUpdate ? "PUT" : "POST", headers: getHeaders(), body: JSON.stringify({ name: formData.name.trim(), city: formData.city.trim(), capacity: Number(formData.capacity) }) });
+      const r   = await res.json();
+      if (r.status === 200 || r.status === 201 || r.success) { toast.success(isUpdate ? "Updated" : "Created"); setOpenModal(false); fetchCenters(); }
+      else toast.error(r.message || "Operation failed");
+    } catch { toast.error("Operation failed"); }
+    finally { setSaving(false); }
   };
 
-  /* ===============================
-     SEARCH FILTER
-  =============================== */
-  const filteredRows = rows.filter(
-    (row) =>
-      row.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.city?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  /* ── IMPORT ── */
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0]; if (!file) return; e.target.value = "";
+    setImporting(true);
+    try {
+      const body = new FormData(); body.append("file", file);
+      const res = await fetch(`${API_BASE}/settings/exam-centers/import`, { method: "POST", headers: { Authorization: `Bearer ${AuthService.getToken()}`, Accept: "application/json", "X-API-KEY": API_KEY }, body });
+      const r   = await res.json();
+      if (r.status === 200 || r.success) { toast.success(r.message || "Import successful"); fetchCenters(); }
+      else toast.error(r.message || "Import failed");
+    } catch { toast.error("Import failed"); }
+    finally { setImporting(false); }
+  };
 
-  /* ===============================
-     DATAGRID COLUMNS
-  =============================== */
+  const handleToggleStatus = async (row, currentStatus) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    try {
+      const res = await fetch(`${API_BASE}/settings/exam-centers/${row.hash_id}/update`, {
+        method: "PUT",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: row.name,
+          city: row.city,
+          capacity: row.capacity,
+          status: newStatus,
+        }),
+      });
+      const r = await res.json();
+      if (r.status === 200 || r.success) {
+        toast.success(`Center marked as ${newStatus}`);
+        fetchCenters();
+      } else toast.error(r.message || "Status update failed");
+    } catch { toast.error("Status update failed"); }
+  };
+
   const columns = [
-    { field: "sr_no", headerName: "Sr No", width: 100 },
-    { field: "name", headerName: "Exam Center Name", flex: 1 },
-    { field: "city", headerName: "City", width: 200 },
-    { field: "capacity", headerName: "Capacity", width: 150 },
+    { field: "sr_no",     headerName: "#",           width: 60 },
+    { field: "name",      headerName: "Center Name", flex: 1, minWidth: 200 },
+    { field: "city",      headerName: "City",        width: 140 },
     {
-      field: "actions",
-      headerName: "Actions",
-      width: 80,
-      sortable: false,
-      renderCell: (params) => (
-        <IconButton
-          onClick={(e) => handleMenuOpen(e, params.row)}
-        >
-          <MoreVertical size={18} />
-        </IconButton>
+      field: "district_id",
+      headerName: "District",
+      width: 170,
+      renderCell: (p) => {
+        const name = getDistrictName(p.value);
+        return name
+          ? <span className="text-slate-700 text-sm">{name}</span>
+          : <span className="text-slate-400 text-xs">—</span>;
+      },
+    },
+    { field: "capacity",  headerName: "Capacity",    width: 100, renderCell: (p) => <span className="font-semibold text-slate-700">{Number(p.value).toLocaleString()}</span> },
+    { field: "status",    headerName: "Status",      width: 100,
+      renderCell: (p) => (
+        <Switch
+          checked={p.value === "active"}
+          onChange={() => handleToggleStatus(p.row, p.value)}
+          inputProps={{ "aria-label": "toggle center status" }}
+          size="small"
+          color={p.value === "active" ? "success" : "error"}
+        />
       ),
     },
+    { field: "actions",   headerName: "Actions",     width: 75, sortable: false,
+      renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> },
   ];
 
-  if (loading && rows.length === 0) {
-    return <InlineLoader text="Loading exam centers..." variant="ring" size="lg" />;
-  }
-
-  const activeCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "active"
-  ).length;
-
-  const inactiveCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "inactive"
-  ).length;
+  if (loading && allRows.length === 0)
+    return <div className="flex justify-center items-center min-h-screen"><InlineLoader text="Loading exam centers..." variant="ring" size="lg" /></div>;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6">
 
         {/* HEADER */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-start mb-6">
           <div>
-            <button
-              onClick={() => navigate("/dashboard/settings")}
-              className="text-sm text-gray-600 flex items-center mb-2"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back
+            <button onClick={() => navigate("/dashboard/settings")} className="text-sm text-slate-500 flex items-center gap-1 mb-2 hover:text-slate-700">
+              <ArrowLeft size={14} /> Back to Settings
             </button>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Exam Centers Management
-            </h1>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg"><Building2 size={22} className="text-blue-700" /></div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">Exam Centers</h1>
+                <p className="text-sm text-slate-500">Manage examination venues and their capacities</p>
+              </div>
+            </div>
           </div>
-
-          <Button
-            onClick={() => {
-              setEditingCenter(null);
-              setFormData({ name: "", city: "", capacity: "" });
-              setOpenModal(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Exam Center
-          </Button>
+          <div className="flex items-center gap-2">
+            <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
+            <button
+              type="button"
+              onClick={() => importRef.current?.click()}
+              disabled={importing}
+              className="px-4 py-2 border border-emerald-700 text-emerald-800 font-medium rounded-lg hover:bg-emerald-50 transition-all duration-200 flex items-center gap-2 text-sm disabled:opacity-60"
+            >
+              <Upload size={15} /> {importing ? "Importing…" : "Import Excel"}
+            </button>
+            <button
+              type="button"
+              onClick={openAdd}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm"
+            >
+              <Plus size={15} /> Add Center
+            </button>
+          </div>
         </div>
 
-        {/* STATS CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-            <CardContent className="p-6">
-              <p className="text-sm text-blue-700 font-medium">
-                Total Centers
-              </p>
-              <h2 className="text-3xl font-bold text-blue-900 mt-2">
-                {total}
-              </h2>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
-            <CardContent className="p-6">
-              <p className="text-sm text-emerald-700 font-medium">
-                Active Centers
-              </p>
-              <h2 className="text-3xl font-bold text-emerald-900 mt-2">
-                {activeCount}
-              </h2>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200">
-            <CardContent className="p-6">
-              <p className="text-sm text-red-700 font-medium">
-                Inactive Centers
-              </p>
-              <h2 className="text-3xl font-bold text-red-900 mt-2">
-                {inactiveCount}
-              </h2>
-            </CardContent>
-          </Card>
-
+        {/* STATS */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200"><CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total Centers</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{total}</h2></CardContent></Card>
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200"><CardContent className="p-5"><p className="text-sm text-emerald-700 font-medium">Active</p><h2 className="text-3xl font-bold text-emerald-900 mt-1">{activeCount}</h2></CardContent></Card>
+          <Card className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200"><CardContent className="p-5"><p className="text-sm text-red-700 font-medium">Inactive</p><h2 className="text-3xl font-bold text-red-900 mt-1">{inactiveCount}</h2></CardContent></Card>
+          <Card className="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200"><CardContent className="p-5"><p className="text-sm text-violet-700 font-medium">Total Capacity</p><h2 className="text-3xl font-bold text-violet-900 mt-1">{totalCapacity.toLocaleString()}</h2></CardContent></Card>
         </div>
 
-        {/* SEARCH */}
-        <div className="mb-4">
-          <TextField
-            fullWidth
-            placeholder="Search exam centers..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        {/* TOOLBAR */}
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+
+          {selectionModel.length > 0 && (
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 flex-wrap">
+              <span className="text-sm font-semibold text-slate-700 mr-1">{selectionModel.length} selected</span>
+              <BulkBtn onClick={() => handleBulkStatus("active")}   icon={CheckCircle} label="Mark Active"
+                className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white" />
+              <BulkBtn onClick={() => handleBulkStatus("inactive")} icon={XCircle}     label="Mark Inactive"
+                className="bg-gradient-to-br from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white" />
+              <BulkBtn onClick={handleBulkDelete}                   icon={Trash2}       label="Delete"
+                className="bg-gradient-to-br from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 text-white" />
+            </div>
+          )}
         </div>
 
-        {/* DATAGRID */}
+        {/* ADVANCED FILTERS */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Exam Centers"
+        />
+
+        {/* GRID — client-side pagination + search */}
         <DataGrid
           rows={filteredRows}
           columns={columns}
-          getRowId={(row) => row.id}
+          getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="server"
-          rowCount={total}
           loading={loading}
           autoHeight
+          checkboxSelection
+          disableRowSelectionOnClick
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={(s) => setSelectionModel(s)}
+          sx={gridSx}
         />
 
-        {/* ACTION MENU */}
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-        >
+        {/* MENU */}
+        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
           <MenuItem onClick={handleEdit}>Edit</MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: "red" }}>
-            Delete
-          </MenuItem>
+          <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>
         </Menu>
 
         {/* MODAL */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)}>
-          <DialogTitle>
-            {editingCenter ? "Edit Exam Center" : "Add Exam Center"}
-          </DialogTitle>
+        <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="sm">
+          <DialogTitle className="font-bold">{editingCenter ? "Edit Exam Center" : "Add Exam Center"}</DialogTitle>
           <DialogContent>
             <TextField
-              fullWidth
-              label="Exam Center Name"
-              margin="normal"
+              fullWidth label="Center Name" margin="normal" size="small" autoFocus
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
+              onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+              placeholder="e.g. Govt School XYZ"
             />
             <TextField
-              fullWidth
-              select
-              label="City"
-              margin="normal"
+              fullWidth select label="City" margin="normal" size="small"
               value={formData.city}
-              onChange={(e) =>
-                setFormData({ ...formData, city: e.target.value })
-              }
+              onChange={(e) => handleCityChange(e.target.value)}
             >
-              {cities.length > 0 ? (
-                cities.map((city) => (
-                  <MenuItem key={city.hash_id || city.id} value={city.name}>
-                    {city.name}
-                  </MenuItem>
-                ))
-              ) : (
-                <MenuItem disabled value="">
-                  No cities found
-                </MenuItem>
-              )}
+              <MenuItem value=""><em>Select a city</em></MenuItem>
+              {cities.length > 0
+                ? cities.map((c) => <MenuItem key={c.hash_id} value={c.city}>{c.city}</MenuItem>)
+                : <MenuItem disabled value="">No cities — add cities first</MenuItem>}
             </TextField>
             <TextField
-              fullWidth
-              label="Capacity"
-              margin="normal"
-              type="number"
+              fullWidth label="District" margin="normal" size="small"
+              value={formData.district_name || ""}
+              InputProps={{ readOnly: true }}
+              helperText={formData.district_name ? "" : "Auto-filled from the selected city's district"}
+              sx={{ "& .MuiInputBase-input": { color: formData.district_name ? "#1e293b" : "#94a3b8" } }}
+            />
+            <TextField
+              fullWidth label="Capacity (seats)" margin="normal" size="small"
+              type="number" inputProps={{ min: 1 }}
               value={formData.capacity}
-              onChange={(e) =>
-                setFormData({ ...formData, capacity: e.target.value })
-              }
+              onChange={(e) => setFormData((p) => ({ ...p, capacity: e.target.value }))}
+              placeholder="e.g. 500"
             />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpenModal(false)}>Cancel</Button>
-            <Button onClick={handleSubmit}>
-              {editingCenter ? "Update" : "Create"}
-            </Button>
+          <DialogActions className="px-4 pb-4 gap-2">
+            <button type="button" onClick={() => setOpenModal(false)} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">Cancel</button>
+            <button type="button" onClick={handleSubmit} disabled={saving}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 text-sm disabled:opacity-60">
+              {saving ? "Saving…" : editingCenter ? "Update" : "Create"}
+            </button>
           </DialogActions>
         </Dialog>
       </div>

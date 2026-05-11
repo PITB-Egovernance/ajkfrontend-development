@@ -7,5 +7,5 @@ export { default as DesignationsManagement } from './Designation/DesignationsMan
 export { default as GradesManagement } from './Grades/GradesManagement';
 export { default as CompaniesManagement } from './Company/CompaniesManagement';
 export { default as ContractorsManagement } from './ContractorsManagement';
-export { default as ExamCitiesManagement } from './ExamCities/ExamCitiesManagement';
+export { default as CitiesManagement } from './Cities/CitiesManagement';
 export { default as ExamCentersManagement } from './ExamCenters/ExamCentersManagement';

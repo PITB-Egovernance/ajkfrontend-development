@@ -12,9 +12,11 @@ import {
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 
 const DispatchSent = () => {
   const [forms, setForms] = useState([]);
+  const [filteredForms, setFilteredForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -23,6 +25,68 @@ const DispatchSent = () => {
     page: 0,
     pageSize: 10,
   });
+
+  const [filters, setFilters] = useState({
+    to: '',
+    subject: '',
+    diary_outward_no: '',
+    date: '',
+    priority: ''
+  });
+
+  const filterConfig = [
+    {
+      name: 'to',
+      label: 'To',
+      type: 'text',
+      placeholder: 'Filter by recipient'
+    },
+    {
+      name: 'subject',
+      label: 'Subject',
+      type: 'text',
+      placeholder: 'Filter by subject'
+    },
+    {
+      name: 'diary_outward_no',
+      label: 'Dispatch No',
+      type: 'text',
+      placeholder: 'Filter by Dispatch No.'
+    },
+    {
+      name: 'date',
+      label: 'Date',
+      type: 'date'
+    },
+    {
+      name: 'priority',
+      label: 'Priority',
+      type: 'select',
+      options: [
+        { value: 'High', label: 'High' },
+        { value: 'Medium', label: 'Medium' },
+        { value: 'Low', label: 'Low' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      to: '',
+      subject: '',
+      diary_outward_no: '',
+      date: '',
+      priority: ''
+    });
+  };
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -51,6 +115,7 @@ const DispatchSent = () => {
       }));
 
       setForms(rows);
+      setFilteredForms(rows);
       setTotalRows(result.data.total);
     } catch (error) {
       console.error('Error:', error);
@@ -87,6 +152,18 @@ const DispatchSent = () => {
     fetchForms(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paginationModel.page, paginationModel.pageSize]);
+
+  useEffect(() => {
+    const filtered = forms.filter((row) => {
+      if (filters.to && !row.to?.toLowerCase().includes(filters.to.toLowerCase())) return false;
+      if (filters.subject && !row.subject?.toLowerCase().includes(filters.subject.toLowerCase())) return false;
+      if (filters.diary_outward_no && !row.diary_outward_no?.toLowerCase().includes(filters.diary_outward_no.toLowerCase())) return false;
+      if (filters.date && row.date_dispatch !== filters.date) return false;
+      if (filters.priority && row.priority !== filters.priority) return false;
+      return true;
+    });
+    setFilteredForms(filtered);
+  }, [filters, forms]);
 
   const columns = [
     // { field: 'id', headerName: 'ID', width: 80 },
@@ -133,10 +210,18 @@ const DispatchSent = () => {
           </button>
         </Link>
       </div>
+
+      <AdvancedFilter
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
+        filterConfig={filterConfig}
+        title="Filter Sent Dispatch"
+      />
         
       <Box sx={{ width: '100%', height: 'auto' }}>
         <DataGrid
-          rows={forms}
+          rows={filteredForms}
           columns={columns}
           getRowId={(row) => row.id}
           paginationModel={paginationModel}
@@ -151,7 +236,7 @@ const DispatchSent = () => {
             '& .MuiDataGrid-columnHeaders': { 
               backgroundColor: '#f5f5f5',
               fontSize: '0.813rem',
-              fontWeight: 600
+              fontWeight: "bold"
             },
             '& .MuiDataGrid-cell': {
               fontSize: '0.813rem',

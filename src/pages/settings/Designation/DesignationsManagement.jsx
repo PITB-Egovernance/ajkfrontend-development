@@ -9,15 +9,31 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
-import { Plus, ArrowLeft, MoreVertical } from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical, Filter, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
+import AdvancedFilter from "components/tables/AdvancedFilter";
+
+const gridSx = {
+  border: "none",
+  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
+  "& .MuiDataGrid-row": { minHeight: "52px !important" },
+  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
+  "& .MuiDataGrid-checkboxInput:hover svg":        { color: "#065f46" },
+  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
+  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
+  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
+  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
+  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
+};
 
 const DesignationsManagement = () => {
   const navigate = useNavigate();
@@ -31,6 +47,53 @@ const DesignationsManagement = () => {
   const [total, setTotal] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [grades, setGrades] = useState([]);
+
+  const [filters, setFilters] = useState({
+    name: '',
+    grade_id: '',
+    status: ''
+  });
+
+  const filterConfig = [
+    {
+      name: 'name',
+      label: 'Designation Name',
+      type: 'text',
+      placeholder: 'Filter by designation name'
+    },
+    {
+      name: 'grade_id',
+      label: 'Grade',
+      type: 'select',
+      options: grades.map(g => ({ value: g.id || g.hash_id, label: g.name }))
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      name: '',
+      grade_id: '',
+      status: ''
+    });
+  };
 
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
@@ -42,7 +105,6 @@ const DesignationsManagement = () => {
 
   const [openModal, setOpenModal] = useState(false);
   const [editingDesignation, setEditingDesignation] = useState(null);
-  const [grades, setGrades] = useState([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -82,7 +144,7 @@ const DesignationsManagement = () => {
           grade_name: item.grade?.name || item.grade_name || "",
           type: item.type,
           status: item.status ?? "active",
-          created_at: item.created_at,
+
         }));
 
         setRows(formatted);
@@ -152,9 +214,28 @@ const DesignationsManagement = () => {
   /* ===============================
      SEARCH FILTER
   =============================== */
-  const filteredRows = rows.filter((row) =>
-    row.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRows = rows.filter((row) => {
+    // Basic search term filter
+    const searchMatch = !searchTerm.trim() || 
+      row.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!searchMatch) return false;
+
+    // Advanced filters
+    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) {
+      return false;
+    }
+    
+    if (filters.grade_id && String(row.grade_id) !== String(filters.grade_id)) {
+      return false;
+    }
+
+    if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
+      return false;
+    }
+    
+    return true;
+  });
 
   /* ===============================
      ADD / UPDATE
@@ -260,6 +341,35 @@ const DesignationsManagement = () => {
     }
   };
 
+  const handleToggleStatus = async (row, currentStatus) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    try {
+      const response = await fetch(`${API_BASE}/settings/designations/${row.hash_id}/update`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          "Content-Type": "application/json",
+          "X-API-KEY": API_KEY,
+        },
+        body: JSON.stringify({
+          name: row.name,
+          grade_id: row.grade_id,
+          type: row.type,
+          status: newStatus,
+        }),
+      });
+      const result = await response.json();
+      if (result.status === 200 || result.success) {
+        toast.success(`Designation marked as ${newStatus}`);
+        fetchDesignations(paginationModel.page, paginationModel.pageSize);
+      } else {
+        toast.error(result.message || "Status update failed");
+      }
+    } catch {
+      toast.error("Status update failed");
+    }
+  };
+
   /* ===============================
      DATAGRID COLUMNS
   =============================== */
@@ -283,17 +393,17 @@ const DesignationsManagement = () => {
     headerName: "Status",
     width: 130,
     renderCell: (params) => (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${
-          params.value === "active"
-            ? "bg-emerald-100 text-emerald-700"
-            : "bg-red-100 text-red-700"
-        }`}
-      >
-        {params.value}
-      </span>
+      <Switch
+        checked={params.value === "active"}
+        onChange={() => handleToggleStatus(params.row, params.value)}
+        inputProps={{ "aria-label": "toggle designation status" }}
+        size="small"
+        color={params.value === "active" ? "success" : "error"}
+      />
     ),
   },
+
+
 
   {
     field: "actions",
@@ -389,15 +499,15 @@ const DesignationsManagement = () => {
           </Card>
         </div>
 
-        {/* SEARCH */}
-        <div className="mb-6">
-          <TextField
-            fullWidth
-            placeholder="Search designations..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+
+        {/* ADVANCED FILTERS */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Designations"
+        />
 
         {/* TABLE */}
         <DataGrid
@@ -410,6 +520,7 @@ const DesignationsManagement = () => {
           rowCount={total}
           loading={loading}
           autoHeight
+          sx={gridSx}
         />
 
         {/* MENU */}
@@ -491,19 +602,21 @@ const DesignationsManagement = () => {
             
 
             {/* Status */}
-            <TextField
-              select
-              fullWidth
-              label="Status"
-              margin="normal"
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({ ...formData, status: e.target.value })
-              }
-            >
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
+            {editingDesignation && (
+              <TextField
+                select
+                fullWidth
+                label="Status"
+                margin="normal"
+                value={formData.status}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value })
+                }
+              >
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="inactive">Inactive</MenuItem>
+              </TextField>
+            )}
 
           </DialogContent>
 

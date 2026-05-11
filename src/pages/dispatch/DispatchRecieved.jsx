@@ -9,14 +9,84 @@ import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 
 export default function DispatchReceived() {
   const [rows, setRows] = useState([]);
   const [filteredRows, setFilteredRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
   const [rowCount, setRowCount] = useState(0);
+
+  const [filters, setFilters] = useState({
+    ref: '',
+    from: '',
+    to: '',
+    subject: '',
+    date: '',
+    priority: ''
+  });
+
+  const filterConfig = [
+    {
+      name: 'ref',
+      label: 'Diary Inward No.',
+      type: 'text',
+      placeholder: 'Filter by Diary No.'
+    },
+    {
+      name: 'from',
+      label: 'From',
+      type: 'text',
+      placeholder: 'Filter by sender'
+    },
+    {
+      name: 'to',
+      label: 'To',
+      type: 'text',
+      placeholder: 'Filter by recipient'
+    },
+    {
+      name: 'subject',
+      label: 'Subject',
+      type: 'text',
+      placeholder: 'Filter by subject'
+    },
+    {
+      name: 'date',
+      label: 'Received Date',
+      type: 'date'
+    },
+    {
+      name: 'priority',
+      label: 'Priority',
+      type: 'select',
+      options: [
+        { value: 'High', label: 'High' },
+        { value: 'Medium', label: 'Medium' },
+        { value: 'Low', label: 'Low' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      ref: '',
+      from: '',
+      to: '',
+      subject: '',
+      date: '',
+      priority: ''
+    });
+  };
 
   const [detailedDispatch, setDetailedDispatch] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -41,13 +111,11 @@ export default function DispatchReceived() {
       const result = await response.json();
       if (result.success) {
         const apiData = result.data;
-        console.log('API Data sample:', apiData.data[0]); // Log first item to see structure
         const mappedRows = apiData.data.map((item, index) => {
-          // Check for various ID fields the API might use
           const realId = item.id || item.hash_id || item.diary_id;
           return {
             id: realId || `temp-${index}-${Date.now()}`,
-            originalId: realId, // Store original ID for API calls
+            originalId: realId,
             ref: item.diary_outward_no || 'N/A',
             from: item.from,
             to: item.to,
@@ -73,7 +141,6 @@ export default function DispatchReceived() {
   const fetchDispatchDetails = async (id) => {
     setModalLoading(true);
     setOpenModal(true);
-    console.log('Fetching details from:', `${API_BASE}/received-forms/${id}`);
     try {
       const response = await fetch(`${API_BASE}/dispatch/received-forms/${id}`, {
         headers: { 
@@ -83,17 +150,11 @@ export default function DispatchReceived() {
         },
       });
       
-      console.log('Response status:', response.status);
-      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', errorText);
         throw new Error(`Failed to fetch details (${response.status})`);
       }
 
       const result = await response.json();
-      console.log('API Result:', result);
-      
       if (result.success) {
         setDetailedDispatch(result.data);
       } else {
@@ -102,7 +163,7 @@ export default function DispatchReceived() {
       }
     } catch (error) {
       console.error('Fetch error:', error);
-      toast.error('Failed to load details. Please check console for more info.');
+      toast.error('Failed to load details.');
       setOpenModal(false);
     } finally {
       setModalLoading(false);
@@ -111,9 +172,8 @@ export default function DispatchReceived() {
 
   const handleView = (row) => {
     const idToFetch = row.originalId || row.id;
-    console.log('Fetching details for ID:', idToFetch, 'Full row:', row);
     if (!idToFetch || idToFetch.toString().startsWith('temp-')) {
-      toast.error('Invalid record ID. Please refresh the page and try again.');
+      toast.error('Invalid record ID.');
       return;
     }
     fetchDispatchDetails(idToFetch);
@@ -124,14 +184,17 @@ export default function DispatchReceived() {
   }, [paginationModel.page, paginationModel.pageSize]);
 
   useEffect(() => {
-    const lower = searchTerm.toLowerCase();
-    const filtered = rows.filter((r) =>
-      [r.ref, r.from, r.to, r.subject].some((field) =>
-        field?.toLowerCase().includes(lower)
-      )
-    );
+    const filtered = rows.filter((row) => {
+      if (filters.ref && !row.ref?.toLowerCase().includes(filters.ref.toLowerCase())) return false;
+      if (filters.from && !row.from?.toLowerCase().includes(filters.from.toLowerCase())) return false;
+      if (filters.to && !row.to?.toLowerCase().includes(filters.to.toLowerCase())) return false;
+      if (filters.subject && !row.subject?.toLowerCase().includes(filters.subject.toLowerCase())) return false;
+      if (filters.date && row.date !== filters.date) return false;
+      if (filters.priority && row.priority !== filters.priority) return false;
+      return true;
+    });
     setFilteredRows(filtered);
-  }, [searchTerm, rows]);
+  }, [filters, rows]);
 
   const handleDownloadPDF = async () => {
     if (!detailedDispatch) return;
@@ -157,7 +220,6 @@ export default function DispatchReceived() {
   };
 
   const columns = [
-    // { field: 'id', headerName: 'ID', width: 70 },
     { field: 'ref', headerName: 'Diary Inward No.', width: 180 },
     { field: 'from', headerName: 'From', flex: 1, minWidth: 150 },
     { field: 'to', headerName: 'To', flex: 1, minWidth: 150 },
@@ -201,15 +263,13 @@ export default function DispatchReceived() {
         </Link>
       </div>
 
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search by Ref No., From, To, Subject..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full md:w-96 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
+      <AdvancedFilter
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
+        filterConfig={filterConfig}
+        title="Filter Received Dispatch"
+      />
 
       <Box sx={{ width: '100%', height: 'auto' }}>
         <DataGrid
@@ -217,9 +277,9 @@ export default function DispatchReceived() {
           columns={columns}
           getRowId={(row) => row.id}
           loading={loading}
-          rowCount={searchTerm ? filteredRows.length : rowCount}
+          rowCount={rowCount}
           pageSizeOptions={[10, 25, 50, 75, 100]}
-          paginationMode={searchTerm ? 'client' : 'server'}
+          paginationMode="server"
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           disableRowSelectionOnClick
@@ -230,7 +290,7 @@ export default function DispatchReceived() {
           sx={{
             '& .MuiDataGrid-columnHeaders': { 
               fontSize: '0.813rem',
-              fontWeight: 600
+              fontWeight: "bold"
             },
             '& .MuiDataGrid-cell': {
               fontSize: '0.813rem',

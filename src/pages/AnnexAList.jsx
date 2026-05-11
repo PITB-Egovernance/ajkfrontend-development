@@ -243,11 +243,11 @@ const AnnexAList = () => {
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase">Name with Father</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase">District</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase">Vacant Due To</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase">Dates</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600 uppercase">Actions</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold font-bold text-slate-600 uppercase">Name with Father</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold font-bold text-slate-600 uppercase">District</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold font-bold text-slate-600 uppercase">Vacant Due To</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold font-bold text-slate-600 uppercase">Dates</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold font-bold text-slate-600 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">

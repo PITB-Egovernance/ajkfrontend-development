@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
@@ -18,6 +19,20 @@ import toast from "react-hot-toast";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { PageLoader, InlineLoader } from "components/ui/Loader";
+
+const gridSx = {
+  border: "none",
+  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
+  "& .MuiDataGrid-row": { minHeight: "52px !important" },
+  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
+  "& .MuiDataGrid-checkboxInput:hover svg":        { color: "#065f46" },
+  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
+  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
+  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
+  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
+  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
+};
 
 const CompaniesManagement = () => {
   const navigate = useNavigate();
@@ -62,7 +77,6 @@ const CompaniesManagement = () => {
 
     try {
       const url = `${API_BASE}/settings/company?page=${page + 1}&per_page=${pageSize}`;
-      console.log("Fetching:", url);
 
       const response = await fetch(url, {
         method: "GET",
@@ -78,7 +92,6 @@ const CompaniesManagement = () => {
       }
 
       const result = await response.json();
-      console.log("API Response:", result.data.data);
 
       if (result.success == true) {
         const dataArray =
@@ -95,7 +108,7 @@ const CompaniesManagement = () => {
           email: item.email,
           address: item.address,
           status: item.status ?? "active",
-          created_at: item.created_at,
+
         }));
 
         setRows(formatted);
@@ -176,7 +189,6 @@ const CompaniesManagement = () => {
       });
 
       const result = await response.json();
-      console.log("Submit Response:", result);
 
       if (result.success === true) {
         toast.success(result.message || "Operation successful");
@@ -216,7 +228,6 @@ const CompaniesManagement = () => {
       );
 
       const result = await response.json();
-      console.log("Delete Response:", result);
 
       if (result.success === true) {
         toast.success(result.message || "Deleted successfully");
@@ -231,6 +242,46 @@ const CompaniesManagement = () => {
     }
   };
   /* ===============================
+     TOGGLE STATUS
+  =============================== */
+  const handleToggleStatus = async (row) => {
+    const newStatus = row.status === "active" ? "inactive" : "active";
+    try {
+      const response = await fetch(
+        `${API_BASE}/settings/company/${row.hash_id}/update`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${TOKEN}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-API-KEY": API_KEY,
+          },
+          body: JSON.stringify({
+            company_name: row.name,
+            type: row.type || "Other",
+            contact_person: row.contact_person || "",
+            contact_number: row.contact_number || "",
+            email: row.email || "",
+            address: row.address || "",
+            ntn: row.ntn || "",
+            status: newStatus,
+          }),
+        }
+      );
+      const result = await response.json();
+      if (result.success === true) {
+        toast.success(`Company marked as ${newStatus}`);
+        fetchCompanies(paginationModel.page, paginationModel.pageSize);
+      } else {
+        toast.error(result.message || "Status update failed");
+      }
+    } catch {
+      toast.error("Status update failed");
+    }
+  };
+
+  /* ===============================
      DATAGRID COLUMNS
   =============================== */
   const columns = [
@@ -243,15 +294,13 @@ const CompaniesManagement = () => {
       headerName: "Status",
       width: 130,
       renderCell: (params) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            params.value === "active"
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-red-100 text-red-700"
-          }`}
-        >
-          {params.value}
-        </span>
+        <Switch
+          checked={params.row.status === "active"}
+          onChange={() => handleToggleStatus(params.row)}
+          size="small"
+          color={params.row.status === "active" ? "success" : "error"}
+          inputProps={{ "aria-label": "toggle company status" }}
+        />
       ),
     },
     {
@@ -372,6 +421,7 @@ const CompaniesManagement = () => {
           rowCount={total}
           loading={loading}
           autoHeight
+          sx={gridSx}
         />
 
         {/* ACTION MENU */}
@@ -435,11 +485,12 @@ const CompaniesManagement = () => {
                 setFormData({ ...formData, company_type: e.target.value })
               }
             >
+              <MenuItem value="Government">Government</MenuItem>
               <MenuItem value="Construction">Construction</MenuItem>
               <MenuItem value="IT Services">IT Services</MenuItem>
               <MenuItem value="Consulting">Consulting</MenuItem>
               <MenuItem value="Engineering">Engineering</MenuItem>
-              <MenuItem value="Supply & Services">Supply & Services</MenuItem>
+              <MenuItem value="Supply & Services">Supply &amp; Services</MenuItem>
               <MenuItem value="Maintenance">Maintenance</MenuItem>
               <MenuItem value="Other">Other</MenuItem>
             </TextField>

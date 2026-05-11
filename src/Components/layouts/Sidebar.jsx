@@ -17,6 +17,13 @@ import {
   Settings,
   MapPin,
   Map,
+  DoorOpen,
+  Hash,
+  Users,
+  Award,
+  GraduationCap,
+  BookOpen as BookOpenIcon,
+  Building2,
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
@@ -45,7 +52,9 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     }
   };
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) =>
+    location.pathname === path ||
+    (path !== '/dashboard' && location.pathname.startsWith(path + '/'));
 
   const menuItems = [
     {
@@ -63,11 +72,26 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       badge: null,
     },
     {
-      id: "applications",
-      label: "Candidates Jobs Applications",
-      icon: ClipboardList,
-      path: "/dashboard/applications",
-      badge: null,
+      id: "candidates",
+      label: "Candidates",
+      icon: Users,
+      submenu: [
+        {
+          label: "Job Applications",
+          path: "/dashboard/applications",
+          icon: ClipboardList,
+        },
+        {
+          label: "Roll Number Management",
+          path: "/dashboard/roll-numbers",
+          icon: Hash,
+        },
+        {
+          label: "Award Lists",
+          path: "/dashboard/award-lists",
+          icon: Award,
+        },
+      ],
     },
     {
       id: "requisitions",
@@ -176,8 +200,8 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           icon: Package,
         },
         {
-          label: "Exam City",
-          path: "/dashboard/settings/exam-cities",
+          label: "Cities",
+          path: "/dashboard/settings/cities",
           icon: Map,
         },
         {
@@ -185,11 +209,31 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           path: "/dashboard/settings/exam-centers",
           icon: MapPin,
         },
-        // {
-        //   label: "Contractors",
-        //   path: "/dashboard/settings/contractors",
-        //   icon: Table,
-        // },
+        {
+          label: "Exam Halls",
+          path: "/dashboard/settings/exam-halls",
+          icon: DoorOpen,
+        },
+        {
+          label: "Qualifications",
+          path: "/dashboard/settings/qualifications",
+          icon: GraduationCap,
+        },
+        {
+          label: "Degrees",
+          path: "/dashboard/settings/degrees",
+          icon: BookOpenIcon,
+        },
+        {
+          label: "Qual. Groups",
+          path: "/dashboard/settings/qualification-groups",
+          icon: GraduationCap,
+        },
+        {
+          label: "Departments",
+          path: "/dashboard/settings/departments",
+          icon: Building2,
+        },
       ],
     },
   ];

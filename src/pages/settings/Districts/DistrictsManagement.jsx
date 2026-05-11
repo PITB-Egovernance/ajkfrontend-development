@@ -8,20 +8,38 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
 import {
   Plus,
   ArrowLeft,
-  MoreVertical
+  MoreVertical,
+  Filter,
+  X
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { PageLoader, InlineLoader } from "components/ui/Loader";
+import AdvancedFilter from "components/tables/AdvancedFilter";
+
+const gridSx = {
+  border: "none",
+  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
+  "& .MuiDataGrid-row": { minHeight: "52px !important" },
+  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
+  "& .MuiDataGrid-checkboxInput:hover svg":        { color: "#065f46" },
+  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
+  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
+  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
+  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
+  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
+};
 
 const DistrictsManagement = () => {
   const navigate = useNavigate();
@@ -35,6 +53,51 @@ const DistrictsManagement = () => {
   const [total, setTotal] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [filters, setFilters] = useState({
+    name: '',
+    code: '',
+    status: ''
+  });
+
+  const filterConfig = [
+    {
+      name: 'name',
+      label: 'Name',
+      type: 'text',
+      placeholder: 'Filter by name'
+    },
+    {
+      name: 'code',
+      label: 'Code',
+      type: 'text',
+      placeholder: 'Filter by code'
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      name: '',
+      code: '',
+      status: ''
+    });
+  };
 
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
@@ -212,11 +275,57 @@ const DistrictsManagement = () => {
   /* ===============================
      SEARCH FILTER
   =============================== */
-  const filteredRows = rows.filter(
-    (row) =>
+  const filteredRows = rows.filter((row) => {
+    // Basic search term filter
+    const searchMatch = !searchTerm.trim() || 
       row.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(row.code)?.includes(searchTerm)
-  );
+      String(row.code)?.includes(searchTerm);
+    
+    if (!searchMatch) return false;
+
+    // Advanced filters
+    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) {
+      return false;
+    }
+    
+    if (filters.code && !String(row.code).toLowerCase().includes(filters.code.toLowerCase())) {
+      return false;
+    }
+
+    if (filters.status && row.status !== filters.status) {
+      return false;
+    }
+    
+    return true;
+  });
+
+  const handleToggleStatus = async (row, currentStatus) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    try {
+      const response = await fetch(`${API_BASE}/settings/districts/${row.hash_id}/update`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          "Content-Type": "application/json",
+          "X-API-KEY": API_KEY,
+        },
+        body: JSON.stringify({
+          name: row.name,
+          code: row.code,
+          status: newStatus,
+        }),
+      });
+      const result = await response.json();
+      if (result.status === 200 || result.success) {
+        toast.success(`District marked as ${newStatus}`);
+        fetchDistricts(paginationModel.page, paginationModel.pageSize);
+      } else {
+        toast.error(result.message || "Status update failed");
+      }
+    } catch {
+      toast.error("Status update failed");
+    }
+  };
 
   /* ===============================
      DATAGRID COLUMNS
@@ -225,12 +334,20 @@ const DistrictsManagement = () => {
     { field: "name", headerName: "Name", flex: 1 },
     { field: "code", headerName: "Code", width: 150 },
     {
-      field: "created_at",
-      headerName: "Created At",
-      width: 180,
-      renderCell: (params) =>
-        new Date(params.value).toLocaleDateString(),
+      field: "status",
+      headerName: "Status",
+      width: 130,
+      renderCell: (params) => (
+        <Switch
+          checked={params.row.status === "active"}
+          onChange={() => handleToggleStatus(params.row, params.row.status)}
+          inputProps={{ "aria-label": "toggle district status" }}
+          size="small"
+          color={params.row.status === "active" ? "success" : "error"}
+        />
+      ),
     },
+
     {
       field: "actions",
       headerName: "Actions",
@@ -330,15 +447,15 @@ const DistrictsManagement = () => {
 
       </div>
 
-      {/* SEARCH */}
-      <div className="mb-4">
-        <TextField
-          fullWidth
-          placeholder="Search districts..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+
+      {/* ADVANCED FILTERS */}
+      <AdvancedFilter
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
+        filterConfig={filterConfig}
+        title="Filter Districts"
+      />
 
       {/* DATAGRID */}
       <DataGrid
@@ -352,6 +469,7 @@ const DistrictsManagement = () => {
         rowCount={total}
         loading={loading}
         autoHeight
+        sx={gridSx}
       />
 
       {/* ACTION MENU */}

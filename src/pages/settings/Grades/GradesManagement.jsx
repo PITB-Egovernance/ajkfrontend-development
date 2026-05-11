@@ -9,15 +9,31 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
-import { Plus, ArrowLeft, MoreVertical } from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical, Filter, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
+import AdvancedFilter from "components/tables/AdvancedFilter";
+
+const gridSx = {
+  border: "none",
+  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
+  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
+  "& .MuiDataGrid-row": { minHeight: "52px !important" },
+  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
+  "& .MuiDataGrid-checkboxInput:hover svg":        { color: "#065f46" },
+  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
+  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
+  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
+  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
+  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
+};
 
 const GradesManagement = () => {
   const navigate = useNavigate();
@@ -30,6 +46,43 @@ const GradesManagement = () => {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filters, setFilters] = useState({
+    name: '',
+    status: ''
+  });
+
+  const filterConfig = [
+    {
+      name: 'name',
+      label: 'Grade Name',
+      type: 'text',
+      placeholder: 'Filter by grade name'
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      name: '',
+      status: ''
+    });
+  };
 
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
@@ -58,12 +111,24 @@ const GradesManagement = () => {
   /* ===============================
      SEARCH FILTER
   =============================== */
-  const filteredRows = rows.filter(
-    (row) =>
-      row.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.ntn?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRows = rows.filter((row) => {
+    // Basic search term filter
+    const searchMatch = !searchTerm.trim() || 
+      row.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!searchMatch) return false;
+
+    // Advanced filters
+    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) {
+      return false;
+    }
+
+    if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
+      return false;
+    }
+    
+    return true;
+  });
 
   /* ================= FETCH ================= */
   const fetchGrades = async (page = 0, pageSize = 15) => {
@@ -185,6 +250,33 @@ const GradesManagement = () => {
     }
   };
 
+  const handleToggleStatus = async (row, currentStatus) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    try {
+      const response = await fetch(`${API_BASE}/settings/grades/${row.hash_id}/update`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          "Content-Type": "application/json",
+          "X-API-KEY": API_KEY,
+        },
+        body: JSON.stringify({
+          name: row.name,
+          status: newStatus,
+        }),
+      });
+      const result = await response.json();
+      if (result.status === 200 || result.success) {
+        toast.success(`Grade marked as ${newStatus}`);
+        fetchGrades(paginationModel.page, paginationModel.pageSize);
+      } else {
+        toast.error(result.message || "Status update failed");
+      }
+    } catch {
+      toast.error("Status update failed");
+    }
+  };
+
   /* ================= COLUMNS ================= */
   const columns = [
     { field: "name", headerName: "Grade", flex: 1 },
@@ -193,15 +285,13 @@ const GradesManagement = () => {
       headerName: "Status",
       width: 130,
       renderCell: (params) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            params.value === "active"
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-red-100 text-red-700"
-          }`}
-        >
-          {params.value}
-        </span>
+        <Switch
+          checked={params.value === "active"}
+          onChange={() => handleToggleStatus(params.row, params.value)}
+          inputProps={{ "aria-label": "toggle grade status" }}
+          size="small"
+          color={params.value === "active" ? "success" : "error"}
+        />
       ),
     },
     {
@@ -290,6 +380,16 @@ const GradesManagement = () => {
                   </Card>
                 </div>
 
+
+        {/* ADVANCED FILTERS */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Grades"
+        />
+
         {/* TABLE */}
         <DataGrid
           rows={rows}
@@ -301,6 +401,7 @@ const GradesManagement = () => {
           rowCount={total}
           loading={loading}
           autoHeight
+          sx={gridSx}
         />
 
         {/* ACTION MENU */}
@@ -356,19 +457,21 @@ const GradesManagement = () => {
               }
             />
 
-            <TextField
-              select
-              fullWidth
-              label="Status"
-              margin="normal"
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({ ...formData, status: e.target.value })
-              }
-            >
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
+            {editingGrade && (
+              <TextField
+                select
+                fullWidth
+                label="Status"
+                margin="normal"
+                value={formData.status}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value })
+                }
+              >
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="inactive">Inactive</MenuItem>
+              </TextField>
+            )}
           </DialogContent>
 
           <DialogActions>

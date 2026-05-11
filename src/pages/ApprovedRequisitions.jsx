@@ -4,6 +4,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 
 const ApprovedRequisitions = () => {
   const navigate = useNavigate();
@@ -16,6 +17,55 @@ const ApprovedRequisitions = () => {
     page: 0,
     pageSize: 10,
   });
+
+  const [filters, setFilters] = useState({
+    hash_id: '',
+    designation: '',
+    scale: '',
+    quota_percentage: '',
+    num_posts: '',
+    vacancy_date: '',
+    status: ''
+  });
+
+  const filterConfig = [
+    { name: 'hash_id', label: 'Ref', type: 'text', placeholder: 'Filter by ref' },
+    { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
+    { name: 'scale', label: 'Scale', type: 'text', placeholder: 'Filter by scale' },
+    { name: 'quota_percentage', label: 'Quota %', type: 'text', placeholder: 'Filter by quota' },
+    { name: 'num_posts', label: 'Posts', type: 'text', placeholder: 'Filter by posts' },
+    { name: 'vacancy_date', label: 'Vacancy Date', type: 'date' },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'Approved', label: 'Approved' },
+        { value: 'Pending', label: 'Pending' },
+        { value: 'Rejected', label: 'Rejected' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      hash_id: '',
+      designation: '',
+      scale: '',
+      quota_percentage: '',
+      num_posts: '',
+      vacancy_date: '',
+      status: ''
+    });
+  };
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -149,6 +199,31 @@ const ApprovedRequisitions = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paginationModel.page]);
 
+  const filteredRows = rows.filter((row) => {
+    if (filters.hash_id && !row.hash_id?.toLowerCase().includes(filters.hash_id.toLowerCase())) {
+      return false;
+    }
+    if (filters.designation && !row.designation?.toLowerCase().includes(filters.designation.toLowerCase())) {
+      return false;
+    }
+    if (filters.scale && !String(row.scale).toLowerCase().includes(filters.scale.toLowerCase())) {
+      return false;
+    }
+    if (filters.quota_percentage && !String(row.quota_percentage).toLowerCase().includes(filters.quota_percentage.toLowerCase())) {
+      return false;
+    }
+    if (filters.num_posts && !String(row.num_posts).toLowerCase().includes(filters.num_posts.toLowerCase())) {
+      return false;
+    }
+    if (filters.vacancy_date && row.vacancy_date !== filters.vacancy_date) {
+      return false;
+    }
+    if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
+      return false;
+    }
+    return true;
+  });
+
   const getStatusClass = (status) => {
     const statusLower = status?.toLowerCase() || '';
     if (statusLower.includes('approved')) return 'bg-green-100 text-green-700';
@@ -200,6 +275,13 @@ const ApprovedRequisitions = () => {
         )}
       </div>
 
+      <AdvancedFilter
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
+        filterConfig={filterConfig}
+      />
+
       <div style={{ width: '100%' }} className="mt-4">
         {loading ? (
           <InlineLoader text="Loading approved requisitions..." variant="ring" size="lg" />
@@ -207,7 +289,7 @@ const ApprovedRequisitions = () => {
           <div className="text-red-600 text-center py-8">Error: {error}</div>
         ) : (
           <DataGrid
-            rows={rows}
+            rows={filteredRows}
             columns={columns}
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
@@ -222,6 +304,7 @@ const ApprovedRequisitions = () => {
             onRowSelectionModelChange={(newSelection) => setSelectionModel(newSelection)}
             autoHeight
             sx={{
+              '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
               '& .MuiDataGrid-row': {
                 minHeight: '52px !important',
               },
@@ -233,6 +316,9 @@ const ApprovedRequisitions = () => {
               },
               '& .MuiDataGrid-checkboxInput.Mui-checked svg': {
                 color: '#064e3b',
+              },
+              '& .MuiDataGrid-columnHeader--checkbox .MuiDataGrid-columnHeaderTitleContainer': {
+                display: 'none',
               },
               '& .MuiCheckbox-root .MuiSvgIcon-root': {
                 color: '#064e3b',

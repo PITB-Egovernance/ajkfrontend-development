@@ -3,6 +3,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import { Link, Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
 import { MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
@@ -28,6 +29,45 @@ const PscTable = () => {
     approved: 0,
     rejected: 0,
   });
+
+  const [filters, setFilters] = useState({
+    hash_id: '',
+    designation: '',
+    remarks: '',
+    status: ''
+  });
+
+  const filterConfig = [
+    { name: 'hash_id', label: 'Ref', type: 'text', placeholder: 'Filter by ref' },
+    { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
+    { name: 'remarks', label: 'Remarks', type: 'text', placeholder: 'Filter by remarks' },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'Approved', label: 'Approved' },
+        { value: 'Pending', label: 'Pending' },
+        { value: 'Rejected', label: 'Rejected' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (name, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      hash_id: '',
+      designation: '',
+      remarks: '',
+      status: ''
+    });
+  };
 
   const API_BASE = Config.apiUrl; // Use configured API URL
   const TOKEN = AuthService.getToken(); // Get token from AuthService
@@ -99,6 +139,22 @@ const PscTable = () => {
     fetchRequisitions(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paginationModel.page, paginationModel.pageSize]);
+
+  const filteredRows = rows.filter((row) => {
+    if (filters.hash_id && !row.hash_id?.toLowerCase().includes(filters.hash_id.toLowerCase())) {
+      return false;
+    }
+    if (filters.designation && !row.designation?.toLowerCase().includes(filters.designation.toLowerCase())) {
+      return false;
+    }
+    if (filters.remarks && !row.remarks?.toLowerCase().includes(filters.remarks.toLowerCase())) {
+      return false;
+    }
+    if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
+      return false;
+    }
+    return true;
+  });
 
   const handleMenuOpen = (event, row) => {
     setAnchorEl(event.currentTarget);
@@ -197,10 +253,12 @@ const PscTable = () => {
   };
 
   const columns = [
-    { field: 'requisition_form', headerName: 'Requisition Form', flex: 1, renderCell: (params) => renderFileLink(params.value) },
-    { field: 'annex_a_form', headerName: 'Annex-A Form', flex: 1, renderCell: (params) => renderFileLink(params.value) },
-    { field: 'other_attachment', headerName: 'Other Attachment', flex: 1, renderCell: (params) => renderFileLink(params.value) },
-    { field: 'remarks', headerName: 'Remarks', flex: 1 },
+    { field: 'hash_id', headerName: 'Ref', width: 120 },
+    { field: 'designation', headerName: 'Designation', minWidth: 200, flex: 1 },
+    { field: 'requisition_form', headerName: 'Requisition Form', width: 180, renderCell: (params) => renderFileLink(params.value) },
+    { field: 'annex_a_form', headerName: 'Annex-A Form', width: 180, renderCell: (params) => renderFileLink(params.value) },
+    { field: 'other_attachment', headerName: 'Other Attachment', width: 180, renderCell: (params) => renderFileLink(params.value) },
+    { field: 'remarks', headerName: 'Remarks', width: 200 },
     {
       field: 'status',
       headerName: 'Status',
@@ -262,8 +320,15 @@ const PscTable = () => {
         </div>
       </div>
 
+      <AdvancedFilter
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
+        filterConfig={filterConfig}
+      />
+
       {/* Data Table */}
-      <div style={{ width: '100%' }}>
+      <div style={{ width: '100%' }} className="mt-4">
         {loading ? (
           <InlineLoader text="Loading requisitions..." variant="ring" size="lg" />
         ) : error ? (
@@ -274,7 +339,7 @@ const PscTable = () => {
           </div>
         ) : (
           <DataGrid
-            rows={rows}
+            rows={filteredRows}
             columns={columns}
             pagination
             paginationMode="server"
@@ -288,6 +353,9 @@ const PscTable = () => {
             sx={{
               '& .MuiDataGrid-row': {
                 minHeight: '52px !important',
+              },
+              '& .MuiDataGrid-columnHeaderTitle': {
+                fontWeight: "bold"
               },
             }}
           />

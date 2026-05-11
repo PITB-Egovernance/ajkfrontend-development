@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataGrid, useGridApiRef } from '@mui/x-data-grid';
 import { IconButton, Menu, MenuItem, TextField, MenuItem as SelectItem } from '@mui/material';
 import { Eye, CheckCircle, XCircle, MoreVertical, RefreshCw, FilterX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from 'components/ui/Loader';
 import Button from 'components/ui/Button';
 import ApplicationApi from 'api/applicationApi';
-import AdvertisementApi from 'api/advertisementApi'; // we will use this to fetch jobs for dropdown
 import toast from 'react-hot-toast';
 import {
   getApplicationOcrBatch,
@@ -14,63 +13,49 @@ import {
   getApplicationOcrBatchPillClass,
 } from 'utils/applicationOcrUtils';
 
+// ── Module-level constants ────────────────────────────────────────────────────
+
+const UNREVIEWED_SENTINEL = '__unreviewed__';
+
+const DEFAULT_FILTERS = {
+  ref_id: '', job_id: '', advertisement_no: '', status: '',
+  payment_status: '', start_date: '', end_date: '',
+  search: '', ocr_batch: '', disability: '',
+};
+
+const STATUS_COLORS = {
+  shortlisted: 'bg-green-100 text-green-700',
+  rejected:    'bg-red-100 text-red-700',
+  interview:   'bg-blue-100 text-blue-700',
+};
+
 const ApplicationsList = () => {
   const navigate = useNavigate();
+  const apiRef = useGridApiRef();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [jobs, setJobs] = useState([]);
-  
-  // Filtering state
-  const [filters, setFilters] = useState({
-    ref_id: '',
-    job_id: '',
-    advertisement_no: '',
-    status: '',
-    payment_status: '',
-    start_date: '',
-    end_date: '',
-    search: '',
-    ocr_batch: ''
-  });
 
-  const defaultFilters = {
-    ref_id: '',
-    job_id: '',
-    advertisement_no: '',
-    status: '',
-    payment_status: '',
-    start_date: '',
-    end_date: '',
-    search: '',
-    ocr_batch: ''
-  };
-  
-  const [paginationModel, setPaginationModel] = useState({
-    page: 0,
-    pageSize: 10,
-  });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
   const [selectionModel, setSelectionModel] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
-
-  // Fetch Jobs for the filter dropdown
-  useEffect(() => {
-    const fetchJobs = async () => {
-      try {
-        // Just an example, maybe there's a dedicated endpoint for jobs dropdown
-        const res = await AdvertisementApi.getAll(1); 
-        // Depending on the structure of your response, adapt this:
-        const data = res.data?.data || res.data || [];
-        setJobs(data);
-      } catch (error) {
-        console.error('Failed to fetch jobs', error);
+  // Derive unique jobs from loaded rows — useMemo avoids extra state + double-render.
+  const jobs = useMemo(() => {
+    const seen   = new Set();
+    const unique = [];
+    rows.forEach((row) => {
+      const key = row.advertisement_no || row.job_title;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push({ id: row.advertisement_no, title: row.job_title, advertisement_no: row.advertisement_no });
       }
-    };
-    fetchJobs();
-  }, []);
+    });
+    return unique;
+  }, [rows]);
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
@@ -85,42 +70,45 @@ const ApplicationsList = () => {
         end_date: filters.end_date,
       };
       const response = await ApplicationApi.getAll(params);
-      
-      const payload = response?.data || response;
-      let data = payload?.data || response.data?.data || response.data || [];
-      let totalCount = payload?.total || response.meta?.total || response.total || data.length || 0;
-      
-      // MOCK DATA FALLBACK removed
-      
+
+      const payload    = response?.data || response;
+      const data       = payload?.data || response.data?.data || response.data || [];
+      const totalCount = payload?.total || response.meta?.total || response.total || data.length || 0;
+
       const formattedRows = data.map((item) => {
-        // Handle snapshot_data which might be a string
         let snapshot = item.snapshot_data;
         if (typeof snapshot === 'string') {
-          try { snapshot = JSON.parse(snapshot); } catch (e) { snapshot = {}; }
+          try { snapshot = JSON.parse(snapshot); } catch { snapshot = {}; }
         }
 
+        const effectiveStatus = item._admin_status !== null && item._admin_status !== undefined
+          ? item._admin_status
+          : (item.status === 'submitted' || !item.status ? '' : item.status);
+
         return {
-          id: item.hash_id || item.id,
-          applicant_name: snapshot?.name || item.candidate?.name || item.profile?.full_name || 'N/A',
-          cnic: snapshot?.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
-          job_title: item.job_post?.post_title || item.job_post?.title || item.job?.title || item.advertisement?.title || 'N/A',
-          job_post_id: item.job_post_id || item.job_post?.id || item.job?.id || item.advertisement?.id || null,
+          id:      item.application_number || item.id,
+          hash_id: item.hash_id || item.id,
+          applicant_name:  snapshot?.name || item.candidate?.name || item.profile?.full_name || 'N/A',
+          cnic:            snapshot?.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
+          job_title:       item.job_post?.post_title || item.job_post?.title || item.job?.title || 'N/A',
+          job_post_id:     item.job_post_id || null,
           advertisement_no: item.advertisement_no || item.job_post?.ext_adv_id || item.job_post?.adv_number || 'N/A',
-          status: item.status || 'Pending',
-          applied_at_raw: item.submitted_at || item.created_at || null,
-          applied_at: item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : (item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'),
-          ocr_batch: getApplicationOcrBatch(item.documents || item.candidate?.documents || []),
-          eligibility_age_passed: item.eligibility_summary?.checks?.age_passed,
-          eligibility_district_passed: item.eligibility_summary?.checks?.district_passed,
+          status:          effectiveStatus,
+          applied_at_raw:  item.submitted_at || item.created_at || null,
+          applied_at: (item.submitted_at || item.created_at)
+            ? new Date(item.submitted_at || item.created_at).toLocaleDateString()
+            : 'N/A',
+          ocr_batch:       getApplicationOcrBatch(item.candidate?.documents || item.documents || []),
+          eligibility_age_passed:       item.eligibility_summary?.checks?.age_passed,
+          eligibility_district_passed:  item.eligibility_summary?.checks?.district_passed,
           eligibility_education_passed: item.eligibility_summary?.checks?.qualification_passed,
           payment_status: item.payment_summary?.status || item.payment?.payment_status || 'N/A',
           payment_amount: item.payment_summary?.amount_paid ?? item.payment?.amount ?? 'N/A',
-          payment_psid: item.payment_summary?.psid_number || item.payment?.psid_number || 'N/A',
+          payment_psid:   item.payment_summary?.psid_number || item.payment?.psid_number || 'N/A',
+          has_disability:  !!(item.candidate?.disability),
+          disability_type: item.candidate?.disability?.disability_type || null,
         };
       });
-      
-      const selectedJob = jobs.find((job) => (job.hash_id || job.id)?.toString() === filters.job_id?.toString());
-      const selectedJobTitle = (selectedJob?.title || selectedJob?.designation || '').toLowerCase();
 
       const locallyFilteredRows = formattedRows.filter((row) => {
         const searchText = (filters.search || '').toLowerCase().trim();
@@ -128,132 +116,130 @@ const ApplicationsList = () => {
           || (row.applicant_name || '').toLowerCase().includes(searchText)
           || (row.cnic || '').toLowerCase().includes(searchText);
 
-        const jobMatch = !filters.job_id
-          || (selectedJobTitle && (row.job_title || '').toLowerCase().includes(selectedJobTitle))
-          || (row.job_post_id !== null && row.job_post_id?.toString() === filters.job_id?.toString());
+        const jobMatch = !filters.job_id || (row.advertisement_no || '') === filters.job_id;
 
         const statusMatch = !filters.status
-          || (row.status || '').toString().toLowerCase() === filters.status.toLowerCase();
+          || (filters.status === UNREVIEWED_SENTINEL
+            ? !row.status
+            : (row.status || '').toString().toLowerCase() === filters.status.toLowerCase());
 
-        const rowDate = row.applied_at_raw ? new Date(row.applied_at_raw) : null;
+        const rowDate    = row.applied_at_raw ? new Date(row.applied_at_raw) : null;
         const startMatch = !filters.start_date || (rowDate && rowDate >= new Date(`${filters.start_date}T00:00:00`));
-        const endMatch = !filters.end_date || (rowDate && rowDate <= new Date(`${filters.end_date}T23:59:59`));
+        const endMatch   = !filters.end_date   || (rowDate && rowDate <= new Date(`${filters.end_date}T23:59:59`));
 
-        const refMatch = !filters.ref_id || (row.id || '').toString().toLowerCase().includes(filters.ref_id.toLowerCase());
-        const adNoMatch = !filters.advertisement_no || (row.advertisement_no || '').toString().toLowerCase().includes(filters.advertisement_no.toLowerCase());
-        const paymentMatch = !filters.payment_status || (row.payment_status || '').toString().toLowerCase() === filters.payment_status.toLowerCase();
-        const batchMatch = !filters.ocr_batch || (row.ocr_batch || '').toString().toLowerCase() === filters.ocr_batch.toLowerCase();
-        return searchMatch && jobMatch && statusMatch && startMatch && endMatch && refMatch && adNoMatch && paymentMatch && batchMatch;
+        const refMatch       = !filters.ref_id          || (row.id || '').toString().toLowerCase().includes(filters.ref_id.toLowerCase());
+        const adNoMatch      = !filters.advertisement_no || (row.advertisement_no || '').toString().toLowerCase().includes(filters.advertisement_no.toLowerCase());
+        const paymentMatch   = !filters.payment_status  || (row.payment_status || '').toString().toLowerCase() === filters.payment_status.toLowerCase();
+        const batchMatch     = !filters.ocr_batch       || (row.ocr_batch || '').toString().toLowerCase() === filters.ocr_batch.toLowerCase();
+        const disabilityMatch = !filters.disability
+          || (filters.disability === 'yes' && row.has_disability)
+          || (filters.disability === 'no'  && !row.has_disability);
+
+        return searchMatch && jobMatch && statusMatch && startMatch && endMatch && refMatch && adNoMatch && paymentMatch && batchMatch && disabilityMatch;
       });
 
       setRows(locallyFilteredRows);
       setTotal(
-        (filters.ref_id || filters.advertisement_no || filters.payment_status || filters.ocr_batch)
+        (filters.ref_id || filters.advertisement_no || filters.payment_status || filters.ocr_batch || filters.disability)
           ? locallyFilteredRows.length
           : totalCount
       );
     } catch (err) {
       toast.error(err.message || 'Failed to fetch applications');
       console.error(err);
-      
     } finally {
       setLoading(false);
     }
   }, [paginationModel, filters]);
 
   useEffect(() => {
-    // Implementing debounce for search
-    const delayDebounceFn = setTimeout(() => {
-      fetchApplications();
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
+    const timer = setTimeout(fetchApplications, 500);
+    return () => clearTimeout(timer);
   }, [fetchApplications]);
+
+  useEffect(() => {
+    if (!loading && rows.length > 0) {
+      setTimeout(() => {
+        apiRef.current?.autosizeColumns?.({
+          includeOutliers: true,
+          includeHeaders: true,
+          expand: true,
+        });
+      }, 0);
+    }
+  }, [rows, loading, apiRef]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
-    setPaginationModel(prev => ({ ...prev, page: 0 })); // Reset page
-  };
-
-  const handleClearFilters = () => {
-    setFilters(defaultFilters);
     setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
-  const handleMenuOpen = (event, row) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedRow(row);
+  const handleClearFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedRow(null);
-  };
+  const handleMenuOpen  = (event, row) => { setAnchorEl(event.currentTarget); setSelectedRow(row); };
+  const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
 
   const handleView = () => {
-    if (selectedRow) {
-      navigate(`/dashboard/applications/${selectedRow.id}`);
-    }
+    if (selectedRow) navigate(`/dashboard/applications/${selectedRow.hash_id}`);
     handleMenuClose();
   };
 
   const updateStatus = async (id, status) => {
     try {
-      // Optimistic update
       setRows(prev => prev.map(r => r.id === id ? { ...r, status } : r));
       await ApplicationApi.updateStatus(id, status);
       toast.success(`Application marked as ${status}`);
-    } catch (error) {
+    } catch {
       toast.error('Failed to update status');
-      fetchApplications(); // Revert on failure
+      fetchApplications();
     }
     handleMenuClose();
   };
 
   const handleBulkStatusUpdate = async (status) => {
-    if (selectionModel.length === 0) return;
+    if (!selectionModel.length) return;
     try {
       setRows(prev => prev.map(r => selectionModel.includes(r.id) ? { ...r, status } : r));
       await ApplicationApi.bulkUpdateStatus(selectionModel, status);
       toast.success(`${selectionModel.length} applications marked as ${status}`);
       setSelectionModel([]);
-    } catch (error) {
+    } catch {
       toast.error('Failed to update bulk status');
       fetchApplications();
     }
   };
 
   const getStatusColor = (status) => {
-    const lowerStatus = status?.toLowerCase() || '';
-    if (lowerStatus === 'pending') return 'bg-yellow-100 text-yellow-700';
-    if (lowerStatus === 'shortlisted') return 'bg-green-100 text-green-700';
-    if (lowerStatus === 'rejected') return 'bg-red-100 text-red-700';
-    if (lowerStatus === 'interview') return 'bg-blue-100 text-blue-700';
-    return 'bg-gray-100 text-gray-700';
+    const key = status?.toLowerCase() || '';
+    if (!key) return 'bg-slate-100 text-slate-400';
+    return STATUS_COLORS[key] ?? 'bg-gray-100 text-gray-700';
   };
 
   const columns = [
-    { field: 'id', headerName: 'Ref ID', width: 100 },
-    { field: 'applicant_name', headerName: 'Applicant Name', flex: 1 },
-    { field: 'cnic', headerName: 'CNIC', width: 160 },
-    { field: 'job_title', headerName: 'Job Advertisement', flex: 1 },
-    { field: 'advertisement_no', headerName: 'Advertisement No', width: 160 },
-    { field: 'applied_at', headerName: 'Applied At', width: 120 },
+    { field: 'id',               headerName: 'Ref ID',           minWidth: 100 },
+    { field: 'applicant_name',   headerName: 'Applicant Name',   minWidth: 150 },
+    { field: 'cnic',             headerName: 'CNIC',             minWidth: 150 },
+    { field: 'job_title',        headerName: 'Job Advertisement', minWidth: 170 },
+    { field: 'advertisement_no', headerName: 'Advertisement No', minWidth: 155 },
+    { field: 'applied_at',       headerName: 'Applied At',       minWidth: 105 },
     {
       field: 'status',
       headerName: 'Status',
-      width: 130,
-      renderCell: (params) => (
+      minWidth: 115,
+      renderCell: (params) => params.value ? (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium uppercase ${getStatusColor(params.value)}`}>
           {params.value}
         </span>
-      ),
+      ) : <span className="text-slate-400 text-xs">—</span>,
     },
     {
       field: 'ocr_batch',
       headerName: 'Batch',
-      width: 110,
+      minWidth: 130,
       sortable: false,
       renderCell: (params) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase border ${getApplicationOcrBatchPillClass(params.value)}`}>
@@ -264,7 +250,7 @@ const ApplicationsList = () => {
     {
       field: 'payment_status',
       headerName: 'Payment Status',
-      width: 140,
+      minWidth: 130,
       sortable: false,
       renderCell: (params) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase border ${params.value?.toLowerCase() === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200'}`}>
@@ -273,10 +259,26 @@ const ApplicationsList = () => {
       ),
     },
     {
+      field: 'has_disability',
+      headerName: 'Disability',
+      minWidth: 110,
+      sortable: false,
+      renderCell: (params) => params.value ? (
+        <span className="px-2.5 py-1 rounded-full text-xs font-semibold uppercase border bg-purple-100 text-purple-700 border-purple-200 capitalize">
+          {params.row.disability_type || 'Yes'}
+        </span>
+      ) : (
+        <span className="px-2.5 py-1 rounded-full text-xs font-semibold uppercase border bg-slate-100 text-slate-400 border-slate-200">
+          None
+        </span>
+      ),
+    },
+    {
       field: 'actions',
       headerName: 'Actions',
-      width: 80,
+      minWidth: 70,
       sortable: false,
+      resizable: false,
       renderCell: (params) => (
         <IconButton onClick={(e) => handleMenuOpen(e, params.row)} size="small">
           <MoreVertical size={20} />
@@ -296,139 +298,68 @@ const ApplicationsList = () => {
         </div>
 
         {/* Filter Section */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-wrap xl:flex-nowrap gap-4 items-end">
-          <TextField
-            label="Search (Name/CNIC)"
-            variant="outlined"
-            size="small"
-            name="search"
-            value={filters.search}
-            onChange={handleFilterChange}
-            className="w-full md:w-64"
-          />
-          <TextField
-            label="Ref ID"
-            variant="outlined"
-            size="small"
-            name="ref_id"
-            value={filters.ref_id}
-            onChange={handleFilterChange}
-            className="w-full md:w-40"
-          />
-          <TextField
-            select
-            label="Job Advertisement"
-            variant="outlined"
-            size="small"
-            name="job_id"
-            value={filters.job_id}
-            onChange={handleFilterChange}
-            className="w-full md:w-64"
-          >
-            <SelectItem value="">All Jobs</SelectItem>
-            {jobs.map(job => (
-              <SelectItem key={job.hash_id || job.id} value={job.hash_id || job.id}>
-                {job.title || job.designation || `Job #${job.id}`}
-              </SelectItem>
-            ))}
-          </TextField>
-          <TextField
-            label="Advertisement No"
-            variant="outlined"
-            size="small"
-            name="advertisement_no"
-            value={filters.advertisement_no}
-            onChange={handleFilterChange}
-            className="w-full md:w-56"
-          />
-          <TextField
-            select
-            label="Status"
-            variant="outlined"
-            size="small"
-            name="status"
-            value={filters.status}
-            onChange={handleFilterChange}
-            className="w-full md:w-48"
-          >
-            <SelectItem value="">All Statuses</SelectItem>
-            <SelectItem value="submitted">Submitted</SelectItem>
-            <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="Shortlisted">Shortlisted</SelectItem>
-            <SelectItem value="Interview">Interview</SelectItem>
-            <SelectItem value="Rejected">Rejected</SelectItem>
-          </TextField>
-          <TextField
-            select
-            label="Payment Status"
-            variant="outlined"
-            size="small"
-            name="payment_status"
-            value={filters.payment_status}
-            onChange={handleFilterChange}
-            className="w-full md:w-44"
-          >
-            <SelectItem value="">All Payments</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="unpaid">Unpaid</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-          </TextField>
-          <TextField
-            select
-            label="OCR Verification"
-            variant="outlined"
-            size="small"
-            name="ocr_batch"
-            value={filters.ocr_batch}
-            onChange={handleFilterChange}
-            className="w-full md:w-48"
-          >
-            <SelectItem value="">All Batches</SelectItem>
-            <SelectItem value="green">OCR Verified</SelectItem>
-            <SelectItem value="yellow">OCR Partially Verified</SelectItem>
-            <SelectItem value="red">OCR Not Verified</SelectItem>
-          </TextField>
-          <TextField
-            type="date"
-            label="Applied At (From)"
-            InputLabelProps={{ shrink: true }}
-            variant="outlined"
-            size="small"
-            name="start_date"
-            value={filters.start_date}
-            onChange={handleFilterChange}
-          />
-          <TextField
-            type="date"
-            label="Applied At (To)"
-            InputLabelProps={{ shrink: true }}
-            variant="outlined"
-            size="small"
-            name="end_date"
-            value={filters.end_date}
-            onChange={handleFilterChange}
-          />
-          <Button
-            variant="outline"
-            size="md"
-            onClick={handleClearFilters}
-            className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-            title="Clear Filters"
-            aria-label="Clear Filters"
-          >
-            <FilterX size={16} />
-          </Button>
-          <Button
-            variant="outline"
-            size="md"
-            onClick={fetchApplications}
-            disabled={loading}
-            className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-            title="Refresh List"
-            aria-label="Refresh List"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </Button>
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 space-y-3">
+          <div className="flex gap-3 items-end flex-wrap">
+            <TextField label="Search (Name/CNIC)" variant="outlined" size="small" name="search"
+              value={filters.search} onChange={handleFilterChange} sx={{ flex: '1 1 160px', minWidth: 140 }} />
+            <TextField label="Ref ID" variant="outlined" size="small" name="ref_id"
+              value={filters.ref_id} onChange={handleFilterChange} sx={{ width: 110 }} />
+            <TextField select label="Job Advertisement" variant="outlined" size="small" name="job_id"
+              value={filters.job_id} onChange={handleFilterChange} sx={{ flex: '1 1 140px', minWidth: 130 }}>
+              <SelectItem value="">All Jobs</SelectItem>
+              {jobs.map(job => (
+                <SelectItem key={job.advertisement_no} value={job.advertisement_no}>{job.title}</SelectItem>
+              ))}
+            </TextField>
+            <TextField label="Advertisement No" variant="outlined" size="small" name="advertisement_no"
+              value={filters.advertisement_no} onChange={handleFilterChange} sx={{ width: 140 }} />
+            <TextField select label="Status" variant="outlined" size="small" name="status"
+              value={filters.status} onChange={handleFilterChange} sx={{ width: 130 }}>
+              <SelectItem value="">All Statuses</SelectItem>
+              <SelectItem value={UNREVIEWED_SENTINEL}>Unreviewed</SelectItem>
+              <SelectItem value="Shortlisted">Shortlisted</SelectItem>
+              <SelectItem value="Interview">Interview</SelectItem>
+              <SelectItem value="Rejected">Rejected</SelectItem>
+            </TextField>
+            <TextField select label="Payment Status" variant="outlined" size="small" name="payment_status"
+              value={filters.payment_status} onChange={handleFilterChange} sx={{ width: 135 }}>
+              <SelectItem value="">All Payments</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+            </TextField>
+          </div>
+          <div className="flex gap-3 items-end flex-wrap">
+            <TextField select label="OCR Verification" variant="outlined" size="small" name="ocr_batch"
+              value={filters.ocr_batch} onChange={handleFilterChange} sx={{ width: 145 }}>
+              <SelectItem value="">All Batches</SelectItem>
+              <SelectItem value="green">OCR Verified</SelectItem>
+              <SelectItem value="yellow">Partially Verified</SelectItem>
+              <SelectItem value="red">Not Verified</SelectItem>
+            </TextField>
+            <TextField select label="Disability" variant="outlined" size="small" name="disability"
+              value={filters.disability} onChange={handleFilterChange} sx={{ width: 125 }}>
+              <SelectItem value="">All</SelectItem>
+              <SelectItem value="yes">Disabled</SelectItem>
+              <SelectItem value="no">Not Disabled</SelectItem>
+            </TextField>
+            <TextField type="date" label="Applied At (From)" InputLabelProps={{ shrink: true }}
+              variant="outlined" size="small" name="start_date"
+              value={filters.start_date} onChange={handleFilterChange} sx={{ width: 170 }} />
+            <TextField type="date" label="Applied At (To)" InputLabelProps={{ shrink: true }}
+              variant="outlined" size="small" name="end_date"
+              value={filters.end_date} onChange={handleFilterChange} sx={{ width: 170 }} />
+            <Button variant="outline" size="md" onClick={handleClearFilters}
+              className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              title="Clear Filters" aria-label="Clear Filters">
+              <FilterX size={16} />
+            </Button>
+            <Button variant="outline" size="md" onClick={fetchApplications} disabled={loading}
+              className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              title="Refresh List" aria-label="Refresh List">
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            </Button>
+          </div>
         </div>
 
         {/* Bulk Actions */}
@@ -436,18 +367,10 @@ const ApplicationsList = () => {
           <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
             <span className="text-emerald-800 font-medium">{selectionModel.length} applications selected</span>
             <div className="flex gap-2">
-              <Button
-                onClick={() => handleBulkStatusUpdate('Shortlisted')} 
-                variant="primary"
-                size="sm"
-              >
+              <Button onClick={() => handleBulkStatusUpdate('Shortlisted')} variant="primary" size="sm">
                 Shortlist Selected
               </Button>
-              <Button
-                onClick={() => handleBulkStatusUpdate('Rejected')} 
-                variant="destructive"
-                size="sm"
-              >
+              <Button onClick={() => handleBulkStatusUpdate('Rejected')} variant="destructive" size="sm">
                 Reject Selected
               </Button>
             </div>
@@ -455,11 +378,14 @@ const ApplicationsList = () => {
         )}
 
         {/* DataGrid */}
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {loading && rows.length === 0 ? (
-            <div className="p-10 flex justify-center"><InlineLoader text="Loading applications..." variant="ring" size="lg" /></div>
+            <div className="p-10 flex justify-center">
+              <InlineLoader text="Loading applications..." variant="ring" size="lg" />
+            </div>
           ) : (
             <DataGrid
+              apiRef={apiRef}
               rows={rows}
               columns={columns}
               paginationMode="server"
@@ -468,28 +394,32 @@ const ApplicationsList = () => {
               onPaginationModelChange={setPaginationModel}
               pageSizeOptions={[10, 25, 50]}
               checkboxSelection
-              onRowSelectionModelChange={(newSelection) => {
-                setSelectionModel(newSelection);
-              }}
+              onRowSelectionModelChange={(s) => setSelectionModel(s)}
               rowSelectionModel={selectionModel}
               disableRowSelectionOnClick
+              autosizeOnMount
+              autosizeOptions={{ includeOutliers: true, includeHeaders: true, expand: true }}
               autoHeight
               loading={loading}
               sx={{
-                '& .MuiDataGrid-row': { minHeight: '52px !important' },
+                border: 'none',
+                '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
+                '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600, fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' },
+                '& .MuiDataGrid-columnHeader':     { padding: '0 8px' },
+                '& .MuiDataGrid-columnSeparator':  { color: '#cbd5e1', '&:hover': { color: '#10b981' } },
+                '& .MuiDataGrid-cell':             { padding: '0 8px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', fontSize: '0.875rem', color: '#334155' },
+                '& .MuiDataGrid-row':              { minHeight: '48px !important', '&:hover': { backgroundColor: '#f8fafc' } },
+                '& .MuiDataGrid-footerContainer':  { borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' },
+                '& .MuiDataGrid-virtualScroller':  { overflowX: 'auto' },
               }}
             />
           )}
         </div>
       </div>
 
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
         <MenuItem onClick={handleView}>
           <Eye size={18} style={{ marginRight: '8px' }} className="text-blue-600" /> View Details
         </MenuItem>
@@ -503,7 +433,6 @@ const ApplicationsList = () => {
           <XCircle size={18} style={{ marginRight: '8px' }} className="text-red-600" /> Mark Rejected
         </MenuItem>
       </Menu>
-
     </div>
   );
 };

@@ -15,13 +15,16 @@ import {
   Filter,
   MoreVertical,
   Pencil,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 
 import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import AdvertisementApi from '../../api/advertisementApi';
-import { Menu, MenuItem, IconButton } from '@mui/material';
+import { Menu, MenuItem, IconButton, TextField } from '@mui/material';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { Link } from 'react-router-dom';
 
 const ActionCell = ({ ad, onView, onEdit, onDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -100,8 +103,57 @@ const AdvertisementRecords = () => {
     per_page: 10,
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAd, setSelectedAd] = useState(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [filters, setFilters] = useState({
+    adv_number: '',
+    adv_date: '',
+    closing_date: '',
+    status: ''
+  });
+
+  const filterConfig = [
+    {
+      name: 'adv_number',
+      label: 'Adv #',
+      type: 'text',
+      placeholder: 'Filter by advertisement number'
+    },
+    {
+      name: 'adv_date',
+      label: 'Adv Date',
+      type: 'date'
+    },
+    {
+      name: 'closing_date',
+      label: 'Closing Date',
+      type: 'date'
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'closed', label: 'Closed' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      adv_number: '',
+      adv_date: '',
+      closing_date: '',
+      status: ''
+    });
+  };
 
   useEffect(() => {
     fetchAdvertisements(1);
@@ -169,29 +221,8 @@ const AdvertisementRecords = () => {
     }
   };
 
-  const viewAdvertisement = async (id) => {
-    const loadingToast = toast.loading('Loading details...');
-    try {
-      const result = await AdvertisementApi.getById(id);
-      
-      if (result.success) {
-        let data = result.data;
-        try {
-          const notesRaw = localStorage.getItem('advertisement_notes_cache');
-          const notesCache = notesRaw ? JSON.parse(notesRaw) : {};
-          if (!data.note && notesCache[data.adv_number]) {
-            data = { ...data, note: notesCache[data.adv_number] };
-          }
-        } catch {}
-        setSelectedAd(data);
-        setShowDetails(true);
-        toast.success('Details loaded', { id: loadingToast });
-      } else {
-        toast.error(result.message || 'Failed to load details', { id: loadingToast });
-      }
-    } catch (error) {
-      toast.error(error.message || 'Error loading details', { id: loadingToast });
-    }
+  const viewAdvertisement = (id) => {
+    navigate(`/dashboard/advertisements/view/${id}`);
   };
 
   const editAdvertisement = (id) => {
@@ -218,10 +249,34 @@ const AdvertisementRecords = () => {
     }
   };
 
-  const filteredAdvertisements = advertisements.filter(ad =>
-    ad.adv_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ad.note?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAdvertisements = advertisements.filter(ad => {
+    // Search Term
+    const searchMatch = !searchTerm.trim() || 
+      ad.adv_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ad.note?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (!searchMatch) return false;
+
+    // Advanced Filters
+    if (filters.adv_number && !ad.adv_number.toLowerCase().includes(filters.adv_number.toLowerCase())) {
+      return false;
+    }
+
+    if (filters.adv_date && ad.adv_date !== filters.adv_date) {
+      return false;
+    }
+
+    if (filters.closing_date && ad.closing_date !== filters.closing_date) {
+      return false;
+    }
+
+    if (filters.status) {
+      const adStatus = new Date(ad.closing_date) > new Date() ? 'active' : 'closed';
+      if (adStatus !== filters.status) return false;
+    }
+
+    return true;
+  });
 
   const parseTermsConditions = (termsString) => {
     if (Array.isArray(termsString)) return termsString;
@@ -233,7 +288,20 @@ const AdvertisementRecords = () => {
   };
 
   const columns = [
-    { field: 'adv_number', headerName: 'Adv #', flex: 1, minWidth: 180 },
+    { 
+      field: 'adv_number', 
+      headerName: 'Adv #', 
+      flex: 1, 
+      minWidth: 180,
+      renderCell: (params) => (
+        <Link 
+          to={`/dashboard/advertisements/view/${params.row.hash_id || params.row.id}`}
+          className="text-emerald-700 font-bold hover:text-emerald-800 hover:underline"
+        >
+          {params.value}
+        </Link>
+      )
+    },
     {
       field: 'adv_date',
       headerName: 'Adv Date',
@@ -254,19 +322,24 @@ const AdvertisementRecords = () => {
           ? params.value.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
           : params.value
     },
-    { field: 'note', headerName: 'Note', flex: 1, minWidth: 200 },
-    { 
-      field: 'advertisement_fee', 
-      headerName: 'Fee (Rs.)', 
-      width: 120,
-      valueFormatter: (params) => params.value ? `Rs. ${params.value}` : 'N/A'
-    },
-    { field: 'important_notes', headerName: 'Important Notes', flex: 1.5, minWidth: 260 },
     {
       field: 'status',
       headerName: 'Status',
       width: 120,
-      valueGetter: (params) => (new Date(params.row.closing_date) > new Date() ? 'Active' : 'Closed')
+      renderCell: (params) => {
+        const isActive = new Date(params.row.closing_date) > new Date();
+        return (
+          <div className="flex items-center h-full">
+            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+              isActive 
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              {isActive ? 'Active' : 'Closed'}
+            </span>
+          </div>
+        );
+      }
     },
     {
       field: 'actions',
@@ -312,6 +385,15 @@ const AdvertisementRecords = () => {
           </div>
         </div>
 
+        {/* Advanced Filters */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Advertisements"
+        />
+
         {/* Advertisements Table */}
         <div className="bg-white rounded-lg shadow-sm p-4">
           {loading ? (
@@ -334,6 +416,7 @@ const AdvertisementRecords = () => {
               pageSizeOptions={[10, 25, 50]}
               disableRowSelectionOnClick
               sx={{
+                '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
                 '& .MuiDataGrid-row': { minHeight: '52px !important' }
               }}
             />
@@ -388,179 +471,6 @@ const AdvertisementRecords = () => {
             </div>
           </div>
         )}
-
-      {/* Details Modal */}
-      {showDetails && selectedAd && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDetails(false)}>
-          <div
-            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 p-6 border-b z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Megaphone className="w-8 h-8 text-white" />
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">{selectedAd.adv_number}</h2>
-                    <p className="text-emerald-100 text-sm">Advertisement Details</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowDetails(false)}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                >
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Core Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center gap-4 transition-all hover:bg-emerald-50">
-                  <div className="p-3 bg-white rounded-xl shadow-sm">
-                    <Calendar className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-emerald-900/50 uppercase tracking-wider mb-0.5">Advertisement Date</p>
-                    <p className="text-lg font-bold text-slate-900">
-                      {new Date(selectedAd.adv_date).toLocaleDateString('en-US', { 
-                        year: 'numeric', month: 'long', day: 'numeric' 
-                      })}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-red-50/50 border border-red-100 rounded-2xl flex items-center gap-4 transition-all hover:bg-red-50">
-                  <div className="p-3 bg-white rounded-xl shadow-sm">
-                    <Clock className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-red-900/50 uppercase tracking-wider mb-0.5">Closing Date</p>
-                    <p className="text-lg font-bold text-slate-900">
-                      {new Date(selectedAd.closing_date).toLocaleDateString('en-US', { 
-                        year: 'numeric', month: 'long', day: 'numeric' 
-                      })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Advertisement Note (Specific) */}
-              {selectedAd.note && (
-                <div className="p-5 bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <FileText className="w-5 h-5 text-emerald-600" />
-                    <h3 className="font-bold text-slate-800">Advertisement Note</h3>
-                  </div>
-                  <p className="text-slate-600 leading-relaxed text-sm">{selectedAd.note}</p>
-                </div>
-              )}
-
-              {/* Job Details Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 px-1">
-                  <Megaphone className="w-5 h-5 text-emerald-600" />
-                  <h3 className="text-lg font-bold text-slate-900 text-center">Requisition Specific Details</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4">
-                  {selectedAd.job_details?.map((job, idx) => (
-                    <div key={idx} className="group relative bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-emerald-300 transition-all shadow-sm hover:shadow-md">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                      <div className="p-5">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-700 font-bold shrink-0">
-                               {idx + 1}
-                            </div>
-                            <div>
-                               <h4 className="font-bold text-slate-900 text-lg">
-                                 {job.designation || job.title || 'Requisition Details'}
-                               </h4>
-                               <p className="text-xs font-medium text-slate-400 font-bold">
-                                 Ref: {job.hash_id || job.id}
-                               </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                               <span className="text-emerald-600 font-bold">Rs.</span>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Application Fee</p>
-                              <p className="font-bold text-slate-900">
-                                {job.pivot?.fee ? `Rs. ${job.pivot.fee}` : 'No fee'}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                               <FileText className="w-4 h-4 text-emerald-600" />
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Test Type</p>
-                              <p className="font-bold text-slate-900 capitalize">
-                                {job.pivot?.test_type === "1" || job.pivot?.test_type === 1 
-                                  ? "MCQs" 
-                                  : job.pivot?.test_type === "2" || job.pivot?.test_type === 2 
-                                    ? "Written Exam" 
-                                    : job.pivot?.test_type || 'N/A'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Footer Notes & Terms */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                {/* Important Notes */}
-                {selectedAd.important_notes && (
-                  <div className="space-y-3">
-                    <h3 className="font-bold text-slate-900 flex items-center gap-2 underline px-1">
-                      Important Notes
-                    </h3>
-                    <div className="p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-sm text-slate-600 leading-relaxed italic">
-                      {selectedAd.important_notes}
-                    </div>
-                  </div>
-                )}
-
-                {/* Terms & Conditions */}
-                {selectedAd.terms_conditions && (
-                  <div className="space-y-3">
-                    <h3 className="font-bold text-slate-900 flex items-center gap-2 underline px-1">
-                      Terms & Conditions
-                    </h3>
-                    <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                      <ul className="space-y-3">
-                        {parseTermsConditions(selectedAd.terms_conditions).map((term, index) => (
-                          <li key={index} className="flex items-start gap-3 text-sm text-slate-600 group">
-                            <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center shrink-0 mt-0.5 transition-colors group-hover:bg-emerald-600">
-                              <span className="text-[10px] text-emerald-700 font-bold group-hover:text-white">{index + 1}</span>
-                            </div>
-                            <span className="leading-normal">{term}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       </div>
     </div>
   );

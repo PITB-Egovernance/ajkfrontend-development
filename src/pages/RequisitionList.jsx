@@ -8,6 +8,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 
 const isDraftStatusValue = (status) => {
   return (status || '').toLowerCase().includes('draft');
@@ -27,8 +28,51 @@ const RequisitionList = () => {
   const [uploadingJobId, setUploadingJobId] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
   const [localDraftMeta, setLocalDraftMeta] = useState(null);
+  const [filters, setFilters] = useState({
+    id: '',
+    designation: '',
+    scale: '',
+    num_posts: '',
+    status: ''
+  });
+
+  const filterConfig = [
+    { name: 'id', label: 'Ref', type: 'text', placeholder: 'Filter by ref' },
+    { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
+    { name: 'scale', label: 'Scale', type: 'text', placeholder: 'Filter by scale' },
+    { name: 'num_posts', label: 'Posts', type: 'text', placeholder: 'Filter by posts' },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'Approved', label: 'Approved' },
+        { value: 'Pending', label: 'Pending' },
+        { value: 'Rejected', label: 'Rejected' },
+        { value: 'Draft', label: 'Draft' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      id: '',
+      designation: '',
+      scale: '',
+      num_posts: '',
+      status: ''
+    });
+  };
+
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 10,
@@ -126,6 +170,27 @@ const RequisitionList = () => {
     fetchRequisitions(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paginationModel.page, paginationModel.pageSize]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (filters.id && !String(row.id).toLowerCase().includes(filters.id.toLowerCase())) {
+        return false;
+      }
+      if (filters.designation && !row.designation?.toLowerCase().includes(filters.designation.toLowerCase())) {
+        return false;
+      }
+      if (filters.scale && !String(row.scale).toLowerCase().includes(filters.scale.toLowerCase())) {
+        return false;
+      }
+      if (filters.num_posts && !String(row.num_posts).toLowerCase().includes(filters.num_posts.toLowerCase())) {
+        return false;
+      }
+      if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
+        return false;
+      }
+      return true;
+    });
+  }, [rows, filters]);
 
   const handleMenuOpen = (event, row) => {
     setAnchorEl(event.currentTarget);
@@ -422,60 +487,6 @@ const RequisitionList = () => {
     return 'bg-gray-100 text-gray-700';
   };
 
-  const isDraftStatus = (status) => {
-    return isDraftStatusValue(status);
-  };
-
-  const isDraftRow = (row) => {
-    return hasDraftIdentity(row) || isDraftStatusValue(row?.status);
-  };
-
-  const draftRows = useMemo(() => {
-    return rows.filter(row => isDraftRow(row));
-  }, [rows]);
-
-  const hasLocalOnlyDraft = useMemo(() => {
-    if (!localDraftMeta?.temp_id) {
-      return false;
-    }
-
-    return !draftRows.some(row => {
-      const rowDraftId = row.temp_id || row.hash_id || row.id;
-      return rowDraftId === localDraftMeta.temp_id;
-    });
-  }, [draftRows, localDraftMeta]);
-
-  const draftCount = draftRows.length + (hasLocalOnlyDraft ? 1 : 0);
-
-  const displayedRows = activeTab === 'drafts' ? draftRows : rows;
-
-  const handleResumeLocalDraft = () => {
-    if (!localDraftMeta?.temp_id) {
-      return;
-    }
-
-    navigate(`/dashboard/requisitions/create?temp_id=${encodeURIComponent(localDraftMeta.temp_id)}&step=${localDraftMeta.step || 1}`);
-  };
-
-  const handleResumeDraft = () => {
-    if (!selectedRow) {
-      handleMenuClose();
-      return;
-    }
-
-    const draftId = selectedRow.temp_id || selectedRow.hash_id || selectedRow.id;
-
-    if (!draftId) {
-      toast.error('Draft identifier is missing');
-      handleMenuClose();
-      return;
-    }
-
-    const stepQuery = selectedRow.current_step ? `&step=${selectedRow.current_step}` : '';
-    navigate(`/dashboard/requisitions/create?temp_id=${encodeURIComponent(draftId)}${stepQuery}`);
-    handleMenuClose();
-  };
-
   const columns = [
     { field: 'id', headerName: 'Ref', width: 100 },
     { field: 'designation', headerName: 'Designation', flex: 1 },
@@ -530,38 +541,14 @@ const RequisitionList = () => {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === 'all' ? 'bg-emerald-900 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setActiveTab('drafts')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${activeTab === 'drafts' ? 'bg-emerald-900 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-          >
-            Drafts
-            <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'drafts' ? 'bg-white text-emerald-900' : 'bg-slate-700 text-white'}`}>{draftCount}</span>
-          </button>
-        </div>
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+        />
 
-        {activeTab === 'drafts' && hasLocalOnlyDraft && (
-          <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-emerald-900">My Saved Draft</p>
-              <p className="text-xs text-emerald-700 mt-1">Draft ID: {localDraftMeta.temp_id} • Step {localDraftMeta.step || 1}</p>
-            </div>
-            <button
-              onClick={handleResumeLocalDraft}
-              className="px-4 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-lg text-sm font-medium transition-all duration-200"
-            >
-              Resume
-            </button>
-          </div>
-        )}
-
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white rounded-lg shadow-sm mt-4">
           <div style={{ width: '100%', height: 'auto' }}>
             {loading ? (
               <InlineLoader text="Loading requisitions..." variant="ring" size="lg" />
@@ -571,24 +558,35 @@ const RequisitionList = () => {
               </div>
             ) : (
               <DataGrid
-                rows={displayedRows}
+                rows={filteredRows}
                 columns={columns}
                 getRowId={(row) => row.id}
                 paginationModel={paginationModel}
                 onPaginationModelChange={setPaginationModel}
-                pageSizeOptions={[10, 25, 50, 75, 100]}
-                pagination
-                paginationMode={activeTab === 'drafts' ? 'client' : 'server'}
-            rowCount={activeTab === 'drafts' ? displayedRows.length : total}
-            loading={loading}
-            disableSelectionOnClick
-            autoHeight
-            sx={{
-              '& .MuiDataGrid-row': {
-                minHeight: '52px !important',
-              },
-            }}
-          />
+                pageSizeOptions={[10, 25, 50]}
+                paginationMode="server"
+                rowCount={total}
+                loading={loading}
+                disableRowSelectionOnClick
+                autoHeight
+                sx={{
+                  border: 'none',
+                  '& .MuiDataGrid-columnHeaders': {
+                    backgroundColor: '#f8fafc',
+                    borderBottom: '1px solid #e2e8f0',
+                  },
+                  '& .MuiDataGrid-cell': {
+                    borderBottom: '1px solid #f1f5f9',
+                  },
+                  '& .MuiDataGrid-row:hover': {
+                    backgroundColor: '#f8fafc',
+                  },
+                  '& .MuiDataGrid-columnHeaderTitle': {
+                    fontWeight: 'bold',
+                    color: '#475569',
+                  },
+                }}
+              />
         )}
         </div>
       </div>
@@ -615,12 +613,17 @@ const RequisitionList = () => {
           <Upload size={18} style={{ marginRight: '8px' }} />
           Upload
         </MenuItem>
-        {selectedRow && isDraftRow(selectedRow) && (
-          <MenuItem onClick={handleResumeDraft}>
-            <Pencil size={18} style={{ marginRight: '8px' }} />
-            Resume Draft
-          </MenuItem>
-        )}
+        {selectedRow && (isDraftStatusValue(selectedRow.status) || hasDraftIdentity(selectedRow)) && (
+            <MenuItem onClick={() => {
+              const draftId = selectedRow.temp_id || selectedRow.hash_id || selectedRow.id;
+              const stepQuery = selectedRow.current_step ? `&step=${selectedRow.current_step}` : '';
+              navigate(`/dashboard/requisitions/create?temp_id=${encodeURIComponent(draftId)}${stepQuery}`);
+              handleMenuClose();
+            }}>
+              <Pencil size={18} style={{ marginRight: '8px' }} />
+              Resume Draft
+            </MenuItem>
+          )}
         <MenuItem onClick={handleEdit}>
           <Pencil size={18} style={{ marginRight: '8px' }} />
           Edit

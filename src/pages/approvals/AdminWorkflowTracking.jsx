@@ -5,22 +5,9 @@ import Button from 'components/ui/Button';
 import StatusBadge from 'components/workflow/StatusBadge';
 import ApprovalWorkflowService from 'services/ApprovalWorkflowService';
 import toast from 'react-hot-toast';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 
 const POLL_INTERVAL_MS = 10000;
-const STATUS_TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'rejected', label: 'Rejected' },
-];
-
-const STAGE_TABS = [
-  { key: 'all', label: 'All Stages' },
-  { key: 'director', label: 'Director' },
-  { key: 'secretary', label: 'Secretary' },
-  { key: 'chairman', label: 'Chairman' },
-  { key: 'completed', label: 'Completed' },
-];
 
 const stageValue = (steps, stage, field) => {
   if (!steps || !steps[stage]) return 'N/A';
@@ -31,8 +18,95 @@ const AdminWorkflowTracking = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [stageFilter, setStageFilter] = useState('all');
+
+  const [filters, setFilters] = useState({
+    referenceNo: '',
+    currentStage: '',
+    workflowStatus: '',
+    directorDecision: '',
+    secretaryDecision: '',
+    chairmanDecision: ''
+  });
+
+  const filterConfig = [
+    {
+      name: 'referenceNo',
+      label: 'Application #',
+      type: 'text',
+      placeholder: 'Filter by Application #'
+    },
+    {
+      name: 'currentStage',
+      label: 'Current Stage',
+      type: 'select',
+      options: [
+        { value: 'director', label: 'Director' },
+        { value: 'secretary', label: 'Secretary' },
+        { value: 'chairman', label: 'Chairman' },
+        { value: 'completed', label: 'Completed' }
+      ]
+    },
+    {
+      name: 'workflowStatus',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'approved', label: 'Approved' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'pending', label: 'Pending' }
+      ]
+    },
+    {
+      name: 'directorDecision',
+      label: 'Director Decision',
+      type: 'select',
+      options: [
+        { value: 'approved', label: 'Approved' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'pending', label: 'Pending' }
+      ]
+    },
+    {
+      name: 'secretaryDecision',
+      label: 'Secretary Decision',
+      type: 'select',
+      options: [
+        { value: 'approved', label: 'Approved' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'pending', label: 'Pending' }
+      ]
+    },
+    {
+      name: 'chairmanDecision',
+      label: 'Chairman Decision',
+      type: 'select',
+      options: [
+        { value: 'approved', label: 'Approved' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'pending', label: 'Pending' }
+      ]
+    }
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      referenceNo: '',
+      currentStage: '',
+      workflowStatus: '',
+      directorDecision: '',
+      secretaryDecision: '',
+      chairmanDecision: ''
+    });
+  };
 
   const loadData = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -151,19 +225,21 @@ const AdminWorkflowTracking = () => {
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
-      const byStatus = statusFilter === 'all' || row.workflowStatus === statusFilter;
-      const byStage = stageFilter === 'all' || row.currentStage === stageFilter;
-      return byStatus && byStage;
-    });
-  }, [rows, statusFilter, stageFilter]);
+      if (filters.referenceNo && !row.referenceNo?.toLowerCase().includes(filters.referenceNo.toLowerCase())) return false;
+      if (filters.currentStage && row.currentStage !== filters.currentStage) return false;
+      if (filters.workflowStatus && row.workflowStatus !== filters.workflowStatus) return false;
+      
+      const directorStatus = stageValue(row.steps, 'director', 'status');
+      const secretaryStatus = stageValue(row.steps, 'secretary', 'status');
+      const chairmanStatus = stageValue(row.steps, 'chairman', 'status');
 
-  const getTabButtonClass = (isActive) =>
-    [
-      'px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
-      isActive
-        ? 'bg-emerald-700 text-white shadow-sm'
-        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50',
-    ].join(' ');
+      if (filters.directorDecision && directorStatus !== filters.directorDecision) return false;
+      if (filters.secretaryDecision && secretaryStatus !== filters.secretaryDecision) return false;
+      if (filters.chairmanDecision && chairmanStatus !== filters.chairmanDecision) return false;
+
+      return true;
+    });
+  }, [rows, filters]);
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
@@ -182,32 +258,19 @@ const AdminWorkflowTracking = () => {
               {loading ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Status:</span>
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setStatusFilter(tab.key)}
-                className={getTabButtonClass(statusFilter === tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
+
+          <div className="mt-4">
+            <AdvancedFilter
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              onClearFilters={handleClearFilters}
+              filterConfig={filterConfig}
+              title="Filter Workflow Tracking"
+            />
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Stage:</span>
-            {STAGE_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setStageFilter(tab.key)}
-                className={getTabButtonClass(stageFilter === tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-            <span className="ml-1 text-xs text-slate-500">Showing {filteredRows.length} of {rows.length}</span>
+
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-xs text-slate-500">Showing {filteredRows.length} of {rows.length}</span>
           </div>
         </CardHeader>
         <CardContent>
@@ -218,7 +281,10 @@ const AdminWorkflowTracking = () => {
             autoHeight
             pageSizeOptions={[10, 25, 50]}
             disableRowSelectionOnClick
-            sx={{ '& .MuiDataGrid-row': { minHeight: '52px !important' } }}
+            sx={{
+              '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+              '& .MuiDataGrid-row': { minHeight: '52px !important' }
+            }}
           />
         </CardContent>
       </Card>
