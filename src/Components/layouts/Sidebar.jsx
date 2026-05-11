@@ -65,13 +65,6 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       badge: null,
     },
     {
-      id: "job-creation",
-      label: "Job Creation",
-      icon: Briefcase,
-      path: "/dashboard/job-creation-form",
-      badge: null,
-    },
-    {
       id: "candidates",
       label: "Candidates",
       icon: Users,
