@@ -202,11 +202,11 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           path: "/dashboard/settings/exam-centers",
           icon: MapPin,
         },
-        {
-          label: "Exam Halls",
-          path: "/dashboard/settings/exam-halls",
-          icon: DoorOpen,
-        },
+        // {
+        //   label: "Exam Halls",
+        //   path: "/dashboard/settings/exam-halls",
+        //   icon: DoorOpen,
+        // },
         {
           label: "Qualifications",
           path: "/dashboard/settings/qualifications",

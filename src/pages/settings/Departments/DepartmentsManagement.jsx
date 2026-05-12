@@ -133,7 +133,7 @@ const DepartmentsManagement = () => {
       });
       const result   = await res.json();
       if (result.success || result.status === 200 || result.status === 201) {
-        toast.success(isUpdate ? 'Department updated' : 'Department added');
+        toast.success(isUpdate ? 'Department updated successfully' : 'Department added successfully');
         setOpenModal(false);
         fetchAll();
       } else {

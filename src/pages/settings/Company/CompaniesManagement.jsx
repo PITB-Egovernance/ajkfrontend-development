@@ -18,7 +18,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
-import { PageLoader, InlineLoader } from "components/ui/Loader";
+import { InlineLoader } from "components/ui/Loader";
 
 const gridSx = {
   border: "none",
@@ -191,7 +191,7 @@ const CompaniesManagement = () => {
       const result = await response.json();
 
       if (result.success === true) {
-        toast.success(result.message || "Operation successful");
+        toast.success(isUpdate ? "Company updated successfully" : "Company added successfully");
         setOpenModal(false);
         setEditingCompany(null);
         fetchCompanies(paginationModel.page, paginationModel.pageSize);
@@ -230,7 +230,7 @@ const CompaniesManagement = () => {
       const result = await response.json();
 
       if (result.success === true) {
-        toast.success(result.message || "Deleted successfully");
+        toast.success("Company deleted successfully");
         fetchCompanies(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || "Delete failed");
