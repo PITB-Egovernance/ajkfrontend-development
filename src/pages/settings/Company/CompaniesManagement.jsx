@@ -191,7 +191,7 @@ const CompaniesManagement = () => {
       const result = await response.json();
 
       if (result.success === true) {
-        toast.success(isUpdate ? "Company updated successfully" : "Company added successfully");
+        toast.success(isUpdate ? "Company updated successfully" : "Company created successfully");
         setOpenModal(false);
         setEditingCompany(null);
         fetchCompanies(paginationModel.page, paginationModel.pageSize);

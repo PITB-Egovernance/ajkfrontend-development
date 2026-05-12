@@ -83,7 +83,7 @@ const CitiesManagement = () => {
   const [selectedRow, setSelectedRow] = useState(null);
   const [openModal,   setOpenModal]   = useState(false);
   const [editingCity, setEditingCity] = useState(null);
-  const [formData,    setFormData]    = useState({ city: "", district_id: "" });
+  const [formData,    setFormData]    = useState({ city_name: "", district_name: "" });
 
   /* ── FETCH ALL ── */
   const fetchCities = async () => {
@@ -100,8 +100,9 @@ const CitiesManagement = () => {
             id:          hid,
             sr_no:       i + 1,
             hash_id:     item.hash_id,
-            city:        item.city || item.name,
-            district_id: item.district_id || item.district?.hash_id || distMap[hid] || null,
+            city:          item.city_name || item.city || item.name,
+            district_name: item.district_name || null,
+            district_id:   item.district_id   || distMap[hid] || null,
             created_at:  item.created_at,
             status:      item.status ?? "active",
           };
@@ -194,10 +195,10 @@ const CitiesManagement = () => {
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
-  const openAdd = () => { setEditingCity(null); setFormData({ city: "", district_id: "" }); setOpenModal(true); };
+  const openAdd = () => { setEditingCity(null); setFormData({ city_name: "", district_name: "" }); setOpenModal(true); };
   const handleEdit = () => {
     setEditingCity(selectedRow);
-    setFormData({ city: selectedRow.city, district_id: selectedRow.district_id || "" });
+    setFormData({ city_name: selectedRow.city, district_name: selectedRow.district_name || "" });
     setOpenModal(true);
     handleMenuClose();
   };
@@ -234,26 +235,19 @@ const CitiesManagement = () => {
 
   /* ── SAVE ── */
   const handleSubmit = async () => {
-    if (!formData.city.trim()) { toast.error("City name is required"); return; }
+    if (!formData.city_name.trim()) { toast.error("City name is required"); return; }
     setSaving(true);
     try {
       const isUpdate = !!editingCity;
-      const url = isUpdate ? `${API_BASE}/settings/cities/${editingCity.hash_id}/update` : `${API_BASE}/settings/cities/store`;
-      const payload = { city: formData.city.trim() };
-      if (formData.district_id) payload.district_id = formData.district_id;
+      const url = isUpdate
+        ? `${API_BASE}/settings/cities/${editingCity.hash_id}/update`
+        : `${API_BASE}/settings/cities/store`;
+      const payload = { city_name: formData.city_name.trim() };
+      if (formData.district_name) payload.district_name = formData.district_name;
       const res = await fetch(url, { method: isUpdate ? "PUT" : "POST", headers: getHeaders(), body: JSON.stringify(payload) });
       const r   = await res.json();
-      if (r.status === 200 || r.status === 201 || r.success) {
-        // Cache district mapping since backend doesn't return district_id in list response
-        if (formData.district_id) {
-          const savedHashId = r.data?.hash_id || editingCity?.hash_id;
-          if (savedHashId) {
-            const map = loadDistrictMap();
-            map[savedHashId] = formData.district_id;
-            saveDistrictMap(map);
-          }
-        }
-        toast.success(isUpdate ? "Updated" : "Created");
+      if (res.ok || r.status === 200 || r.status === 201 || r.success) {
+        toast.success(isUpdate ? "City updated successfully" : "City added successfully");
         setOpenModal(false);
         fetchCities();
       } else {
@@ -270,9 +264,9 @@ const CitiesManagement = () => {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify({
-          city:        row.city,
-          district_id: row.district_id || undefined,
-          status:      newStatus,
+          city_name:     row.city,
+          district_name: row.district_name || undefined,
+          status:        newStatus,
         }),
       });
       const r = await res.json();
@@ -287,16 +281,12 @@ const CitiesManagement = () => {
     { field: "sr_no",        headerName: "#",          width: 65 },
     { field: "city",         headerName: "City Name",  flex: 1 },
     {
-      field: "district_id",
+      field: "district_name",
       headerName: "District",
       width: 180,
-      renderCell: (p) => {
-        if (!p.value) return <span className="text-slate-400 text-xs">—</span>;
-        const district = districts.find((d) => (d.hash_id || d.id) === p.value);
-        return district
-          ? <span className="text-slate-700 text-sm">{district.name}</span>
-          : <span className="text-slate-400 text-xs">—</span>;
-      },
+      renderCell: (p) => p.value
+        ? <span className="text-slate-700 text-sm">{p.value}</span>
+        : <span className="text-slate-400 text-xs">—</span>,
     },
     { field: "status",     headerName: "Status",    width: 110,
       renderCell: (p) => (
@@ -404,20 +394,20 @@ const CitiesManagement = () => {
           <DialogContent>
             <TextField
               fullWidth label="City Name" margin="normal" size="small" autoFocus
-              value={formData.city}
-              onChange={(e) => setFormData((f) => ({ ...f, city: e.target.value }))}
+              value={formData.city_name}
+              onChange={(e) => setFormData((f) => ({ ...f, city_name: e.target.value }))}
               placeholder="e.g. Muzaffarabad"
             />
             <TextField
               select fullWidth label="District" margin="normal" size="small"
-              value={formData.district_id}
-              onChange={(e) => setFormData((f) => ({ ...f, district_id: e.target.value }))}
+              value={formData.district_name}
+              onChange={(e) => setFormData((f) => ({ ...f, district_name: e.target.value }))}
               disabled={loadingDistricts}
               helperText={loadingDistricts ? "Loading districts…" : "Link this city to a district"}
             >
               <MenuItem value="">— Select District —</MenuItem>
               {districts.map((d) => (
-                <MenuItem key={d.hash_id || d.id} value={d.hash_id || d.id}>
+                <MenuItem key={d.hash_id || d.id} value={d.name}>
                   {d.name}
                 </MenuItem>
               ))}

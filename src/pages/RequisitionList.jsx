@@ -234,11 +234,10 @@ const RequisitionList = () => {
   const handleFileChange = (e, fieldName) => {
     const file = e.target.files[0];
     if (file) {
-      const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'];
       const maxSize = 2 * 1024 * 1024; // 2MB
 
-      if (!validTypes.includes(file.type)) {
-        toast.error('Invalid file type. Only PDF, DOC, DOCX, JPG, PNG are allowed');
+      if (file.type !== 'application/pdf') {
+        toast.error('Only PDF files are allowed. Please upload a PDF file (Max size: 2MB)');
         e.target.value = '';
         return;
       }
@@ -657,7 +656,7 @@ const RequisitionList = () => {
               </Typography>
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.jpg,.png"
+                accept=".pdf"
                 onChange={(e) => handleFileChange(e, 'requisition_form')}
                 className="w-full p-2 border border-gray-300 rounded"
               />
@@ -675,7 +674,7 @@ const RequisitionList = () => {
               </Typography>
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.jpg,.png"
+                accept=".pdf"
                 onChange={(e) => handleFileChange(e, 'annex_a_form')}
                 className="w-full p-2 border border-gray-300 rounded"
               />
@@ -693,7 +692,7 @@ const RequisitionList = () => {
               </Typography>
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.jpg,.png"
+                accept=".pdf"
                 onChange={(e) => handleFileChange(e, 'other_attachment')}
                 className="w-full p-2 border border-gray-300 rounded"
               />
@@ -734,7 +733,7 @@ const RequisitionList = () => {
             />
 
             <Typography variant="caption" className="text-gray-500 block mt-2">
-              * Accepted formats: PDF, DOC, DOCX, JPG, PNG (Max size: 2MB)
+              * Only PDF files accepted (Max size: 2MB)
             </Typography>
           </div>
         </DialogContent>
