@@ -16,6 +16,7 @@ import Button from "components/ui/Button";
 import { Plus, ArrowLeft, MoreVertical, Filter, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
@@ -272,7 +273,7 @@ const GradesManagement = () => {
   /* ================= DELETE ================= */
   const handleDelete = async () => {
     if (!selectedRow) return;
-    if (!window.confirm("Delete this grade?")) return;
+    if (!await confirmDelete({ title: 'Delete Grade', message: 'Are you sure you want to delete this grade?' })) return;
 
     try {
       const response = await fetch(

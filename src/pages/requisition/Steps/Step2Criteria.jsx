@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { TextField, MenuItem } from '@mui/material';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { TextField, MenuItem, FormControl, InputLabel, Select, OutlinedInput, Box, Chip, Checkbox, ListItemText, ListSubheader, FormControlLabel } from '@mui/material';
 import { useLocalSettings, localSettingsApi } from 'hooks/useLocalSettings';
+import { InlineLoader } from 'components/ui/Loader';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
+import toast from 'react-hot-toast';
 
 // Sentinel value used to detect "Other" selection in every dropdown.
 const OTHER = '__other__';
@@ -18,7 +22,122 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     experience_type:          '',
     experience_length:        0,
     min_qualification:        '',
+    eligible_degrees:         '', // Stores comma-separated degree names
   });
+
+  // Ref to prevent useEffect from overwriting user changes after initialization
+  const isInitializedRef = useRef(false);
+
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [allDegrees, setAllDegrees] = useState([]);
+  const [loadingDegrees, setLoadingDegrees] = useState(false);
+
+  const API_BASE = Config.apiUrl;
+  const TOKEN = AuthService.getToken();
+  const API_KEY = Config.apiKey;
+
+  // Fetch all degrees to handle grouping
+  useEffect(() => {
+    const fetchAllDegrees = async () => {
+      setLoadingDegrees(true);
+      try {
+        const response = await fetch(`${API_BASE}/settings/degrees?per_page=1000`, {
+          headers: {
+            Authorization: `Bearer ${TOKEN}`,
+            Accept: 'application/json',
+            'X-API-KEY': API_KEY,
+          },
+        });
+        const result = await response.json();
+        if (result.success || result.status === 200) {
+          const degrees = Array.isArray(result.data?.data) ? result.data.data : result.data || [];
+          setAllDegrees(degrees);
+        }
+      } catch (error) {
+        console.error('Error fetching degrees:', error);
+      } finally {
+        setLoadingDegrees(false);
+      }
+    };
+    fetchAllDegrees();
+  }, [API_BASE, TOKEN, API_KEY]);
+
+  // Group degrees by their group name
+  const groupedDegrees = useMemo(() => {
+    const grouped = {};
+    allDegrees.forEach(d => {
+      const groupName = d.degree_group || 'Other';
+      if (!grouped[groupName]) grouped[groupName] = [];
+      const code = d.degree_code || d.name || d.hash_id || d.id || '';
+      grouped[groupName].push({
+        id: d.hash_id || d.id,
+        name: d.degree_name || d.name || '',
+        code: String(code),
+        group: groupName
+      });
+    });
+    return grouped;
+  }, [allDegrees]);
+
+  // Helper to get selected degree names as array (trim whitespace for robust matching)
+  const selectedDegreeList = useMemo(() => {
+    return formData.eligible_degrees
+      ? formData.eligible_degrees.split(',').map(d => d ? String(d).trim() : '').filter(d => d)
+      : [];
+  }, [formData.eligible_degrees]);
+
+  // Handle group selection change from dropdown
+  const handleGroupChange = (event) => {
+    const newGroups = typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
+    
+    // Find groups that were just added
+    const addedGroups = newGroups.filter(g => !selectedGroups.includes(g));
+    // Find groups that were just removed
+    const removedGroups = selectedGroups.filter(g => !newGroups.includes(g));
+
+    let updatedDegrees = [...selectedDegreeList];
+
+    // If a group was added, add all its degrees by default
+    addedGroups.forEach(groupName => {
+      const groupDegrees = groupedDegrees[groupName] || [];
+      groupDegrees.forEach(d => {
+        if (!updatedDegrees.includes(d.name)) {
+          updatedDegrees.push(d.name);
+        }
+      });
+    });
+
+    // If a group was removed, remove all its degrees
+    removedGroups.forEach(groupName => {
+      const groupDegreeNames = (groupedDegrees[groupName] || []).map(d => d.name);
+      updatedDegrees = updatedDegrees.filter(name => !groupDegreeNames.includes(name));
+    });
+
+    setSelectedGroups(newGroups);
+    setFormData(prev => ({ ...prev, eligible_degrees: updatedDegrees.join(',') }));
+  };
+
+  // Handle individual degree checkbox toggle
+  const handleDegreeCheckboxToggle = (degreeName) => {
+    if (!degreeName) return;
+    const trimmedName = String(degreeName).trim();
+    setFormData(prev => {
+      const current = prev.eligible_degrees
+        ? prev.eligible_degrees.split(',').map(d => d ? String(d).trim() : '').filter(d => d)
+        : [];
+      const index = current.indexOf(trimmedName);
+      
+      let updated;
+      if (index > -1) {
+        updated = current.filter(c => c !== trimmedName);
+      } else {
+        updated = [...current, trimmedName];
+      }
+      
+      const newEligibleDegrees = updated.join(',');
+      return { ...prev, eligible_degrees: newEligibleDegrees };
+    });
+  };
 
   // "Other" custom text inputs — one per dropdown that supports it.
   const [customAcademic, setCustomAcademic] = useState('');
@@ -35,21 +154,45 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   const [showAuthority, setShowAuthority] = useState(false);
 
   useEffect(() => {
-    if (data && Object.keys(data).length > 0) {
+    if (data && Object.keys(data).length > 0 && !isInitializedRef.current) {
+      isInitializedRef.current = true;
+
+      // Decode degree_equivalence (stored as comma-separated degree names, e.g. "MSCS,MCS")
+      const raw = data.degree_equivalence || '';
+      const degreeNames = raw.split(',').map(d => d ? String(d).trim() : '').filter(d => d);
+
       setFormData({
         academic_qualification:   data.academic_qualification   || '',
         equivalent_qualification: data.equivalent_qualification || '',
         authority_certificate:    data.authority_certificate    || '',
-        degree_equivalence:       data.degree_equivalence       || '',
+        degree_equivalence:       degreeNames.length > 0 ? degreeNames.join(',') : (data.degree_equivalence || ''),
         any_other_qualification:  data.any_other_qualification  || '',
         training_institute:       data.training_institute       || '',
         experience_type:          data.experience_type          || '',
         experience_length:        data.experience_length        || 0,
         min_qualification:        data.min_qualification        || '',
+        eligible_degrees:         degreeNames.length > 0 ? degreeNames.join(',') : (data.eligible_degrees || ''),
       });
       setShowAuthority(data.equivalent_qualification === 'Yes');
     }
   }, [data]);
+
+  // Separate effect for selectedGroups — runs after allDegrees are available
+  useEffect(() => {
+    if (isInitializedRef.current && formData.eligible_degrees && allDegrees.length > 0 && selectedGroups.length === 0) {
+      const names = formData.eligible_degrees.split(',').map(d => d ? String(d).trim() : '').filter(d => d);
+      const groupsFound = new Set();
+      names.forEach(name => {
+        // Match by degree_name or degree_code
+        const deg = allDegrees.find(d => (d.degree_name || d.name) === name || (d.degree_code || d.name) === name);
+        if (deg?.degree_group) groupsFound.add(deg.degree_group);
+      });
+      const groups = Array.from(groupsFound);
+      if (groups.length > 0) {
+        setSelectedGroups(groups);
+      }
+    }
+  }, [allDegrees, formData.eligible_degrees]);
 
   // Degrees filtered to match the selected academic qualification.
   const filteredDegrees = activeDegrees.filter((d) => {
@@ -67,30 +210,51 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
 
     if (value === OTHER) {
       setShowOther((prev) => ({ ...prev, [name]: true }));
-      // Keep the field's stored value as the previous value until confirmed.
       return;
     }
 
     setShowOther((prev) => ({ ...prev, [name]: false }));
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === 'experience_length' ? parseInt(value) || 0 : value,
-    }));
 
+    // Handle side effects outside of setFormData callback
     if (name === 'equivalent_qualification') {
       setShowAuthority(value === 'Yes');
-      if (value !== 'Yes') {
-        setFormData((prev) => ({ ...prev, authority_certificate: '', degree_equivalence: '' }));
-        setShowOther((prev) => ({ ...prev, degree_equivalence: false }));
-      }
     }
-
-    // Reset degree filter when qualification changes.
     if (name === 'academic_qualification') {
-      setFormData((prev) => ({ ...prev, degree_equivalence: '' }));
-      setShowOther((prev) => ({ ...prev, degree_equivalence: false }));
       setCustomDegree('');
     }
+
+    setFormData((prev) => {
+      const newData = {
+        ...prev,
+        [name]: name === 'experience_length' ? parseInt(value) || 0 : value,
+      };
+
+      if (name === 'equivalent_qualification') {
+        if (value !== 'Yes') {
+          newData.authority_certificate = '';
+          newData.degree_equivalence = '';
+          newData.eligible_degrees = '';
+        }
+      }
+
+      // Reset degree filter when qualification changes.
+      if (name === 'academic_qualification') {
+        newData.degree_equivalence = '';
+        newData.eligible_degrees = '';
+      }
+
+      // Auto-select all degrees in group when group is selected in Equivalence dropdown
+      if (name === 'degree_equivalence') {
+        if (value !== OTHER && value !== '') {
+          const groupDegrees = groupedDegrees[value] || [];
+          newData.eligible_degrees = groupDegrees.map(d => d.name).join(',');
+        } else {
+          newData.eligible_degrees = '';
+        }
+      }
+
+      return newData;
+    });
   };
 
   // Confirms a custom "Other" value: saves it to localStorage and sets the field.
@@ -128,6 +292,18 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     setCustom('');
   };
 
+  // ── Build submit payload ──────────────────────────────────────────────────
+  //  degree_equivalence stores only the checked degree names (e.g. "MSCS,MCS")
+  //  No group name is stored — only the checkbox selections.
+
+  const buildSubmitData = () => {
+    const submitData = { ...formData };
+    if (selectedDegreeList.length > 0) {
+      submitData.degree_equivalence = selectedDegreeList.join(',');
+    }
+    return submitData;
+  };
+
   // ── Validation + submit ────────────────────────────────────────────────────
 
   const handleSubmit = (e) => {
@@ -148,7 +324,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       }
     }
 
-    onNext(formData);
+    onNext(buildSubmitData());
   };
 
   // ── Reusable "Other" reveal block ─────────────────────────────────────────
@@ -265,8 +441,11 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
             onChange={handleChange}
           >
             <MenuItem value="">Select</MenuItem>
-            {filteredDegrees.map((d) => (
-              <MenuItem key={d.id} value={d.name}>{d.name}</MenuItem>
+            {/* Show unique group names in this dropdown */}
+            {Object.keys(groupedDegrees).sort().map((groupName) => (
+              <MenuItem key={groupName} value={groupName}>
+                {groupName}
+              </MenuItem>
             ))}
             <MenuItem value={OTHER} sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
               Other (specify)
@@ -280,9 +459,36 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               placeholder="e.g. BS Environmental Science"
             />
           )}
-          {formData.academic_qualification && filteredDegrees.length === 0 && !showOther.degree_equivalence && (
+
+          {/* Individual Degree Checkboxes for the selected Equivalence group */}
+          {formData.degree_equivalence && groupedDegrees[formData.degree_equivalence] && !showOther.degree_equivalence && (
+            <div className="mt-3 p-3 border rounded-lg bg-slate-50 animate-in fade-in slide-in-from-top-1 duration-300">
+              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-tight mb-2 border-b border-emerald-100 pb-1">
+                Select Specific Degrees for Equivalence
+              </p>
+              <div className="flex flex-col gap-0.5">
+                {groupedDegrees[formData.degree_equivalence].map(degree => (
+                  <FormControlLabel
+                    key={degree.id}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={selectedDegreeList.includes(degree.name)}
+                        onChange={() => handleDegreeCheckboxToggle(degree.name)}
+                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                      />
+                    }
+                    label={<span className="text-xs text-slate-700">{degree.name}</span>}
+                    sx={{ m: 0 }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {formData.academic_qualification && Object.keys(groupedDegrees).length === 0 && !showOther.degree_equivalence && (
             <p className="text-xs text-slate-400 mt-1">
-              No degrees linked to this qualification — select "Other" to enter one.
+              No degrees found — select "Other" to enter one.
             </p>
           )}
         </div>
@@ -373,7 +579,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => onSaveDraft?.(formData)}
+            onClick={() => onSaveDraft?.(buildSubmitData())}
             className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200"
           >
             Save Draft

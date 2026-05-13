@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
@@ -141,7 +142,7 @@ const ApplicantsList = ({ advertisementId, advertisementTitle, onBack }) => {
   };
 
   const bulkRejectUnpaid = async () => {
-    if (!window.confirm("Reject all unpaid applications for this advertisement?")) return;
+    if (!await confirmDelete({ title: 'Reject Unpaid Applications', message: 'Are you sure you want to reject all unpaid applications for this advertisement?', warning: 'This will reject all unpaid candidates.' })) return;
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/roll-numbers/${advertisementId}/bulk-reject-unpaid`, { method: "POST", headers: getHeaders() });
@@ -168,7 +169,7 @@ const ApplicantsList = ({ advertisementId, advertisementTitle, onBack }) => {
 
   const generateRollNumbers = async () => {
     if (!data?.config) { toast.error("Save roll number format first"); setConfigModal(true); return; }
-    if (!window.confirm("Generate roll numbers for all eligible candidates?")) return;
+    if (!await confirmDelete({ title: 'Generate Roll Numbers', message: 'Generate roll numbers for all eligible candidates?', warning: '' })) return;
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/roll-numbers/${advertisementId}/generate`, { method: "POST", headers: getHeaders() });

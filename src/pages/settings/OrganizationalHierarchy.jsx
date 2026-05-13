@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
@@ -164,7 +165,7 @@ const OrganizationalHierarchy = () => {
   };
 
   const handleDelete = async (branchId) => {
-    if (!window.confirm('Are you sure you want to delete this branch? This action cannot be undone.')) {
+    if (!await confirmDelete({ title: 'Delete Branch', message: 'Are you sure you want to delete this branch?' })) {
       return;
     }
 

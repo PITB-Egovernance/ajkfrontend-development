@@ -9,6 +9,7 @@ import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, Trash2, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import { localSettingsApi } from 'hooks/useLocalSettings';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
@@ -177,8 +178,8 @@ const QualificationGroupsManagement = () => {
     load();
   };
 
-  const handleDelete = (row) => {
-    if (!window.confirm(`Delete group "${row.name}"?`)) return;
+  const handleDelete = async (row) => {
+    if (!await confirmDelete({ title: 'Delete Group', identifier: row.name })) return;
     localSettingsApi.remove(KEY, row.id);
     toast.success('Deleted');
     load();

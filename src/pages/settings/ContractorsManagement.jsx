@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
@@ -170,7 +171,7 @@ const ContractorsManagement = () => {
   };
 
   const handleDelete = async (contractorId) => {
-    if (!window.confirm('Are you sure you want to delete this contractor?')) {
+    if (!await confirmDelete({ title: 'Delete Contractor', message: 'Are you sure you want to delete this contractor?' })) {
       return;
     }
 

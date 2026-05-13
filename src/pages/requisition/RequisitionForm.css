@@ -177,7 +177,7 @@
   margin-bottom: 15px;
 }
 
-.requisition-form-container .form-group label {
+.requisition-form-container .form-group > label:not(.MuiFormControlLabel-root):not(.MuiInputLabel-root):not([class*="Mui"]) {
   font-weight: 500;
   color: #1a2b3c;
   margin-bottom: 6px;

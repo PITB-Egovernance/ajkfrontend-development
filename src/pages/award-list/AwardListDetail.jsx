@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import confirmDelete from 'components/ui/ConfirmDelete';
 
 const API_BASE = Config.apiUrl; // local — switch to Config.productionUrl after deploying backend
 
@@ -171,7 +172,7 @@ export default function AwardListDetail() {
   };
 
   const handlePublish = async () => {
-    if (!window.confirm('Publish results? Candidates will be able to view their status.')) return;
+    if (!await confirmDelete({ title: 'Publish Results', message: 'Publish results? Candidates will be able to view their status.', warning: '' })) return;
     setPublishing(true);
     setActionMsg('');
     await runAction(`${API_BASE}/award-lists/${id}/publish`, 'POST', 'Results published successfully.');

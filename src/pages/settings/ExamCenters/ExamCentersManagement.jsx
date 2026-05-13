@@ -16,6 +16,7 @@ import Button from "components/ui/Button";
 import { Plus, ArrowLeft, MoreVertical, Building2, Upload, Trash2, CheckCircle, XCircle, Filter, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
@@ -252,7 +253,7 @@ const ExamCentersManagement = () => {
   /* ── SINGLE DELETE ── */
   const handleDelete = async () => {
     if (!selectedRow) return; handleMenuClose();
-    if (!window.confirm(`Delete "${selectedRow.name}"?`)) return;
+    if (!await confirmDelete({ title: 'Delete Exam Center', identifier: selectedRow.name })) return;
     try {
       const res = await fetch(`${API_BASE}/settings/exam-centers/${selectedRow.hash_id}/delete`, { method: "DELETE", headers: getHeaders(false) });
       const r   = await res.json();
@@ -271,9 +272,9 @@ const ExamCentersManagement = () => {
     } catch { toast.error("Action failed"); }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (!selectionModel.length) return;
-    if (!window.confirm(`Delete ${selectionModel.length} center(s)?`)) return;
+    if (!await confirmDelete({ title: 'Delete Exam Centers', message: `Are you sure you want to delete ${selectionModel.length} center${selectionModel.length > 1 ? 's' : ''}?` })) return;
     bulkAction(`${API_BASE}/settings/exam-centers/bulk-delete`, "DELETE", { hashes: selectionModel }, "Deleted");
   };
   const handleBulkStatus = (status) => {
