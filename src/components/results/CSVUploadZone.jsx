@@ -75,6 +75,8 @@ const CSVUploadZone = ({ onFileSelect, onPreview, onCommit, loading }) => {
       onDragLeave={handleDrag}
       onDragOver={handleDrag}
       onDrop={handleDrop}
+      role="region"
+      aria-label="CSV file upload area"
     >
       <input
         ref={fileInputRef}
@@ -82,6 +84,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, onCommit, loading }) => {
         accept=".csv"
         className="hidden"
         onChange={handleChange}
+        aria-label="Select CSV file for results import"
       />
 
       <div className="flex flex-col items-center justify-center text-center">
@@ -164,6 +167,18 @@ const CSVUploadZone = ({ onFileSelect, onPreview, onCommit, loading }) => {
             <p className="text-xs text-slate-400 mt-6 font-medium">
               Only .csv files are supported. Maximum size 10MB.
             </p>
+
+            {dragActive && (
+              <div 
+                role="status" 
+                aria-live="polite" 
+                className="absolute inset-0 flex items-center justify-center bg-emerald-500/10 rounded-2xl pointer-events-none"
+              >
+                <p className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl animate-bounce">
+                  Drop CSV file here
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>

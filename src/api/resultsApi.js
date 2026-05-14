@@ -73,7 +73,7 @@ const ResultsApi = {
   /**
    * Import results via CSV
    */
-  importCSV: async (formData, dryRun = false) => {
+  importCSV: async (formData, dryRun = false, page = 1) => {
     const token = AuthService.getToken();
     const headers = {
       'Accept': 'application/json',
@@ -87,6 +87,10 @@ const ResultsApi = {
     if (dryRun) {
       formData.append('dry_run', '1');
     }
+    
+    if (page) {
+      formData.append('page', page.toString());
+    }
 
     const response = await fetch(`${API_BASE}/results/import`, {
       method: 'POST',
@@ -97,10 +101,60 @@ const ResultsApi = {
   },
 
   /**
+   * Finalize CSV import with hash validation
+   */
+  confirmImport: async (jobId, formData) => {
+    const token = AuthService.getToken();
+    const headers = {
+      'Accept': 'application/json',
+      'X-API-KEY': API_KEY,
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE}/results/${jobId}/import/confirm`, {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+    });
+    return handleResponse(response);
+  },
+
+  searchResult: async (jobPostId, query) => {
+    const response = await fetch(`${API_BASE}/results/search?job_post_id=${jobPostId}&query=${query}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  downloadResultPDF: async (hashId, mode = 'unofficial') => {
+    const response = await fetch(`${API_BASE}/results/${hashId}/print?mode=${mode}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleBlobResponse(response);
+  },
+
+  logUnmaskAudit: async (hashId) => {
+    const response = await fetch(`${API_BASE}/results/${hashId}/unmask-audit`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Download CSV Template for Result Import
    */
-  downloadTemplate: async () => {
-    const response = await fetch(`${API_BASE}/results/import/template`, {
+  downloadTemplate: async (jobPostId = null) => {
+    let url = `${API_BASE}/results/import/template`;
+    if (jobPostId) {
+      url += `?job_post_id=${jobPostId}`;
+    }
+    const response = await fetch(url, {
       method: 'GET',
       headers: getHeaders(),
     });
@@ -167,6 +221,17 @@ const ResultsApi = {
   },
 
   /**
+   * Get current publication status
+   */
+  getPublishStatus: async (jobPostId) => {
+    const response = await fetch(`${API_BASE}/results/publish/${jobPostId}/status`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Download Gazette PDF
    */
   downloadGazette: async (jobPostId) => {
@@ -204,10 +269,144 @@ const ResultsApi = {
    * Reveal masked CNIC
    */
   unmaskCnic: async (resultId, reason) => {
+    // Validate reason is provided and has minimum length for audit trail
+    if (!reason || reason.trim().length < 10) {
+      throw new Error('Please provide a specific reason (at least 10 characters) for CNIC unmasking');
+    }
+
     const response = await fetch(`${API_BASE}/results/${resultId}/unmask-cnic`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ 
+        reason: reason.trim(),
+        timestamp: new Date().toISOString()
+      }),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Get latest import history
+   */
+  getImportHistory: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE}/results/import/history?${query}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Get paginated list of candidates for a job
+   */
+  getCandidates: async (jobId, params = {}) => {
+    const searchParams = new URLSearchParams();
+    
+    Object.entries(params).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach(v => searchParams.append(`${key}[]`, v));
+      } else if (value !== null && value !== undefined) {
+        searchParams.append(key, value);
+      }
+    });
+
+    const query = searchParams.toString();
+    const response = await fetch(`${API_BASE}/results/${jobId}/candidates?${query}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Verify and approve results
+   */
+  verifyResults: async (jobId) => {
+    const response = await fetch(`${API_BASE}/results/${jobId}/verify`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Publish results officially
+   */
+  publishResults: async (data) => {
+    const response = await fetch(`${API_BASE}/results/publish`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Save manual mark entry (Add or Update)
+   */
+  saveMarks: async (data) => {
+    const response = await fetch(`${API_BASE}/results/marks`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Download the official Gazette PDF
+   */
+  downloadGazette: async (jobId) => {
+    const response = await fetch(`${API_BASE}/results/publish/${jobId}/pdf`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to generate Gazette PDF');
+    return response.blob();
+  },
+
+  /**
+   * Fetch all mark edits awaiting approval
+   */
+  getPendingMarkEdits: async () => {
+    const response = await fetch(`${API_BASE}/results/marks/edits/pending`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Approve or Reject a mark edit
+   */
+  resolveMarkEdit: async (jobId, editId, data) => {
+    const response = await fetch(`${API_BASE}/results/${jobId}/marks-edits/${editId}/approve`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Fetch aggregate statistics for the results dashboard
+   */
+  getStats: async () => {
+    const response = await fetch(`${API_BASE}/results/marks/stats`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Finalize batch for review
+   */
+  confirmFinalize: async (jobId) => {
+    const response = await fetch(`${API_BASE}/results/${jobId}/finalize`, {
+      method: 'POST',
+      headers: getHeaders(),
     });
     return handleResponse(response);
   },

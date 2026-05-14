@@ -29,6 +29,8 @@ import {
   BarChart3,
   Eye,
   Upload,
+  LayoutDashboard,
+  PlusCircle,
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
@@ -159,15 +161,8 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       id: "results",
       label: "Results",
       icon: Award,
-      submenu: [
-        { label: "Dashboard", path: "/dashboard/results", icon: BarChart3 },
-        { label: "Manual Mark Entry", path: "/dashboard/results/entry", icon: FileText },
-        { label: "CSV Import", path: "/dashboard/results/import", icon: Upload },
-        { label: "View Results", path: "/dashboard/results/view", icon: Eye },
-        { label: "Award Lists", path: "/dashboard/results/awards", icon: Award },
-        { label: "Merit Management", path: "/dashboard/results/merit", icon: TrendingUp },
-        { label: "Publication", path: "/dashboard/results/publish", icon: Send },
-      ],
+      path: "/dashboard/results",
+      badge: null,
     },
     {
       id: "workflow-tracking",

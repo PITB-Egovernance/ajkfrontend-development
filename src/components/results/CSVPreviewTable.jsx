@@ -12,6 +12,11 @@ import { AlertCircle, CheckCircle2, FileText } from 'lucide-react';
 const CSVPreviewTable = ({ data }) => {
   if (!data || !data.length) return null;
 
+  const PREVIEW_LIMIT = 100;
+  const visibleRows = data.slice(0, PREVIEW_LIMIT);
+  const totalRows = data.length;
+  const hasMore = totalRows > PREVIEW_LIMIT;
+
   // Extract keys from the first row's data object to build headers
   const firstRowData = data[0].data || data[0];
   const headers = Object.keys(firstRowData);
@@ -23,9 +28,16 @@ const CSVPreviewTable = ({ data }) => {
           <FileText size={16} className="text-emerald-600" />
           Dry Run Preview
         </h4>
-        <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
-          First {data.length} records
-        </span>
+        <div className="flex items-center gap-3">
+          {hasMore && (
+            <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+              Performance Limit Active
+            </span>
+          )}
+          <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
+            Showing {visibleRows.length} of {totalRows} records
+          </span>
+        </div>
       </div>
       
       <div className="overflow-x-auto">
@@ -41,7 +53,7 @@ const CSVPreviewTable = ({ data }) => {
             </tr>
           </thead>
           <tbody>
-            {data.map((row, index) => {
+            {visibleRows.map((row, index) => {
               const rowStatus = row.status || 'valid';
               const rowData = row.data || row;
               const rowError = row.error || null;

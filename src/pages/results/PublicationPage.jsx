@@ -56,8 +56,16 @@ const PublicationPage = () => {
       ]);
 
       // Check current status
-      // const res = await ResultsApi.getPublishStatus(jobId);
-      // setIsPublished(res.data.status === 'published');
+      const res = await ResultsApi.getPublishStatus(jobId);
+      setIsPublished(res.data?.status === 'published');
+      
+      if (res.data) {
+        setFormData(prev => ({
+          ...prev,
+          pub_type: res.data.pub_type || 'final',
+          gazette_ref: res.data.gazette_ref || '',
+        }));
+      }
 
     } catch (err) {
       toast.error('Failed to load publication readiness checks');
@@ -129,28 +137,6 @@ const PublicationPage = () => {
       toast.error(err.message || 'Withdrawal request failed');
     }
   };
-
-  if (!jobId) {
-    return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-10 text-center space-y-6">
-          <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-            <Send size={40} />
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Select a Job Post</h2>
-          <p className="text-slate-500 font-medium leading-relaxed">
-            Please choose a job from the Results Dashboard to finalize and publish its official gazette.
-          </p>
-          <Button 
-            onClick={() => navigate('/dashboard/results')}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-100 font-black text-xs uppercase tracking-[0.2em]"
-          >
-            Go to Results Dashboard
-          </Button>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="p-8 bg-slate-50 min-h-screen">

@@ -1,354 +1,392 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DataGrid } from '@mui/x-data-grid';
-import { TextField, MenuItem, IconButton, Menu } from '@mui/material';
-import { Eye, Download, MoreVertical, RefreshCw, FilterX, Search, ArrowLeft } from 'lucide-react';
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { 
+  ArrowLeft, 
+  Search, 
+  FilterX, 
+  Edit3, 
+  CheckCircle2, 
+  AlertCircle,
+  Clock,
+  MoreHorizontal,
+  ChevronDown,
+  Download,
+  Plus,
+  FileText,
+  ShieldCheck,
+  Globe
+} from 'lucide-react';
 import Button from 'components/ui/Button';
-import { Card, CardContent } from 'components/ui/Card';
-import { InlineLoader, DataGridLoader } from 'components/ui/Loader';
+import { toast } from 'react-hot-toast';
+import { InlineLoader } from 'components/ui/Loader';
 import ResultsApi from 'api/resultsApi';
-import StatusBadge from 'components/results/StatusBadge';
-import CnicCell from 'components/results/CnicCell';
-import toast from 'react-hot-toast';
+import MarkEntryModal from 'components/results/MarkEntryModal';
 
 /**
- * ResultsViewPage
- * Public-facing (authenticated) result grid with search and unmasking capabilities
+ * ResultsViewPage (v2.0)
+ * High-performance candidate marks table using TanStack Table & Virtual Scrolling
  */
-
 const ResultsViewPage = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
-  const [rows, setRows] = useState([]);
+  
+  // Data State
+  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedRow, setSelectedRow] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const [filters, setFilters] = useState({
-    roll_number: '',
-    cnic: '',
-    status: '',
-  });
+  // Filter State
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  const [paginationModel, setPaginationModel] = useState({
-    page: 0,
-    pageSize: 10,
-  });
+  // Modal State
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
 
-  const fetchResults = useCallback(async () => {
-    if (!jobId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  // Fetch Logic
+  const fetchData = async (cursor = null, isAppend = false, immediate = false) => {
+    if (!immediate) setLoading(true);
     try {
       const params = {
-        job_post_id: jobId,
-        page: paginationModel.page + 1,
-        per_page: paginationModel.pageSize,
-        roll_number: filters.roll_number,
-        cnic: filters.cnic,
-        status: filters.status
+        limit: 100,
+        cursor: cursor,
+        search: search,
+        // Ensure marks_status is always an array for the backend validation
+        marks_status: statusFilter === 'all' ? [] : [statusFilter],
       };
-      
-      const response = await ResultsApi.searchResults(params);
-      
-      // Handle both { data: [...] } and direct array [...] responses
-      let data = [];
-      let totalCount = 0;
 
-      if (response && response.data) {
-        if (Array.isArray(response.data)) {
-          data = response.data;
-          totalCount = response.total || response.meta?.total || data.length;
-        } else if (response.data.data && Array.isArray(response.data.data)) {
-          data = response.data.data;
-          totalCount = response.data.total || response.data.meta?.total || data.length;
-        }
-      } else if (Array.isArray(response)) {
-        data = response;
-        totalCount = data.length;
+      const response = await ResultsApi.getCandidates(jobId, params);
+      
+      if (isAppend) {
+        setData(prev => [...prev, ...response.data]);
+      } else {
+        setData(response.data);
       }
 
-      const formattedRows = data.map(item => ({
-        id: item.hash_id || item.id,
-        roll_number: item.application?.roll_number || item.application?.application_number || item.roll_no || item.roll_number || 'N/A',
-        candidate_name: item.application?.candidate_name || item.application?.full_name || item.name || item.candidate_name || 'N/A',
-        cnic_masked: item.cnic_masked || item.application?.cnic || item.application?.cnic_masked || item.cnic || 'N/A',
-        total_marks: `${item.obtained_marks || 0} / ${item.total_max_marks || 100}`,
-        percentage: `${item.percentage || 0}%`,
-        status: item.status || 'N/A',
-        original_data: item
-      }));
-
-      setRows(formattedRows);
-      setTotal(totalCount || formattedRows.length);
-    } catch (error) {
-      toast.error(error.message || 'Failed to fetch results');
+      setHasMore(response.pagination.has_more);
+      setNextCursor(response.pagination.next_cursor);
+      setTotalCount(response.pagination.total);
+    } catch (err) {
+      toast.error('Failed to fetch candidate data');
     } finally {
       setLoading(false);
     }
-  }, [jobId, paginationModel, filters]);
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchResults();
+      fetchData();
     }, 500);
     return () => clearTimeout(timer);
-  }, [fetchResults]);
+  }, [search, statusFilter, jobId]);
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-    setPaginationModel(prev => ({ ...prev, page: 0 }));
+  const handleEditClick = (candidate) => {
+    setSelectedCandidate(candidate);
+    setIsEntryModalOpen(true);
   };
 
-  const handleClearFilters = () => {
-    setFilters({ roll_number: '', cnic: '', status: '' });
-    setPaginationModel(prev => ({ ...prev, page: 0 }));
+  const handleEntrySuccess = () => {
+    setIsEntryModalOpen(false);
+    fetchData(null, false, true); // Immediate refresh bypassing debounce
   };
 
-  const handleMenuOpen = (event, row) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedRow(row);
-  };
+  // Table Columns
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'full_name',
+      header: 'Candidate Identity',
+      cell: info => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-900 text-xs leading-none">{info.getValue()}</span>
+          <span className="text-[10px] text-slate-400 font-mono mt-1">
+            Roll: <span className="text-indigo-600 font-black">{info.row.original.roll_no}</span> | CNIC: {info.row.original.cnic}
+          </span>
+        </div>
+      ),
+      size: 350,
+    },
+    {
+      accessorKey: 'marks_status',
+      header: 'Status',
+      cell: info => {
+        const status = info.getValue() || 'Pending';
+        const styles = {
+          'Pending': 'bg-slate-100 text-slate-500 border-slate-200',
+          'Uploaded': 'bg-blue-50 text-blue-600 border-blue-100',
+          'Under Verification': 'bg-amber-50 text-amber-600 border-amber-100',
+          'Approved': 'bg-emerald-50 text-emerald-600 border-emerald-100',
+          'Published': 'bg-indigo-50 text-indigo-600 border-indigo-100'
+        };
+        return (
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest ${styles[status] || styles['Pending']}`}>
+            <div className={`w-1 h-1 rounded-full ${status === 'Pending' ? 'bg-slate-400' : 'bg-current'}`}></div>
+            {status}
+          </div>
+        );
+      },
+      size: 180,
+    },
+    {
+      accessorKey: 'marks_summary',
+      header: 'Marks Preview',
+      cell: info => {
+        const marks = info.getValue() || {};
+        return (
+          <div className="flex gap-1.5">
+            {Object.entries(marks).map(([key, val]) => (
+              <div key={key} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 flex flex-col items-center min-w-[50px]">
+                <span className="text-[7px] font-black text-slate-400 uppercase leading-none mb-0.5">{key}</span>
+                <span className="text-[10px] font-black text-slate-900">{val.obtained}</span>
+              </div>
+            ))}
+            {Object.keys(marks).length === 0 && <span className="text-slate-300 italic text-[10px] mt-1">No data</span>}
+          </div>
+        );
+      },
+      size: 250,
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: info => (
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            className="h-14 px-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.25rem] shadow-xl shadow-indigo-100 flex items-center gap-3 transition-all border-none"
+            onClick={() => handleEditClick(info.row.original)}
+          >
+            <Edit3 size={20} />
+            <span className="text-xs font-black uppercase tracking-[0.15em]">Enter Marks</span>
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="h-14 w-14 p-0 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-900 rounded-[1.25rem] border-2 border-slate-100 transition-all shadow-md flex items-center justify-center group"
+            title="More Options"
+          >
+            <MoreHorizontal size={32} className="group-hover:scale-110 transition-transform" />
+          </Button>
+        </div>
+      ),
+      size: 220,
+    }
+  ], []);
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedRow(null);
-  };
+  // Table Instance
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
 
-  const handleDownloadSlip = async () => {
-    if (!selectedRow) return;
+  // Virtualization
+  const tableContainerRef = useRef(null);
+  const { rows } = table.getRowModel();
+  
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 84,
+    overscan: 15,
+  });
+
+  const handleDownloadTemplate = async () => {
     try {
-      toast.loading('Generating slip...', { id: 'slip-download' });
-      const blob = await ResultsApi.downloadSlip(selectedRow.id);
-      const url = window.URL.createObjectURL(blob);
+      toast.loading('Generating template...', { id: 'download' });
+      const blob = await ResultsApi.downloadTemplate(jobId);
       
-      // Create a temporary link and trigger download
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `Result_Slip_${selectedRow.roll_number}.pdf`);
+      link.setAttribute('download', `Result_Template_${jobId}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
       
-      toast.success('Slip downloaded', { id: 'slip-download' });
+      toast.success('Template downloaded successfully', { id: 'download' });
     } catch (error) {
-      toast.error('Failed to download slip', { id: 'slip-download' });
+      toast.error(error.message || 'Failed to download template', { id: 'download' });
     }
-    handleMenuClose();
   };
 
-  const columns = [
-    { field: 'roll_number', headerName: 'Roll No', width: 120, headerClassName: 'bg-slate-50 font-black' },
-    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1, headerClassName: 'bg-slate-50 font-black' },
-    { 
-      field: 'cnic_masked', 
-      headerName: 'CNIC', 
-      width: 200,
-      headerClassName: 'bg-slate-50 font-black',
-      renderCell: (params) => (
-        <CnicCell resultId={params.row.id} maskedCnic={params.value} />
-      )
-    },
-    { field: 'total_marks', headerName: 'Total Marks', width: 150, headerClassName: 'bg-slate-50 font-black' },
-    { field: 'percentage', headerName: '%', width: 100, headerClassName: 'bg-slate-50 font-black' },
-    { 
-      field: 'status', 
-      headerName: 'Status', 
-      width: 140,
-      headerClassName: 'bg-slate-50 font-black',
-      renderCell: (params) => <StatusBadge status={params.value} />
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 80,
-      sortable: false,
-      headerClassName: 'bg-slate-50 font-black',
-      renderCell: (params) => (
-        <IconButton onClick={(e) => handleMenuOpen(e, params.row)} size="small" className="hover:bg-emerald-50 text-slate-400 hover:text-emerald-600">
-          <MoreVertical size={20} />
-        </IconButton>
-      ),
-    },
-  ];
-
-  if (!jobId) {
-    return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-10 text-center space-y-6">
-          <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-            <Search size={40} />
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Select a Job Post</h2>
-          <p className="text-slate-500 font-medium leading-relaxed">
-            Please choose a job from the Results Dashboard to view its specific candidate results.
-          </p>
-          <Button 
-            onClick={() => navigate('/dashboard/results')}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-100 font-black text-xs uppercase tracking-[0.2em]"
-          >
-            Go to Results Dashboard
-          </Button>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-8 bg-slate-50 min-h-screen">
-      <div className="max-w-8xl mx-auto space-y-8">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => navigate(-1)}
-              className="p-2 bg-white rounded-xl shadow-sm hover:shadow-md border border-slate-200 transition-all text-slate-600 hover:text-emerald-600"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">Job Results</h1>
-              <p className="text-sm font-semibold text-slate-500 mt-1 uppercase tracking-widest">
-                Viewing candidates for Job Post ID: <span className="text-emerald-600 font-bold">#{jobId}</span>
-              </p>
-            </div>
+    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shadow-sm z-10">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/dashboard/results')} className="p-2 hover:bg-slate-50 rounded-xl transition-all">
+            <ArrowLeft size={20} className="text-slate-400 hover:text-slate-900" />
+          </button>
+          <div>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight leading-tight">Candidates Marks Console</h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-0.5 flex items-center gap-2">
+              Job Post: <span className="text-indigo-600 font-black">#{jobId}</span>
+              <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+              Records: <span className="text-slate-900">{totalCount.toLocaleString()}</span>
+            </p>
           </div>
         </div>
 
-        {/* Filters Section */}
-        <Card className="border-none shadow-sm overflow-visible bg-white/80 backdrop-blur-md">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
-              <TextField
-                label="Roll Number"
-                size="small"
-                variant="outlined"
-                name="roll_number"
-                value={filters.roll_number}
-                onChange={handleFilterChange}
-                fullWidth
-                placeholder="Ex: 50412"
-              />
-              <TextField
-                label="CNIC (Full/Masked)"
-                size="small"
-                variant="outlined"
-                name="cnic"
-                value={filters.cnic}
-                onChange={handleFilterChange}
-                fullWidth
-                placeholder="XXXXX-XXXXXXX-X"
-              />
-              <TextField
-                select
-                label="Result Status"
-                size="small"
-                variant="outlined"
-                name="status"
-                value={filters.status}
-                onChange={handleFilterChange}
-                fullWidth
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                <MenuItem value="pass" className="text-emerald-600 font-bold">Pass</MenuItem>
-                <MenuItem value="fail" className="text-red-600 font-bold">Fail</MenuItem>
-                <MenuItem value="withheld" className="text-amber-600 font-bold">Withheld</MenuItem>
-                <MenuItem value="absent" className="text-slate-500 font-bold">Absent</MenuItem>
-              </TextField>
-              
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleClearFilters}
-                  className="flex-1 py-2.5 border-slate-200 text-slate-500 hover:bg-slate-50 font-bold text-xs uppercase tracking-widest"
-                >
-                  <FilterX size={16} className="mr-2" /> Reset
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={fetchResults}
-                  disabled={loading}
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-100 font-bold text-xs uppercase tracking-widest"
-                >
-                  <Search size={16} className="mr-2" /> Search
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline"
+            className="border-slate-200 bg-white text-slate-600 font-black text-[10px] uppercase tracking-widest px-6 h-11 rounded-2xl shadow-sm hover:bg-slate-50 flex items-center gap-2"
+            onClick={() => navigate(`/dashboard/results/import/${jobId}`)}
+          >
+            <Plus size={16} />
+            Bulk Import
+          </Button>
+          <Button 
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest px-6 h-11 rounded-2xl shadow-lg shadow-emerald-100 flex items-center gap-2"
+            onClick={handleDownloadTemplate}
+          >
+            <Download size={16} />
+            Export List
+          </Button>
+        </div>
+      </header>
 
-        {/* DataGrid Container */}
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-          <DataGrid
-            rows={rows}
-            columns={columns}
-            paginationMode="server"
-            rowCount={total}
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            pageSizeOptions={[10, 25, 50]}
-            disableRowSelectionOnClick
-            autoHeight
-            loading={loading}
-            className="border-none"
-            sx={{
-              '& .MuiDataGrid-columnHeaderTitle': {
-                fontWeight: '900 !important',
-                textTransform: 'uppercase',
-                fontSize: '10px',
-                letterSpacing: '0.1em',
-                color: '#64748b'
-              },
-              '& .MuiDataGrid-cell': {
-                borderColor: '#f1f5f9',
-                fontSize: '13px',
-                fontWeight: '500',
-                color: '#334155'
-              },
-              '& .MuiDataGrid-row:hover': {
-                backgroundColor: '#f8fafc',
-              },
-            }}
-            slots={{
-              loadingOverlay: DataGridLoader,
-              noRowsOverlay: () => (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
-                  <Search size={40} strokeWidth={1} />
-                  <p className="text-sm font-bold uppercase tracking-widest">No results found matching your criteria</p>
-                </div>
-              )
-            }}
+      {/* Toolbar */}
+      <div className="bg-white border-b border-slate-100 px-8 py-4 flex items-center gap-6">
+        <div className="relative flex-grow max-w-md">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder="Search by Roll No or Name..."
+            className="w-full pl-12 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded-2xl text-sm transition-all outline-none"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
           />
         </div>
+
+        <div className="flex items-center gap-2">
+          {['all', 'Pending', 'Uploaded', 'Under Verification', 'Approved'].map(status => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                statusFilter === status 
+                  ? 'bg-slate-900 text-white shadow-lg' 
+                  : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        PaperProps={{
-          className: 'shadow-xl border border-slate-100 rounded-xl mt-2 min-w-[180px]'
-        }}
-      >
-        <MenuItem 
-          onClick={() => {
-            if (selectedRow) navigate(`/dashboard/results/detail/${selectedRow.id}`);
-            handleMenuClose();
-          }} 
-          className="gap-3 py-3 font-bold text-slate-700 text-sm"
+      {/* Virtual Table Content */}
+      <div className="flex-grow overflow-hidden relative">
+        <div 
+          ref={tableContainerRef} 
+          className="h-full overflow-auto scrollbar-thin scrollbar-thumb-slate-200"
+          onScroll={(e) => {
+            const { scrollHeight, scrollTop, clientHeight } = e.currentTarget;
+            if (scrollHeight - scrollTop <= clientHeight * 1.5 && hasMore && !loading) {
+              fetchData(nextCursor, true);
+            }
+          }}
         >
-          <Eye size={18} className="text-blue-600" /> View Details
-        </MenuItem>
-        <MenuItem onClick={handleDownloadSlip} className="gap-3 py-3 font-bold text-slate-700 text-sm border-t border-slate-50">
-          <Download size={18} className="text-emerald-600" /> Download Slip
-        </MenuItem>
-      </Menu>
+          <div style={{ height: `${rowVirtualizer.getTotalSize() + 52}px`, width: '100%', position: 'relative' }}>
+            {/* Div-based Header */}
+            <div className="sticky top-0 bg-white z-30 shadow-sm border-b border-slate-200 flex w-full h-[52px]">
+              {table.getHeaderGroups()[0].headers.map(header => (
+                <div 
+                  key={header.id} 
+                  className="px-8 flex items-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white"
+                  style={{ width: header.getSize() }}
+                >
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                </div>
+              ))}
+            </div>
+
+            {/* Div-based Rows with Offset */}
+            {rowVirtualizer.getVirtualItems().map(virtualRow => {
+              const row = rows[virtualRow.index];
+              if (!row) return null;
+              return (
+                <div 
+                  key={row.id}
+                  className="hover:bg-indigo-50/40 transition-all flex items-center border-b border-slate-100 group"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
+                    // 52px is the header height - ensures AC-001 is fully visible
+                    transform: `translateY(${virtualRow.start + 52}px)`,
+                  }}
+                >
+                  {row.getVisibleCells().map(cell => (
+                    <div 
+                      key={cell.id} 
+                      className="px-8 flex items-center h-full"
+                      style={{ width: cell.column.getSize() }}
+                    >
+                      <div className="w-full">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+
+          {loading && (
+            <div className="flex items-center justify-center py-10 bg-white/50 backdrop-blur-sm sticky bottom-0">
+              <div className="flex flex-col items-center gap-2">
+                <InlineLoader />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fetching candidates...</p>
+              </div>
+            </div>
+          )}
+
+          {!loading && data.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-32 gap-4">
+              <div className="p-6 bg-slate-100 rounded-[2.5rem] text-slate-400">
+                <Search size={48} strokeWidth={1} />
+              </div>
+              <div className="text-center">
+                <h3 className="text-base font-black text-slate-900">No candidates found</h3>
+                <p className="text-xs font-medium text-slate-400 mt-1">Try adjusting your filters or search term</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Footer / Status Bar */}
+      <footer className="bg-white border-t border-slate-200 px-8 py-4 flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest z-10">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+            System Operational
+          </div>
+          <div className="hidden md:block">Optimization: Virtual Viewport Active</div>
+        </div>
+        <div>
+          Showing {data.length} of {totalCount} Candidates
+        </div>
+      </footer>
+      <MarkEntryModal 
+        isOpen={isEntryModalOpen}
+        onClose={() => setIsEntryModalOpen(false)}
+        candidate={selectedCandidate}
+        jobId={jobId}
+        onSuccess={handleEntrySuccess}
+      />
     </div>
   );
 };
