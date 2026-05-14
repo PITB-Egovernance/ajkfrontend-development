@@ -344,7 +344,7 @@ const ResultsDashboard = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
             <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
               <LayoutDashboard size={16} className="text-indigo-500" />
-              Job Management Console
+              Job Listings
             </h2>
 
             <div className="relative w-full md:w-72">

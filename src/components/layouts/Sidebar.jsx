@@ -24,7 +24,6 @@ import {
   GraduationCap,
   BookOpen as BookOpenIcon,
   Building2,
-  Award,
   TrendingUp,
   BarChart3,
   Eye,

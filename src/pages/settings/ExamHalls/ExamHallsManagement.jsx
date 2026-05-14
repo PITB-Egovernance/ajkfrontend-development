@@ -48,7 +48,7 @@ const emptyForm = { exam_center_id: "", name: "", floor: "", capacity: "" };
 const ExamHallsManagement = () => {
   const navigate = useNavigate();
 
-  const API_BASE = Config.apiUrl; // local — switch to Config.productionUrl after deploying backend
+  const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
   const API_KEY  = Config.apiKey;
 
   const getHeaders = () => ({

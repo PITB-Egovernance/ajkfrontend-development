@@ -13,7 +13,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 
-const API_BASE = Config.productionUrl;
+const API_BASE = Config.apiUrl;
 
 const getHeaders = () => ({
   Authorization: `Bearer ${AuthService.getToken()}`,
