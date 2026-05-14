@@ -23,7 +23,7 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 
-const API_BASE = Config.apiUrl; // local — switch to Config.productionUrl after deploying backend
+const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 const API_KEY  = Config.apiKey;
 
 const getHeaders = () => ({
