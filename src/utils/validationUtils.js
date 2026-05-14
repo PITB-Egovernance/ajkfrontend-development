@@ -1,140 +1,110 @@
 /**
- * Validation Utilities
- * Helper functions for form and data validation
+ * Utility functions for frontend validation
  */
 
 /**
- * Validates email format
- * @param {string} email - Email to validate
- * @returns {boolean} True if valid email
+ * Validates the Pakistani CNIC pattern (5-7-1)
+ * @param {string} cnic 
+ * @returns {boolean}
+ */
+export const validateCnicPattern = (cnic) => {
+  if (!cnic) return false;
+  const cnicRegex = /^\d{5}-\d{7}-\d{1}$/;
+  return cnicRegex.test(cnic);
+};
+
+export const isValidCNIC = (cnic) => validateCnicPattern(cnic);
+
+/**
+ * Validates if a string has a minimum length after trimming
+ * @param {string} str 
+ * @param {number} min 
+ * @returns {boolean}
+ */
+export const hasMinLength = (str, min) => {
+  return str && str.trim().length >= min;
+};
+
+export const minLength = (str, min) => hasMinLength(str, min);
+
+export const maxLength = (str, max) => {
+  return !str || str.trim().length <= max;
+};
+
+/**
+ * Email validation
  */
 export const isValidEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
 };
 
 /**
- * Validates CNIC format (13 digits)
- * @param {string} cnic - CNIC to validate
- * @returns {boolean} True if valid CNIC
- */
-export const isValidCNIC = (cnic) => {
-  if (!cnic) return false;
-  const cleaned = cnic.replace(/\D/g, '');
-  return /^\d{13}$/.test(cleaned);
-};
-
-/**
- * Validates phone number format
- * @param {string} phone - Phone number to validate
- * @returns {boolean} True if valid phone
+ * Phone validation
  */
 export const isValidPhone = (phone) => {
-  const phoneRegex = /^[0-9\s\-+()]{10,}$/;
-  return phoneRegex.test(phone?.replace(/\s+/g, '') || '');
+  const re = /^((\+92)|(0092))-{0,1}\d{3}-{0,1}\d{7}$|^\d{11}$|^\d{4}-\d{7}$/;
+  return re.test(phone);
 };
 
 /**
- * Validates URL format
- * @param {string} url - URL to validate
- * @returns {boolean} True if valid URL
+ * URL validation
  */
 export const isValidURL = (url) => {
   try {
     new URL(url);
     return true;
-  } catch {
+  } catch (_) {
     return false;
   }
 };
 
 /**
- * Validates if value is a number
- * @param {*} value - Value to check
- * @returns {boolean} True if numeric
+ * Numeric validation
  */
-export const isNumeric = (value) => {
-  return !isNaN(value) && !isNaN(parseFloat(value));
+export const isNumeric = (val) => {
+  return !isNaN(parseFloat(val)) && isFinite(val);
+};
+
+export const isPositiveNumber = (val) => {
+  return isNumeric(val) && parseFloat(val) > 0;
 };
 
 /**
- * Validates if value is a positive number
- * @param {*} value - Value to check
- * @returns {boolean} True if positive number
+ * Regex pattern matching
  */
-export const isPositiveNumber = (value) => {
-  return isNumeric(value) && parseFloat(value) > 0;
+export const matchesPattern = (str, pattern) => {
+  const re = new RegExp(pattern);
+  return re.test(str);
 };
 
 /**
- * Validates minimum string length
- * @param {string} str - String to validate
- * @param {number} minLength - Minimum length
- * @returns {boolean} True if valid
+ * Equality check
  */
-export const minLength = (str, minLength) => {
-  return str && str.trim().length >= minLength;
+export const equals = (a, b) => {
+  return a === b;
 };
 
 /**
- * Validates maximum string length
- * @param {string} str - String to validate
- * @param {number} maxLength - Maximum length
- * @returns {boolean} True if valid
- */
-export const maxLength = (str, maxLength) => {
-  return !str || str.length <= maxLength;
-};
-
-/**
- * Validates if value matches a pattern
- * @param {string} value - Value to validate
- * @param {RegExp} pattern - Pattern to match
- * @returns {boolean} True if matches
- */
-export const matchesPattern = (value, pattern) => {
-  return pattern.test(value);
-};
-
-/**
- * Validates if two values are equal
- * @param {*} value1 - First value
- * @param {*} value2 - Second value
- * @returns {boolean} True if equal
- */
-export const equals = (value1, value2) => {
-  return value1 === value2;
-};
-
-/**
- * Validates password strength
- * @param {string} password - Password to validate
- * @returns {Object} Validation result with score and requirements
+ * Password strength validation
  */
 export const validatePasswordStrength = (password) => {
-  const requirements = {
-    minLength: password?.length >= 8,
-    hasUpperCase: /[A-Z]/.test(password),
-    hasLowerCase: /[a-z]/.test(password),
-    hasNumbers: /\d/.test(password),
-    hasSpecialChar: /[!@#$%^&*()\-_+={}[\];:'",.<>/?|]/.test(password)
-  };
-
-  const score = Object.values(requirements).filter(Boolean).length;
-  const strength = score <= 2 ? 'weak' : score <= 3 ? 'fair' : score <= 4 ? 'good' : 'strong';
-
-  return { score, strength, requirements };
+  // At least 8 characters, one uppercase, one lowercase, one number
+  const re = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
+  return re.test(password);
 };
 
 const validationUtils = {
-  isValidEmail,
+  validateCnicPattern,
   isValidCNIC,
+  hasMinLength,
+  minLength,
+  maxLength,
+  isValidEmail,
   isValidPhone,
   isValidURL,
   isNumeric,
   isPositiveNumber,
-  minLength,
-  maxLength,
   matchesPattern,
   equals,
   validatePasswordStrength
