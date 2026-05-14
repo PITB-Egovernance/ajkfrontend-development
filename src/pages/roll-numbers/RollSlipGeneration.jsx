@@ -13,6 +13,7 @@ import {
 import { Card, CardContent } from "components/ui/Card";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
@@ -96,9 +97,9 @@ const RollSlipGeneration = () => {
   const handlePublish = async () => {
     const unallocated = rows.filter((r) => r.center_name === "Not assigned").length;
     if (unallocated > 0) {
-      if (!window.confirm(`${unallocated} candidate(s) have no exam center assigned. Publish anyway?`)) return;
+      if (!await confirmDelete({ title: 'Publish Admit Cards', message: `${unallocated} candidate(s) have no exam center assigned. Publish anyway?`, warning: '' })) return;
     } else {
-      if (!window.confirm(`Publish admit cards for all ${rows.length} eligible candidates? Candidates will be able to download their slips.`)) return;
+      if (!await confirmDelete({ title: 'Publish Admit Cards', message: `Publish admit cards for all ${rows.length} eligible candidates? Candidates will be able to download their slips.`, warning: '' })) return;
     }
     setPublishing(true);
     try {

@@ -14,6 +14,7 @@ import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, DoorOpen, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
@@ -144,7 +145,7 @@ const ExamHallsManagement = () => {
 
   const handleDelete = async () => {
     if (!selectedRow) return; handleMenuClose();
-    if (!window.confirm(`Delete "${selectedRow.name}"?`)) return;
+    if (!await confirmDelete({ title: 'Delete Exam Hall', identifier: selectedRow.name })) return;
     try {
       const res = await fetch(`${API_BASE}/settings/exam-halls/${selectedRow.hash_id}/delete`, { method: "DELETE", headers: getHeaders() });
       const r   = await res.json();
@@ -162,9 +163,9 @@ const ExamHallsManagement = () => {
     } catch { toast.error("Action failed"); }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (!selectionModel.length) return;
-    if (!window.confirm(`Delete ${selectionModel.length} hall(s)?`)) return;
+    if (!await confirmDelete({ title: 'Delete Exam Halls', message: `Are you sure you want to delete ${selectionModel.length} hall${selectionModel.length > 1 ? 's' : ''}?` })) return;
     bulkAction(`${API_BASE}/settings/exam-halls/bulk-delete`, "DELETE", { hashes: selectionModel }, "Deleted");
   };
 

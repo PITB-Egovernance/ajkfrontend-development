@@ -111,12 +111,16 @@ const RequisitionEdit = () => {
             academic_qualification: req.qualification?.academic_qualification || '',
             equivalent_qualification: req.qualification?.equivalent_qualification || '',
             authority_certificate: req.qualification?.authority_certificate || '',
-            degree_equivalence: req.qualification?.degree_equivalence || '',
+            degree_equivalence: (() => {
+              // Stored as comma-separated degree names, e.g. "MSCS,MCS"
+              return req.qualification?.degree_equivalence || '';
+            })(),
             any_other_qualification: req.qualification?.any_other_qualification || '',
             training_institute: req.qualification?.training_institute || '',
             experience_type: req.qualification?.experience_type || '',
             experience_length: req.qualification?.experience_length || 0,
             min_qualification: req.qualification?.min_qualification || '',
+            eligible_degrees: req.qualification?.degree_equivalence || '',
           },
           step3: {
             min_age: req.eligibility?.min_age || 18,

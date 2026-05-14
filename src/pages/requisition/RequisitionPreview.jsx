@@ -312,8 +312,25 @@ const RequisitionPreview = () => {
                   <TableCell>{step2.authority_certificate || 'N/A'}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Degree Equivalence</TableCell>
-                  <TableCell>{step2.degree_equivalence || 'N/A'}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Eligible Degrees</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const raw = step2.degree_equivalence || '';
+                      const degreeNames = raw.split(',').map(d => d.trim()).filter(d => d);
+                      if (degreeNames.length > 0) {
+                        return (
+                          <div className="flex flex-wrap gap-1.5">
+                            {degreeNames.map((name, idx) => (
+                              <span key={idx} className="inline-block bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-sm font-medium">
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return 'N/A';
+                    })()}
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Any Other Qualification</TableCell>
@@ -387,29 +404,25 @@ const RequisitionPreview = () => {
                   <TableCell>{step3.gender_basis || 'N/A'}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>District/Unit</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>District/Posts</TableCell>
                   <TableCell>
-                   
-                    {Array.isArray(step4.districts)
-                      ? step4.districts.map(d => getDistrictName(d)).join(', ')
-                      : getDistrictName(step4.districts) || 'N/A'}
-                  </TableCell>
-                  
-                </TableRow>
-                {/* <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Quota</TableCell>
-                  <TableCell>
-                    {step4.quotas && Array.isArray(step4.quotas)
-                      ? step4.quotas.join(', ')
-                      : step4.quotas || 'N/A'}
-                  </TableCell>
-                </TableRow> */}
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Posts</TableCell>
-                  <TableCell>
-                    {step4.posts && Array.isArray(step4.posts)
-                      ? step4.posts.join(', ')
-                      : step4.posts || 'N/A'}
+                    {(() => {
+                      const districts = Array.isArray(step4.districts) ? step4.districts : step4.districts ? [step4.districts] : [];
+                      const posts = Array.isArray(step4.posts) ? step4.posts : step4.posts ? [step4.posts] : [];
+                      if (districts.length > 0) {
+                        return (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {districts.map((d, i) => (
+                              <span key={i} className="inline-flex items-center gap-1">
+                                <span className="text-slate-700">{getDistrictName(d)}/</span>
+                                <span className="inline-block bg-emerald-700 text-white px-2 py-0.5 rounded text-sm font-semibold">{posts[i] || '-'}</span>
+                              </span>
+                            )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, <span key={`sep-${i}`} className="text-slate-500">,</span>, curr], [])}
+                          </div>
+                        );
+                      }
+                      return 'N/A';
+                    })()}
                   </TableCell>
                 </TableRow>
               </TableBody>

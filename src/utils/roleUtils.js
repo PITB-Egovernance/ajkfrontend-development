@@ -41,6 +41,6 @@ export const getDefaultDashboardPath = (userRole) => {
   if (role === 'director') return '/dashboard/approvals/director';
   if (role === 'secretary') return '/dashboard/approvals/secretary';
   if (role === 'chairman') return '/dashboard/approvals/chairman';
-  if (role === 'admin') return '/dashboard/workflow-tracking';
+  // All users including admin now redirect to main dashboard
   return '/dashboard';
 };

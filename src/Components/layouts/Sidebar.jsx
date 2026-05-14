@@ -143,13 +143,13 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       ],
     },
     
-    {
-      id: "workflow-tracking",
-      label: "Workflow Tracking",
-      icon: CheckCircle,
-      path: "/dashboard/workflow-tracking",
-      roles: ["admin"],
-    },
+    // {
+    //   id: "workflow-tracking",
+    //   label: "Workflow Tracking",
+    //   icon: CheckCircle,
+    //   path: "/dashboard/workflow-tracking",
+    //   roles: ["admin"],
+    // },
     {
       id: "settings",
       label: "Settings",
@@ -217,11 +217,11 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           path: "/dashboard/settings/degrees",
           icon: BookOpenIcon,
         },
-        {
-          label: "Qual. Groups",
-          path: "/dashboard/settings/qualification-groups",
-          icon: GraduationCap,
-        },
+        // {
+        //   label: "Qual. Groups",
+        //   path: "/dashboard/settings/qualification-groups",
+        //   icon: GraduationCap,
+        // },
         {
           label: "Departments",
           path: "/dashboard/settings/departments",

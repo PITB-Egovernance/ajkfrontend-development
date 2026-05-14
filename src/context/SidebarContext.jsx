@@ -4,7 +4,11 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 export const SidebarContext = createContext(null);
 
 /**
+ *
  * Sidebar Provider Component
+// Commenting out tabs for future restoration
+// Workflow Tracking
+// Qualification Groups
  * Manages sidebar state across the application
  */
 export const SidebarProvider = ({ children }) => {

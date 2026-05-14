@@ -8,6 +8,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 
 const isDraftStatusValue = (status) => {
@@ -423,57 +424,27 @@ const RequisitionList = () => {
     
     handleMenuClose();
     
-    toast((t) => (
-      <div className="flex flex-col gap-3">
-        <div>
-          <p className="font-semibold text-gray-800">Delete Requisition</p>
-          <p className="text-sm text-gray-600 mt-1">
-            Are you sure you want to delete requisition #{selectedRow.id}?
-          </p>
-          <p className="text-xs text-red-600 mt-1">This action cannot be undone.</p>
-        </div>
-        <div className="flex gap-2 justify-end">
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              setLoading(true);
-              try {
-                // Use hash_id for deletion to match API endpoint
-                const deleteId = selectedRow.hash_id || selectedRow.id;
-                console.log('🗑️ Deleting requisition:', deleteId);
-                
-                const result = await RequisitionApi.delete(deleteId);
-                console.log('🗑️ Delete response:', result);
-                
-                if (result.success) {
-                  toast.success(result.message || 'Requisition deleted successfully');
-                  fetchRequisitions(paginationModel.page, paginationModel.pageSize);
-                } else {
-                  toast.error(result.error || result.message || 'Failed to delete requisition');
-                }
-              } catch (error) {
-                toast.error(error.message || 'Error deleting requisition');
-                console.error('Delete error:', error);
-              } finally {
-                setLoading(false);
-              }
-            }}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    ), {
-      duration: Infinity,
-      position: 'top-center',
-    });
+    if (!await confirmDelete({ title: 'Delete Requisition', identifier: `#${selectedRow.id}` })) return;
+    setLoading(true);
+    try {
+      const deleteId = selectedRow.hash_id || selectedRow.id;
+      console.log('🗑️ Deleting requisition:', deleteId);
+      
+      const result = await RequisitionApi.delete(deleteId);
+      console.log('🗑️ Delete response:', result);
+      
+      if (result.success) {
+        toast.success(result.message || 'Requisition deleted successfully');
+        fetchRequisitions(paginationModel.page, paginationModel.pageSize);
+      } else {
+        toast.error(result.error || result.message || 'Failed to delete requisition');
+      }
+    } catch (error) {
+      toast.error(error.message || 'Error deleting requisition');
+      console.error('Delete error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusColor = (status) => {

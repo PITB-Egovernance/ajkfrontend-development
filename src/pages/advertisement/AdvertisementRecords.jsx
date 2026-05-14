@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DataGrid } from '@mui/x-data-grid';
 import toast from 'react-hot-toast';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import { 
   Megaphone, 
   Eye, 
@@ -230,7 +231,7 @@ const AdvertisementRecords = () => {
   };
 
   const deleteAdvertisement = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this advertisement? This action cannot be undone.')) {
+    if (!await confirmDelete({ title: 'Delete Advertisement', message: 'Are you sure you want to delete this advertisement?' })) {
       return;
     }
 

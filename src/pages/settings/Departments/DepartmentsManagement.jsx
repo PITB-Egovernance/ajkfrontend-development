@@ -8,6 +8,7 @@ import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, MoreVertical, Building } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
@@ -145,7 +146,7 @@ const DepartmentsManagement = () => {
 
   const handleDelete = async () => {
     if (!selectedRow) return;
-    if (!window.confirm(`Delete department "${selectedRow.department_name}"?`)) {
+    if (!await confirmDelete({ title: 'Delete Department', identifier: selectedRow.department_name })) {
       setAnchorEl(null); return;
     }
     try {
