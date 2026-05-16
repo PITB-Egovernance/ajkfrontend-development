@@ -9,18 +9,10 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { 
   ArrowLeft, 
   Search, 
-  FilterX, 
   Edit3, 
-  CheckCircle2, 
-  AlertCircle,
-  Clock,
   MoreHorizontal,
-  ChevronDown,
   Download,
-  Plus,
-  FileText,
-  ShieldCheck,
-  Globe
+  Plus
 } from 'lucide-react';
 import Button from 'components/ui/Button';
 import { toast } from 'react-hot-toast';
@@ -52,7 +44,7 @@ const ResultsViewPage = () => {
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
 
   // Fetch Logic
-  const fetchData = async (cursor = null, isAppend = false, immediate = false) => {
+  const fetchData = React.useCallback(async (cursor = null, isAppend = false, immediate = false) => {
     if (!immediate) setLoading(true);
     try {
       const params = {
@@ -79,14 +71,14 @@ const ResultsViewPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [jobId, search, statusFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchData();
     }, 500);
     return () => clearTimeout(timer);
-  }, [search, statusFilter, jobId]);
+  }, [fetchData]);
 
   const handleEditClick = (candidate) => {
     setSelectedCandidate(candidate);
@@ -107,7 +99,10 @@ const ResultsViewPage = () => {
         <div className="flex flex-col">
           <span className="font-black text-slate-900 text-xs leading-none">{info.getValue()}</span>
           <span className="text-[10px] text-slate-400 font-mono mt-1">
-            Roll: <span className="text-indigo-600 font-black">{info.row.original.roll_no}</span> | CNIC: {info.row.original.cnic}
+            Ref: <span className="text-blue-600 font-black">{info.row.original.application_number}</span> | Roll: <span className="text-indigo-600 font-black">{info.row.original.roll_no || 'N/A'}</span>
+          </span>
+          <span className="text-[9px] text-slate-400 font-medium mt-0.5">
+            CNIC: {info.row.original.cnic}
           </span>
         </div>
       ),

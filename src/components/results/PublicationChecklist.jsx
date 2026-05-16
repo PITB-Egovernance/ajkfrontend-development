@@ -55,9 +55,11 @@ const PublicationChecklist = ({ checks = [] }) => {
                 <p className={`text-sm font-bold leading-tight ${check.passed ? 'text-slate-600' : 'text-slate-900'}`}>
                   {check.label}
                 </p>
-                {!check.passed && check.error && (
-                  <p className="text-[11px] text-red-500 font-bold mt-1 bg-red-50 px-2 py-0.5 rounded inline-block">
-                    {check.error}
+                {check.message && (
+                  <p className={`text-[11px] font-bold mt-1 px-2 py-0.5 rounded inline-block ${
+                    check.passed ? 'text-emerald-600 bg-emerald-50' : 'text-red-500 bg-red-50'
+                  }`}>
+                    {check.message}
                   </p>
                 )}
               </div>

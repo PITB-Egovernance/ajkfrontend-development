@@ -118,7 +118,7 @@ const ApprovalsPage = () => {
                           <h4 className="text-lg font-black text-slate-900 leading-tight">
                             {edit.exam_result?.application?.candidate_name || 'N/A'}
                           </h4>
-                          <p className="text-xs font-bold text-indigo-600">Roll: {edit.exam_result?.roll_no}</p>
+                          <p className="text-xs font-bold text-indigo-600">Roll: {edit.exam_result?.roll_no || edit.exam_result?.roll_number || 'N/A'}</p>
                         </div>
                       </div>
 
@@ -128,9 +128,9 @@ const ApprovalsPage = () => {
                           <FileText size={16} className="text-slate-400" />
                           {edit.exam_result?.job_post?.designation || 'Position'}
                         </div>
-                        <div className="flex items-start gap-2 text-xs font-medium text-slate-500 leading-relaxed italic">
+                        <div className="flex items-start gap-2 text-xs font-bold text-slate-800 leading-relaxed bg-amber-50 p-2 rounded-lg border border-amber-100">
                           <Info size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                          "{edit.reason}"
+                          <span>Reason: {edit.reason || 'Correction Requested'}</span>
                         </div>
                         <div className="pt-2 border-t border-slate-200 mt-3">
                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Requested By</p>
@@ -153,12 +153,21 @@ const ApprovalsPage = () => {
                             <span className="text-xl font-black text-slate-400 tabular-nums">{edit.original_marks?.obtained ?? 'N/A'}</span>
                           </div>
                           <div className="space-y-2">
-                            {Object.entries(edit.original_marks?.subjects || {}).map(([sub, val]) => (
-                              <div key={sub} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                                <span className="text-xs font-medium text-slate-500 capitalize">{sub.replace('_', ' ')}</span>
-                                <span className="text-sm font-black text-slate-400">{val}</span>
-                              </div>
-                            ))}
+                            {Array.isArray(edit.original_marks?.subjects) ? (
+                              edit.original_marks.subjects.map((sub, i) => (
+                                <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                                  <span className="text-xs font-medium text-slate-500 capitalize">{sub.subject_name.replace('_', ' ')}</span>
+                                  <span className="text-sm font-black text-slate-400">{sub.obtained_marks}</span>
+                                </div>
+                              ))
+                            ) : (
+                              Object.entries(edit.original_marks?.subjects || {}).map(([sub, val]) => (
+                                <div key={sub} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                                  <span className="text-xs font-medium text-slate-500 capitalize">{sub.replace('_', ' ')}</span>
+                                  <span className="text-sm font-black text-slate-400">{val}</span>
+                                </div>
+                              ))
+                            )}
                           </div>
                         </div>
                       </div>
