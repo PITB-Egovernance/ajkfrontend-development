@@ -101,6 +101,40 @@ const ResultsApi = {
   },
 
   /**
+   * Scan CSV headers dynamically
+   */
+  scanCSVHeaders: async (formData) => {
+    const token = AuthService.getToken();
+    const headers = {
+      'Accept': 'application/json',
+      'X-API-KEY': API_KEY,
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE}/results/import/dynamic/scan`, {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Process CSV import with custom mappings configuration
+   */
+  processDynamicImport: async (payload) => {
+    const response = await fetch(`${API_BASE}/results/import/dynamic/process`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Finalize CSV import with hash validation
    */
   confirmImport: async (jobId, formData) => {

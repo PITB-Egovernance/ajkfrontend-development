@@ -260,11 +260,11 @@ const AwardListPage = () => {
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text('Azad Jammu & Kashmir Public Service Commission', pageWidth / 2, 15, { align: 'center' });
-    
+
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.text('Interview Award List', pageWidth / 2, 22, { align: 'center' });
-    
+
     // Horizontal Line
     doc.setDrawColor(200, 200, 200);
     doc.line(15, 26, pageWidth - 15, 26);
@@ -324,7 +324,7 @@ const AwardListPage = () => {
     const finalY = doc.lastAutoTable.finalY + 30;
     doc.line(15, finalY, 65, finalY);
     doc.text('Interview Secretary', 25, finalY + 5);
-    
+
     doc.line(pageWidth - 65, finalY, pageWidth - 15, finalY);
     doc.text('Chairman / Member', pageWidth - 55, finalY + 5);
 
@@ -397,7 +397,7 @@ const AwardListPage = () => {
         {/* Left Panel: Configuration */}
         <div className="col-span-3 space-y-6">
           {isInitialized && currentJob && (
-            <Card className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/80 text-white space-y-4">
+            <Card className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/70 text-white space-y-4">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-white/20 rounded-lg">
                   <Users size={20} />
@@ -619,7 +619,7 @@ const AwardListPage = () => {
                             </div>
                           </td>
 
-                           {/* Part-A: Academics */}
+                          {/* Part-A: Academics */}
                           <td className="px-4 py-6 bg-blue-50/5">
                             <div className="grid grid-cols-3 gap-2 w-[220px] mx-auto">
                               {['marks_matric', 'marks_intermediate', 'marks_graduation', 'marks_masters', 'marks_additional', 'marks_bu_position'].map(field => (

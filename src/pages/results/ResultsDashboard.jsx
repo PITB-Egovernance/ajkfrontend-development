@@ -430,7 +430,7 @@ const ResultsDashboard = () => {
                                     </Button>
                                   </Link>
                                   <Link to={`/dashboard/results/view/${getJobRouteId(job)}`}>
-                                    <Button className="h-10 px-6 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-slate-200 transition-all flex items-center gap-2 group-hover:scale-105">
+                                    <Button className="h-10 px-5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-slate-200 transition-all flex items-center gap-2 group-hover:scale-105 whitespace-nowrap">
                                       Manage Results
                                       <ArrowRight size={14} strokeWidth={3} />
                                     </Button>
@@ -441,7 +441,7 @@ const ResultsDashboard = () => {
                               {(job.result_status === 'Under Verification') && (
                                 <Button
                                   onClick={() => handleVerify(job)}
-                                  className="h-10 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-100 transition-all flex items-center gap-2"
+                                  className="h-10 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-100 transition-all flex items-center gap-2 whitespace-nowrap"
                                 >
                                   <CheckCircle2 size={14} strokeWidth={3} />
                                   Approve & Verify
@@ -450,17 +450,29 @@ const ResultsDashboard = () => {
 
                               {(job.result_status === 'Approved') && (
                                 <div className="flex items-center gap-2">
+                                  {/* Allow admin to go back to import/edit stages before official publication */}
+                                  <Link to={`/dashboard/results/import/${getJobRouteId(job)}`}>
+                                    <Button variant="ghost" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Re-Import CSV">
+                                      <FileSpreadsheet size={18} />
+                                    </Button>
+                                  </Link>
+                                  <Link to={`/dashboard/results/view/${getJobRouteId(job)}`}>
+                                    <Button variant="ghost" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Manage Results">
+                                      <ArrowRight size={18} />
+                                    </Button>
+                                  </Link>
+
                                   <Button
                                     onClick={() => handleOpenPublish(job)}
-                                    className="h-10 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all flex items-center gap-2"
+                                    className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
                                   >
                                     <Send size={14} strokeWidth={3} />
                                     Official Publication
                                   </Button>
-                                  
+
                                   {(isAdmin || isDirector || userRole === 'data_entry' || userRole === 'dataentry' || userRole === 'senior_admin' || userRole === 'secretary') && (
                                     <Link to={`/dashboard/results/merit/${getJobRouteId(job)}`}>
-                                      <Button className="h-10 px-4 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2">
+                                      <Button className="h-10 px-5 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap">
                                         <LayoutDashboard size={14} />
                                         Manage Merit
                                       </Button>
@@ -474,7 +486,7 @@ const ResultsDashboard = () => {
                                   <Button
                                     variant="outline"
                                     onClick={() => handleDownloadGazette(job)}
-                                    className="h-10 px-4 rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
+                                    className="h-10 px-4 rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap"
                                   >
                                     <FileText size={14} />
                                     Gazette
@@ -494,16 +506,16 @@ const ResultsDashboard = () => {
                                           toast.error('Withdrawal failed', { id: 'withdraw' });
                                         }
                                       }}
-                                      className="h-10 px-4 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 border border-rose-100"
+                                      className="h-10 px-4 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 border border-rose-100 whitespace-nowrap"
                                     >
                                       <ShieldAlert size={14} />
                                       Withdraw
                                     </Button>
                                   )}
-                                  
+
                                   {(isAdmin || isDirector || userRole === 'data_entry' || userRole === 'dataentry' || userRole === 'senior_admin') && (
                                     <Link to={`/dashboard/results/merit/${getJobRouteId(job)}`}>
-                                      <Button className="h-10 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 transition-all flex items-center gap-2">
+                                      <Button className="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 whitespace-nowrap">
                                         <LayoutDashboard size={14} />
                                         Manage Merit
                                       </Button>

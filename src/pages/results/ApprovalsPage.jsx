@@ -57,6 +57,52 @@ const ApprovalsPage = () => {
     }
   };
 
+  const renderSubjectRows = (marksContainer, isNew = false) => {
+    if (!marksContainer) return <p className="text-xs text-slate-400 italic">No marks registered</p>;
+    
+    const subjects = marksContainer.subjects;
+    if (!subjects) return <p className="text-xs text-slate-400 italic">No subject details available</p>;
+
+    let items = [];
+
+    if (Array.isArray(subjects)) {
+      items = subjects.map(s => ({
+        name: s?.subject_name || s?.name || 'Subject',
+        score: s?.obtained_marks !== undefined ? s.obtained_marks : (s?.obtained !== undefined ? s.obtained : 'N/A')
+      }));
+    } else if (typeof subjects === 'object') {
+      items = Object.entries(subjects).map(([name, score]) => ({
+        name: name,
+        score: score
+      }));
+    }
+
+    if (items.length === 0) {
+      return <p className="text-xs text-slate-400 italic">No subject marks registered</p>;
+    }
+
+    return items.map((item, idx) => (
+      <div 
+        key={idx} 
+        className={`flex items-center justify-between py-2 border-b last:border-0 ${
+          isNew ? 'border-indigo-100/50' : 'border-slate-100'
+        }`}
+      >
+        <span className={`text-xs font-semibold capitalize ${isNew ? 'text-indigo-900' : 'text-slate-500'}`}>
+          {item.name.replace(/_/g, ' ')}
+        </span>
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-black ${isNew ? 'text-indigo-700' : 'text-slate-400'}`}>
+            {item.score}
+          </span>
+          {isNew && (
+            <span className="px-1.5 py-0.5 bg-indigo-100 rounded text-[9px] font-bold text-indigo-600">NEW</span>
+          )}
+        </div>
+      </div>
+    ));
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
@@ -153,21 +199,7 @@ const ApprovalsPage = () => {
                             <span className="text-xl font-black text-slate-400 tabular-nums">{edit.original_marks?.obtained ?? 'N/A'}</span>
                           </div>
                           <div className="space-y-2">
-                            {Array.isArray(edit.original_marks?.subjects) ? (
-                              edit.original_marks.subjects.map((sub, i) => (
-                                <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                                  <span className="text-xs font-medium text-slate-500 capitalize">{sub.subject_name.replace('_', ' ')}</span>
-                                  <span className="text-sm font-black text-slate-400">{sub.obtained_marks}</span>
-                                </div>
-                              ))
-                            ) : (
-                              Object.entries(edit.original_marks?.subjects || {}).map(([sub, val]) => (
-                                <div key={sub} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                                  <span className="text-xs font-medium text-slate-500 capitalize">{sub.replace('_', ' ')}</span>
-                                  <span className="text-sm font-black text-slate-400">{val}</span>
-                                </div>
-                              ))
-                            )}
+                            {renderSubjectRows(edit.original_marks, false)}
                           </div>
                         </div>
                       </div>
@@ -184,15 +216,7 @@ const ApprovalsPage = () => {
                             <span className="text-xl font-black text-indigo-600 tabular-nums">{edit.new_marks?.obtained ?? 'N/A'}</span>
                           </div>
                           <div className="space-y-2">
-                            {edit.new_marks?.subjects?.map((sub, i) => (
-                              <div key={i} className="flex items-center justify-between py-2 border-b border-indigo-100/50 last:border-0">
-                                <span className="text-xs font-medium text-indigo-900 capitalize">{sub.subject_name}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-black text-indigo-700">{sub.obtained_marks}</span>
-                                  <div className="px-1.5 py-0.5 bg-indigo-100 rounded text-[9px] font-bold text-indigo-600">NEW</div>
-                                </div>
-                              </div>
-                            ))}
+                            {renderSubjectRows(edit.new_marks, true)}
                           </div>
                         </div>
                       </div>
