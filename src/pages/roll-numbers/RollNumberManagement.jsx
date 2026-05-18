@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { DataGrid } from "@mui/x-data-grid";
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DataGrid } from '@mui/x-data-grid';
 import {
   TextField,
   IconButton,
@@ -9,561 +9,606 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
-} from "@mui/material";
-import { Card, CardContent } from "components/ui/Card";
+} from '@mui/material';
 import {
   Hash,
-  ArrowRight,
-  CheckCircle,
-  XCircle,
+  Eye,
+  Send,
   RefreshCw,
-  Settings2,
-  Users,
-  ClipboardCheck,
-  AlertCircle,
+  FilterX,
   MoreVertical,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
-import confirmDelete from 'components/ui/ConfirmDelete';
-import Config from "config/baseUrl";
-import AuthService from "services/authService";
-import { InlineLoader } from "components/ui/Loader";
+  CheckCircle2,
+  Download,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { Card, CardContent } from 'components/ui/Card';
+import Button from 'components/ui/Button';
+import { InlineLoader } from 'components/ui/Loader';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
+import {
+  getApplicationOcrBatch,
+  getApplicationOcrBatchLabel,
+  getApplicationOcrBatchPillClass,
+} from 'utils/applicationOcrUtils';
 
-const API_BASE = Config.apiUrl; // local — switch to Config.productionUrl after deploying backend
-const API_KEY  = Config.apiKey;
+const API_BASE = Config.apiUrl;
 
 const getHeaders = () => ({
   Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "Content-Type": "application/json",
-  "X-API-KEY": API_KEY,
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  'X-API-KEY': Config.apiKey,
 });
 
+const DEFAULT_FILTERS = {
+  search: '',
+  advertisement_no: '',
+  generated: '',
+};
+
+const EMPTY_FORM = {
+  exam_center_id: '',
+  exam_hall_id: '',
+  prefix: 'AJK',
+  starting_number: '1001',
+  format: 'sequential',
+};
+
 const gridSx = {
-  border: "none",
-  "& .MuiDataGrid-columnHeaders":    { backgroundColor: "#f8fafc" },
-  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
-  "& .MuiDataGrid-row": { minHeight: "56px !important" },
-  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
-  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
-  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
-  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
-  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
-  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
+  border: 'none',
+  '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
+  '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+  '& .MuiDataGrid-cell':             { padding: '0 8px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', fontSize: '0.875rem', color: '#334155' },
+  '& .MuiDataGrid-row':              { minHeight: '52px !important', '&:hover': { backgroundColor: '#f8fafc' } },
+  '& .MuiDataGrid-footerContainer':  { borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' },
+  '& .MuiDataGrid-checkboxInput svg':             { color: '#064e3b' },
+  '& .MuiDataGrid-checkboxInput.Mui-checked svg':  { color: '#064e3b' },
+  '& .MuiCheckbox-root .MuiSvgIcon-root':          { color: '#064e3b' },
+  '& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root': { color: '#064e3b' },
+  '& .MuiDataGrid-row.Mui-selected':       { backgroundColor: '#ecfdf5' },
+  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: '#d1fae5' },
 };
 
-// ── Sub-page: Applicant eligibility table for a selected advertisement ──────
-const ApplicantsList = ({ advertisementId, advertisementTitle, onBack }) => {
-  const [data,           setData]           = useState(null);
-  const [loading,        setLoading]        = useState(true);
-  const [saving,         setSaving]         = useState(false);
-  const [searchTerm,     setSearchTerm]     = useState("");
-  const [filterStatus,   setFilterStatus]   = useState("");
-  const [selectionModel, setSelectionModel] = useState([]);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
-  const [anchorEl,       setAnchorEl]       = useState(null);
-  const [selectedRow,    setSelectedRow]    = useState(null);
-  const [rejectModal,    setRejectModal]    = useState(false);
-  const [rejectReason,   setRejectReason]   = useState("");
-  const [configModal,    setConfigModal]    = useState(false);
-  const [configForm,     setConfigForm]     = useState({ prefix: "AJK", starting_number: "1001", format: "sequential" });
-  const navigate = useNavigate();
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ per_page: 500 });
-      if (filterStatus) params.set("eligibility_status", filterStatus);
-      if (searchTerm)   params.set("search", searchTerm);
-      const res    = await fetch(`${API_BASE}/roll-numbers/${advertisementId}/applications?${params}`, { headers: getHeaders() });
-      const result = await res.json();
-      if (result.success || result.status === 200) {
-        setData(result.data);
-        if (result.data?.config) {
-          const c = result.data.config;
-          setConfigForm({ prefix: c.prefix ?? "AJK", starting_number: String(c.starting_number ?? "1001"), format: c.format ?? "sequential" });
-        }
-      } else {
-        toast.error(result.message || "Failed to load");
-      }
-    } catch { toast.error("Server error"); }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { fetchData(); }, [advertisementId, filterStatus]); // eslint-disable-line
-
-  const rows = (data?.applications?.data ?? []).map((app, i) => ({
-    id:                app.id,
-    sr_no:             i + 1,
-    application_number: app.application_number,
-    candidate_name:    app.candidate_name,
-    candidate_cnic:    app.candidate_cnic,
-    paid:              !!app.paid_at,
-    eligibility_status: app.roll_number?.eligibility_status ?? "pending",
-    roll_number:       app.roll_number?.roll_number ?? null,
-    rejection_reason:  app.roll_number?.rejection_reason ?? null,
-  }));
-
-  const filtered = searchTerm.trim()
-    ? rows.filter((r) => [r.candidate_name, r.candidate_cnic, r.application_number].some((v) => v?.toLowerCase().includes(searchTerm.toLowerCase())))
-    : rows;
-
-  const stats = data?.stats ?? {};
-
-  const setEligibility = async (appId, status, reason = null) => {
-    setSaving(true);
-    try {
-      const res = await fetch(`${API_BASE}/roll-numbers/${appId}/eligibility`, {
-        method: "PUT", headers: getHeaders(),
-        body: JSON.stringify({ eligibility_status: status, rejection_reason: reason, advertisement_id: advertisementId }),
-      });
-      const r = await res.json();
-      if (r.success || r.status === 200) { toast.success("Updated"); fetchData(); }
-      else toast.error(r.message || "Failed");
-    } catch { toast.error("Server error"); }
-    finally { setSaving(false); }
-  };
-
-  const bulkSetEligibility = async (status) => {
-    if (!selectionModel.length) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`${API_BASE}/roll-numbers/${advertisementId}/bulk-eligibility`, {
-        method: "POST", headers: getHeaders(),
-        body: JSON.stringify({ application_ids: selectionModel, eligibility_status: status }),
-      });
-      const r = await res.json();
-      if (r.success || r.status === 200) { toast.success(r.message || "Updated"); setSelectionModel([]); fetchData(); }
-      else toast.error(r.message || "Failed");
-    } catch { toast.error("Server error"); }
-    finally { setSaving(false); }
-  };
-
-  const bulkRejectUnpaid = async () => {
-    if (!await confirmDelete({ title: 'Reject Unpaid Applications', message: 'Are you sure you want to reject all unpaid applications for this advertisement?', warning: 'This will reject all unpaid candidates.' })) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`${API_BASE}/roll-numbers/${advertisementId}/bulk-reject-unpaid`, { method: "POST", headers: getHeaders() });
-      const r   = await res.json();
-      if (r.success || r.status === 200) { toast.success(r.message || "Done"); fetchData(); }
-      else toast.error(r.message || "Failed");
-    } catch { toast.error("Server error"); }
-    finally { setSaving(false); }
-  };
-
-  const saveConfig = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch(`${API_BASE}/roll-numbers/${advertisementId}/configure`, {
-        method: "POST", headers: getHeaders(),
-        body: JSON.stringify({ prefix: configForm.prefix, starting_number: Number(configForm.starting_number), format: configForm.format }),
-      });
-      const r = await res.json();
-      if (r.success || r.status === 200) { toast.success("Configuration saved"); setConfigModal(false); fetchData(); }
-      else toast.error(r.message || "Failed");
-    } catch { toast.error("Server error"); }
-    finally { setSaving(false); }
-  };
-
-  const generateRollNumbers = async () => {
-    if (!data?.config) { toast.error("Save roll number format first"); setConfigModal(true); return; }
-    if (!await confirmDelete({ title: 'Generate Roll Numbers', message: 'Generate roll numbers for all eligible candidates?', warning: '' })) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`${API_BASE}/roll-numbers/${advertisementId}/generate`, { method: "POST", headers: getHeaders() });
-      const r   = await res.json();
-      if (r.success || r.status === 200) { toast.success(r.message || "Generated"); fetchData(); }
-      else toast.error(r.message || "Failed");
-    } catch { toast.error("Server error"); }
-    finally { setSaving(false); }
-  };
-
-  const columns = [
-    { field: "sr_no",             headerName: "#",            width: 55 },
-    { field: "application_number", headerName: "App No.",     width: 140 },
-    { field: "candidate_name",    headerName: "Name",         flex: 1, minWidth: 160 },
-    { field: "candidate_cnic",    headerName: "CNIC",         width: 150 },
-    { field: "paid",              headerName: "Payment",      width: 100,
-      renderCell: (p) => p.value
-        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Paid</span>
-        : <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Unpaid</span> },
-    { field: "eligibility_status", headerName: "Eligibility", width: 120,
-      renderCell: (p) => {
-        const map = { eligible: "bg-emerald-100 text-emerald-700", rejected: "bg-red-100 text-red-700", pending: "bg-amber-100 text-amber-700" };
-        return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${map[p.value] ?? map.pending}`}>{p.value}</span>;
-      }},
-    { field: "roll_number",       headerName: "Roll No.",     width: 140,
-      renderCell: (p) => p.value ? <span className="font-mono font-bold text-indigo-700">{p.value}</span> : <span className="text-slate-400 text-xs">Not assigned</span> },
-    { field: "actions",           headerName: "Actions",      width: 80, sortable: false,
-      renderCell: (p) => <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelectedRow(p.row); }}><MoreVertical size={18} /></IconButton> },
-  ];
-
-  if (loading && !data)
-    return <div className="flex justify-center items-center py-20"><InlineLoader text="Loading applications..." variant="ring" size="lg" /></div>;
-
-  return (
-    <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6">
-
-        {/* HEADER */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <button onClick={onBack} className="text-sm text-slate-500 flex items-center gap-1 mb-2 hover:text-slate-700">
-              ← Back to Advertisements
-            </button>
-            <h2 className="text-xl font-bold text-slate-900">{advertisementTitle}</h2>
-            <p className="text-sm text-slate-500">Eligibility screening and roll number assignment</p>
-          </div>
-          <div className="flex gap-2 flex-wrap justify-end">
-            <button onClick={() => setConfigModal(true)}
-              className="px-3 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-slate-50">
-              <Settings2 size={14} /> Configure Format
-            </button>
-            <button onClick={generateRollNumbers} disabled={saving}
-              className="px-3 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-60">
-              <Hash size={14} /> Generate Roll Numbers
-            </button>
-            <button onClick={() => navigate(`/dashboard/roll-numbers/${advertisementId}/center-allocation`)}
-              className="px-3 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white rounded-lg text-sm font-medium flex items-center gap-2">
-              Center Allocation <ArrowRight size={14} />
-            </button>
-          </div>
-        </div>
-
-        {/* STATS */}
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
-          {[
-            { label: "Total Apps",   value: stats.total ?? 0,       color: "blue" },
-            { label: "Shortlisted",  value: stats.shortlisted ?? 0, color: "emerald" },
-            { label: "Eligible",     value: stats.eligible ?? 0,    color: "green" },
-            { label: "Rejected",     value: stats.rejected ?? 0,    color: "red" },
-            { label: "Roll Nos.",    value: stats.generated ?? 0,   color: "indigo" },
-            { label: "Published",    value: stats.published ?? 0,   color: "violet" },
-          ].map(({ label, value, color }) => (
-            <Card key={label} className={`bg-gradient-to-br from-${color}-50 to-${color}-100 border border-${color}-200`}>
-              <CardContent className="p-4">
-                <p className={`text-xs text-${color}-700 font-medium`}>{label}</p>
-                <h3 className={`text-2xl font-bold text-${color}-900 mt-1`}>{value}</h3>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* TOOLBAR */}
-        <div className="flex items-center gap-3 mb-4 flex-wrap justify-between">
-          <div className="flex gap-3">
-            <TextField size="small" placeholder="Search name, CNIC…" value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)} sx={{ width: 240 }} />
-            <TextField select size="small" label="Filter" value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)} sx={{ width: 160 }}>
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="pending">Pending</MenuItem>
-              <MenuItem value="eligible">Eligible</MenuItem>
-              <MenuItem value="rejected">Rejected</MenuItem>
-            </TextField>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {selectionModel.length > 0 && (
-              <>
-                <button onClick={() => bulkSetEligibility("eligible")} disabled={saving}
-                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm font-medium flex items-center gap-1.5">
-                  <CheckCircle size={13} /> Mark Eligible ({selectionModel.length})
-                </button>
-                <button onClick={() => { setRejectModal(true); }} disabled={saving}
-                  className="px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm font-medium flex items-center gap-1.5">
-                  <XCircle size={13} /> Reject ({selectionModel.length})
-                </button>
-              </>
-            )}
-            <button onClick={bulkRejectUnpaid} disabled={saving}
-              className="px-3 py-1.5 border border-red-300 text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium flex items-center gap-1.5">
-              <AlertCircle size={13} /> Reject All Unpaid
-            </button>
-            <button onClick={fetchData}
-              className="px-3 py-1.5 border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-lg text-sm font-medium flex items-center gap-1.5">
-              <RefreshCw size={13} /> Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* GRID */}
-        <DataGrid
-          rows={filtered} columns={columns} getRowId={(r) => r.id}
-          paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[25, 50, 100]} loading={loading} autoHeight
-          checkboxSelection disableRowSelectionOnClick
-          rowSelectionModel={selectionModel} onRowSelectionModelChange={setSelectionModel}
-          sx={gridSx}
-        />
-
-        {/* ROW MENU */}
-        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => { setAnchorEl(null); setSelectedRow(null); }}>
-          <MenuItem onClick={() => { setEligibility(selectedRow.id, "eligible"); setAnchorEl(null); }}>Mark Eligible</MenuItem>
-          <MenuItem onClick={() => { setRejectModal(true); setSelectionModel([selectedRow.id]); setAnchorEl(null); }} sx={{ color: "red" }}>Reject</MenuItem>
-        </Menu>
-
-        {/* REJECT MODAL */}
-        <Dialog open={rejectModal} onClose={() => setRejectModal(false)} fullWidth maxWidth="sm">
-          <DialogTitle>Rejection Reason</DialogTitle>
-          <DialogContent>
-            <TextField fullWidth multiline rows={3} margin="normal" size="small" label="Reason (optional)"
-              value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="e.g. CNIC expired, Domicile mismatch…" />
-          </DialogContent>
-          <DialogActions className="px-4 pb-4 gap-2">
-            <button onClick={() => setRejectModal(false)}
-              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm">Cancel</button>
-            <button onClick={async () => {
-              if (selectionModel.length > 1 || !selectedRow) {
-                setSaving(true);
-                try {
-                  const res = await fetch(`${API_BASE}/roll-numbers/${advertisementId}/bulk-eligibility`, {
-                    method: "POST", headers: getHeaders(),
-                    body: JSON.stringify({ application_ids: selectionModel, eligibility_status: "rejected", rejection_reason: rejectReason }),
-                  });
-                  const r = await res.json();
-                  if (r.success || r.status === 200) { toast.success("Rejected"); setSelectionModel([]); fetchData(); }
-                  else toast.error(r.message || "Failed");
-                } catch { toast.error("Server error"); }
-                finally { setSaving(false); }
-              } else {
-                await setEligibility(selectionModel[0], "rejected", rejectReason);
-              }
-              setRejectModal(false); setRejectReason("");
-            }} disabled={saving}
-              className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm disabled:opacity-60">
-              {saving ? "Rejecting…" : "Confirm Reject"}
-            </button>
-          </DialogActions>
-        </Dialog>
-
-        {/* CONFIG MODAL */}
-        <Dialog open={configModal} onClose={() => setConfigModal(false)} fullWidth maxWidth="sm">
-          <DialogTitle className="font-bold">Configure Roll Number Format</DialogTitle>
-          <DialogContent>
-            <TextField fullWidth label="Prefix" margin="normal" size="small"
-              value={configForm.prefix} onChange={(e) => setConfigForm((p) => ({ ...p, prefix: e.target.value }))}
-              helperText="e.g. AJK → Roll number will be: AJK-001001" />
-            <TextField fullWidth label="Starting Number" margin="normal" size="small" type="number"
-              inputProps={{ min: 1 }}
-              value={configForm.starting_number} onChange={(e) => setConfigForm((p) => ({ ...p, starting_number: e.target.value }))} />
-            <TextField select fullWidth label="Format" margin="normal" size="small"
-              value={configForm.format} onChange={(e) => setConfigForm((p) => ({ ...p, format: e.target.value }))}>
-              <MenuItem value="sequential">Sequential (1001, 1002, 1003…)</MenuItem>
-              <MenuItem value="random">Random (shuffled order)</MenuItem>
-            </TextField>
-          </DialogContent>
-          <DialogActions className="px-4 pb-4 gap-2">
-            <button onClick={() => setConfigModal(false)}
-              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm">Cancel</button>
-            <button onClick={saveConfig} disabled={saving}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white rounded-lg text-sm disabled:opacity-60">
-              {saving ? "Saving…" : "Save Configuration"}
-            </button>
-          </DialogActions>
-        </Dialog>
-      </div>
-    </div>
-  );
-};
-
-// ── Main page: list advertisements with roll number progress ────────────────
 const RollNumberManagement = () => {
   const navigate = useNavigate();
-  const [rows,           setRows]           = useState([]);
-  const [loading,        setLoading]        = useState(true);
-  const [searchTerm,     setSearchTerm]     = useState("");
-  const [filterGenerated, setFilterGenerated] = useState(""); // "" | "yes" | "no"
-  const [filterPublished, setFilterPublished] = useState(""); // "" | "yes" | "no"
-  const [filterHasApps,   setFilterHasApps]   = useState(""); // "" | "yes" | "no"
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
-  const [selectedAd,     setSelectedAd]     = useState(null);
 
-  const fetchAds = async () => {
+  const [rows,            setRows]            = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [generating,      setGenerating]      = useState(false);
+  const [total,           setTotal]           = useState(0);
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+  const [selectionModel,  setSelectionModel]  = useState([]);
+  const [filters,         setFilters]         = useState(DEFAULT_FILTERS);
+
+  const [anchorEl,    setAnchorEl]    = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
+
+  const [allocModal, setAllocModal] = useState(false);
+  const [formData,   setFormData]   = useState(EMPTY_FORM);
+  const [centers,    setCenters]    = useState([]);
+  const [halls,      setHalls]      = useState([]);
+
+  const [resultModal, setResultModal] = useState(null); // { count, slips }
+
+  // ── Data ────────────────────────────────────────────────────────────────
+  const fetchShortlisted = useCallback(async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/roll-numbers?per_page=200`, { headers: getHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.search)           params.set('search', filters.search);
+      if (filters.advertisement_no) params.set('advertisement_no', filters.advertisement_no);
+
+      const res    = await fetch(`${API_BASE}/roll-numbers/shortlisted?${params}`, { headers: getHeaders() });
       const result = await res.json();
-      if (result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
-        setRows(data.map((ad, i) => ({
-          id:                 ad.hash_id,
-          sr_no:              i + 1,
-          title:              ad.adv_number ? `Adv #${ad.adv_number}` : `Advertisement #${i + 1}`,
-          total_applications: ad.total_applications ?? 0,
-          paid_applications:  ad.paid_applications ?? 0,
-          generated:          !!ad.roll_number_config?.generated_at,
-          published:          !!ad.roll_number_config?.published_at,
-          hash_id:            ad.hash_id,
-        })));
+
+      if (res.ok && (result.success || result.status === 200)) {
+        const payload = result.data ?? {};
+        const data    = payload.data ?? [];
+
+        const mapped = data
+          .map((item) => ({
+            id:                item.application_number,
+            application_number: item.application_number,
+            applicant_name:    item.candidate_name || 'N/A',
+            cnic:              item.candidate_cnic || 'N/A',
+            job_title:         item.job_title || 'N/A',
+            advertisement_no:  item.advertisement_no || 'N/A',
+            advertisement_id:  item.advertisement_id,
+            applied_at:        item.applied_at ? new Date(item.applied_at).toLocaleDateString() : 'N/A',
+            payment_status:    item.payment_status || 'N/A',
+            ocr_batch:         getApplicationOcrBatch(item.documents || []),
+            has_disability:    !!item.disability,
+            disability_type:   item.disability?.disability_type || null,
+            roll_number:       item.roll_number,
+            exam_center:       item.exam_center,
+            exam_city:         item.exam_city,
+            published_at:      item.published_at,
+          }))
+          .filter((row) => filters.generated === 'yes' ? !!row.roll_number
+                          : filters.generated === 'no'  ? !row.roll_number
+                          : true);
+
+        setRows(mapped);
+        setTotal(filters.generated ? mapped.length : (payload.total ?? mapped.length));
       } else {
-        toast.error(result.message || "Failed to load");
+        toast.error(result.message || 'Failed to load shortlisted applications');
+        setRows([]);
+        setTotal(0);
       }
-    } catch { toast.error("Server error"); }
-    finally { setLoading(false); }
+    } catch {
+      toast.error('Server error');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [paginationModel.page, paginationModel.pageSize, filters]);
+
+  useEffect(() => {
+    const t = setTimeout(fetchShortlisted, 300);
+    return () => clearTimeout(t);
+  }, [fetchShortlisted]);
+
+  // ── Centers & halls (loaded on modal open) ──────────────────────────────
+  const fetchCenters = useCallback(async () => {
+    try {
+      const res    = await fetch(`${API_BASE}/settings/exam-centers?per_page=500`, { headers: getHeaders() });
+      const result = await res.json();
+      if (res.ok && (result.success || result.status === 200)) {
+        const list = result.data?.data ?? result.data ?? [];
+        setCenters(Array.isArray(list) ? list : []);
+      } else {
+        toast.error(res.status === 401 ? 'Session expired — please log in again' : (result.message || 'Failed to load exam centers'));
+      }
+    } catch {
+      toast.error('Could not reach server — check your connection');
+    }
+  }, []);
+
+  const fetchHalls = useCallback(async (centerId) => {
+    if (!centerId) { setHalls([]); return; }
+    try {
+      const res    = await fetch(`${API_BASE}/settings/exam-halls/by-center/${centerId}`, { headers: getHeaders() });
+      const result = await res.json();
+      if (res.ok && (result.success || result.status === 200)) {
+        setHalls(result.data ?? []);
+      } else {
+        setHalls([]);
+      }
+    } catch { setHalls([]); }
+  }, []);
+
+  // ── Filters ─────────────────────────────────────────────────────────────
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  useEffect(() => { fetchAds(); }, []);
-
-  if (selectedAd) {
-    return <ApplicantsList advertisementId={selectedAd.id} advertisementTitle={selectedAd.title} onBack={() => { setSelectedAd(null); fetchAds(); }} />;
-  }
-
-  const filteredRows = rows.filter((r) => {
-    if (searchTerm.trim() && !r.title?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    if (filterGenerated === "yes" && !r.generated) return false;
-    if (filterGenerated === "no"  &&  r.generated) return false;
-    if (filterPublished === "yes" && !r.published) return false;
-    if (filterPublished === "no"  &&  r.published) return false;
-    if (filterHasApps === "yes" && r.total_applications === 0) return false;
-    if (filterHasApps === "no"  && r.total_applications  >  0) return false;
-    return true;
-  });
-
-  const hasFilters = searchTerm.trim() || filterGenerated || filterPublished || filterHasApps;
-
-  const clearFilters = () => {
-    setSearchTerm("");
-    setFilterGenerated("");
-    setFilterPublished("");
-    setFilterHasApps("");
-    setPaginationModel((p) => ({ ...p, page: 0 }));
+  const handleClearFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
+  // ── Generate slip flow ──────────────────────────────────────────────────
+  const openAllocModal = () => {
+    if (selectionModel.length === 0) {
+      toast.error('Select at least one shortlisted candidate');
+      return;
+    }
+    setFormData(EMPTY_FORM);
+    setHalls([]);
+    setAllocModal(true);
+    fetchCenters();
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'exam_center_id') {
+      setFormData((prev) => ({ ...prev, exam_center_id: value, exam_hall_id: '' }));
+      fetchHalls(value);
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!formData.exam_center_id) { toast.error('Choose an exam center'); return; }
+    if (!formData.prefix?.trim()) { toast.error('Enter a roll number prefix'); return; }
+    if (!formData.starting_number) { toast.error('Enter a starting number'); return; }
+
+    setGenerating(true);
+    try {
+      const body = {
+        application_numbers: selectionModel,
+        exam_center_id:      Number(formData.exam_center_id),
+        exam_hall_id:        formData.exam_hall_id ? Number(formData.exam_hall_id) : null,
+        prefix:              formData.prefix.trim(),
+        starting_number:     Number(formData.starting_number),
+        format:              formData.format,
+      };
+      const res    = await fetch(`${API_BASE}/roll-numbers/generate-slips`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(body),
+      });
+      const result = await res.json();
+
+      if (res.ok && (result.success || result.status === 200)) {
+        toast.success(result.message || 'Roll number slips generated');
+        setAllocModal(false);
+        setSelectionModel([]);
+        setResultModal({ count: result.data?.generated_count ?? 0, slips: result.data?.slips ?? [] });
+        fetchShortlisted();
+      } else {
+        toast.error(result.message || 'Failed to generate slips');
+      }
+    } catch {
+      toast.error('Server error');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // ── Slip download ───────────────────────────────────────────────────────────
+  const downloadSlip = useCallback(async (applicationNumber) => {
+    const tid = toast.loading('Preparing slip PDF…');
+    try {
+      const res = await fetch(`${API_BASE}/roll-numbers/slip/${applicationNumber}`, { headers: getHeaders() });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.dismiss(tid);
+        toast.error(err.message || 'Failed to download slip');
+        return;
+      }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `AdmissionSlip_${applicationNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.dismiss(tid);
+      toast.success('Slip downloaded');
+    } catch {
+      toast.dismiss(tid);
+      toast.error('Could not download slip');
+    }
+  }, []);
+
+  // ── Row menu ────────────────────────────────────────────────────────────
+  const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
+  const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
+
+  const handleView = () => {
+    if (selectedRow) navigate(`/dashboard/applications/${selectedRow.application_number}`);
+    handleMenuClose();
+  };
+
+  const handleGenerateOne = () => {
+    if (!selectedRow) return;
+    setSelectionModel([selectedRow.application_number]);
+    handleMenuClose();
+    setTimeout(openAllocModal, 0);
+  };
+
+  // ── Stats ───────────────────────────────────────────────────────────────
+  const stats = useMemo(() => ({
+    total:        rows.length,
+    withRoll:     rows.filter((r) => r.roll_number).length,
+    withoutRoll:  rows.filter((r) => !r.roll_number).length,
+    published:    rows.filter((r) => r.published_at).length,
+  }), [rows]);
+
+  // ── Columns (match /dashboard/applications) ─────────────────────────────
   const columns = [
-    { field: "sr_no",              headerName: "#",             width: 60 },
-    { field: "title",              headerName: "Advertisement", flex: 1, minWidth: 240 },
-    { field: "total_applications", headerName: "Applications",  width: 130,
-      renderCell: (p) => <span className="font-semibold text-slate-700">{p.value}</span> },
-    { field: "paid_applications",  headerName: "Paid",          width: 100,
-      renderCell: (p) => <span className="font-semibold text-emerald-700">{p.value}</span> },
-    { field: "generated",          headerName: "Roll Nos.",     width: 110,
+    { field: 'application_number', headerName: 'Ref ID',          minWidth: 110, flex: 0.8 },
+    { field: 'applicant_name',     headerName: 'Applicant Name',  minWidth: 160, flex: 1.1 },
+    { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
+    { field: 'job_title',          headerName: 'Job Advertisement', minWidth: 180, flex: 1.2 },
+    { field: 'advertisement_no',   headerName: 'Advertisement No', minWidth: 140, flex: 0.8 },
+    { field: 'applied_at',         headerName: 'Applied At',      minWidth: 110, flex: 0.7 },
+    {
+      field: 'roll_number',
+      headerName: 'Roll Number',
+      minWidth: 140,
+      flex: 0.9,
       renderCell: (p) => p.value
-        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">Generated</span>
-        : <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">Pending</span> },
-    { field: "published",          headerName: "Published",     width: 110,
-      renderCell: (p) => p.value
-        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Published</span>
-        : <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Unpublished</span> },
-    { field: "actions",            headerName: "Manage",        width: 120, sortable: false,
+        ? <span className="font-mono font-bold text-indigo-700">{p.value}</span>
+        : <span className="text-slate-400 text-xs">Not generated</span>,
+    },
+    {
+      field: 'ocr_batch',
+      headerName: 'Batch',
+      minWidth: 130,
+      flex: 0.7,
+      sortable: false,
       renderCell: (p) => (
-        <button onClick={() => setSelectedAd(p.row)}
-          className="px-3 py-1 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white text-xs font-medium rounded-lg flex items-center gap-1">
-          Open <ArrowRight size={12} />
-        </button>
-      )},
+        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase border ${getApplicationOcrBatchPillClass(p.value)}`}>
+          {getApplicationOcrBatchLabel(p.value)}
+        </span>
+      ),
+    },
+    {
+      field: 'payment_status',
+      headerName: 'Payment Status',
+      minWidth: 130,
+      flex: 0.8,
+      sortable: false,
+      renderCell: (p) => (
+        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase border ${p.value === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200'}`}>
+          {p.value || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      field: 'has_disability',
+      headerName: 'Disability',
+      minWidth: 110,
+      flex: 0.6,
+      sortable: false,
+      renderCell: (p) => p.value
+        ? <span className="px-2.5 py-1 rounded-full text-xs font-semibold uppercase border bg-purple-100 text-purple-700 border-purple-200 capitalize">{p.row.disability_type || 'Yes'}</span>
+        : <span className="px-2.5 py-1 rounded-full text-xs font-semibold uppercase border bg-slate-100 text-slate-400 border-slate-200">None</span>,
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      minWidth: 80,
+      flex: 0.4,
+      sortable: false,
+      resizable: false,
+      renderCell: (p) => (
+        <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}>
+          <MoreVertical size={18} />
+        </IconButton>
+      ),
+    },
   ];
-
-  if (loading && rows.length === 0)
-    return <div className="flex justify-center items-center min-h-screen"><InlineLoader text="Loading advertisements…" variant="ring" size="lg" /></div>;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6">
+      <div className="max-w-8xl mx-auto">
 
         {/* HEADER */}
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-100 rounded-lg"><Hash size={22} className="text-indigo-700" /></div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Roll Number Management</h1>
-              <p className="text-sm text-slate-500">Eligibility screening, roll number generation and admit card publishing</p>
+              <h1 className="text-2xl font-bold text-slate-900">Roll Number Slip Generation</h1>
+              <p className="text-sm text-slate-500 mt-1">Generate roll number slips for shortlisted candidates with exam center allocation.</p>
             </div>
           </div>
         </div>
 
-        {/* SUMMARY CARDS */}
+        {/* STATS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-            <CardContent className="p-5 flex items-center gap-3">
-              <ClipboardCheck size={28} className="text-blue-700" />
-              <div><p className="text-sm text-blue-700 font-medium">Total Ads</p><h2 className="text-2xl font-bold text-blue-900">{rows.length}</h2></div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
-            <CardContent className="p-5 flex items-center gap-3">
-              <Users size={28} className="text-emerald-700" />
-              <div><p className="text-sm text-emerald-700 font-medium">Total Applications</p><h2 className="text-2xl font-bold text-emerald-900">{rows.reduce((s, r) => s + r.total_applications, 0)}</h2></div>
+            <CardContent className="p-4">
+              <p className="text-xs text-blue-700 font-medium">Shortlisted (this page)</p>
+              <h2 className="text-2xl font-bold text-blue-900 mt-1">{stats.total}</h2>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200">
-            <CardContent className="p-5 flex items-center gap-3">
-              <Hash size={28} className="text-indigo-700" />
-              <div><p className="text-sm text-indigo-700 font-medium">Roll Nos. Generated</p><h2 className="text-2xl font-bold text-indigo-900">{rows.filter((r) => r.generated).length}</h2></div>
+            <CardContent className="p-4">
+              <p className="text-xs text-indigo-700 font-medium">Roll Numbers Generated</p>
+              <h2 className="text-2xl font-bold text-indigo-900 mt-1">{stats.withRoll}</h2>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200">
-            <CardContent className="p-5 flex items-center gap-3">
-              <CheckCircle size={28} className="text-violet-700" />
-              <div><p className="text-sm text-violet-700 font-medium">Published</p><h2 className="text-2xl font-bold text-violet-900">{rows.filter((r) => r.published).length}</h2></div>
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200">
+            <CardContent className="p-4">
+              <p className="text-xs text-amber-700 font-medium">Awaiting Generation</p>
+              <h2 className="text-2xl font-bold text-amber-900 mt-1">{stats.withoutRoll}</h2>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
+            <CardContent className="p-4">
+              <p className="text-xs text-emerald-700 font-medium">Slips Published</p>
+              <h2 className="text-2xl font-bold text-emerald-900 mt-1">{stats.published}</h2>
             </CardContent>
           </Card>
         </div>
 
         {/* FILTERS */}
-        <div className="flex flex-wrap items-end gap-3 mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-          <TextField
-            size="small"
-            placeholder="Search advertisement…"
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }}
-            sx={{ flex: "1 1 220px", minWidth: 180 }}
-          />
-          <TextField
-            select size="small" label="Applications"
-            value={filterHasApps}
-            onChange={(e) => { setFilterHasApps(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }}
-            sx={{ minWidth: 155 }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="yes">Has Applications</MenuItem>
-            <MenuItem value="no">No Applications</MenuItem>
-          </TextField>
-          <TextField
-            select size="small" label="Roll Numbers"
-            value={filterGenerated}
-            onChange={(e) => { setFilterGenerated(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }}
-            sx={{ minWidth: 160 }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="yes">Generated</MenuItem>
-            <MenuItem value="no">Not Generated</MenuItem>
-          </TextField>
-          <TextField
-            select size="small" label="Slip Status"
-            value={filterPublished}
-            onChange={(e) => { setFilterPublished(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }}
-            sx={{ minWidth: 150 }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="yes">Published</MenuItem>
-            <MenuItem value="no">Unpublished</MenuItem>
-          </TextField>
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              className="px-3 py-2 text-sm border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 flex items-center gap-1.5 whitespace-nowrap"
-            >
-              <RefreshCw size={13} /> Clear
-            </button>
-          )}
-          {hasFilters && (
-            <span className="text-xs text-slate-500 self-center">
-              {filteredRows.length} of {rows.length} shown
-            </span>
-          )}
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
+          <div className="flex gap-3 items-end flex-wrap">
+            <TextField label="Search (Name / CNIC / Ref ID)" variant="outlined" size="small" name="search"
+              value={filters.search} onChange={handleFilterChange} sx={{ flex: '1 1 220px', minWidth: 200 }} />
+            <TextField label="Advertisement No" variant="outlined" size="small" name="advertisement_no"
+              value={filters.advertisement_no} onChange={handleFilterChange} sx={{ width: 160 }} />
+            <TextField select label="Roll Number" variant="outlined" size="small" name="generated"
+              value={filters.generated} onChange={handleFilterChange} sx={{ width: 160 }}>
+              <MenuItem key="all" value="">All</MenuItem>
+              <MenuItem key="yes" value="yes">Generated</MenuItem>
+              <MenuItem key="no" value="no">Not Generated</MenuItem>
+            </TextField>
+            <Button variant="outline" size="md" onClick={handleClearFilters}
+              className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              title="Clear Filters" aria-label="Clear Filters">
+              <FilterX size={16} />
+            </Button>
+            <Button variant="outline" size="md" onClick={fetchShortlisted} disabled={loading}
+              className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              title="Refresh List" aria-label="Refresh List">
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            </Button>
+          </div>
         </div>
 
+        {/* BULK BAR */}
+        {selectionModel.length > 0 && (
+          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
+            <span className="text-emerald-800 font-medium">
+              {selectionModel.length} candidate{selectionModel.length === 1 ? '' : 's'} selected
+            </span>
+            <Button onClick={openAllocModal} variant="primary" size="sm" className="flex items-center gap-2">
+              <Send size={14} /> Generate Roll No Slip
+            </Button>
+          </div>
+        )}
+
         {/* GRID */}
-        <DataGrid
-          rows={filteredRows} columns={columns} getRowId={(r) => r.id}
-          paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50, 100]} loading={loading} autoHeight
-          disableRowSelectionOnClick sx={gridSx}
-        />
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          {loading && rows.length === 0 ? (
+            <div className="p-10 flex justify-center">
+              <InlineLoader text="Loading shortlisted applications..." variant="ring" size="lg" />
+            </div>
+          ) : rows.length === 0 && !loading ? (
+            <div className="p-16 flex flex-col items-center justify-center text-center">
+              <div className="p-4 bg-slate-100 rounded-full mb-4">
+                <Eye size={32} className="text-slate-400" />
+              </div>
+              <p className="text-base font-semibold text-slate-700">No shortlisted applications</p>
+              <p className="text-sm text-slate-400 mt-1 max-w-sm">
+                Mark candidates as <strong>Shortlisted</strong> from the Applications page — they will appear here ready for roll number generation.
+              </p>
+            </div>
+          ) : (
+            <DataGrid
+              rows={rows}
+              columns={columns}
+              getRowId={(r) => r.id}
+              paginationMode="server"
+              rowCount={total}
+              paginationModel={paginationModel}
+              onPaginationModelChange={setPaginationModel}
+              pageSizeOptions={[15, 25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
+              checkboxSelection
+              onRowSelectionModelChange={(s) => setSelectionModel(s)}
+              rowSelectionModel={selectionModel}
+              disableRowSelectionOnClick
+              autoHeight
+              loading={loading}
+              sx={gridSx}
+            />
+          )}
+        </div>
       </div>
+
+      {/* ROW MENU */}
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <MenuItem key="view" onClick={handleView}>
+          <Eye size={16} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
+        </MenuItem>
+        <MenuItem key="generate" onClick={handleGenerateOne} disabled={!!selectedRow?.roll_number}>
+          <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
+        </MenuItem>
+        <MenuItem key="download" onClick={() => { downloadSlip(selectedRow?.application_number); handleMenuClose(); }}
+          disabled={!selectedRow?.roll_number}>
+          <Download size={16} style={{ marginRight: '8px' }} className="text-violet-600" /> Download Slip PDF
+        </MenuItem>
+      </Menu>
+
+      {/* CENTER ALLOCATION MODAL */}
+      <Dialog open={allocModal} onClose={() => !generating && setAllocModal(false)} fullWidth maxWidth="sm">
+        <DialogTitle className="font-bold">Center Allocation & Roll Number Format</DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-slate-500 mb-3">
+            Generating slips for <strong>{selectionModel.length}</strong> shortlisted candidate{selectionModel.length === 1 ? '' : 's'}.
+          </p>
+
+          <TextField select fullWidth required label="Exam Center" margin="normal" size="small"
+            name="exam_center_id" value={formData.exam_center_id} onChange={handleFormChange}>
+            <MenuItem key="none" value="">— Select center —</MenuItem>
+            {centers.map((c) => (
+              <MenuItem key={c.id} value={String(c.id)}>
+                {c.name} {c.city ? `(${c.city})` : ''}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField select fullWidth label="Exam Hall (optional)" margin="normal" size="small"
+            name="exam_hall_id" value={formData.exam_hall_id} onChange={handleFormChange}
+            disabled={!formData.exam_center_id || halls.length === 0}
+            helperText={!formData.exam_center_id ? 'Choose a center first' : halls.length === 0 ? 'No halls — first active hall will be picked' : ''}>
+            <MenuItem key="auto" value="">Auto (first active hall)</MenuItem>
+            {halls.map((h) => (
+              <MenuItem key={h.id} value={String(h.id)}>
+                {h.name} {h.capacity ? `— capacity ${h.capacity}` : ''}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <TextField fullWidth required label="Roll Number Prefix" margin="normal" size="small"
+              name="prefix" value={formData.prefix} onChange={handleFormChange}
+              helperText="e.g. AJK → AJK-001001" />
+            <TextField fullWidth required type="number" inputProps={{ min: 1 }}
+              label="Starting Number" margin="normal" size="small"
+              name="starting_number" value={formData.starting_number} onChange={handleFormChange} />
+          </div>
+
+          <TextField select fullWidth label="Format" margin="normal" size="small"
+            name="format" value={formData.format} onChange={handleFormChange}>
+            <MenuItem key="sequential" value="sequential">Sequential (1001, 1002, 1003 …)</MenuItem>
+            <MenuItem key="random" value="random">Random (shuffled within range)</MenuItem>
+          </TextField>
+        </DialogContent>
+        <DialogActions className="px-4 pb-4 gap-2">
+          <Button variant="outline" size="md" onClick={() => setAllocModal(false)} disabled={generating}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="md" onClick={handleGenerate} disabled={generating} className="flex items-center gap-2">
+            <Send size={14} /> {generating ? 'Generating…' : 'Generate Slip'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* RESULT MODAL */}
+      <Dialog open={!!resultModal} onClose={() => setResultModal(null)} fullWidth maxWidth="md">
+        <DialogTitle className="font-bold flex items-center gap-2">
+          <CheckCircle2 className="text-emerald-600" size={20} /> Slips Generated
+        </DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-slate-600 mb-3">
+            {resultModal?.count} roll number slip{resultModal?.count === 1 ? '' : 's'} generated successfully.
+          </p>
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-700">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold">Ref ID</th>
+                  <th className="text-left px-3 py-2 font-semibold">Candidate</th>
+                  <th className="text-left px-3 py-2 font-semibold">Roll Number</th>
+                  <th className="text-left px-3 py-2 font-semibold">Center</th>
+                  <th className="text-left px-3 py-2 font-semibold">Slip</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(resultModal?.slips ?? []).map((s) => (
+                  <tr key={s.application_number} className="border-t border-slate-100">
+                    <td className="px-3 py-2 font-mono text-xs">{s.application_number}</td>
+                    <td className="px-3 py-2">{s.candidate_name}</td>
+                    <td className="px-3 py-2 font-mono font-bold text-indigo-700">{s.roll_number}</td>
+                    <td className="px-3 py-2 text-slate-600">{s.exam_center}{s.exam_city ? ` — ${s.exam_city}` : ''}</td>
+                    <td className="px-3 py-2">
+                      <button onClick={() => downloadSlip(s.application_number)}
+                        className="flex items-center gap-1 text-xs px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded font-medium">
+                        <Download size={12}/> PDF
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+        <DialogActions className="px-4 pb-4 gap-2">
+          <Button variant="outline" size="md" onClick={() => setResultModal(null)}>Close</Button>
+          <Button variant="primary" size="md"
+            onClick={() => resultModal?.slips?.forEach(s => downloadSlip(s.application_number))}
+            className="flex items-center gap-2">
+            <Download size={14}/> Download All Slips
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
