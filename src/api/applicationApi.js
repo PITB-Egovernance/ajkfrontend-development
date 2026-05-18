@@ -84,25 +84,46 @@ const ApplicationApi = {
 
   getById: async (id) => {
     // Application numbers (e.g. AJK-2026-00001) come from the admin backend
-    // (roll numbers page, shortlisted list). Route those to the admin API which
-    // supports lookup by application_number and returns the same response shape.
-    // All other ids (short hash strings) are candidate-portal hash_ids.
+    // (roll numbers page, shortlisted list). The candidate portal has the rich
+    // data (documents, education, experience…) keyed by hash_id, so first look
+    // up the hash_id from the candidate portal using the application_number,
+    // then fetch full detail by hash_id. Falls back to admin API if the
+    // application isn't present in the candidate portal.
     const isAppNumber = /^[A-Z]+-\d{4}-\d+$/.test(String(id));
+    let lookupId = id;
 
     if (isAppNumber) {
-      const response = await fetch(`${ADMIN_API_BASE}/applications/${id}`, {
-        method: 'GET',
-        headers: getAdminHeaders(),
-      });
-      const result   = await handleResponse(response);
-      const appData  = result?.data?.application ?? result?.data ?? result;
-      // Admin API is the source of truth — status is already correct.
-      if (appData) appData._admin_status = appData.status ?? null;
-      return result;
+      try {
+        const listResp = await fetch(
+          `${CANDIDATE_API_BASE}/applications?search=${encodeURIComponent(id)}&per_page=5`,
+          { method: 'GET', headers: getCandidateHeaders() }
+        );
+        if (listResp.ok) {
+          const listResult = await listResp.json();
+          const items      = listResult?.data?.data ?? listResult?.data ?? [];
+          const match      = items.find((a) => a.application_number === id) || items[0];
+          const candidateHashId = match?.hash_id || match?.id;
+          if (candidateHashId && !/^[A-Z]+-\d{4}-\d+$/.test(String(candidateHashId))) {
+            lookupId = candidateHashId; // got a real candidate-portal hash
+          }
+        }
+      } catch { /* silent — fall through to admin API */ }
+
+      // If we couldn't resolve a hash_id, hit the admin API as last resort.
+      if (lookupId === id) {
+        const response = await fetch(`${ADMIN_API_BASE}/applications/${id}`, {
+          method: 'GET',
+          headers: getAdminHeaders(),
+        });
+        const result   = await handleResponse(response);
+        const appData  = result?.data?.application ?? result?.data ?? result;
+        if (appData) appData._admin_status = appData.status ?? null;
+        return result;
+      }
     }
 
-    // Candidate portal hash_id path (normal Applications list flow).
-    const response = await fetch(`${CANDIDATE_API_BASE}/applications/${id}`, {
+    // Fetch full data from candidate portal by hash_id.
+    const response = await fetch(`${CANDIDATE_API_BASE}/applications/${lookupId}`, {
       method: 'GET',
       headers: getCandidateHeaders(),
     });
