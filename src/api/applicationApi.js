@@ -2,13 +2,10 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { buildQueryString } from 'utils/apiUtils';
 
-// Candidate portal — source of truth for rich candidate data (disability, education, documents, etc.)
-const CANDIDATE_API_BASE = Config.candidateApiUrl || `${Config.apiUrl}/admin`;
-const CANDIDATE_API_KEY  = Config.candidateApiKey  || Config.apiKey;
-
-// Admin backend — source of truth for application status
-const ADMIN_API_BASE = Config.apiUrl;
-const ADMIN_API_KEY  = Config.apiKey;
+const CANDIDATE_API_BASE = Config.candidateApiUrl;
+const CANDIDATE_API_KEY  = Config.candidateApiKey;
+const ADMIN_API_BASE     = Config.apiUrl;
+const ADMIN_API_KEY      = Config.apiKey;
 
 const getCandidateHeaders = () => ({
   'Accept': 'application/json',
@@ -33,7 +30,8 @@ const handleResponse = async (response) => {
   return result;
 };
 
-// Low-level helper — returns the raw {application_number → admin_status} map, or {} on failure.
+// The candidate portal application list always reports status='submitted' (its own column).
+// The real admin status (Shortlisted / Rejected / Interview) is overlaid from the admin DB.
 const fetchAdminStatuses = async (numbers) => {
   try {
     const res  = await fetch(
@@ -47,7 +45,6 @@ const fetchAdminStatuses = async (numbers) => {
   }
 };
 
-// Inject _admin_status into every item of a paginated list response.
 const overlayAdminStatuses = async (result) => {
   const items   = result?.data?.data ?? [];
   const numbers = items.map((a) => a.application_number).filter(Boolean);
@@ -63,9 +60,18 @@ const overlayAdminStatuses = async (result) => {
   return result;
 };
 
+// Minimal candidate metadata shipped with every status write so the admin can
+// upsert a row even when the application has never been pushed to admin DB.
+const buildApplicationMeta = (app) => ({
+  application_number: app.application_number || app.id,
+  candidate_name:     app.applicant_name || app.candidate_name || app.snapshot_data?.name || null,
+  candidate_cnic:     app.cnic || app.candidate_cnic || app.snapshot_data?.cnic || null,
+  candidate_email:    app.candidate_email || app.snapshot_data?.email || null,
+  candidate_mobile:   app.candidate_mobile || app.snapshot_data?.mobile_number || null,
+  advertisement_no:   app.advertisement_no || app.job_post?.adv_number || app.job_post?.ext_adv_id || null,
+});
+
 const ApplicationApi = {
-  // READ: candidate portal (disability, documents, education, preferred cities, etc.)
-  // + admin status overlay so status persists across refreshes
   getAll: async (params = {}) => {
     const filteredParams = Object.fromEntries(
       Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -76,44 +82,67 @@ const ApplicationApi = {
     return overlayAdminStatuses(result);
   },
 
-  // READ single application — candidate portal (full data) + admin status overlay.
-  // preferred_exam_cities is now returned by the admin backend show() response,
-  // so the old per_page=100 list fallback fetch has been removed.
   getById: async (id) => {
+    // Application numbers (e.g. AJK-2026-00001) come from the admin backend
+    // (roll numbers page, shortlisted list). Route those to the admin API which
+    // supports lookup by application_number and returns the same response shape.
+    // All other ids (short hash strings) are candidate-portal hash_ids.
+    const isAppNumber = /^[A-Z]+-\d{4}-\d+$/.test(String(id));
+
+    if (isAppNumber) {
+      const response = await fetch(`${ADMIN_API_BASE}/applications/${id}`, {
+        method: 'GET',
+        headers: getAdminHeaders(),
+      });
+      const result   = await handleResponse(response);
+      const appData  = result?.data?.application ?? result?.data ?? result;
+      // Admin API is the source of truth — status is already correct.
+      if (appData) appData._admin_status = appData.status ?? null;
+      return result;
+    }
+
+    // Candidate portal hash_id path (normal Applications list flow).
     const response = await fetch(`${CANDIDATE_API_BASE}/applications/${id}`, {
       method: 'GET',
       headers: getCandidateHeaders(),
     });
     const result = await handleResponse(response);
 
-    // Resolve which object holds the application data
     const appData = result?.data?.application ?? result?.data ?? result;
     const appNum  = appData?.application_number;
-
-    // Overlay admin status using the shared primitive (failure silently ignored).
     if (appNum) {
       const map = await fetchAdminStatuses([appNum]);
       appData._admin_status = map[appNum] ?? null;
     }
-
     return result;
   },
 
-  // WRITE: admin backend — identified by application_number (shared key)
-  updateStatus: async (applicationNumber, status) => {
+  // Single status update. Pass the row (or any object with candidate fields) as `meta`
+  // so the backend can upsert the received_application stub if it doesn't yet exist.
+  updateStatus: async (applicationNumber, status, meta = null) => {
+    const body = { status };
+    if (meta) body.application = buildApplicationMeta({ ...meta, application_number: applicationNumber });
+
     const response = await fetch(`${ADMIN_API_BASE}/applications/${applicationNumber}/status`, {
       method: 'PUT',
       headers: getAdminHeaders(),
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(body),
     });
     return handleResponse(response);
   },
 
-  bulkUpdateStatus: async (applicationNumbers, status) => {
+  // Bulk status update. Pass `applications` (array of row objects) so the backend
+  // can upsert any stubs that don't yet exist in the admin DB.
+  bulkUpdateStatus: async (applicationNumbers, status, applications = []) => {
+    const body = {
+      ids: applicationNumbers,
+      status,
+      applications: applications.map(buildApplicationMeta),
+    };
     const response = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
       method: 'PUT',
       headers: getAdminHeaders(),
-      body: JSON.stringify({ ids: applicationNumbers, status }),
+      body: JSON.stringify(body),
     });
     return handleResponse(response);
   },
