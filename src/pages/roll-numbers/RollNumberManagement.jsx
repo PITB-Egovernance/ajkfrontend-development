@@ -315,6 +315,47 @@ const RollNumberManagement = () => {
     }
   };
 
+  // ── Bulk slip deletion ──────────────────────────────────────────────────────
+  const bulkDeleteSlips = async () => {
+    if (selectionModel.length === 0) return;
+
+    // Filter to only rows that actually have a roll number
+    const rowsWithRoll = rows.filter(r => selectionModel.includes(r.id) && r.roll_number);
+    if (rowsWithRoll.length === 0) {
+      toast.error('None of the selected candidates have a roll number to delete');
+      return;
+    }
+
+    const ok = await confirmDelete({
+      title:      'Delete Roll Number Slips',
+      message:    `Remove roll numbers and exam center allocation for ${rowsWithRoll.length} selected candidate${rowsWithRoll.length === 1 ? '' : 's'}?`,
+      identifier: `${rowsWithRoll.length} slips`,
+      warning:    'Those candidates will lose their roll numbers and allocations. You can regenerate new slips afterwards.',
+    });
+    if (!ok) return;
+
+    const tid = toast.loading(`Deleting ${rowsWithRoll.length} slip${rowsWithRoll.length === 1 ? '' : 's'}…`);
+    try {
+      const res = await fetch(`${API_BASE}/roll-numbers/bulk-delete-slips`, {
+        method:  'POST',
+        headers: getHeaders(),
+        body:    JSON.stringify({ application_numbers: rowsWithRoll.map(r => r.application_number) }),
+      });
+      const result = await res.json().catch(() => ({}));
+      toast.dismiss(tid);
+      if (res.ok && (result.success || result.status === 200)) {
+        toast.success(result.message || `${result.data?.deleted ?? rowsWithRoll.length} slip(s) deleted`);
+        setSelectionModel([]);
+        fetchShortlisted();
+      } else {
+        toast.error(result.message || 'Failed to delete slips');
+      }
+    } catch {
+      toast.dismiss(tid);
+      toast.error('Server error deleting slips');
+    }
+  };
+
   // ── Row menu ────────────────────────────────────────────────────────────
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
@@ -442,10 +483,21 @@ const RollNumberManagement = () => {
           <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
             <span className="text-emerald-800 font-medium">
               {selectionModel.length} candidate{selectionModel.length === 1 ? '' : 's'} selected
+              {(() => {
+                const withRoll = rows.filter(r => selectionModel.includes(r.id) && r.roll_number).length;
+                return withRoll > 0 ? ` · ${withRoll} with roll number` : '';
+              })()}
             </span>
-            <Button onClick={openAllocModal} variant="primary" size="sm" className="flex items-center gap-2">
-              <Send size={14} /> Generate Roll No Slip
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={openAllocModal} variant="primary" size="sm" className="flex items-center gap-2">
+                <Send size={14} /> Generate Roll No Slip
+              </Button>
+              <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
+                className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
+                disabled={rows.filter(r => selectionModel.includes(r.id) && r.roll_number).length === 0}>
+                <Trash2 size={14} /> Delete Roll No Slip
+              </Button>
+            </div>
           </div>
         )}
 
