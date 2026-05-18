@@ -19,12 +19,14 @@ import {
   MoreVertical,
   CheckCircle2,
   Download,
+  Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import {
@@ -280,6 +282,39 @@ const RollNumberManagement = () => {
     }
   }, []);
 
+  // ── Slip deletion ───────────────────────────────────────────────────────────
+  const deleteSlip = async (row) => {
+    const applicationNumber = row?.application_number;
+    if (!applicationNumber) return;
+
+    const ok = await confirmDelete({
+      title:      'Delete Roll Number Slip',
+      message:    `Remove roll number ${row.roll_number || ''} for ${row.applicant_name || applicationNumber}?`,
+      identifier: applicationNumber,
+      warning:    'The candidate will lose this roll number and exam center allocation. You can regenerate a new slip afterwards.',
+    });
+    if (!ok) return;
+
+    const tid = toast.loading('Deleting slip…');
+    try {
+      const res = await fetch(`${API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+        method:  'DELETE',
+        headers: getHeaders(),
+      });
+      const result = await res.json().catch(() => ({}));
+      toast.dismiss(tid);
+      if (res.ok && (result.success || result.status === 200)) {
+        toast.success(result.message || 'Slip deleted');
+        fetchShortlisted();
+      } else {
+        toast.error(result.message || 'Failed to delete slip');
+      }
+    } catch {
+      toast.dismiss(tid);
+      toast.error('Server error deleting slip');
+    }
+  };
+
   // ── Row menu ────────────────────────────────────────────────────────────
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
@@ -304,14 +339,11 @@ const RollNumberManagement = () => {
     published:    rows.filter((r) => r.published_at).length,
   }), [rows]);
 
-  // ── Columns (match /dashboard/applications) ─────────────────────────────
+  // ── Columns ─────────────────────────────
   const columns = [
     { field: 'application_number', headerName: 'Ref ID',          minWidth: 110, flex: 0.8 },
     { field: 'applicant_name',     headerName: 'Applicant Name',  minWidth: 160, flex: 1.1 },
     { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
-    { field: 'job_title',          headerName: 'Job Advertisement', minWidth: 180, flex: 1.2 },
-    { field: 'advertisement_no',   headerName: 'Advertisement No', minWidth: 140, flex: 0.8 },
-    { field: 'applied_at',         headerName: 'Applied At',      minWidth: 110, flex: 0.7 },
     {
       field: 'roll_number',
       headerName: 'Roll Number',
@@ -320,40 +352,6 @@ const RollNumberManagement = () => {
       renderCell: (p) => p.value
         ? <span className="font-mono font-bold text-indigo-700">{p.value}</span>
         : <span className="text-slate-400 text-xs">Not generated</span>,
-    },
-    {
-      field: 'ocr_batch',
-      headerName: 'Batch',
-      minWidth: 130,
-      flex: 0.7,
-      sortable: false,
-      renderCell: (p) => (
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase border ${getApplicationOcrBatchPillClass(p.value)}`}>
-          {getApplicationOcrBatchLabel(p.value)}
-        </span>
-      ),
-    },
-    {
-      field: 'payment_status',
-      headerName: 'Payment Status',
-      minWidth: 130,
-      flex: 0.8,
-      sortable: false,
-      renderCell: (p) => (
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase border ${p.value === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200'}`}>
-          {p.value || 'N/A'}
-        </span>
-      ),
-    },
-    {
-      field: 'has_disability',
-      headerName: 'Disability',
-      minWidth: 110,
-      flex: 0.6,
-      sortable: false,
-      renderCell: (p) => p.value
-        ? <span className="px-2.5 py-1 rounded-full text-xs font-semibold uppercase border bg-purple-100 text-purple-700 border-purple-200 capitalize">{p.row.disability_type || 'Yes'}</span>
-        : <span className="px-2.5 py-1 rounded-full text-xs font-semibold uppercase border bg-slate-100 text-slate-400 border-slate-200">None</span>,
     },
     {
       field: 'actions',
@@ -503,6 +501,10 @@ const RollNumberManagement = () => {
         <MenuItem key="download" onClick={() => { downloadSlip(selectedRow?.application_number); handleMenuClose(); }}
           disabled={!selectedRow?.roll_number}>
           <Download size={16} style={{ marginRight: '8px' }} className="text-violet-600" /> Download Slip PDF
+        </MenuItem>
+        <MenuItem key="delete" onClick={() => { const row = selectedRow; handleMenuClose(); deleteSlip(row); }}
+          disabled={!selectedRow?.roll_number}>
+          <Trash2 size={16} style={{ marginRight: '8px' }} className="text-red-600" /> Delete Slip
         </MenuItem>
       </Menu>
 
