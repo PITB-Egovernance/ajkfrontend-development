@@ -197,11 +197,16 @@ const RollNumberManagement = () => {
   };
 
   // ── Generate slip flow ──────────────────────────────────────────────────
-  const openAllocModal = () => {
-    if (selectionModel.length === 0) {
+  // Accept an optional explicit selection so the row-menu "Generate Roll Slip"
+  // can open the modal without waiting for a setSelectionModel state flush
+  // (which was causing the "Select at least one" error).
+  const openAllocModal = (explicitSelection = null) => {
+    const selection = explicitSelection ?? selectionModel;
+    if (!selection || selection.length === 0) {
       toast.error('Select at least one shortlisted candidate');
       return;
     }
+    if (explicitSelection) setSelectionModel(explicitSelection);
     setFormData(EMPTY_FORM);
     setHalls([]);
     setAllocModal(true);
@@ -367,9 +372,10 @@ const RollNumberManagement = () => {
 
   const handleGenerateOne = () => {
     if (!selectedRow) return;
-    setSelectionModel([selectedRow.application_number]);
+    const appNum = selectedRow.application_number;
     handleMenuClose();
-    setTimeout(openAllocModal, 0);
+    // Pass selection explicitly to avoid state-flush race
+    openAllocModal([appNum]);
   };
 
   // ── Stats ───────────────────────────────────────────────────────────────
