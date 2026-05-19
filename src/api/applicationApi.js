@@ -5,6 +5,10 @@ import { buildQueryString } from 'utils/apiUtils';
 const CANDIDATE_API_BASE = Config.candidateApiUrl;
 const CANDIDATE_API_KEY  = Config.candidateApiKey;
 const ADMIN_API_BASE     = Config.apiUrl;
+// Application STATUS endpoints (single + bulk update + statuses overlay) are
+// served from the local backend until the upsertStatus controller ships to
+// the live admin server. Everything else still goes to ADMIN_API_BASE.
+const STATUS_API_BASE    = Config.rollNumberApiUrl;
 const ADMIN_API_KEY      = Config.apiKey;
 
 const getCandidateHeaders = () => ({
@@ -35,7 +39,7 @@ const handleResponse = async (response) => {
 const fetchAdminStatuses = async (numbers) => {
   try {
     const res  = await fetch(
-      `${ADMIN_API_BASE}/applications/statuses?numbers=${numbers.join(',')}`,
+      `${STATUS_API_BASE}/applications/statuses?numbers=${numbers.join(',')}`,
       { headers: getAdminHeaders() }
     );
     const json = await res.json();
@@ -144,7 +148,7 @@ const ApplicationApi = {
     const body = { status };
     if (meta) body.application = buildApplicationMeta({ ...meta, application_number: applicationNumber });
 
-    const response = await fetch(`${ADMIN_API_BASE}/applications/${applicationNumber}/status`, {
+    const response = await fetch(`${STATUS_API_BASE}/applications/${applicationNumber}/status`, {
       method: 'PUT',
       headers: getAdminHeaders(),
       body: JSON.stringify(body),
@@ -160,7 +164,7 @@ const ApplicationApi = {
       status,
       applications: applications.map(buildApplicationMeta),
     };
-    const response = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
+    const response = await fetch(`${STATUS_API_BASE}/applications/bulk-status`, {
       method: 'PUT',
       headers: getAdminHeaders(),
       body: JSON.stringify(body),
