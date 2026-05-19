@@ -15,6 +15,7 @@ import {
   MoreVertical,
   Download,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -427,6 +428,11 @@ const RollNumberManagement = () => {
         </MenuItem>
         <MenuItem key="generate" onClick={handleGenerateOne} disabled={!!selectedRow?.roll_number}>
           <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
+        </MenuItem>
+        <MenuItem key="edit"
+          onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate(`/dashboard/roll-numbers/edit-slip/${row.application_number}`, { state: { row } }); }}
+          disabled={!selectedRow?.roll_number}>
+          <Pencil size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Edit Slip
         </MenuItem>
         <MenuItem key="download" onClick={() => { downloadSlip(selectedRow?.application_number); handleMenuClose(); }}
           disabled={!selectedRow?.roll_number}>

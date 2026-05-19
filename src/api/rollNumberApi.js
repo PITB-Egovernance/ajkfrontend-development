@@ -57,6 +57,16 @@ const RollNumberApi = {
     });
   },
 
+  // Update an existing slip's editable fields
+  updateSlip: async (applicationNumber, body) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+      method:  'PUT',
+      headers: getAdminHeaders(),
+      body:    JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
   // Delete one slip
   deleteSlip: async (applicationNumber) => {
     const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
