@@ -52,6 +52,7 @@ import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
 import CenterAllocation from 'pages/roll-numbers/CenterAllocation';
 import RollSlipGeneration from 'pages/roll-numbers/RollSlipGeneration';
+import RollSlipGenerator from 'pages/roll-numbers/RollSlipGenerator';
 import AwardList from 'pages/award-list/AwardList';
 import AwardListDetail from 'pages/award-list/AwardListDetail';
 
@@ -159,6 +160,7 @@ function App() {
 
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />
+          <Route path="roll-numbers/generate-slips" element={<RollSlipGenerator />} />
           <Route path="roll-numbers/:advertisementId/center-allocation" element={<CenterAllocation />} />
           <Route path="roll-numbers/:advertisementId/slip-generation" element={<RollSlipGeneration />} />
 

@@ -5,10 +5,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 } from '@mui/material';
 import {
   Hash,
@@ -17,7 +13,6 @@ import {
   RefreshCw,
   FilterX,
   MoreVertical,
-  CheckCircle2,
   Download,
   Trash2,
 } from 'lucide-react';
@@ -40,14 +35,6 @@ const DEFAULT_FILTERS = {
   generated: '',
 };
 
-const EMPTY_FORM = {
-  exam_center_id: '',
-  exam_hall_id: '',
-  prefix: 'AJK',
-  starting_number: '1001',
-  format: 'sequential',
-};
-
 const gridSx = {
   border: 'none',
   '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
@@ -68,7 +55,6 @@ const RollNumberManagement = () => {
 
   const [rows,            setRows]            = useState([]);
   const [loading,         setLoading]         = useState(true);
-  const [generating,      setGenerating]      = useState(false);
   const [total,           setTotal]           = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]  = useState([]);
@@ -76,13 +62,6 @@ const RollNumberManagement = () => {
 
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
-
-  const [allocModal, setAllocModal] = useState(false);
-  const [formData,   setFormData]   = useState(EMPTY_FORM);
-  const [centers,    setCenters]    = useState([]);
-  const [halls,      setHalls]      = useState([]);
-
-  const [resultModal, setResultModal] = useState(null); // { count, slips }
 
   // ── Data ────────────────────────────────────────────────────────────────
   const fetchShortlisted = useCallback(async () => {
@@ -143,29 +122,6 @@ const RollNumberManagement = () => {
     return () => clearTimeout(t);
   }, [fetchShortlisted]);
 
-  // ── Centers & halls (loaded on modal open) ──────────────────────────────
-  const fetchCenters = useCallback(async () => {
-    try {
-      const result = await RollNumberApi.getExamCenters(500);
-      const list   = result.data?.data ?? result.data ?? [];
-      setCenters(Array.isArray(list) ? list : []);
-    } catch (err) {
-      toast.error(err?.status === 401
-        ? 'Session expired — please log in again'
-        : (err?.message || 'Failed to load exam centers'));
-    }
-  }, []);
-
-  const fetchHalls = useCallback(async (centerId) => {
-    if (!centerId) { setHalls([]); return; }
-    try {
-      const result = await RollNumberApi.getHallsByCenter(centerId);
-      setHalls(result.data ?? []);
-    } catch {
-      setHalls([]);
-    }
-  }, []);
-
   // ── Filters ─────────────────────────────────────────────────────────────
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -178,59 +134,17 @@ const RollNumberManagement = () => {
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  // ── Generate slip flow ──────────────────────────────────────────────────
-  // Accept an optional explicit selection so the row-menu "Generate Roll Slip"
-  // can open the modal without waiting for a setSelectionModel state flush
-  // (which was causing the "Select at least one" error).
-  const openAllocModal = (explicitSelection = null) => {
-    const selection = explicitSelection ?? selectionModel;
-    if (!selection || selection.length === 0) {
+  // ── Generate slip flow (navigates to the full-page generator) ──────────
+  const openSlipGenerator = (explicitSelection = null) => {
+    const selectionIds = explicitSelection ?? selectionModel;
+    if (!selectionIds || selectionIds.length === 0) {
       toast.error('Select at least one shortlisted candidate');
       return;
     }
-    if (explicitSelection) setSelectionModel(explicitSelection);
-    setFormData(EMPTY_FORM);
-    setHalls([]);
-    setAllocModal(true);
-    fetchCenters();
-  };
-
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'exam_center_id') {
-      setFormData((prev) => ({ ...prev, exam_center_id: value, exam_hall_id: '' }));
-      fetchHalls(value);
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!formData.exam_center_id) { toast.error('Choose an exam center'); return; }
-    if (!formData.prefix?.trim()) { toast.error('Enter a roll number prefix'); return; }
-    if (!formData.starting_number) { toast.error('Enter a starting number'); return; }
-
-    setGenerating(true);
-    try {
-      const body = {
-        application_numbers: selectionModel,
-        exam_center_id:      Number(formData.exam_center_id),
-        exam_hall_id:        formData.exam_hall_id ? Number(formData.exam_hall_id) : null,
-        prefix:              formData.prefix.trim(),
-        starting_number:     Number(formData.starting_number),
-        format:              formData.format,
-      };
-      const result = await RollNumberApi.generateSlips(body);
-      toast.success('Roll number slips generated successfully');
-      setAllocModal(false);
-      setSelectionModel([]);
-      setResultModal({ count: result.data?.generated_count ?? 0, slips: result.data?.slips ?? [] });
-      fetchShortlisted();
-    } catch (err) {
-      toast.error(err?.message || 'Failed to generate slips');
-    } finally {
-      setGenerating(false);
-    }
+    const selectedApps = rows.filter((r) => selectionIds.includes(r.id));
+    navigate('/dashboard/roll-numbers/generate-slips', {
+      state: { applications: selectedApps },
+    });
   };
 
   // ── Slip download ───────────────────────────────────────────────────────────
@@ -333,7 +247,7 @@ const RollNumberManagement = () => {
     const appNum = selectedRow.application_number;
     handleMenuClose();
     // Pass selection explicitly to avoid state-flush race
-    openAllocModal([appNum]);
+    openSlipGenerator([appNum]);
   };
 
   // ── Stats ───────────────────────────────────────────────────────────────
@@ -453,7 +367,7 @@ const RollNumberManagement = () => {
               })()}
             </span>
             <div className="flex gap-2">
-              <Button onClick={openAllocModal} variant="primary" size="sm" className="flex items-center gap-2">
+              <Button onClick={openSlipGenerator} variant="primary" size="sm" className="flex items-center gap-2">
                 <Send size={14} /> Generate Roll No Slip
               </Button>
               <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
@@ -524,109 +438,6 @@ const RollNumberManagement = () => {
         </MenuItem>
       </Menu>
 
-      {/* CENTER ALLOCATION MODAL */}
-      <Dialog open={allocModal} onClose={() => !generating && setAllocModal(false)} fullWidth maxWidth="sm">
-        <DialogTitle className="font-bold">Center Allocation & Roll Number Format</DialogTitle>
-        <DialogContent>
-          <p className="text-sm text-slate-500 mb-3">
-            Generating slips for <strong>{selectionModel.length}</strong> shortlisted candidate{selectionModel.length === 1 ? '' : 's'}.
-          </p>
-
-          <TextField select fullWidth required label="Exam Center" margin="normal" size="small"
-            name="exam_center_id" value={formData.exam_center_id} onChange={handleFormChange}>
-            <MenuItem key="none" value="">— Select center —</MenuItem>
-            {centers.map((c) => (
-              <MenuItem key={c.id} value={String(c.id)}>
-                {c.name} {c.city ? `(${c.city})` : ''}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField select fullWidth label="Exam Hall (optional)" margin="normal" size="small"
-            name="exam_hall_id" value={formData.exam_hall_id} onChange={handleFormChange}
-            disabled={!formData.exam_center_id || halls.length === 0}
-            helperText={!formData.exam_center_id ? 'Choose a center first' : halls.length === 0 ? 'No halls — first active hall will be picked' : ''}>
-            <MenuItem key="auto" value="">Auto (first active hall)</MenuItem>
-            {halls.map((h) => (
-              <MenuItem key={h.id} value={String(h.id)}>
-                {h.name} {h.capacity ? `— capacity ${h.capacity}` : ''}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <div className="grid grid-cols-2 gap-3">
-            <TextField fullWidth required label="Roll Number Prefix" margin="normal" size="small"
-              name="prefix" value={formData.prefix} onChange={handleFormChange}
-              helperText="e.g. AJK → AJK-001001" />
-            <TextField fullWidth required type="number" inputProps={{ min: 1 }}
-              label="Starting Number" margin="normal" size="small"
-              name="starting_number" value={formData.starting_number} onChange={handleFormChange} />
-          </div>
-
-          <TextField select fullWidth label="Format" margin="normal" size="small"
-            name="format" value={formData.format} onChange={handleFormChange}>
-            <MenuItem key="sequential" value="sequential">Sequential (1001, 1002, 1003 …)</MenuItem>
-            <MenuItem key="random" value="random">Random (shuffled within range)</MenuItem>
-          </TextField>
-        </DialogContent>
-        <DialogActions className="px-4 pb-4 gap-2">
-          <Button variant="outline" size="md" onClick={() => setAllocModal(false)} disabled={generating}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="md" onClick={handleGenerate} disabled={generating} className="flex items-center gap-2">
-            <Send size={14} /> {generating ? 'Generating…' : 'Generate Slip'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* RESULT MODAL */}
-      <Dialog open={!!resultModal} onClose={() => setResultModal(null)} fullWidth maxWidth="md">
-        <DialogTitle className="font-bold flex items-center gap-2">
-          <CheckCircle2 className="text-emerald-600" size={20} /> Slips Generated
-        </DialogTitle>
-        <DialogContent>
-          <p className="text-sm text-slate-600 mb-3">
-            {resultModal?.count} roll number slip{resultModal?.count === 1 ? '' : 's'} generated successfully.
-          </p>
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-700">
-                <tr>
-                  <th className="text-left px-3 py-2 font-semibold">Ref ID</th>
-                  <th className="text-left px-3 py-2 font-semibold">Candidate</th>
-                  <th className="text-left px-3 py-2 font-semibold">Roll Number</th>
-                  <th className="text-left px-3 py-2 font-semibold">Center</th>
-                  <th className="text-left px-3 py-2 font-semibold">Slip</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(resultModal?.slips ?? []).map((s) => (
-                  <tr key={s.application_number} className="border-t border-slate-100">
-                    <td className="px-3 py-2 font-mono text-xs">{s.application_number}</td>
-                    <td className="px-3 py-2">{s.candidate_name}</td>
-                    <td className="px-3 py-2 font-mono font-bold text-indigo-700">{s.roll_number}</td>
-                    <td className="px-3 py-2 text-slate-600">{s.exam_center}{s.exam_city ? ` — ${s.exam_city}` : ''}</td>
-                    <td className="px-3 py-2">
-                      <button onClick={() => downloadSlip(s.application_number)}
-                        className="flex items-center gap-1 text-xs px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded font-medium">
-                        <Download size={12}/> PDF
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </DialogContent>
-        <DialogActions className="px-4 pb-4 gap-2">
-          <Button variant="outline" size="md" onClick={() => setResultModal(null)}>Close</Button>
-          <Button variant="primary" size="md"
-            onClick={() => resultModal?.slips?.forEach(s => downloadSlip(s.application_number))}
-            className="flex items-center gap-2">
-            <Download size={14}/> Download All Slips
-          </Button>
-        </DialogActions>
-      </Dialog>
     </div>
   );
 };
