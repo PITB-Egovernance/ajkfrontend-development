@@ -228,26 +228,28 @@ const RequisitionForm = () => {
         Object.keys(stepData).forEach(key => {
           let value = stepData[key];
 
-          // Defensive: Ensure service_rules and syllabus are never arrays
+          // service_rules / syllabus are file uploads — handle carefully.
           if ((key === 'service_rules' || key === 'syllabus')) {
             if (Array.isArray(value)) {
-              console.warn(`⚠️ ${key} is an array, converting to string:`, value);
+              console.warn(`⚠️ ${key} is an array, taking first item:`, value);
               value = value.length > 0 ? value[0] : null;
             }
 
-            // CRITICAL: Always send service_rules and syllabus, even if null
-            // If it's a File, append it; if it's a string (existing file path), append it; if null, skip (don't upload)
             if (value instanceof File) {
+              // Brand-new upload — send as multipart file
               formDataToSend.append(key, value);
               console.log(`  ✅ ${key}: [File: ${value.name}]`);
             } else if (typeof value === 'string' && value !== '') {
-              formDataToSend.append(key, value);
-              console.log(`  ✅ ${key}: ${value} (existing file path)`);
+              // Existing-file path from a previous save (e.g. user clicked
+              // Previous, edited other fields, then Next). The backend's
+              // `file` validation rule rejects strings → 500 + HTML
+              // fallback. Skip the field so the backend keeps the file
+              // it already has stored against this temp_id.
+              console.log(`  ℹ️ ${key}: existing file (${value}) — skipping so backend keeps it`);
             } else {
-              // Don't append null/empty for files - backend will keep existing or set null
-              console.log(`  ℹ️ ${key}: not provided (null/empty) - will use existing or null`);
+              console.log(`  ℹ️ ${key}: not provided (null/empty)`);
             }
-            return; // Skip the general handling below
+            return;
           }
 
           if (value instanceof File) {
