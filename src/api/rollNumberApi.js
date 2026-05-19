@@ -1,7 +1,8 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
-const ADMIN_API_BASE = Config.apiUrl;
+// Roll number endpoints are served from the local backend (see baseUrl.js)
+const ADMIN_API_BASE = Config.rollNumberApiUrl;
 const ADMIN_API_KEY  = Config.apiKey;
 
 const getAdminHeaders = (json = true) => {
