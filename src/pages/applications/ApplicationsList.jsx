@@ -35,6 +35,7 @@ const ApplicationsList = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [apiError, setApiError] = useState(null);
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
@@ -59,13 +60,16 @@ const ApplicationsList = () => {
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
+    setApiError(null);
     try {
+      // UNREVIEWED_SENTINEL is a frontend-only token (no admin row with that status exists);
+      // skip sending it to the server so the local filter can pick up rows whose status is empty.
       const params = {
         page: paginationModel.page + 1,
         per_page: paginationModel.pageSize,
         search: filters.search,
         job_id: filters.job_id,
-        status: filters.status,
+        status: filters.status === UNREVIEWED_SENTINEL ? '' : filters.status,
         start_date: filters.start_date,
         end_date: filters.end_date,
       };
@@ -81,6 +85,8 @@ const ApplicationsList = () => {
           try { snapshot = JSON.parse(snapshot); } catch { snapshot = {}; }
         }
 
+        // Admin DB is the source of truth for status (overlaid via _admin_status).
+        // Fall back to candidate status, masking the implicit 'submitted' as blank.
         const effectiveStatus = item._admin_status !== null && item._admin_status !== undefined
           ? item._admin_status
           : (item.status === 'submitted' || !item.status ? '' : item.status);
@@ -145,8 +151,8 @@ const ApplicationsList = () => {
           : totalCount
       );
     } catch (err) {
+      setApiError(err.message || 'Failed to fetch applications');
       toast.error(err.message || 'Failed to fetch applications');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -190,8 +196,9 @@ const ApplicationsList = () => {
 
   const updateStatus = async (id, status) => {
     try {
+      const row = rows.find((r) => r.id === id);
       setRows(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-      await ApplicationApi.updateStatus(id, status);
+      await ApplicationApi.updateStatus(id, status, row);
       toast.success(`Application marked as ${status}`);
     } catch {
       toast.error('Failed to update status');
@@ -203,8 +210,9 @@ const ApplicationsList = () => {
   const handleBulkStatusUpdate = async (status) => {
     if (!selectionModel.length) return;
     try {
+      const selectedRows = rows.filter((r) => selectionModel.includes(r.id));
       setRows(prev => prev.map(r => selectionModel.includes(r.id) ? { ...r, status } : r));
-      await ApplicationApi.bulkUpdateStatus(selectionModel, status);
+      await ApplicationApi.bulkUpdateStatus(selectionModel, status, selectedRows);
       toast.success(`${selectionModel.length} applications marked as ${status}`);
       setSelectionModel([]);
     } catch {
@@ -297,8 +305,8 @@ const ApplicationsList = () => {
           </div>
         </div>
 
-        {/* Filter Section */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 space-y-3">
+        {/* Filter Section — single flex-wrap container so each row is fully packed */}
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
           <div className="flex gap-3 items-end flex-wrap">
             <TextField label="Search (Name/CNIC)" variant="outlined" size="small" name="search"
               value={filters.search} onChange={handleFilterChange} sx={{ flex: '1 1 160px', minWidth: 140 }} />
@@ -328,8 +336,6 @@ const ApplicationsList = () => {
               <SelectItem value="unpaid">Unpaid</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
             </TextField>
-          </div>
-          <div className="flex gap-3 items-end flex-wrap">
             <TextField select label="OCR Verification" variant="outlined" size="small" name="ocr_batch"
               value={filters.ocr_batch} onChange={handleFilterChange} sx={{ width: 145 }}>
               <SelectItem value="">All Batches</SelectItem>
@@ -377,11 +383,33 @@ const ApplicationsList = () => {
           </div>
         )}
 
+        {/* API Error Banner */}
+        {apiError && !loading && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 flex items-start gap-3">
+            <XCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-700">Failed to load applications</p>
+              <p className="text-xs text-red-600 mt-0.5">{apiError}</p>
+              <p className="text-xs text-red-500 mt-1">Check your network connection or contact the system administrator.</p>
+            </div>
+          </div>
+        )}
+
         {/* DataGrid */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {loading && rows.length === 0 ? (
             <div className="p-10 flex justify-center">
               <InlineLoader text="Loading applications..." variant="ring" size="lg" />
+            </div>
+          ) : !apiError && rows.length === 0 && !loading ? (
+            <div className="p-16 flex flex-col items-center justify-center text-center">
+              <div className="p-4 bg-slate-100 rounded-full mb-4">
+                <Eye size={32} className="text-slate-400" />
+              </div>
+              <p className="text-base font-semibold text-slate-700">No applications found</p>
+              <p className="text-sm text-slate-400 mt-1 max-w-sm">
+                Applications appear here once candidates submit them through the candidate portal. Try adjusting your filters or check back later.
+              </p>
             </div>
           ) : (
             <DataGrid
@@ -426,11 +454,11 @@ const ApplicationsList = () => {
         <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Shortlisted')}>
           <CheckCircle size={18} style={{ marginRight: '8px' }} className="text-green-600" /> Mark Shortlisted
         </MenuItem>
-        <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Interview')}>
-          <CheckCircle size={18} style={{ marginRight: '8px' }} className="text-blue-600" /> Mark for Interview
-        </MenuItem>
         <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Rejected')}>
           <XCircle size={18} style={{ marginRight: '8px' }} className="text-red-600" /> Mark Rejected
+        </MenuItem>
+        <MenuItem onClick={() => updateStatus(selectedRow?.id, 'submitted')}>
+          <RefreshCw size={18} style={{ marginRight: '8px' }} className="text-yellow-600" /> Unshortlist (Reset)
         </MenuItem>
       </Menu>
     </div>
