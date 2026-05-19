@@ -115,6 +115,31 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
     }));
   };
 
+  // ── Real-time row-level validation (district unique + post is a non-negative int) ──
+  const rowErrors = (() => {
+    const districts = formData.district || [];
+    const posts     = formData.post || [];
+    const seen      = new Map();   // districtId → first index seen
+    return districts.map((districtId, i) => {
+      const errors = {};
+      if (districtId && seen.has(districtId)) {
+        errors.district = 'This district is already added in another row';
+      } else if (districtId) {
+        seen.set(districtId, i);
+      }
+      const postRaw = posts[i];
+      if (postRaw !== '' && postRaw !== null && postRaw !== undefined) {
+        const n = Number(postRaw);
+        if (!Number.isInteger(n) || n < 0) errors.post = 'Whole number 0 or more';
+      }
+      return errors;
+    });
+  })();
+
+  // Sum of entered posts (just informational — Step 1's num_posts is final total)
+  const totalPostsEntered = (formData.post || [])
+    .reduce((sum, p) => sum + (Number(p) || 0), 0);
+
   const addRow = () => {
     setFormData(prev => ({
       ...prev,
@@ -142,6 +167,13 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
     if (Object.keys(errs).length > 0) {
       setAgeErrors(errs);
       toast.error(errs.min_age || errs.max_age || 'Fix the age limits');
+      return;
+    }
+
+    // Block on row-level errors (duplicate districts, bad post numbers)
+    const firstRowError = rowErrors.find((re) => Object.keys(re).length > 0);
+    if (firstRowError) {
+      toast.error(firstRowError.district || firstRowError.post || 'Fix the district / post rows');
       return;
     }
 
@@ -323,7 +355,6 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
             {formData.district.map((_, index) => (
               <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                 <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
-                  
                   <TextField
                     fullWidth
                     required
@@ -334,6 +365,8 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
                     onChange={(e) =>
                       handleArrayChange(index, 'district', e.target.value)
                     }
+                    error={!!rowErrors[index]?.district}
+                    helperText={rowErrors[index]?.district || ' '}
                   >
                     <MenuItem value="">Select District</MenuItem>
 
@@ -363,13 +396,14 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
                 <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
                   <TextField
                     fullWidth
-                    required
                     type="number"
                     size="small"
-                    value={formData.post[index]}
+                    value={formData.post[index] ?? ''}
                     onChange={(e) => handleArrayChange(index, 'post', e.target.value)}
-                    placeholder="Posts"
+                    placeholder="Optional"
                     inputProps={{ min: 0 }}
+                    error={!!rowErrors[index]?.post}
+                    helperText={rowErrors[index]?.post || 'Decide later'}
                   />
                 </td>
                 <td style={{ padding: '12px 16px', verticalAlign: 'middle', textAlign: 'center' }}>
@@ -401,8 +435,19 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
           </tbody>
         </table>
       </div>
-      <div style={{ marginTop: '12px', padding: '8px 12px', backgroundColor: '#f1f5f9', borderRadius: '6px', display: 'inline-block' }}>
-        <small style={{ color: '#475569', fontWeight: '500', fontSize: '0.85rem' }}>Total Entries: {formData.district.length}</small>
+      <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ padding: '8px 12px', backgroundColor: '#f1f5f9', borderRadius: '6px' }}>
+          <small style={{ color: '#475569', fontWeight: '500', fontSize: '0.85rem' }}>
+            Districts added: <strong>{formData.district.filter(Boolean).length}</strong> / {formData.district.length}
+          </small>
+        </div>
+        {totalPostsEntered > 0 && (
+          <div style={{ padding: '8px 12px', backgroundColor: '#ecfdf5', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+            <small style={{ color: '#065f46', fontWeight: '500', fontSize: '0.85rem' }}>
+              Posts entered so far: <strong>{totalPostsEntered}</strong> (per-district allocation can be finalised later)
+            </small>
+          </div>
+        )}
       </div>
 
       <div className="navigation-buttons">
