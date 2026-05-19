@@ -115,30 +115,60 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
     }));
   };
 
-  // ── Real-time row-level validation (district unique + post is a non-negative int) ──
+  // Step 1's total — comes through the `data` prop (RequisitionForm passes all
+  // accumulated step data forward). Used as the upper bound on per-district posts.
+  const stepOneTotal = Number(data?.num_posts) || 0;
+
+  // How many rows have a post value entered? (Empty / null / undefined don't count.)
+  const isPostFilled = (v) => v !== '' && v !== null && v !== undefined;
+  const postsFilledCount = (formData.post || []).filter(isPostFilled).length;
+  const someButNotAllPostsFilled =
+    postsFilledCount > 0 && postsFilledCount < (formData.district?.length ?? 0);
+
+  // Sum of entered posts
+  const totalPostsEntered = (formData.post || [])
+    .reduce((sum, p) => sum + (Number(p) || 0), 0);
+
+  const exceedsStepOneTotal = stepOneTotal > 0 && totalPostsEntered > stepOneTotal;
+
+  // ── Real-time row-level validation ──
+  // - district required + unique across rows
+  // - posts (per row): if any row has a value, ALL rows must; non-negative int;
+  //   running sum so far cannot exceed Step 1's num_posts
   const rowErrors = (() => {
     const districts = formData.district || [];
     const posts     = formData.post || [];
-    const seen      = new Map();   // districtId → first index seen
+    const seen      = new Map();
+    let runningSum  = 0;
+
     return districts.map((districtId, i) => {
       const errors = {};
+
       if (districtId && seen.has(districtId)) {
         errors.district = 'This district is already added in another row';
       } else if (districtId) {
         seen.set(districtId, i);
       }
+
       const postRaw = posts[i];
-      if (postRaw !== '' && postRaw !== null && postRaw !== undefined) {
+      if (isPostFilled(postRaw)) {
         const n = Number(postRaw);
-        if (!Number.isInteger(n) || n < 0) errors.post = 'Whole number 0 or more';
+        if (!Number.isInteger(n) || n < 0) {
+          errors.post = 'Whole number 0 or more';
+        } else {
+          runningSum += n;
+          if (stepOneTotal > 0 && runningSum > stepOneTotal) {
+            errors.post = `Total exceeds Step 1's ${stepOneTotal} posts`;
+          }
+        }
+      } else if (someButNotAllPostsFilled) {
+        // Partial fill: this row is empty while others have values
+        errors.post = 'Fill posts for every district, or leave them all empty';
       }
+
       return errors;
     });
   })();
-
-  // Sum of entered posts (just informational — Step 1's num_posts is final total)
-  const totalPostsEntered = (formData.post || [])
-    .reduce((sum, p) => sum + (Number(p) || 0), 0);
 
   const addRow = () => {
     setFormData(prev => ({
@@ -441,10 +471,26 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
             Districts added: <strong>{formData.district.filter(Boolean).length}</strong> / {formData.district.length}
           </small>
         </div>
-        {totalPostsEntered > 0 && (
-          <div style={{ padding: '8px 12px', backgroundColor: '#ecfdf5', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
-            <small style={{ color: '#065f46', fontWeight: '500', fontSize: '0.85rem' }}>
-              Posts entered so far: <strong>{totalPostsEntered}</strong> (per-district allocation can be finalised later)
+        {postsFilledCount > 0 && (
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: '6px',
+              backgroundColor: exceedsStepOneTotal ? '#fef2f2' : '#ecfdf5',
+              border: `1px solid ${exceedsStepOneTotal ? '#fca5a5' : '#a7f3d0'}`,
+            }}
+          >
+            <small style={{ color: exceedsStepOneTotal ? '#991b1b' : '#065f46', fontWeight: 500, fontSize: '0.85rem' }}>
+              Posts entered: <strong>{totalPostsEntered}</strong>
+              {stepOneTotal > 0 && <> / {stepOneTotal} (Step 1 total)</>}
+              {exceedsStepOneTotal && <> &nbsp;— exceeds Step 1's total!</>}
+            </small>
+          </div>
+        )}
+        {someButNotAllPostsFilled && (
+          <div style={{ padding: '8px 12px', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '6px' }}>
+            <small style={{ color: '#92400e', fontWeight: 500, fontSize: '0.85rem' }}>
+              Fill posts for every district, or leave them all empty.
             </small>
           </div>
         )}
