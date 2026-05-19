@@ -168,12 +168,13 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
           <TextField
             fullWidth
             required
+            type="date"
             label="Date of Occurrence of Vacancy"
             name="vacancy_date"
             value={formData.vacancy_date}
             onChange={handleChange}
-            placeholder="Day-Month-Year (e.g., 09-September-2025)"
-            helperText="Format: DD-Month-YYYY"
+            InputLabelProps={{ shrink: true }}
+            helperText="Pick the date from the calendar"
           />
         </div>
 
