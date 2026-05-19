@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { TextField, MenuItem, FormControl, InputLabel, Select, OutlinedInput, Box, Chip, Checkbox, ListItemText } from '@mui/material';
+import { TextField, MenuItem, Box, Chip, Checkbox, ListItemText } from '@mui/material';
 import { useLocalSettings, localSettingsApi } from 'hooks/useLocalSettings';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
@@ -468,25 +468,22 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           </div>
         )}
 
-        {/* Degree of Equivalence — nested checkbox dropdown */}
+        {/* Degree of Equivalence — nested checkbox dropdown (matches sibling fields) */}
         <div className="col-md-6 form-group">
-          <FormControl fullWidth size="small">
-            <InputLabel shrink>
-              {formData.equivalent_qualification === 'Yes'
+          <TextField
+            fullWidth
+            select
+            label={
+              formData.equivalent_qualification === 'Yes'
                 ? 'Name Degree of Equivalence *'
-                : 'Name Degree of Equivalence (Optional)'}
-            </InputLabel>
-            <Select
-              multiple
-              displayEmpty
-              value={selectedDegreeList}
-              onChange={() => { /* handled via item onClick to keep menu open */ }}
-              input={<OutlinedInput notched label={
-                formData.equivalent_qualification === 'Yes'
-                  ? 'Name Degree of Equivalence *'
-                  : 'Name Degree of Equivalence (Optional)'} />}
-              renderValue={(selected) => {
-                if (!selected || selected.length === 0) return <span style={{ color: '#94a3b8' }}>Select</span>;
+                : 'Name Degree of Equivalence (Optional)'
+            }
+            value={selectedDegreeList}
+            SelectProps={{
+              multiple: true,
+              onChange: () => { /* manual state via item onClick to keep menu open */ },
+              renderValue: (selected) => {
+                if (!selected || selected.length === 0) return '';
                 if (selected.length <= 3) {
                   return (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
@@ -495,59 +492,59 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
                   );
                 }
                 return `${selected.length} degrees selected`;
-              }}
-              MenuProps={{ PaperProps: { sx: { maxHeight: 380 } } }}
-            >
-              {/* Master "Select All" */}
-              <MenuItem dense onClick={(e) => { e.preventDefault(); handleToggleAll(); }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
-                <Checkbox size="small" checked={allSelected} indeterminate={someSelected}
-                  sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }} />
-                <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
-              </MenuItem>
+              },
+              MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+            }}
+          >
+            {/* Master "Select All" */}
+            <MenuItem dense onClick={(e) => { e.preventDefault(); handleToggleAll(); }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+              <Checkbox size="small" checked={allSelected} indeterminate={someSelected}
+                sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }} />
+              <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+            </MenuItem>
 
-              {/* Groups with nested degree checkboxes */}
-              {Object.keys(groupedDegrees).sort().flatMap((groupName) => [
+            {/* Groups with nested degree checkboxes */}
+            {Object.keys(groupedDegrees).sort().flatMap((groupName) => [
+              <MenuItem
+                key={`grp-${groupName}`}
+                dense
+                onClick={(e) => { e.preventDefault(); handleToggleGroup(groupName); }}
+                sx={{ bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' } }}
+              >
+                <Checkbox
+                  size="small"
+                  checked={isGroupFullySelected(groupName)}
+                  indeterminate={isGroupPartiallySelected(groupName)}
+                  sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+                />
+                <ListItemText primary={groupName} primaryTypographyProps={{ fontSize: 12.5, fontWeight: 600, color: '#064e3b' }} />
+              </MenuItem>,
+              ...groupedDegrees[groupName].map((d) => (
                 <MenuItem
-                  key={`grp-${groupName}`}
+                  key={d.id ?? d.name}
                   dense
-                  onClick={(e) => { e.preventDefault(); handleToggleGroup(groupName); }}
-                  sx={{ bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' } }}
+                  onClick={(e) => { e.preventDefault(); handleDegreeCheckboxToggle(d.name); }}
+                  sx={{ pl: 5 }}
                 >
                   <Checkbox
                     size="small"
-                    checked={isGroupFullySelected(groupName)}
-                    indeterminate={isGroupPartiallySelected(groupName)}
-                    sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+                    checked={selectedDegreeList.includes(d.name)}
+                    sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
                   />
-                  <ListItemText primary={groupName} primaryTypographyProps={{ fontSize: 12.5, fontWeight: 600, color: '#064e3b' }} />
-                </MenuItem>,
-                ...groupedDegrees[groupName].map((d) => (
-                  <MenuItem
-                    key={d.id ?? d.name}
-                    dense
-                    onClick={(e) => { e.preventDefault(); handleDegreeCheckboxToggle(d.name); }}
-                    sx={{ pl: 5 }}
-                  >
-                    <Checkbox
-                      size="small"
-                      checked={selectedDegreeList.includes(d.name)}
-                      sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
-                    />
-                    <ListItemText primary={d.name} primaryTypographyProps={{ fontSize: 12 }} />
-                  </MenuItem>
-                )),
-              ])}
+                  <ListItemText primary={d.name} primaryTypographyProps={{ fontSize: 12 }} />
+                </MenuItem>
+              )),
+            ])}
 
-              {/* Other (custom) */}
-              <MenuItem
-                dense
-                onClick={(e) => { e.preventDefault(); setShowOther((p) => ({ ...p, degree_equivalence: true })); }}
-                sx={{ borderTop: '1px solid #e2e8f0', color: 'text.secondary', fontStyle: 'italic' }}
-              >
-                Other (specify)
-              </MenuItem>
-            </Select>
-          </FormControl>
+            {/* Other (custom) */}
+            <MenuItem
+              dense
+              onClick={(e) => { e.preventDefault(); setShowOther((p) => ({ ...p, degree_equivalence: true })); }}
+              sx={{ borderTop: '1px solid #e2e8f0', color: 'text.secondary', fontStyle: 'italic' }}
+            >
+              Other (specify)
+            </MenuItem>
+          </TextField>
 
           {showOther.degree_equivalence && (
             <OtherInput
