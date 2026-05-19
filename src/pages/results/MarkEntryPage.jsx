@@ -15,7 +15,7 @@ import { normalizeJobResponse, getJobRouteId, getJobApiId } from 'utils/jobMappe
  * Handles batch manual entry of candidate results with keyset pagination
  */
 
-const normalizeKey = (name) => name.toLowerCase().replace(/\s+/g, '_');
+const normalizeKey = (name) => name;
 
 const MarkEntryPage = () => {
   const navigate = useNavigate();
@@ -94,7 +94,13 @@ const MarkEntryPage = () => {
       if (!selectedJob) return;
       try {
         const res = await ResultsApi.getSubjectTemplates(selectedJob);
-        setSubjectTemplates(res.data || []);
+        const templates = res.data || [];
+        setSubjectTemplates(templates);
+        if (templates.length > 0) {
+          const calculatedTotal = templates.reduce((sum, t) => sum + (Number(t.max_marks) || 0), 0);
+          setTotalMaxMarks(calculatedTotal);
+          setPassingMarks(Math.ceil(calculatedTotal * 0.4));
+        }
       } catch (err) {
         console.error('Failed to load subjects', err);
       }

@@ -131,30 +131,70 @@ const AwardListPage = () => {
   };
 
   const handleMarkChange = (id, field, value) => {
-    let val = parseFloat(value);
-    if (isNaN(val)) val = 0;
-    val = Math.max(0, val);
+    let val = value;
+    if (field !== 'remarks' && field !== 'status' && field !== 'pathway') {
+      val = parseFloat(value);
+      if (isNaN(val)) val = '';
+    }
 
     setAwards(prev => prev.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: val };
 
-        // Live Recalculate Part A
-        const partAFields = ['marks_matric', 'marks_intermediate', 'marks_graduation', 'marks_masters', 'marks_additional', 'marks_bu_position'];
-        if (partAFields.includes(field)) {
-          const rawA = partAFields.reduce((sum, f) => sum + (parseFloat(updated[f]) || 0), 0);
-          updated.part_a_total = Math.min(rawA, 25);
+        if (field === 'pathway') {
+          if (value === 'traditional') {
+            updated.bs_4yr_obt = '';
+            updated.bs_4yr_total = '';
+          } else {
+            updated.grad_obt = '';
+            updated.grad_total = '';
+            updated.masters_obt = '';
+            updated.masters_total = '';
+          }
         }
 
-        // Live Recalculate Part B
-        const partBFields = ['marks_pak_kashmir', 'marks_islamic', 'marks_current_aff'];
-        if (partBFields.includes(field)) {
-          const rawB = partBFields.reduce((sum, f) => sum + (parseFloat(updated[f]) || 0), 0);
-          updated.part_b_total = Math.min(rawB, 30);
+        // Live calculation logic in React
+        const matricObt = parseFloat(updated.matric_obt) || 0;
+        const matricTotal = parseFloat(updated.matric_total) || 0;
+        const marks_matric = matricTotal > 0 ? Math.min((matricObt / matricTotal) * 2.0, 2.0) : 0.0;
+
+        const interObt = parseFloat(updated.inter_obt) || 0;
+        const interTotal = parseFloat(updated.inter_total) || 0;
+        const marks_intermediate = interTotal > 0 ? Math.min((interObt / interTotal) * 3.0, 3.0) : 0.0;
+
+        const bsObt = parseFloat(updated.bs_4yr_obt) || 0;
+        const bsTotal = parseFloat(updated.bs_4yr_total) || 0;
+        let pathWeight = 0.0;
+
+        if (bsTotal > 0 || updated.pathway === 'bs') {
+          pathWeight = bsTotal > 0 ? Math.min((bsObt / bsTotal) * 15.0, 15.0) : 0.0;
+          updated.marks_graduation = 0.0;
+          updated.marks_masters = 0.0;
+        } else {
+          const gradObt = parseFloat(updated.grad_obt) || 0;
+          const gradTotal = parseFloat(updated.grad_total) || 0;
+          updated.marks_graduation = gradTotal > 0 ? Math.min((gradObt / gradTotal) * 4.0, 4.0) : 0.0;
+
+          const mastersObt = parseFloat(updated.masters_obt) || 0;
+          const mastersTotal = parseFloat(updated.masters_total) || 0;
+          updated.marks_masters = mastersTotal > 0 ? Math.min((mastersObt / mastersTotal) * 11.0, 11.0) : 0.0;
+
+          pathWeight = updated.marks_graduation + updated.marks_masters;
         }
 
-        // Live Recalculate Grand Total
-        updated.grand_total = Math.min((updated.part_a_total || 0) + (updated.part_b_total || 0), 55);
+        updated.marks_bu_position = Math.min(parseFloat(updated.board_position_marks) || 0, 1.0);
+        updated.marks_additional = Math.min(parseFloat(updated.mphil_phd_marks) || 0, 2.0);
+
+        updated.part_a_total = parseFloat(Math.min(
+          marks_matric + marks_intermediate + pathWeight + updated.marks_bu_position + updated.marks_additional,
+          25.00
+        ).toFixed(2));
+
+        updated.mcq_test_marks = parseFloat(Math.min(parseFloat(updated.mcq_test_marks) || 0, 45.00).toFixed(2));
+        updated.interview_marks = parseFloat(Math.min(parseFloat(updated.interview_marks) || 0, 30.00).toFixed(2));
+        updated.part_b_total = updated.interview_marks;
+
+        updated.grand_total = parseFloat(Math.min(updated.part_a_total + updated.mcq_test_marks + updated.part_b_total, 100.00).toFixed(2));
 
         return updated;
       }
@@ -170,25 +210,28 @@ const AwardListPage = () => {
       const award = latestAwardsRef.current.find(a => a.id === id);
       if (!award) return;
 
-      // Extract only the fields we want to save
       const payload = {
-        marks_matric: field === 'marks_matric' ? val : award.marks_matric,
-        marks_intermediate: field === 'marks_intermediate' ? val : award.marks_intermediate,
-        marks_graduation: field === 'marks_graduation' ? val : award.marks_graduation,
-        marks_masters: field === 'marks_masters' ? val : award.marks_masters,
-        marks_additional: field === 'marks_additional' ? val : award.marks_additional,
-        marks_bu_position: field === 'marks_bu_position' ? val : award.marks_bu_position,
-        marks_pak_kashmir: field === 'marks_pak_kashmir' ? val : award.marks_pak_kashmir,
-        marks_islamic: field === 'marks_islamic' ? val : award.marks_islamic,
-        marks_current_aff: field === 'marks_current_aff' ? val : award.marks_current_aff,
-        status: field === 'status' ? value : award.status,
-        remarks: field === 'remarks' ? value : award.remarks,
+        matric_obt: award.matric_obt === '' ? null : parseFloat(award.matric_obt) || 0,
+        matric_total: award.matric_total === '' ? null : parseFloat(award.matric_total) || 0,
+        inter_obt: award.inter_obt === '' ? null : parseFloat(award.inter_obt) || 0,
+        inter_total: award.inter_total === '' ? null : parseFloat(award.inter_total) || 0,
+        grad_obt: award.grad_obt === '' ? null : parseFloat(award.grad_obt) || 0,
+        grad_total: award.grad_total === '' ? null : parseFloat(award.grad_total) || 0,
+        masters_obt: award.masters_obt === '' ? null : parseFloat(award.masters_obt) || 0,
+        masters_total: award.masters_total === '' ? null : parseFloat(award.masters_total) || 0,
+        bs_4yr_obt: award.bs_4yr_obt === '' ? null : parseFloat(award.bs_4yr_obt) || 0,
+        bs_4yr_total: award.bs_4yr_total === '' ? null : parseFloat(award.bs_4yr_total) || 0,
+        board_position_marks: parseFloat(award.board_position_marks) || 0,
+        mphil_phd_marks: parseFloat(award.mphil_phd_marks) || 0,
+        mcq_test_marks: parseFloat(award.mcq_test_marks) || 0,
+        interview_marks: parseFloat(award.interview_marks) || 0,
+        status: award.status,
+        remarks: award.remarks,
       };
 
       setSavingRows(prev => ({ ...prev, [id]: true }));
       try {
         const res = await ResultsApi.patchAward(id, payload, award.version);
-        // Update local version from server response
         setAwards(prev => prev.map(a => a.id === id ? { ...a, version: res.data.version } : a));
       } catch (err) {
         if (err.status === 409) {
@@ -199,23 +242,68 @@ const AwardListPage = () => {
       } finally {
         setSavingRows(prev => ({ ...prev, [id]: false }));
       }
-    }, 1500); // 1.5 second debounce
+    }, 1500);
+  };
+
+  const handleDownloadTemplate = async () => {
+    if (!selectedJob) return;
+    try {
+      toast.loading('Generating Pre-filled Template...', { id: 'temp-download' });
+      const blob = await ResultsApi.downloadAwardTemplate(selectedJob, selectedDistrict);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Interview_Award_Template_${selectedJob}_${selectedDistrict}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Template downloaded successfully!', { id: 'temp-download' });
+    } catch (err) {
+      toast.error('Failed to download template', { id: 'temp-download' });
+    }
+  };
+
+  const handleImportCSV = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('job_post_id', selectedJob);
+    formData.append('district', selectedDistrict);
+
+    setLoading(true);
+    try {
+      toast.loading('Importing and recalculating...', { id: 'csv-import' });
+      const res = await ResultsApi.importAwards(formData);
+      if (res.success) {
+        toast.success(res.message, { id: 'csv-import' });
+        if (res.errors && res.errors.length > 0) {
+          console.warn('Import skipped rows:', res.errors);
+          toast.error(`${res.errors.length} rows failed to import. Check console/details.`, { duration: 6000 });
+        }
+        handleLoadList();
+      } else {
+        toast.error(res.message || 'Import failed', { id: 'csv-import' });
+      }
+    } catch (err) {
+      toast.error('Failed to import CSV file', { id: 'csv-import' });
+    } finally {
+      setLoading(false);
+      e.target.value = '';
+    }
   };
 
   const handleAutoRank = () => {
     const sorted = [...awards].sort((a, b) => {
-      // Priority 1: Grand Total
       if (b.grand_total !== a.grand_total) return b.grand_total - a.grand_total;
-      // Priority 2: Part A
       if (b.part_a_total !== a.part_a_total) return b.part_a_total - a.part_a_total;
-      // Fallback: Internal ID stability
       return (a.id || 0) - (b.id || 0);
     });
 
     setAwards(sorted.map((item, index) => ({
       ...item,
-      merit_rank: index + 1,
-      status: (index < 5) ? 'Selected' : 'Provisional' // Dummy selection logic
+      merit_rank: index + 1
     })));
 
     toast.success('Ranks auto-computed!');
@@ -224,15 +312,35 @@ const AwardListPage = () => {
   const handleExportCSV = () => {
     if (!awards.length) return;
 
-    const headers = ['Rank', 'Roll Number', 'Candidate Name', 'Part-A Total', 'Part-B Total', 'Grand Total', 'Status'];
+    const headers = [
+      'Rank', 'Roll Number', 'Candidate Name',
+      'Matric Obt', 'Matric Total', 'Intermediate Obt', 'Intermediate Total',
+      'BA/BSc Obt', 'BA/BSc Total', 'MA/MSc Obt', 'MA/MSc Total',
+      'BS 4-Year Obt', 'BS 4-Year Total', 'Board Position (0 or 1)', 'M.Phil or PhD',
+      'Academic Total (A)', 'MCQs Test Marks (B)', 'Interview Marks (C)', 'Grand Total', 'Status'
+    ];
+
     const csvContent = [
       headers.join(','),
       ...awards.map(row => [
         row.merit_rank || '-',
         row.application?.application_number || 'TBD',
-        `"${row.application?.candidate_name}"`, // Quote names for safety
+        `"${row.application?.candidate_name}"`,
+        row.matric_obt ?? '',
+        row.matric_total ?? '',
+        row.inter_obt ?? '',
+        row.inter_total ?? '',
+        row.grad_obt ?? '',
+        row.grad_total ?? '',
+        row.masters_obt ?? '',
+        row.masters_total ?? '',
+        row.bs_4yr_obt ?? '',
+        row.bs_4yr_total ?? '',
+        row.board_position_marks ?? 0,
+        row.mphil_phd_marks ?? 0,
         row.part_a_total || 0,
-        row.part_b_total || 0,
+        row.mcq_test_marks || 0,
+        row.interview_marks || 0,
         row.grand_total || 0,
         row.status || 'Provisional'
       ].join(','))
@@ -253,23 +361,20 @@ const AwardListPage = () => {
   const handleExportPDF = () => {
     if (!awards.length) return;
 
-    const doc = new jsPDF('p', 'mm', 'a4');
+    const doc = new jsPDF('l', 'mm', 'a4'); // Use landscape for wider table
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Header - Official Branded
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text('Azad Jammu & Kashmir Public Service Commission', pageWidth / 2, 15, { align: 'center' });
 
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    doc.text('Interview Award List', pageWidth / 2, 22, { align: 'center' });
+    doc.text('Interview Award List (Standard Layout)', pageWidth / 2, 22, { align: 'center' });
 
-    // Horizontal Line
     doc.setDrawColor(200, 200, 200);
     doc.line(15, 26, pageWidth - 15, 26);
 
-    // Job Details Block
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('Post:', 15, 35);
@@ -291,20 +396,20 @@ const AwardListPage = () => {
     doc.setFont('helvetica', 'normal');
     doc.text(new Date().toLocaleDateString(), 145, 42);
 
-    // Table
     const tableData = awards.map(row => [
       row.merit_rank || '-',
       row.application?.application_number || 'TBD',
       row.application?.candidate_name,
-      row.part_a_total,
-      row.part_b_total,
-      row.grand_total,
+      row.part_a_total || '0.00',
+      row.mcq_test_marks || '0.00',
+      row.interview_marks || '0.00',
+      row.grand_total || '0.00',
       (row.status || 'Provisional').toUpperCase()
     ]);
 
     autoTable(doc, {
       startY: 50,
-      head: [['Rank', 'Roll No', 'Candidate Name', 'Part-A', 'Part-B', 'Grand Total', 'Status']],
+      head: [['Rank', 'Roll No', 'Candidate Name', 'Academic (A) [25]', 'Written (B) [45]', 'Interview (C) [30]', 'Grand Total [100]', 'Status']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
@@ -313,14 +418,14 @@ const AwardListPage = () => {
         0: { cellWidth: 15, halign: 'center' },
         1: { cellWidth: 35 },
         2: { cellWidth: 'auto' },
-        3: { cellWidth: 20, halign: 'center' },
-        4: { cellWidth: 20, halign: 'center' },
-        5: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
-        6: { cellWidth: 30, halign: 'center' }
+        3: { cellWidth: 30, halign: 'center' },
+        4: { cellWidth: 30, halign: 'center' },
+        5: { cellWidth: 30, halign: 'center' },
+        6: { cellWidth: 35, halign: 'center', fontStyle: 'bold' },
+        7: { cellWidth: 30, halign: 'center' }
       }
     });
 
-    // Signature Area
     const finalY = doc.lastAutoTable.finalY + 30;
     doc.line(15, finalY, 65, finalY);
     doc.text('Interview Secretary', 25, finalY + 5);
@@ -339,15 +444,21 @@ const AwardListPage = () => {
         job_post_id: selectedJob,
         awards: awards.map(a => ({
           application_id: a.application_id,
-          marks_matric: a.marks_matric ?? 0,
-          marks_intermediate: a.marks_intermediate ?? 0,
-          marks_graduation: a.marks_graduation ?? 0,
-          marks_masters: a.marks_masters ?? 0,
-          marks_additional: a.marks_additional ?? 0,
-          marks_bu_position: a.marks_bu_position ?? 0,
-          marks_pak_kashmir: a.marks_pak_kashmir ?? 0,
-          marks_islamic: a.marks_islamic ?? 0,
-          marks_current_aff: a.marks_current_aff ?? 0,
+          matric_obt: a.matric_obt ?? null,
+          matric_total: a.matric_total ?? null,
+          inter_obt: a.inter_obt ?? null,
+          inter_total: a.inter_total ?? null,
+          grad_obt: a.grad_obt ?? null,
+          grad_total: a.grad_total ?? null,
+          masters_obt: a.masters_obt ?? null,
+          masters_total: a.masters_total ?? null,
+          bs_4yr_obt: a.bs_4yr_obt ?? null,
+          bs_4yr_total: a.bs_4yr_total ?? null,
+          board_position_marks: a.board_position_marks ?? 0,
+          mphil_phd_marks: a.mphil_phd_marks ?? 0,
+          mcq_test_marks: a.mcq_test_marks ?? 0,
+          interview_marks: a.interview_marks ?? 0,
+          remarks: a.remarks ?? '',
           merit_rank: a.merit_rank,
           status: a.status ?? 'Provisional'
         }))
@@ -393,53 +504,60 @@ const AwardListPage = () => {
         </div>
       </div>
 
-      <div className="px-8 mt-8 grid grid-cols-12 gap-8 max-w-[1700px] mx-auto w-full">
-        {/* Left Panel: Configuration */}
-        <div className="col-span-3 space-y-6">
-          {isInitialized && currentJob && (
-            <Card className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/70 text-white space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Users size={20} />
+      <div className="px-8 mt-8 space-y-8 max-w-[1700px] mx-auto w-full">
+        {/* Top Panels: Configuration Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {isInitialized && currentJob ? (
+            <Card className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/70 text-white space-y-4 flex flex-col justify-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/20 rounded-xl">
+                  <Users size={22} />
                 </div>
-                <h4 className="font-black uppercase tracking-widest text-[10px]">Context Header</h4>
+                <div>
+                  <h4 className="font-black uppercase tracking-widest text-[9px] text-indigo-200">Context Header</h4>
+                  <p className="text-sm font-black leading-tight mt-0.5">{currentJob.designation}</p>
+                </div>
               </div>
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-white/10">
                 <div>
-                  <label className="text-[8px] font-black uppercase text-indigo-200">Post Title</label>
-                  <p className="text-sm font-black leading-tight">{currentJob.designation}</p>
+                  <label className="text-[7px] font-black uppercase text-indigo-200 block">Case No.</label>
+                  <p className="text-xs font-bold">#{currentJob.id}</p>
                 </div>
                 <div>
-                  <label className="text-[8px] font-black uppercase text-indigo-200">Case No.</label>
-                  <p className="text-xs font-bold">#{currentJob.id} - {selectedDistrict}</p>
+                  <label className="text-[7px] font-black uppercase text-indigo-200 block">District</label>
+                  <p className="text-xs font-bold uppercase">{selectedDistrict}</p>
                 </div>
-                <div className="flex gap-4">
-                  <div>
-                    <label className="text-[8px] font-black uppercase text-indigo-200">Interview</label>
-                    <p className="text-[10px] font-bold">{interviewDate}</p>
-                  </div>
-                  <div>
-                    <label className="text-[8px] font-black uppercase text-indigo-200">Doc Date</label>
-                    <p className="text-[10px] font-bold">{lastDocDate}</p>
-                  </div>
+                <div>
+                  <label className="text-[7px] font-black uppercase text-indigo-200 block">Interview Date</label>
+                  <p className="text-xs font-bold">{interviewDate}</p>
+                </div>
+                <div>
+                  <label className="text-[7px] font-black uppercase text-indigo-200 block">Last Doc Date</label>
+                  <p className="text-xs font-bold">{lastDocDate}</p>
                 </div>
               </div>
             </Card>
+          ) : (
+            <Card className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/5 border-2 border-indigo-200/10 text-indigo-400 flex flex-col items-center justify-center text-center">
+              <Users size={28} className="mb-2 opacity-55" />
+              <h4 className="font-black uppercase tracking-widest text-[9px] tracking-wider">No Active Selection</h4>
+              <p className="text-[9px] mt-1 text-slate-400">Load or create a new award list below to view the context.</p>
+            </Card>
           )}
 
-          <Card className="border-none shadow-2xl rounded-[2.5rem] p-8 space-y-6 bg-white overflow-hidden">
+          <Card className="border-none shadow-2xl rounded-[2.5rem] p-6 space-y-4 bg-white overflow-hidden">
             <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
               <Filter size={14} className="text-indigo-500" />
               List Criteria
             </h3>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Job Post</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Job Post</label>
                 <select
                   value={selectedJob}
                   onChange={(e) => setSelectedJob(e.target.value)}
-                  className="w-full h-14 px-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700"
+                  className="w-full h-10 px-2 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700 text-[10px]"
                 >
                   <option value="">Select Job...</option>
                   {jobs.map(job => (
@@ -450,12 +568,12 @@ const AwardListPage = () => {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">District</label>
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">District</label>
                 <select
                   value={selectedDistrict}
                   onChange={(e) => setSelectedDistrict(e.target.value)}
-                  className="w-full h-14 px-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700"
+                  className="w-full h-10 px-2 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700 text-[10px]"
                 >
                   {districts.map(d => (
                     <option key={d} value={d}>{d === 'all' ? 'All Districts' : d}</option>
@@ -463,236 +581,423 @@ const AwardListPage = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Interview Date</label>
-                  <Input
-                    type="date"
-                    value={interviewDate}
-                    onChange={(e) => setInterviewDate(e.target.value)}
-                    className="h-14 rounded-2xl bg-slate-50 border-2 border-slate-100"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Last Doc Date</label>
-                  <Input
-                    type="date"
-                    value={lastDocDate}
-                    onChange={(e) => setLastDocDate(e.target.value)}
-                    className="h-14 rounded-2xl bg-slate-50 border-2 border-slate-100"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Interview Date</label>
+                <Input
+                  type="date"
+                  value={interviewDate}
+                  onChange={(e) => setInterviewDate(e.target.value)}
+                  className="h-10 rounded-xl bg-slate-50 border-2 border-slate-100 text-[10px]"
+                />
               </div>
 
-              <div className="pt-4 space-y-3">
-                <Button
-                  onClick={() => handleLoadList()}
-                  loading={loading}
-                  className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-100"
-                >
-                  Load Award List
-                </Button>
-
-                <Button
-                  onClick={handleInitialize}
-                  variant="outline"
-                  className="w-full h-14 rounded-2xl border-2 border-indigo-100 text-indigo-600 font-black text-xs uppercase tracking-widest hover:bg-indigo-50"
-                >
-                  Create Award List
-                </Button>
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Last Doc Date</label>
+                <Input
+                  type="date"
+                  value={lastDocDate}
+                  onChange={(e) => setLastDocDate(e.target.value)}
+                  className="h-10 rounded-xl bg-slate-50 border-2 border-slate-100 text-[10px]"
+                />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <Button
+                onClick={() => handleLoadList()}
+                loading={loading}
+                className="h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-100 border-none animate-all"
+              >
+                Load List
+              </Button>
+
+              <Button
+                onClick={handleInitialize}
+                variant="outline"
+                className="h-9 rounded-xl border-2 border-indigo-100 text-indigo-600 font-black text-[9px] uppercase tracking-widest hover:bg-indigo-50"
+              >
+                Create New
+              </Button>
             </div>
           </Card>
 
-          <div className="p-8 bg-emerald-600 rounded-[2.5rem] text-white space-y-4 shadow-2xl relative overflow-hidden">
-            <h4 className="font-black uppercase tracking-widest text-[10px] text-emerald-200">Quick Reference</h4>
-            <div className="space-y-3 relative z-10">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-emerald-100">Part A Cap</span>
-                <span className="text-xs font-black">25.0</span>
+          <div className="p-5 bg-emerald-600 rounded-[2rem] text-white shadow-xl relative overflow-hidden self-start">
+            <div>
+              <h4 className="font-black uppercase tracking-widest text-[9px] text-emerald-200 mb-2.5">Quick Reference Limits</h4>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-white/10 p-2 rounded-xl">
+                  <span className="text-[7px] font-black text-emerald-200 block uppercase">Acad (A)</span>
+                  <span className="text-xs font-black mt-0.5 block">25.0</span>
+                </div>
+                <div className="bg-white/10 p-2 rounded-xl">
+                  <span className="text-[7px] font-black text-emerald-200 block uppercase">Written (B)</span>
+                  <span className="text-xs font-black mt-0.5 block">45.0</span>
+                </div>
+                <div className="bg-white/10 p-2 rounded-xl">
+                  <span className="text-[7px] font-black text-emerald-200 block uppercase">Viva (C)</span>
+                  <span className="text-xs font-black mt-0.5 block">30.0</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-emerald-100">Part B Cap</span>
-                <span className="text-xs font-black">30.0</span>
-              </div>
-              <div className="h-px bg-white/20 my-2"></div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-black text-white uppercase">Grand Total</span>
-                <span className="text-lg font-black underline decoration-2 underline-offset-4">55.0</span>
-              </div>
+            </div>
+            <div className="pt-2.5 border-t border-white/20 mt-2.5 flex justify-between items-center">
+              <span className="text-[9px] font-black text-white uppercase tracking-widest">Grand Total Limit</span>
+              <span className="text-xs font-black underline decoration-2 underline-offset-4">100.0 Marks</span>
             </div>
           </div>
         </div>
 
-        {/* Right Panel: Scoring Table */}
-        <div className="col-span-9 space-y-6">
-          {!isInitialized ? (
-            <div className="h-[650px] bg-white rounded-[3.5rem] border-4 border-dashed border-slate-100 flex flex-col items-center justify-center text-center p-12">
-              <div className="p-10 bg-slate-50 rounded-full mb-8">
-                <Trophy size={100} strokeWidth={1} className="text-slate-200" />
-              </div>
-              <h2 className="text-3xl font-black text-slate-300 uppercase tracking-widest">Awaiting List Selection</h2>
-              <p className="text-slate-400 font-medium max-w-sm mt-4 leading-relaxed">
-                Initialize a new list or load an existing draft to begin candidate scoring and merit ranking.
-              </p>
+        {/* Scoring Table - Full Width */}
+        {!isInitialized ? (
+          <div className="h-[650px] bg-white rounded-[3.5rem] border-4 border-dashed border-slate-100 flex flex-col items-center justify-center text-center p-12 shadow-sm">
+            <div className="p-10 bg-slate-50 rounded-full mb-8">
+              <Trophy size={100} strokeWidth={1} className="text-slate-200" />
             </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Stats Bar */}
-              <div className="bg-white p-5 rounded-[2rem] shadow-xl flex items-center justify-between border border-slate-100">
-                <div className="flex items-center gap-10 px-6">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Candidates</span>
-                    <span className="text-2xl font-black text-slate-900">{awards.length}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">District</span>
-                    <span className="text-xs font-black text-indigo-600 uppercase bg-indigo-50 px-4 py-1.5 rounded-full mt-1">
-                      {selectedDistrict}
-                    </span>
-                  </div>
+            <h2 className="text-3xl font-black text-slate-300 uppercase tracking-widest">Awaiting List Selection</h2>
+            <p className="text-slate-400 font-medium max-w-sm mt-4 leading-relaxed">
+              Initialize a new list or load an existing draft to begin candidate scoring and merit ranking.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Stats Bar */}
+            <div className="bg-white p-5 rounded-[2rem] shadow-xl flex items-center justify-between border border-slate-100">
+              <div className="flex items-center gap-10 px-6">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Candidates</span>
+                  <span className="text-2xl font-black text-slate-900">{awards.length}</span>
                 </div>
-
-                <div className="flex items-center gap-4">
-                  <Button
-                    onClick={handleExportCSV}
-                    className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
-                  >
-                    <TableIcon size={16} />
-                    Export CSV
-                  </Button>
-                  <Button
-                    onClick={handleExportPDF}
-                    className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
-                  >
-                    <FileText size={16} />
-                    Export PDF
-                  </Button>
-                  <Button
-                    onClick={handleAutoRank}
-                    className="h-14 px-8 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-widest flex items-center gap-3 border-none shadow-xl shadow-emerald-100"
-                  >
-                    <RefreshCw size={18} />
-                    Run Auto-Rank
-                  </Button>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">District</span>
+                  <span className="text-xs font-black text-indigo-600 uppercase bg-indigo-50 px-4 py-1.5 rounded-full mt-1">
+                    {selectedDistrict}
+                  </span>
                 </div>
               </div>
 
-              {/* Advanced Scoring Table */}
-              <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="px-6 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Rank</th>
-                        <th className="px-6 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Candidate</th>
-                        <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-blue-50/40">Part-A (25)</th>
-                        <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-indigo-50/40">Part-B (30)</th>
-                        <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-emerald-50/40">Grand (55)</th>
-                        <th className="px-6 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
+              <div className="flex items-center gap-4">
+                <input
+                  type="file"
+                  id="award-csv-file"
+                  accept=".csv,.txt"
+                  className="hidden"
+                  onChange={handleImportCSV}
+                />
+                <Button
+                  onClick={handleDownloadTemplate}
+                  className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
+                >
+                  <FileText size={16} />
+                  Download Template
+                </Button>
+                <Button
+                  onClick={() => document.getElementById('award-csv-file').click()}
+                  className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
+                >
+                  <TableIcon size={16} />
+                  Import CSV
+                </Button>
+                <Button
+                  onClick={handleExportCSV}
+                  className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
+                >
+                  <TableIcon size={16} />
+                  Export CSV
+                </Button>
+                <Button
+                  onClick={handleExportPDF}
+                  className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
+                >
+                  <FileText size={16} />
+                  Export PDF
+                </Button>
+                <Button
+                  onClick={handleAutoRank}
+                  className="h-14 px-8 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-widest flex items-center gap-3 border-none shadow-xl shadow-emerald-100"
+                >
+                  <RefreshCw size={18} />
+                  Run Auto-Rank
+                </Button>
+              </div>
+            </div>
+
+            {/* Advanced Scoring Table */}
+            <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="px-6 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Rank</th>
+                      <th className="px-6 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Candidate</th>
+                      <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-blue-50/40">Part-A: Academic Credentials (25)</th>
+                      <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/40">Written Exam (45)</th>
+                      <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-indigo-50/40">Interview Viva (30)</th>
+                      <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-emerald-50/40">Grand (100)</th>
+                      <th className="px-6 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {awards.map((row, index) => (
+                      <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-6 py-6">
+                          <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center text-base font-black ${index < 3 ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-slate-100 text-slate-400'
+                            }`}>
+                            {row.merit_rank || '-'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-6">
+                          <div className="flex flex-col relative w-[180px]">
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-slate-900 text-sm leading-tight">{row.application?.candidate_name}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1 text-slate-400">
+                              <Clock size={10} />
+                              <span className="text-[9px] font-bold uppercase tracking-wider">Applied: {row.application?.application_number}</span>
+                            </div>
+                            {savingRows[row.id] && (
+                              <div className="flex items-center gap-1 mt-0.5 animate-pulse">
+                                <div className="w-1 h-1 bg-indigo-500 rounded-full"></div>
+                                <span className="text-[7px] font-black text-indigo-500 uppercase tracking-widest">Autosaving...</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Part-A: Academics */}
+                        <td className="px-4 py-6 bg-blue-50/5">
+                          <div className="flex flex-col gap-2 w-[340px] mx-auto text-left">
+                            {/* Matric and Inter Row */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-[8px] font-black text-slate-400 uppercase">Matric (Obt/Tot)</span>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={row.matric_obt ?? ''}
+                                    placeholder="Obt"
+                                    onChange={(e) => handleMarkChange(row.id, 'matric_obt', e.target.value)}
+                                    className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                  />
+                                  <span className="text-slate-300">/</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={row.matric_total ?? ''}
+                                    placeholder="Total"
+                                    onChange={(e) => handleMarkChange(row.id, 'matric_total', e.target.value)}
+                                    className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[8px] font-black text-slate-400 uppercase">Inter (Obt/Tot)</span>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={row.inter_obt ?? ''}
+                                    placeholder="Obt"
+                                    onChange={(e) => handleMarkChange(row.id, 'inter_obt', e.target.value)}
+                                    className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                  />
+                                  <span className="text-slate-300">/</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={row.inter_total ?? ''}
+                                    placeholder="Total"
+                                    onChange={(e) => handleMarkChange(row.id, 'inter_total', e.target.value)}
+                                    className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Pathway Selection */}
+                            <div className="flex items-center gap-2 my-1">
+                              <span className="text-[8px] font-black text-slate-400 uppercase">Path:</span>
+                              <select
+                                value={row.bs_4yr_total > 0 || row.pathway === 'bs' ? 'bs' : 'traditional'}
+                                onChange={(e) => handleMarkChange(row.id, 'pathway', e.target.value)}
+                                className="h-7 text-[10px] font-black text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 focus:border-blue-400 focus:ring-0 cursor-pointer"
+                              >
+                                <option value="traditional">Traditional (BA/BSc + MA/MSc)</option>
+                                <option value="bs">BS 4-Years</option>
+                              </select>
+                            </div>
+
+                            {/* Degree Inputs Conditional */}
+                            {!(row.bs_4yr_total > 0 || row.pathway === 'bs') ? (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <span className="text-[8px] font-black text-slate-400 uppercase">BA/BSc (Obt/Tot)</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      min="0"
+                                      value={row.grad_obt ?? ''}
+                                      placeholder="Obt"
+                                      onChange={(e) => handleMarkChange(row.id, 'grad_obt', e.target.value)}
+                                      className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                    />
+                                    <span className="text-slate-300">/</span>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      min="0"
+                                      value={row.grad_total ?? ''}
+                                      placeholder="Total"
+                                      onChange={(e) => handleMarkChange(row.id, 'grad_total', e.target.value)}
+                                      className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-[8px] font-black text-slate-400 uppercase">MA/MSc (Obt/Tot)</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      min="0"
+                                      value={row.masters_obt ?? ''}
+                                      placeholder="Obt"
+                                      onChange={(e) => handleMarkChange(row.id, 'masters_obt', e.target.value)}
+                                      className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                    />
+                                    <span className="text-slate-300">/</span>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      min="0"
+                                      value={row.masters_total ?? ''}
+                                      placeholder="Total"
+                                      onChange={(e) => handleMarkChange(row.id, 'masters_total', e.target.value)}
+                                      className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="text-[8px] font-black text-slate-400 uppercase">BS 4-Year (Obt/Tot)</span>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={row.bs_4yr_obt ?? ''}
+                                    placeholder="Obt"
+                                    onChange={(e) => handleMarkChange(row.id, 'bs_4yr_obt', e.target.value)}
+                                    className="w-[48%] h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                  />
+                                  <span className="text-slate-300">/</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={row.bs_4yr_total ?? ''}
+                                    placeholder="Total"
+                                    onChange={(e) => handleMarkChange(row.id, 'bs_4yr_total', e.target.value)}
+                                    className="w-[48%] h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Extras */}
+                            <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-100 items-end">
+                              <div>
+                                <label className="text-[7px] font-black text-slate-400 uppercase text-center block mb-1">Position (0/1)</label>
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  max="1"
+                                  value={row.board_position_marks ?? '0'}
+                                  onChange={(e) => handleMarkChange(row.id, 'board_position_marks', e.target.value)}
+                                  className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[7px] font-black text-slate-400 uppercase text-center block mb-1">PG (0/1/2)</label>
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  max="2"
+                                  value={row.mphil_phd_marks ?? '0'}
+                                  onChange={(e) => handleMarkChange(row.id, 'mphil_phd_marks', e.target.value)}
+                                  className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                                />
+                              </div>
+                              <div className="flex flex-col items-end justify-center h-8">
+                                <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest leading-none">Acad Sub A</span>
+                                <span className="text-sm font-black text-blue-700 leading-tight mt-0.5">{row.part_a_total || '0.00'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Written MCQ: scaled out of 45 */}
+                        <td className="px-4 py-6 bg-slate-50/10 text-center">
+                          <div className="flex flex-col items-center gap-1 w-[90px] mx-auto">
+                            <label className="text-[8px] font-black text-slate-400 uppercase">Written (45)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              max="45"
+                              value={row.mcq_test_marks ?? ''}
+                              onChange={(e) => handleMarkChange(row.id, 'mcq_test_marks', e.target.value)}
+                              className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-blue-400 focus:ring-0 shadow-sm"
+                            />
+                          </div>
+                        </td>
+
+                        {/* Part-B: Interview Viva */}
+                        <td className="px-4 py-6 bg-indigo-50/5 text-center">
+                          <div className="flex flex-col items-center gap-1 w-[90px] mx-auto">
+                            <label className="text-[8px] font-black text-slate-400 uppercase">Viva (30)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              max="30"
+                              value={row.interview_marks ?? ''}
+                              onChange={(e) => handleMarkChange(row.id, 'interview_marks', e.target.value)}
+                              className="w-full h-8 text-center bg-white border-2 border-slate-100 rounded-lg text-xs font-bold text-slate-700 focus:border-indigo-400 focus:ring-0 shadow-sm"
+                            />
+                          </div>
+                        </td>
+
+                        {/* Grand Total */}
+                        <td className="px-6 py-6 bg-emerald-50/5 text-center">
+                          <div className="flex flex-col items-center">
+                            <span className="text-2xl font-black text-slate-900 leading-none">{row.grand_total || '0.00'}</span>
+                            <div className="w-12 h-1 bg-emerald-500 rounded-full mt-2"></div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-6 text-right">
+                          <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest ${row.status === 'Selected' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                            {row.status === 'Selected' ? <UserCheck size={14} /> : <Clock size={14} />}
+                            {row.status || 'Provisional'}
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {awards.map((row, index) => (
-                        <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-6 py-6">
-                            <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center text-base font-black ${index < 3 ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-slate-100 text-slate-400'
-                              }`}>
-                              {row.merit_rank || '-'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-6">
-                            <div className="flex flex-col relative">
-                              <div className="flex items-center gap-2">
-                                <span className="font-black text-slate-900 text-base leading-tight">{row.application?.candidate_name}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 mt-1 text-slate-400">
-                                <Clock size={10} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Applied: {row.application?.application_number}</span>
-                              </div>
-                              {savingRows[row.id] && (
-                                <div className="flex items-center gap-1 mt-0.5 animate-pulse">
-                                  <div className="w-1 h-1 bg-indigo-500 rounded-full"></div>
-                                  <span className="text-[7px] font-black text-indigo-500 uppercase tracking-widest">Autosaving...</span>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Part-A: Academics */}
-                          <td className="px-4 py-6 bg-blue-50/5">
-                            <div className="grid grid-cols-3 gap-2 w-[220px] mx-auto">
-                              {['marks_matric', 'marks_intermediate', 'marks_graduation', 'marks_masters', 'marks_additional', 'marks_bu_position'].map(field => (
-                                <div key={field} className="group/field">
-                                  <label className="text-[7px] font-black text-slate-400 uppercase text-center block mb-1">
-                                    {field.split('_')[1].substring(0, 3)}
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.5"
-                                    min="0"
-                                    value={row[field] ?? ''}
-                                    onChange={(e) => handleMarkChange(row.id, field, e.target.value)}
-                                    className="w-full h-9 text-center bg-white border-2 border-slate-100 rounded-xl text-xs font-black text-slate-700 focus:border-blue-400 focus:ring-0 transition-all shadow-sm"
-                                  />
-                                </div>
-                              ))}
-                              <div className="col-span-3 mt-1 pt-2 border-t border-slate-100 flex justify-between items-center px-2">
-                                <span className="text-[9px] font-black text-blue-500 uppercase">Sub A</span>
-                                <span className="text-sm font-black text-blue-700">{row.part_a_total || '0.00'}</span>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Part-B: Interview */}
-                          <td className="px-4 py-6 bg-indigo-50/5">
-                            <div className="grid grid-cols-3 gap-2 w-[180px] mx-auto">
-                              {['marks_pak_kashmir', 'marks_islamic', 'marks_current_aff'].map(field => (
-                                <div key={field}>
-                                  <label className="text-[7px] font-black text-slate-400 uppercase text-center block mb-1">
-                                    {field.split('_')[1].substring(0, 3)}
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.5"
-                                    min="0"
-                                    value={row[field] ?? ''}
-                                    onChange={(e) => handleMarkChange(row.id, field, e.target.value)}
-                                    className="w-full h-9 text-center bg-white border-2 border-slate-100 rounded-xl text-xs font-black text-slate-700 focus:border-indigo-400 focus:ring-0 transition-all shadow-sm"
-                                  />
-                                </div>
-                              ))}
-                              <div className="col-span-3 mt-1 pt-2 border-t border-slate-100 flex justify-between items-center px-2">
-                                <span className="text-[9px] font-black text-indigo-500 uppercase">Sub B</span>
-                                <span className="text-sm font-black text-indigo-700">{row.part_b_total || '0.00'}</span>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Grand Total */}
-                          <td className="px-6 py-6 bg-emerald-50/5 text-center">
-                            <div className="flex flex-col items-center">
-                              <span className="text-2xl font-black text-slate-900 leading-none">{row.grand_total || '0.00'}</span>
-                              <div className="w-12 h-1 bg-emerald-500 rounded-full mt-2"></div>
-                            </div>
-                          </td>
-
-                          <td className="px-6 py-6 text-right">
-                            <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest ${row.status === 'Selected' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100' : 'bg-slate-100 text-slate-500'
-                              }`}>
-                              {row.status === 'Selected' ? <UserCheck size={14} /> : <Clock size={14} />}
-                              {row.status || 'Provisional'}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

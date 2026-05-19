@@ -234,20 +234,20 @@ const ImportResultsPage = () => {
             
             {/* Left Column: Visual Table Grid */}
             <div className="lg:col-span-3 space-y-8">
-              <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white">
-                <CardHeader className="bg-slate-900 text-white p-8">
-                  <div className="flex justify-between items-center">
+              <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white border border-slate-100">
+                <CardHeader className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-8 border-b border-indigo-950/40">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                     <div>
-                      <CardTitle className="text-xl font-black tracking-tight">Transactional Dry-Run Sandbox</CardTitle>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Spreadsheet Candidate Marks Audit</p>
+                      <h3 className="text-xl font-black tracking-tight text-white">Transactional Dry-Run Sandbox</h3>
+                      <p className="text-xs font-bold text-slate-300 uppercase tracking-widest mt-1">Spreadsheet Candidate Marks Audit</p>
                     </div>
                     {previewData.success ? (
-                      <span className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-full text-xs font-black uppercase tracking-widest">
+                      <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-black uppercase tracking-widest shadow-inner">
                         <CheckCircle2 size={16} /> All Slates Clean
                       </span>
                     ) : (
-                      <span className="flex items-center gap-2 px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-400 rounded-full text-xs font-black uppercase tracking-widest animate-pulse">
-                        <XCircle size={16} /> Validation Action Required
+                      <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-xs font-black uppercase tracking-widest animate-pulse shadow-inner">
+                        <XCircle size={16} /> Validation Required
                       </span>
                     )}
                   </div>
@@ -256,7 +256,7 @@ const ImportResultsPage = () => {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 text-[10px] font-black uppercase tracking-wider">
+                        <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-wider">
                           <th className="py-5 px-6 text-center w-16">Row</th>
                           <th className="py-5 px-6">Candidate Details</th>
                           <th className="py-5 px-6">Subject Breakdown</th>
@@ -270,78 +270,80 @@ const ImportResultsPage = () => {
                           return (
                             <tr 
                               key={idx} 
-                              className={`hover:bg-slate-50/50 transition-colors ${
-                                hasErrors ? 'bg-red-50/20' : ''
+                              className={`hover:bg-slate-50/30 transition-colors ${
+                                hasErrors ? 'bg-rose-50/10' : ''
                               }`}
                             >
                               {/* Row Num */}
-                              <td className="py-5 px-6 text-center font-bold text-slate-400">{row.row_num}</td>
+                              <td className="py-5 px-6 text-center font-black text-slate-400">{row.row_num}</td>
                               
                               {/* Candidate Key & Name */}
                               <td className="py-5 px-6">
-                                <div className="space-y-1">
-                                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-mono text-[10px] font-black">
+                                <div className="flex flex-col items-start gap-1.5">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 bg-indigo-50 border border-indigo-100/50 text-indigo-700 rounded-lg font-mono text-[10px] font-extrabold">
                                     Roll No: {row.roll_no}
                                   </span>
-                                  <p className="font-black text-slate-800 text-sm mt-1">{row.candidate_name}</p>
+                                  <p className="font-extrabold text-slate-800 text-sm tracking-tight">{row.candidate_name}</p>
                                 </div>
                               </td>
-
+ 
                               {/* Subject Breakdown */}
                               <td className="py-5 px-6">
                                 <div className="flex flex-wrap gap-2">
                                   {row.subjects.map((sub, sIdx) => {
-                                    let tagClass = 'bg-emerald-50 text-emerald-800 border-emerald-100';
+                                    let tagClass = 'bg-emerald-50/70 text-emerald-700 border-emerald-100/80';
                                     let obtainedText = `${sub.obtained_marks} / ${sub.max_marks}`;
-
+ 
                                     if (sub.status === 'missing') {
-                                      tagClass = 'bg-red-100 text-red-700 border-red-200 animate-pulse';
+                                      tagClass = 'bg-rose-50 text-rose-700 border-rose-100 animate-pulse';
                                       obtainedText = 'Missing';
                                     } else if (sub.status === 'invalid') {
-                                      tagClass = 'bg-amber-100 text-amber-800 border-amber-200';
+                                      tagClass = 'bg-amber-50 text-amber-700 border-amber-100';
                                       obtainedText = `Invalid (${sub.obtained_marks})`;
                                     } else if (sub.status === 'out_of_bounds') {
-                                      tagClass = 'bg-rose-100 text-rose-800 border-rose-200';
+                                      tagClass = 'bg-rose-100/50 text-rose-800 border-rose-200';
                                       obtainedText = `${sub.obtained_marks} (Exceeds Max ${sub.max_marks})`;
                                     }
-
+ 
                                     return (
                                       <span 
                                         key={sIdx} 
-                                        className={`px-2.5 py-1 border rounded-lg font-bold text-[10px] flex items-center gap-1 ${tagClass}`}
+                                        className={`px-3 py-1 border rounded-full font-bold text-[10px] flex items-center gap-1.5 transition-all hover:scale-105 hover:bg-white shadow-sm ${tagClass}`}
                                       >
-                                        <span className="opacity-60">{sub.subject_name}:</span>
-                                        <span className="font-extrabold">{obtainedText}</span>
+                                        <span className="opacity-70 font-semibold uppercase text-[9px] tracking-wider">{sub.subject_name}:</span>
+                                        <span className="font-black">{obtainedText}</span>
                                       </span>
                                     );
                                   })}
                                 </div>
                               </td>
-
+ 
                               {/* Obtained Score & Percentage */}
                               <td className="py-5 px-6 text-center">
-                                <div className="space-y-1">
-                                  <p className="font-extrabold text-slate-800 text-sm">{row.obtained_marks} Obtained</p>
-                                  <p className="text-[10px] font-bold text-slate-400">{row.percentage}% Score</p>
+                                <div className="inline-flex flex-col items-center bg-indigo-50/40 border border-indigo-100/50 rounded-2xl px-4 py-2">
+                                  <span className="text-base font-black text-slate-800 tabular-nums">{row.obtained_marks}</span>
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Obtained</span>
+                                  <div className="h-px w-6 bg-slate-200 my-1"></div>
+                                  <span className="text-[10px] font-black text-indigo-600">{row.percentage}% Score</span>
                                 </div>
                               </td>
-
+ 
                               {/* Audit Validation Status & Error List */}
                               <td className="py-5 px-6">
                                 {hasErrors ? (
                                   <div className="space-y-1.5 max-w-xs">
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 rounded-md text-[10px] font-black uppercase tracking-wider">
-                                      <AlertCircle size={12} /> Verification Failed
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-100 text-rose-700 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                      <AlertCircle size={12} /> Failed Checks
                                     </span>
                                     {row.errors.map((err, eIdx) => (
-                                      <p key={eIdx} className="text-[10px] font-bold text-red-600 leading-tight">
-                                        ● {err}
+                                      <p key={eIdx} className="text-[10px] font-bold text-rose-600 leading-tight">
+                                        • {err}
                                       </p>
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-md text-[10px] font-black uppercase tracking-wider">
-                                    <CheckCircle2 size={12} /> Clear & Eligible
+                                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200/60 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
+                                    <CheckCircle2 size={12} className="text-emerald-500" /> Passed
                                   </span>
                                 )}
                               </td>
@@ -354,43 +356,43 @@ const ImportResultsPage = () => {
                 </CardContent>
               </Card>
             </div>
-
+ 
             {/* Right Column: Dry-Run Action Panel */}
             <div className="space-y-8">
               
               {/* Summary Stats Card */}
-              <Card className="border-none shadow-2xl bg-slate-900 text-white rounded-3xl overflow-hidden">
-                <CardHeader className="bg-slate-800/80 p-6 border-b border-white/5">
-                  <CardTitle className="text-base font-black flex items-center gap-3 tracking-tight">
-                    <Send size={18} className="text-emerald-400" /> Dry-Run Summary
+              <Card className="border-none shadow-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-3xl overflow-hidden border border-white/5">
+                <CardHeader className="bg-slate-900/60 p-6 border-b border-white/5">
+                  <CardTitle className="text-sm font-black flex items-center gap-2.5 tracking-tight uppercase">
+                    <Send size={16} className="text-indigo-400" /> Dry-Run Stats
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-8 space-y-6">
+                <CardContent className="p-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-800 rounded-2xl space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Rows</p>
+                    <div className="p-4 bg-white/[0.03] border border-white/[0.05] rounded-2xl space-y-1 hover:bg-white/[0.05] transition-all">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Rows</p>
                       <p className="text-2xl font-black text-white">{previewData.summary.total ?? previewData.rows.length}</p>
                     </div>
-                    <div className="p-4 bg-slate-800 rounded-2xl space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valid Rows</p>
+                    <div className="p-4 bg-white/[0.03] border border-white/[0.05] rounded-2xl space-y-1 hover:bg-white/[0.05] transition-all">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Valid Rows</p>
                       <p className="text-2xl font-black text-emerald-400">{previewData.summary.imported ?? 0}</p>
                     </div>
                   </div>
-
-                  <div className="p-4 bg-slate-800 rounded-2xl space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Failed Rows</p>
-                    <p className={`text-2xl font-black ${previewData.summary.failed > 0 ? 'text-red-400 animate-pulse' : 'text-slate-400'}`}>
+ 
+                  <div className="p-4 bg-white/[0.03] border border-white/[0.05] rounded-2xl space-y-1 hover:bg-white/[0.05] transition-all">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Failed Rows</p>
+                    <p className={`text-2xl font-black ${previewData.summary.failed > 0 ? 'text-rose-400 animate-pulse' : 'text-slate-400'}`}>
                       {previewData.summary.failed ?? 0}
                     </p>
                   </div>
                 </CardContent>
               </Card>
-
+ 
               {/* Execution Actions Card */}
-              <Card className="border-none shadow-2xl bg-white rounded-3xl overflow-hidden p-6 space-y-6 border border-slate-200">
+              <Card className="border-none shadow-2xl bg-white rounded-3xl overflow-hidden p-6 space-y-6 border border-slate-100">
                 {previewData.success ? (
                   <div className="space-y-4">
-                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800 text-xs font-bold leading-relaxed">
+                    <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl text-emerald-800 text-xs font-bold leading-relaxed shadow-inner">
                       🚀 <strong>Pristine Slates!</strong> All candidate rows passed parsing checks, and match active candidate registrations perfectly. You are ready to save!
                     </div>
                     
@@ -404,11 +406,11 @@ const ImportResultsPage = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-800 text-xs font-bold leading-relaxed space-y-2">
-                      <p className="font-extrabold uppercase text-[10px] text-red-700 tracking-wider">⚠️ Action Required</p>
+                    <div className="p-4 bg-rose-50/60 border border-rose-100 rounded-2xl text-rose-800 text-xs font-bold leading-relaxed space-y-2 shadow-inner">
+                      <p className="font-extrabold uppercase text-[10px] text-rose-700 tracking-wider">⚠️ Action Required</p>
                       <p>The visual sandbox detected broken cells or empty marks. You must fix the empty/invalid fields in your CSV spreadsheet or adjust column maps before saving!</p>
                     </div>
-
+ 
                     <Button 
                       onClick={() => setIsMapperOpen(true)}
                       className="w-full h-auto py-4 px-6 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs uppercase tracking-widest shadow-md rounded-2xl transition-all"
@@ -417,7 +419,7 @@ const ImportResultsPage = () => {
                     </Button>
                   </div>
                 )}
-
+ 
                 <Button 
                   variant="outline"
                   onClick={handleReset}
@@ -427,7 +429,7 @@ const ImportResultsPage = () => {
                   <RefreshCw size={14} className="mr-2" /> Start Over / Upload New
                 </Button>
               </Card>
-
+ 
             </div>
           </div>
         ) : (

@@ -218,6 +218,37 @@ const ResultsApi = {
   },
 
   /**
+   * Download pre-filled CSV template for interview awards
+   */
+  downloadAwardTemplate: async (jobPostId, district = 'all') => {
+    const response = await fetch(`${API_BASE}/results/awards/export-template?job_post_id=${jobPostId}&district=${district}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleBlobResponse(response);
+  },
+
+  /**
+   * Import interview awards from CSV file
+   */
+  importAwards: async (formData) => {
+    const token = AuthService.getToken();
+    const headers = {
+      'Accept': 'application/json',
+      'X-API-KEY': API_KEY,
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${API_BASE}/results/awards/import`, {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Initialize Award List from eligible candidates
    */
   initializeAwards: async (data) => {

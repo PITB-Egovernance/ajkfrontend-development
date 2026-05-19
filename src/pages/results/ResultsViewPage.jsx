@@ -155,7 +155,8 @@ const ResultsViewPage = () => {
         <div className="flex items-center gap-4">
           <Button 
             variant="ghost" 
-            className="h-14 px-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.25rem] shadow-xl shadow-indigo-100 flex items-center gap-3 transition-all border-none"
+            disabled
+            className="h-14 px-8 bg-slate-200 text-slate-400 rounded-[1.25rem] flex items-center gap-3 transition-all border-none cursor-not-allowed opacity-60"
             onClick={() => handleEditClick(info.row.original)}
           >
             <Edit3 size={20} />
@@ -163,10 +164,11 @@ const ResultsViewPage = () => {
           </Button>
           <Button 
             variant="ghost" 
-            className="h-14 w-14 p-0 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-900 rounded-[1.25rem] border-2 border-slate-100 transition-all shadow-md flex items-center justify-center group"
+            disabled
+            className="h-14 w-14 p-0 bg-slate-50 text-slate-300 rounded-[1.25rem] border border-slate-200 transition-all flex items-center justify-center cursor-not-allowed opacity-60"
             title="More Options"
           >
-            <MoreHorizontal size={32} className="group-hover:scale-110 transition-transform" />
+            <MoreHorizontal size={32} />
           </Button>
         </div>
       ),
