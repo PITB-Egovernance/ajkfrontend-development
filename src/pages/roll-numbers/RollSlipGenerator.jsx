@@ -18,6 +18,16 @@ const EMPTY_FORM = {
   attendance_time: '',
 };
 
+// Convert HH:MM (24-hour, from <input type="time">) → "H:MM AM/PM"
+const formatTime12h = (value) => {
+  if (!value) return '';
+  const [h, m] = value.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return value;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+};
+
 const RollSlipGenerator = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -95,7 +105,7 @@ const RollSlipGenerator = () => {
         starting_number:     Number(formData.starting_number),
         format:              formData.format,
         exam_date:           formData.exam_date || null,
-        attendance_time:     formData.attendance_time || null,
+        attendance_time:     formData.attendance_time ? formatTime12h(formData.attendance_time) : null,
       };
       const r = await RollNumberApi.generateSlips(body);
       toast.success('Roll number slips generated successfully');
@@ -236,10 +246,13 @@ const RollSlipGenerator = () => {
                     InputLabelProps={{ shrink: true }}
                     name="exam_date" value={formData.exam_date} onChange={handleFormChange}
                     helperText="Day name is derived automatically (e.g. Sunday)" />
-                  <TextField fullWidth label="Attendance Time" margin="normal" size="small"
-                    placeholder="e.g. 2:00 PM" name="attendance_time"
-                    value={formData.attendance_time} onChange={handleFormChange}
-                    helperText="Time candidates must arrive at the centre" />
+                  <TextField fullWidth type="time" label="Attendance Time" margin="normal" size="small"
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ step: 300 }}{/* 5-minute increments */}
+                    name="attendance_time" value={formData.attendance_time} onChange={handleFormChange}
+                    helperText={formData.attendance_time
+                      ? `Will print as: ${formatTime12h(formData.attendance_time)}`
+                      : 'Time candidates must arrive at the centre'} />
                 </div>
               </div>
 
