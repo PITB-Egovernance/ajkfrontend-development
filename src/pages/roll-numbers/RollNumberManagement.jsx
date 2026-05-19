@@ -27,22 +27,12 @@ import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import confirmDelete from 'components/ui/ConfirmDelete';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import RollNumberApi from 'api/rollNumberApi';
 import {
   getApplicationOcrBatch,
   getApplicationOcrBatchLabel,
   getApplicationOcrBatchPillClass,
 } from 'utils/applicationOcrUtils';
-
-const API_BASE = Config.apiUrl;
-
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -98,17 +88,14 @@ const RollNumberManagement = () => {
   const fetchShortlisted = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        per_page: String(paginationModel.pageSize),
-        page: String(paginationModel.page + 1),
+      const result = await RollNumberApi.getShortlisted({
+        per_page:         paginationModel.pageSize,
+        page:             paginationModel.page + 1,
+        search:           filters.search,
+        advertisement_no: filters.advertisement_no,
       });
-      if (filters.search)           params.set('search', filters.search);
-      if (filters.advertisement_no) params.set('advertisement_no', filters.advertisement_no);
 
-      const res    = await fetch(`${API_BASE}/roll-numbers/shortlisted?${params}`, { headers: getHeaders() });
-      const result = await res.json();
-
-      if (res.ok && (result.success || result.status === 200)) {
+      if (result.success || result.status === 200) {
         const payload = result.data ?? {};
         const data    = payload.data ?? [];
 
@@ -142,9 +129,10 @@ const RollNumberManagement = () => {
         setRows([]);
         setTotal(0);
       }
-    } catch {
-      toast.error('Server error');
+    } catch (err) {
+      toast.error(err?.message || 'Server error');
       setRows([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -158,30 +146,24 @@ const RollNumberManagement = () => {
   // ── Centers & halls (loaded on modal open) ──────────────────────────────
   const fetchCenters = useCallback(async () => {
     try {
-      const res    = await fetch(`${API_BASE}/settings/exam-centers?per_page=500`, { headers: getHeaders() });
-      const result = await res.json();
-      if (res.ok && (result.success || result.status === 200)) {
-        const list = result.data?.data ?? result.data ?? [];
-        setCenters(Array.isArray(list) ? list : []);
-      } else {
-        toast.error(res.status === 401 ? 'Session expired — please log in again' : (result.message || 'Failed to load exam centers'));
-      }
-    } catch {
-      toast.error('Could not reach server — check your connection');
+      const result = await RollNumberApi.getExamCenters(500);
+      const list   = result.data?.data ?? result.data ?? [];
+      setCenters(Array.isArray(list) ? list : []);
+    } catch (err) {
+      toast.error(err?.status === 401
+        ? 'Session expired — please log in again'
+        : (err?.message || 'Failed to load exam centers'));
     }
   }, []);
 
   const fetchHalls = useCallback(async (centerId) => {
     if (!centerId) { setHalls([]); return; }
     try {
-      const res    = await fetch(`${API_BASE}/settings/exam-halls/by-center/${centerId}`, { headers: getHeaders() });
-      const result = await res.json();
-      if (res.ok && (result.success || result.status === 200)) {
-        setHalls(result.data ?? []);
-      } else {
-        setHalls([]);
-      }
-    } catch { setHalls([]); }
+      const result = await RollNumberApi.getHallsByCenter(centerId);
+      setHalls(result.data ?? []);
+    } catch {
+      setHalls([]);
+    }
   }, []);
 
   // ── Filters ─────────────────────────────────────────────────────────────
@@ -238,22 +220,14 @@ const RollNumberManagement = () => {
         starting_number:     Number(formData.starting_number),
         format:              formData.format,
       };
-      const res    = await fetch(`${API_BASE}/roll-numbers/generate-slips`, {
-        method: 'POST', headers: getHeaders(), body: JSON.stringify(body),
-      });
-      const result = await res.json();
-
-      if (res.ok && (result.success || result.status === 200)) {
-        toast.success(result.message || 'Roll number slips generated');
-        setAllocModal(false);
-        setSelectionModel([]);
-        setResultModal({ count: result.data?.generated_count ?? 0, slips: result.data?.slips ?? [] });
-        fetchShortlisted();
-      } else {
-        toast.error(result.message || 'Failed to generate slips');
-      }
-    } catch {
-      toast.error('Server error');
+      const result = await RollNumberApi.generateSlips(body);
+      toast.success('Roll number slips generated successfully');
+      setAllocModal(false);
+      setSelectionModel([]);
+      setResultModal({ count: result.data?.generated_count ?? 0, slips: result.data?.slips ?? [] });
+      fetchShortlisted();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to generate slips');
     } finally {
       setGenerating(false);
     }
@@ -263,7 +237,7 @@ const RollNumberManagement = () => {
   const downloadSlip = useCallback(async (applicationNumber) => {
     const tid = toast.loading('Preparing slip PDF…');
     try {
-      const res = await fetch(`${API_BASE}/roll-numbers/slip/${applicationNumber}`, { headers: getHeaders() });
+      const res = await RollNumberApi.downloadSlip(applicationNumber);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         toast.dismiss(tid);
@@ -280,7 +254,7 @@ const RollNumberManagement = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.dismiss(tid);
-      toast.success('Slip downloaded');
+      toast.success('Slip downloaded successfully');
     } catch {
       toast.dismiss(tid);
       toast.error('Could not download slip');
@@ -302,21 +276,13 @@ const RollNumberManagement = () => {
 
     const tid = toast.loading('Deleting slip…');
     try {
-      const res = await fetch(`${API_BASE}/roll-numbers/slip/${applicationNumber}`, {
-        method:  'DELETE',
-        headers: getHeaders(),
-      });
-      const result = await res.json().catch(() => ({}));
+      await RollNumberApi.deleteSlip(applicationNumber);
       toast.dismiss(tid);
-      if (res.ok && (result.success || result.status === 200)) {
-        toast.success(result.message || 'Slip deleted');
-        fetchShortlisted();
-      } else {
-        toast.error(result.message || 'Failed to delete slip');
-      }
-    } catch {
+      toast.success('Roll number slip deleted successfully');
+      fetchShortlisted();
+    } catch (err) {
       toast.dismiss(tid);
-      toast.error('Server error deleting slip');
+      toast.error(err?.message || 'Failed to delete slip');
     }
   };
 
@@ -341,23 +307,15 @@ const RollNumberManagement = () => {
 
     const tid = toast.loading(`Deleting ${rowsWithRoll.length} slip${rowsWithRoll.length === 1 ? '' : 's'}…`);
     try {
-      const res = await fetch(`${API_BASE}/roll-numbers/bulk-delete-slips`, {
-        method:  'POST',
-        headers: getHeaders(),
-        body:    JSON.stringify({ application_numbers: rowsWithRoll.map(r => r.application_number) }),
-      });
-      const result = await res.json().catch(() => ({}));
+      const result = await RollNumberApi.bulkDeleteSlips(rowsWithRoll.map(r => r.application_number));
       toast.dismiss(tid);
-      if (res.ok && (result.success || result.status === 200)) {
-        toast.success(result.message || `${result.data?.deleted ?? rowsWithRoll.length} slip(s) deleted`);
-        setSelectionModel([]);
-        fetchShortlisted();
-      } else {
-        toast.error(result.message || 'Failed to delete slips');
-      }
-    } catch {
+      const count = result.data?.deleted ?? rowsWithRoll.length;
+      toast.success(`${count} roll number slip${count === 1 ? '' : 's'} deleted successfully`);
+      setSelectionModel([]);
+      fetchShortlisted();
+    } catch (err) {
       toast.dismiss(tid);
-      toast.error('Server error deleting slips');
+      toast.error(err?.message || 'Failed to delete slips');
     }
   };
 

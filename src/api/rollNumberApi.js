@@ -1,0 +1,95 @@
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
+
+const ADMIN_API_BASE = Config.apiUrl;
+const ADMIN_API_KEY  = Config.apiKey;
+
+const getAdminHeaders = (json = true) => {
+  const h = {
+    Accept:          'application/json',
+    'X-API-KEY':     ADMIN_API_KEY,
+    Authorization:   `Bearer ${AuthService.getToken()}`,
+  };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
+const handleResponse = async (response) => {
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error  = new Error(result.message || 'Request failed');
+    error.status = response.status;
+    error.errors = result.errors || {};
+    throw error;
+  }
+  return result;
+};
+
+const RollNumberApi = {
+  // List shortlisted applications eligible for slip generation
+  getShortlisted: async (params = {}) => {
+    const search    = new URLSearchParams();
+    if (params.per_page)         search.set('per_page',         String(params.per_page));
+    if (params.page)             search.set('page',             String(params.page));
+    if (params.search)           search.set('search',           params.search);
+    if (params.advertisement_no) search.set('advertisement_no', params.advertisement_no);
+
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/shortlisted?${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  // Generate roll-number slips for selected applications
+  generateSlips: async (body) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generate-slips`, {
+      method:  'POST',
+      headers: getAdminHeaders(),
+      body:    JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
+  // Download a single slip — returns the raw Response so the caller can stream the PDF blob
+  downloadSlip: async (applicationNumber) => {
+    return fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+      headers: getAdminHeaders(false),
+    });
+  },
+
+  // Delete one slip
+  deleteSlip: async (applicationNumber) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+      method:  'DELETE',
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  // Bulk delete slips
+  bulkDeleteSlips: async (applicationNumbers) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/bulk-delete-slips`, {
+      method:  'POST',
+      headers: getAdminHeaders(),
+      body:    JSON.stringify({ application_numbers: applicationNumbers }),
+    });
+    return handleResponse(res);
+  },
+
+  // Exam centers + halls for the allocation modal
+  getExamCenters: async (perPage = 500) => {
+    const res = await fetch(`${ADMIN_API_BASE}/settings/exam-centers?per_page=${perPage}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  getHallsByCenter: async (centerId) => {
+    const res = await fetch(`${ADMIN_API_BASE}/settings/exam-halls/by-center/${centerId}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+};
+
+export default RollNumberApi;
