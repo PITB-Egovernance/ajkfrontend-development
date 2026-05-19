@@ -14,6 +14,8 @@ const EMPTY_FORM = {
   prefix:          'AJK',
   starting_number: '1001',
   format:          'sequential',
+  exam_date:       '',
+  attendance_time: '',
 };
 
 const RollSlipGenerator = () => {
@@ -92,6 +94,8 @@ const RollSlipGenerator = () => {
         prefix:              formData.prefix.trim(),
         starting_number:     Number(formData.starting_number),
         format:              formData.format,
+        exam_date:           formData.exam_date || null,
+        attendance_time:     formData.attendance_time || null,
       };
       const r = await RollNumberApi.generateSlips(body);
       toast.success('Roll number slips generated successfully');
@@ -223,6 +227,20 @@ const RollSlipGenerator = () => {
                   <MenuItem key="sequential" value="sequential">Sequential (1001, 1002, 1003 …)</MenuItem>
                   <MenuItem key="random" value="random">Random (shuffled within range)</MenuItem>
                 </TextField>
+              </div>
+
+              <div className="mt-2 pt-3 border-t border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">Exam Schedule (printed on slip)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <TextField fullWidth type="date" label="Exam Date" margin="normal" size="small"
+                    InputLabelProps={{ shrink: true }}
+                    name="exam_date" value={formData.exam_date} onChange={handleFormChange}
+                    helperText="Day name is derived automatically (e.g. Sunday)" />
+                  <TextField fullWidth label="Attendance Time" margin="normal" size="small"
+                    placeholder="e.g. 2:00 PM" name="attendance_time"
+                    value={formData.attendance_time} onChange={handleFormChange}
+                    helperText="Time candidates must arrive at the centre" />
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 mt-6">
