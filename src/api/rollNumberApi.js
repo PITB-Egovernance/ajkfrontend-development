@@ -1,8 +1,12 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
-// Roll number endpoints are served from the local backend (see baseUrl.js)
-const ADMIN_API_BASE = Config.rollNumberApiUrl;
+// Roll-number endpoints (slip generation, edit, delete, download…) aren't
+// deployed to the live admin server yet, so they hit the local backend.
+// Other admin endpoints (exam centers, halls, etc.) ARE live, so they
+// continue to use Config.apiUrl.
+const ROLL_API_BASE  = Config.rollNumberApiUrl;
+const ADMIN_API_BASE = Config.apiUrl;
 const ADMIN_API_KEY  = Config.apiKey;
 
 const getAdminHeaders = (json = true) => {
@@ -35,7 +39,7 @@ const RollNumberApi = {
     if (params.search)           search.set('search',           params.search);
     if (params.advertisement_no) search.set('advertisement_no', params.advertisement_no);
 
-    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/shortlisted?${search}`, {
+    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/shortlisted?${search}`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);
@@ -43,7 +47,7 @@ const RollNumberApi = {
 
   // Generate roll-number slips for selected applications
   generateSlips: async (body) => {
-    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generate-slips`, {
+    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/generate-slips`, {
       method:  'POST',
       headers: getAdminHeaders(),
       body:    JSON.stringify(body),
@@ -53,14 +57,14 @@ const RollNumberApi = {
 
   // Download a single slip — returns the raw Response so the caller can stream the PDF blob
   downloadSlip: async (applicationNumber) => {
-    return fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+    return fetch(`${ROLL_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
       headers: getAdminHeaders(false),
     });
   },
 
   // Update an existing slip's editable fields
   updateSlip: async (applicationNumber, body) => {
-    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
       method:  'PUT',
       headers: getAdminHeaders(),
       body:    JSON.stringify(body),
@@ -70,7 +74,7 @@ const RollNumberApi = {
 
   // Delete one slip
   deleteSlip: async (applicationNumber) => {
-    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
       method:  'DELETE',
       headers: getAdminHeaders(false),
     });
@@ -79,7 +83,7 @@ const RollNumberApi = {
 
   // Bulk delete slips
   bulkDeleteSlips: async (applicationNumbers) => {
-    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/bulk-delete-slips`, {
+    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/bulk-delete-slips`, {
       method:  'POST',
       headers: getAdminHeaders(),
       body:    JSON.stringify({ application_numbers: applicationNumbers }),
