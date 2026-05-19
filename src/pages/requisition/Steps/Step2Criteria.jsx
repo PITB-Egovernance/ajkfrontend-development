@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { TextField, MenuItem, FormControl, InputLabel, Select, OutlinedInput, Box, Chip, Checkbox, ListItemText, ListSubheader, FormControlLabel } from '@mui/material';
+import { TextField, MenuItem, FormControl, InputLabel, Select, OutlinedInput, Box, Chip, Checkbox, ListItemText } from '@mui/material';
 import { useLocalSettings, localSettingsApi } from 'hooks/useLocalSettings';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
@@ -126,16 +126,57 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         ? prev.eligible_degrees.split(',').map(d => d ? String(d).trim() : '').filter(d => d)
         : [];
       const index = current.indexOf(trimmedName);
-      
+
       let updated;
       if (index > -1) {
         updated = current.filter(c => c !== trimmedName);
       } else {
         updated = [...current, trimmedName];
       }
-      
+
       const newEligibleDegrees = updated.join(',');
       return { ...prev, eligible_degrees: newEligibleDegrees };
+    });
+  };
+
+  // ── Tree-select helpers (Select All / per-group / per-degree) ────────────
+  const allDegreeNames = useMemo(
+    () => Object.values(groupedDegrees).flat().map((d) => d.name),
+    [groupedDegrees]
+  );
+
+  const isGroupFullySelected = (groupName) => {
+    const group = groupedDegrees[groupName] || [];
+    return group.length > 0 && group.every((d) => selectedDegreeList.includes(d.name));
+  };
+
+  const isGroupPartiallySelected = (groupName) => {
+    const group = groupedDegrees[groupName] || [];
+    const some  = group.some((d) => selectedDegreeList.includes(d.name));
+    return some && !isGroupFullySelected(groupName);
+  };
+
+  const allSelected     = allDegreeNames.length > 0 && allDegreeNames.every((n) => selectedDegreeList.includes(n));
+  const someSelected    = selectedDegreeList.length > 0 && !allSelected;
+
+  const handleToggleAll = () => {
+    setFormData((prev) => ({
+      ...prev,
+      eligible_degrees: allSelected ? '' : allDegreeNames.join(','),
+    }));
+  };
+
+  const handleToggleGroup = (groupName) => {
+    const groupDegreeNames = (groupedDegrees[groupName] || []).map((d) => d.name);
+    setFormData((prev) => {
+      const current = prev.eligible_degrees
+        ? prev.eligible_degrees.split(',').map((d) => d ? String(d).trim() : '').filter(Boolean)
+        : [];
+      const fullySelected = groupDegreeNames.every((n) => current.includes(n));
+      const next = fullySelected
+        ? current.filter((n) => !groupDegreeNames.includes(n))           // unselect all in group
+        : Array.from(new Set([...current, ...groupDegreeNames]));        // select all in group
+      return { ...prev, eligible_degrees: next.join(',') };
     });
   };
 
@@ -427,30 +468,87 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           </div>
         )}
 
-        {/* Degree of Equivalence */}
+        {/* Degree of Equivalence — nested checkbox dropdown */}
         <div className="col-md-6 form-group">
-          <TextField
-            fullWidth select
-            label={
-              formData.equivalent_qualification === 'Yes'
+          <FormControl fullWidth size="small">
+            <InputLabel shrink>
+              {formData.equivalent_qualification === 'Yes'
                 ? 'Name Degree of Equivalence *'
-                : 'Name Degree of Equivalence (Optional)'
-            }
-            name="degree_equivalence"
-            value={showOther.degree_equivalence ? OTHER : formData.degree_equivalence}
-            onChange={handleChange}
-          >
-            <MenuItem value="">Select</MenuItem>
-            {/* Show unique group names in this dropdown */}
-            {Object.keys(groupedDegrees).sort().map((groupName) => (
-              <MenuItem key={groupName} value={groupName}>
-                {groupName}
+                : 'Name Degree of Equivalence (Optional)'}
+            </InputLabel>
+            <Select
+              multiple
+              displayEmpty
+              value={selectedDegreeList}
+              onChange={() => { /* handled via item onClick to keep menu open */ }}
+              input={<OutlinedInput notched label={
+                formData.equivalent_qualification === 'Yes'
+                  ? 'Name Degree of Equivalence *'
+                  : 'Name Degree of Equivalence (Optional)'} />}
+              renderValue={(selected) => {
+                if (!selected || selected.length === 0) return <span style={{ color: '#94a3b8' }}>Select</span>;
+                if (selected.length <= 3) {
+                  return (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                      {selected.map((v) => <Chip key={v} label={v} size="small" />)}
+                    </Box>
+                  );
+                }
+                return `${selected.length} degrees selected`;
+              }}
+              MenuProps={{ PaperProps: { sx: { maxHeight: 380 } } }}
+            >
+              {/* Master "Select All" */}
+              <MenuItem dense onClick={(e) => { e.preventDefault(); handleToggleAll(); }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                <Checkbox size="small" checked={allSelected} indeterminate={someSelected}
+                  sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }} />
+                <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
               </MenuItem>
-            ))}
-            <MenuItem value={OTHER} sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-              Other (specify)
-            </MenuItem>
-          </TextField>
+
+              {/* Groups with nested degree checkboxes */}
+              {Object.keys(groupedDegrees).sort().flatMap((groupName) => [
+                <MenuItem
+                  key={`grp-${groupName}`}
+                  dense
+                  onClick={(e) => { e.preventDefault(); handleToggleGroup(groupName); }}
+                  sx={{ bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' } }}
+                >
+                  <Checkbox
+                    size="small"
+                    checked={isGroupFullySelected(groupName)}
+                    indeterminate={isGroupPartiallySelected(groupName)}
+                    sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+                  />
+                  <ListItemText primary={groupName} primaryTypographyProps={{ fontSize: 12.5, fontWeight: 600, color: '#064e3b' }} />
+                </MenuItem>,
+                ...groupedDegrees[groupName].map((d) => (
+                  <MenuItem
+                    key={d.id ?? d.name}
+                    dense
+                    onClick={(e) => { e.preventDefault(); handleDegreeCheckboxToggle(d.name); }}
+                    sx={{ pl: 5 }}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={selectedDegreeList.includes(d.name)}
+                      sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                    />
+                    <ListItemText primary={d.name} primaryTypographyProps={{ fontSize: 12 }} />
+                  </MenuItem>
+                )),
+              ])}
+
+              {/* Other (custom) */}
+              <MenuItem
+                dense
+                onClick={(e) => { e.preventDefault(); setShowOther((p) => ({ ...p, degree_equivalence: true })); }}
+                sx={{ borderTop: '1px solid #e2e8f0', color: 'text.secondary', fontStyle: 'italic' }}
+              >
+                Other (specify)
+              </MenuItem>
+            </Select>
+          </FormControl>
+
           {showOther.degree_equivalence && (
             <OtherInput
               fieldName="degree_equivalence"
@@ -460,33 +558,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
             />
           )}
 
-          {/* Individual Degree Checkboxes for the selected Equivalence group */}
-          {formData.degree_equivalence && groupedDegrees[formData.degree_equivalence] && !showOther.degree_equivalence && (
-            <div className="mt-3 p-3 border rounded-lg bg-slate-50 animate-in fade-in slide-in-from-top-1 duration-300">
-              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-tight mb-2 border-b border-emerald-100 pb-1">
-                Select Specific Degrees for Equivalence
-              </p>
-              <div className="flex flex-col gap-0.5">
-                {groupedDegrees[formData.degree_equivalence].map(degree => (
-                  <FormControlLabel
-                    key={degree.id}
-                    control={
-                      <Checkbox
-                        size="small"
-                        checked={selectedDegreeList.includes(degree.name)}
-                        onChange={() => handleDegreeCheckboxToggle(degree.name)}
-                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
-                      />
-                    }
-                    label={<span className="text-xs text-slate-700">{degree.name}</span>}
-                    sx={{ m: 0 }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {formData.academic_qualification && Object.keys(groupedDegrees).length === 0 && !showOther.degree_equivalence && (
+          {Object.keys(groupedDegrees).length === 0 && !showOther.degree_equivalence && (
             <p className="text-xs text-slate-400 mt-1">
               No degrees found — select "Other" to enter one.
             </p>
