@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Checkbox, FormControlLabel } from '@mui/material';
-import { MoreVertical, Eye, Upload, Pencil, Trash2, X } from 'lucide-react';
+import { MoreVertical, Eye, Upload, Pencil, Trash2, X, ArrowRight } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
@@ -171,6 +171,7 @@ const RequisitionList = () => {
     fetchRequisitions(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paginationModel.page, paginationModel.pageSize]);
+
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -503,12 +504,22 @@ const RequisitionList = () => {
             <h1 className="text-2xl font-bold text-slate-900">List of Requisitions</h1>
             <p className="text-sm text-slate-500 mt-1">All requisitions are shown below.</p>
           </div>
-          <button
-            onClick={() => navigate('create')}
-            className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-          >
-            + Add New
-          </button>
+          <div className="flex items-center gap-3">
+            {localDraftMeta?.temp_id && (
+              <Link
+                to={`/dashboard/requisitions/create?temp_id=${encodeURIComponent(localDraftMeta.temp_id)}&step=${localDraftMeta.step || 1}`}
+                className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium flex items-center gap-2 transition-all duration-200"
+              >
+                <ArrowRight className="w-4 h-4" /> Resume Draft
+              </Link>
+            )}
+            <button
+              onClick={() => navigate('create')}
+              className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              + Add New
+            </button>
+          </div>
         </div>
 
         <AdvancedFilter

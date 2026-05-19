@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { InlineLoader } from 'components/ui/Loader';
-import { Briefcase, GraduationCap, UserCheck } from 'lucide-react';
+import { Briefcase, GraduationCap, UserCheck, Trash } from 'lucide-react';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Step1JobDetails from './Steps/Step1JobDetails';
 import Step2Criteria from './Steps/Step2Criteria';
 import Step3Eligibility from './Steps/Step3Eligibility';
@@ -581,10 +582,35 @@ const RequisitionForm = () => {
     }
   };
 
+  const handleDeleteDraft = async () => {
+    const ok = await confirmDelete({
+      title:      'Delete Draft',
+      message:    'Discard this requisition draft? All entered data will be lost.',
+      identifier: tempId,
+      warning:    'This cannot be undone.',
+    });
+    if (!ok) return;
+    localStorage.removeItem('requisitionDraftMeta');
+    toast.success('Draft deleted');
+    navigate('/dashboard/requisitions');
+  };
+
   return (
     <div className="requisition-form-container">
       <div className="container">
-        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white py-3 px-5 rounded-t-lg text-center text-2xl font-bold">New Requisition Form</div>
+        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white py-3 px-5 rounded-t-lg flex items-center justify-between">
+          <span className="text-2xl font-bold flex-1 text-center">New Requisition Form</span>
+          {tempId && (
+            <button
+              type="button"
+              onClick={handleDeleteDraft}
+              className="ml-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md flex items-center gap-1.5 text-sm font-medium transition-all"
+              title="Delete this draft and start over"
+            >
+              <Trash className="w-4 h-4" /> Delete Draft
+            </button>
+          )}
+        </div>
 
         {/* Step Progress */}
         <div className={`step-progress active-${activeStep}`}>
