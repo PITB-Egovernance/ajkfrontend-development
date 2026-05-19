@@ -6,7 +6,18 @@ import { useState, useCallback } from 'react';
  * @param {Object} validationRules - Validation rules object
  * @returns {Object} - Form state and handlers
  */
-const useFormValidation = (initialValues = {}, validationRules = {}) => {
+const useFormValidation = (initialValues = {}, validationRules = {}, options = {}) => {
+  // options:
+  //   validateOnChange (default true)  — re-run validation as the user types
+  //   validateOnBlur   (default true)  — re-run validation when the field loses focus
+  //   liveErrorsUntouched (default false) — by default errors only appear after the
+  //     field is touched (jquery-style). Set true to show errors immediately on render.
+  const {
+    validateOnChange    = true,
+    validateOnBlur      = true,
+    liveErrorsUntouched = false,
+  } = options;
+
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -128,7 +139,7 @@ const useFormValidation = (initialValues = {}, validationRules = {}) => {
   // Handle input change
   const handleChange = useCallback((e) => {
     const { name, value, type, checked, files } = e.target;
-    
+
     let newValue;
     if (type === 'checkbox') {
       newValue = checked;
@@ -138,19 +149,19 @@ const useFormValidation = (initialValues = {}, validationRules = {}) => {
       newValue = value;
     }
 
-    setValues(prev => ({
-      ...prev,
-      [name]: newValue
-    }));
-
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: null
-      }));
-    }
-  }, [errors]);
+    setValues(prev => {
+      const next = { ...prev, [name]: newValue };
+      if (validateOnChange) {
+        // Run validation against the just-applied value
+        const err = validateField(name, newValue, next);
+        setErrors(prevErrs => ({ ...prevErrs, [name]: err }));
+      } else if (errors[name]) {
+        // No live-validation: just clear stale error when user starts typing
+        setErrors(prevErrs => ({ ...prevErrs, [name]: null }));
+      }
+      return next;
+    });
+  }, [errors, validateOnChange, validateField]);
 
   // Set single value programmatically
   const setValue = useCallback((name, value) => {
@@ -259,13 +270,29 @@ const useFormValidation = (initialValues = {}, validationRules = {}) => {
     setIsSubmitting,
 
     // Helper to get field props
+    // Default shape is suitable for <input>; the wrapper component
+    // <ValidatedTextField> picks the message off `helperText` instead.
     getFieldProps: (name) => ({
       name,
-      value: values[name] || '',
+      value: values[name] ?? '',
       onChange: handleChange,
       onBlur: handleBlur,
-      error: touched[name] && errors[name] ? errors[name] : undefined
-    })
+      error: touched[name] && errors[name] ? errors[name] : undefined,
+    }),
+
+    // MUI-friendly variant: returns `error` as boolean and `helperText` as
+    // string, ready to spread directly onto <TextField>.
+    getMuiFieldProps: (name, fallbackHelper = ' ') => {
+      const showError = !!errors[name] && (liveErrorsUntouched || touched[name]);
+      return {
+        name,
+        value: values[name] ?? '',
+        onChange: handleChange,
+        onBlur:   handleBlur,
+        error:    showError,
+        helperText: showError ? errors[name] : fallbackHelper,
+      };
+    },
   };
 };
 
