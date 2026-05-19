@@ -1,6 +1,43 @@
 import { useState, useEffect } from 'react';
 import { TextField, MenuItem } from '@mui/material';
 import { Plus, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+// Age limits aligned with AJK PSC / Pakistan government service:
+// - 18 is the legal minimum employment age in Pakistan.
+// - 60 is the mandatory civil-service retirement age; no entry age may
+//   exceed it. Many posts cap at 28–35 with up to 5 years relaxation,
+//   so 60 is a hard upper bound, not a practical default.
+const AGE_MIN = 18;
+const AGE_MAX = 60;
+
+/**
+ * Returns { min_age?: string, max_age?: string } with any error messages.
+ * An empty object means the values are valid.
+ */
+const validateAges = (minRaw, maxRaw) => {
+  const errors = {};
+  const min    = minRaw === '' || minRaw === null ? null : Number(minRaw);
+  const max    = maxRaw === '' || maxRaw === null ? null : Number(maxRaw);
+
+  if (min !== null) {
+    if (Number.isNaN(min) || !Number.isInteger(min)) errors.min_age = 'Enter a whole number';
+    else if (min < AGE_MIN)                          errors.min_age = `Minimum age must be at least ${AGE_MIN}`;
+    else if (min > AGE_MAX)                          errors.min_age = `Minimum age cannot exceed ${AGE_MAX}`;
+  }
+  if (max !== null) {
+    if (Number.isNaN(max) || !Number.isInteger(max)) errors.max_age = 'Enter a whole number';
+    else if (max < AGE_MIN)                          errors.max_age = `Maximum age must be at least ${AGE_MIN}`;
+    else if (max > AGE_MAX)                          errors.max_age = `Maximum age cannot exceed ${AGE_MAX} (retirement age)`;
+  }
+  if (!errors.min_age && !errors.max_age && min !== null && max !== null) {
+    if (min >= max) {
+      errors.min_age = 'Must be less than maximum age';
+      errors.max_age = 'Must be greater than minimum age';
+    }
+  }
+  return errors;
+};
 
 const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = [], isEdit = false }) => {
   const [formData, setFormData] = useState({
@@ -19,6 +56,7 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
   });
 
   const [showRelaxation, setShowRelaxation] = useState(data.age_relaxation === 'Yes');
+  const [ageErrors,      setAgeErrors]      = useState({});
 
   // Update form data when data prop changes (for edit mode)
   useEffect(() => {
@@ -57,10 +95,13 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'min_age' || name === 'max_age') {
+        setAgeErrors(validateAges(next.min_age, next.max_age));
+      }
+      return next;
+    });
 
     if (name === 'age_relaxation') {
       setShowRelaxation(value === 'Yes');
@@ -96,6 +137,14 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    const errs = validateAges(formData.min_age, formData.max_age);
+    if (Object.keys(errs).length > 0) {
+      setAgeErrors(errs);
+      toast.error(errs.min_age || errs.max_age || 'Fix the age limits');
+      return;
+    }
+
     onNext({
       ...formData,
       other_conditions: formData.other_conditions || 'N/A',
@@ -116,7 +165,9 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
             name="min_age"
             value={formData.min_age}
             onChange={handleChange}
-            inputProps={{ min: 18 }}
+            inputProps={{ min: AGE_MIN, max: AGE_MAX - 1 }}
+            error={!!ageErrors.min_age}
+            helperText={ageErrors.min_age || `Must be between ${AGE_MIN} and ${AGE_MAX - 1}`}
           />
         </div>
 
@@ -129,7 +180,9 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
             name="max_age"
             value={formData.max_age}
             onChange={handleChange}
-            inputProps={{ min: formData.min_age }}
+            inputProps={{ min: AGE_MIN + 1, max: AGE_MAX }}
+            error={!!ageErrors.max_age}
+            helperText={ageErrors.max_age || `Must be greater than minimum age, up to ${AGE_MAX} (retirement age)`}
           />
         </div>
 
