@@ -248,11 +248,11 @@ const RollSlipGenerator = () => {
                     helperText="Day name is derived automatically (e.g. Sunday)" />
                   <TextField fullWidth type="time" label="Attendance Time" margin="normal" size="small"
                     InputLabelProps={{ shrink: true }}
-                    inputProps={{ step: 300 }}{/* 5-minute increments */}
+                    inputProps={{ step: 300 }}
                     name="attendance_time" value={formData.attendance_time} onChange={handleFormChange}
                     helperText={formData.attendance_time
                       ? `Will print as: ${formatTime12h(formData.attendance_time)}`
-                      : 'Time candidates must arrive at the centre'} />
+                      : 'Time candidates must arrive at the centre (5-minute steps)'} />
                 </div>
               </div>
 
