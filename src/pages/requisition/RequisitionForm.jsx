@@ -569,6 +569,7 @@ const RequisitionForm = () => {
         return (
           <Step3Eligibility
             data={formData.step3}
+            step1Data={formData.step1}
             onNext={handleNext}
             onBack={handleBack}
             onSaveDraft={handleSaveDraft}

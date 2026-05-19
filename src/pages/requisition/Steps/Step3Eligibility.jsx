@@ -39,7 +39,7 @@ const validateAges = (minRaw, maxRaw) => {
   return errors;
 };
 
-const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = [], isEdit = false }) => {
+const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, districtOptions = [], isEdit = false }) => {
   const [formData, setFormData] = useState({
     min_age: data.min_age || '',
     max_age: data.max_age || '',
@@ -115,9 +115,10 @@ const Step3Eligibility = ({ data, onNext, onBack, onSaveDraft,districtOptions = 
     }));
   };
 
-  // Step 1's total — comes through the `data` prop (RequisitionForm passes all
-  // accumulated step data forward). Used as the upper bound on per-district posts.
-  const stepOneTotal = Number(data?.num_posts) || 0;
+  // Step 1's total — comes through the dedicated step1Data prop from
+  // RequisitionForm (formData.step1.num_posts). Used as the upper bound on
+  // per-district posts.
+  const stepOneTotal = Number(step1Data?.num_posts) || Number(data?.num_posts) || 0;
 
   // How many rows have a post value entered? (Empty / null / undefined don't count.)
   const isPostFilled = (v) => v !== '' && v !== null && v !== undefined;
