@@ -91,16 +91,19 @@ const RollNumberApi = {
     return handleResponse(res);
   },
 
-  // Exam centers + halls for the allocation modal
+  // Exam centers + halls for the slip-generation allocation modal.
+  // These go to LOCAL because the live ExamCenter/ExamHall models still
+  // hide the numeric `id` (only hash_id is exposed). Slip generation needs
+  // the numeric id to satisfy `exists:exam_centers,id` in the FormRequest.
   getExamCenters: async (perPage = 500) => {
-    const res = await fetch(`${ADMIN_API_BASE}/settings/exam-centers?per_page=${perPage}`, {
+    const res = await fetch(`${ROLL_API_BASE}/settings/exam-centers?per_page=${perPage}`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);
   },
 
   getHallsByCenter: async (centerId) => {
-    const res = await fetch(`${ADMIN_API_BASE}/settings/exam-halls/by-center/${centerId}`, {
+    const res = await fetch(`${ROLL_API_BASE}/settings/exam-halls/by-center/${centerId}`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);
