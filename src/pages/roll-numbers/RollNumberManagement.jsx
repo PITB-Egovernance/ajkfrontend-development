@@ -59,6 +59,16 @@ const RollNumberManagement = () => {
   const [total,           setTotal]           = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]  = useState([]);
+  // MUI X DataGrid v7+ may emit { type: 'include'|'exclude', ids: Set } instead
+  // of a plain array. Normalize to a flat array of ids so .includes / .length work.
+  const selectedIds = useMemo(() => {
+    if (!selectionModel) return [];
+    if (Array.isArray(selectionModel)) return selectionModel;
+    if (selectionModel.ids instanceof Set) return Array.from(selectionModel.ids);
+    if (Array.isArray(selectionModel.ids)) return selectionModel.ids;
+    if (selectionModel instanceof Set) return Array.from(selectionModel);
+    return [];
+  }, [selectionModel]);
   const [filters,         setFilters]         = useState(DEFAULT_FILTERS);
 
   const [anchorEl,    setAnchorEl]    = useState(null);
@@ -137,12 +147,12 @@ const RollNumberManagement = () => {
 
   // ── Generate slip flow (navigates to the full-page generator) ──────────
   const openSlipGenerator = (explicitSelection = null) => {
-    const selectionIds = explicitSelection ?? selectionModel;
-    if (!selectionIds || selectionIds.length === 0) {
+    const ids = Array.isArray(explicitSelection) ? explicitSelection : selectedIds;
+    if (!ids || ids.length === 0) {
       toast.error('Select at least one shortlisted candidate');
       return;
     }
-    const selectedApps = rows.filter((r) => selectionIds.includes(r.id));
+    const selectedApps = rows.filter((r) => ids.includes(r.id));
     navigate('/dashboard/roll-numbers/generate-slips', {
       state: { applications: selectedApps },
     });
@@ -203,10 +213,10 @@ const RollNumberManagement = () => {
 
   // ── Bulk slip deletion ──────────────────────────────────────────────────────
   const bulkDeleteSlips = async () => {
-    if (selectionModel.length === 0) return;
+    if (selectedIds.length === 0) return;
 
     // Filter to only rows that actually have a roll number
-    const rowsWithRoll = rows.filter(r => selectionModel.includes(r.id) && r.roll_number);
+    const rowsWithRoll = rows.filter(r => selectedIds.includes(r.id) && r.roll_number);
     if (rowsWithRoll.length === 0) {
       toast.error('None of the selected candidates have a roll number to delete');
       return;
@@ -358,12 +368,12 @@ const RollNumberManagement = () => {
         </div>
 
         {/* BULK BAR */}
-        {selectionModel.length > 0 && (
+        {selectedIds.length > 0 && (
           <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
             <span className="text-emerald-800 font-medium">
-              {selectionModel.length} candidate{selectionModel.length === 1 ? '' : 's'} selected
+              {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
               {(() => {
-                const withRoll = rows.filter(r => selectionModel.includes(r.id) && r.roll_number).length;
+                const withRoll = rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length;
                 return withRoll > 0 ? ` · ${withRoll} with roll number` : '';
               })()}
             </span>
@@ -373,7 +383,7 @@ const RollNumberManagement = () => {
               </Button>
               <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
                 className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
-                disabled={rows.filter(r => selectionModel.includes(r.id) && r.roll_number).length === 0}>
+                disabled={rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
                 <Trash2 size={14} /> Delete Roll No Slip
               </Button>
             </div>
