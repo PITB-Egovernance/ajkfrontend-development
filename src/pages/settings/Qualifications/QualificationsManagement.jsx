@@ -5,7 +5,7 @@ import {
   DialogContent, DialogActions, Switch, Menu, MenuItem,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
-import { Plus, ArrowLeft, MoreVertical } from 'lucide-react';
+import { Plus, ArrowLeft, MoreVertical, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
