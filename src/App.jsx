@@ -216,7 +216,7 @@ function App() {
           <Route
             path="results/merit/:jobId?"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'chairman']}>
+              <ProtectedRoute allowedRoles={['admin', 'chairman', 'senior_admin', 'data_entry', 'dataentry']}>
                 <MeritManagementPage />
               </ProtectedRoute>
             }

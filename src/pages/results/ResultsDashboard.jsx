@@ -15,7 +15,8 @@ import {
   Plus,
   FileDown,
   CheckCircle2,
-  FileText
+  FileText,
+  Award
 } from 'lucide-react';
 import { useAuth } from 'context/AuthContext';
 import { getUserRole } from 'utils/roleUtils';
@@ -42,10 +43,9 @@ const ResultsDashboard = () => {
   const [pendingCount, setPendingCount] = useState(0);
 
   const [stats, setStats] = useState([
-    { label: 'Total Results Entered', value: '0', icon: Database, bg: 'bg-blue-50', iconBg: 'bg-blue-500' },
-    { label: 'Pending Publication', value: '0', icon: ClipboardCheck, bg: 'bg-amber-50', iconBg: 'bg-amber-500' },
-    { label: 'Published Results', value: '0', icon: Send, bg: 'bg-emerald-50', iconBg: 'bg-emerald-500' },
-    { label: 'Bulk Imports (CSV)', value: '0', icon: FileSpreadsheet, bg: 'bg-purple-50', iconBg: 'bg-purple-500' },
+    { label: 'Total Results Entered', value: '0', icon: Database, bg: 'bg-blue-50', iconBg: 'bg-blue-600' },
+    { label: 'Pending Publication', value: '0', icon: ClipboardCheck, bg: 'bg-amber-50', iconBg: 'bg-amber-600' },
+    { label: 'Published Results', value: '0', icon: Send, bg: 'bg-emerald-50', iconBg: 'bg-emerald-600' },
   ]);
 
   const [jobs, setJobs] = useState([]);
@@ -185,20 +185,12 @@ const ResultsDashboard = () => {
       show: isAdmin
     },
     {
-      title: 'Bulk CSV Import',
-      desc: 'Batch process results via CSV',
-      icon: FileSpreadsheet,
-      iconBg: 'bg-blue-500',
-      show: isAdmin,
-      extraAction: {
-        label: 'Download Template',
-        onClick: (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          handleDownloadTemplate();
-        },
-        icon: FileDown
-      },
+      title: 'Interview Award List',
+      desc: 'Build merit lists for interviews',
+      link: '/dashboard/results/awards',
+      icon: Award,
+      iconBg: 'bg-emerald-600',
+      show: isAdmin || user?.role === 'interview_secretary' || user?.role === 'secretary'
     },
     {
       title: 'Verification Queue',
@@ -250,45 +242,53 @@ const ResultsDashboard = () => {
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, idx) => (
-            <Card key={idx} className="border-none shadow-xl rounded-3xl overflow-hidden hover:scale-[1.02] transition-all duration-300">
-              <CardContent className="p-8">
+            <Card key={idx} className="border-none shadow-xl rounded-[2rem] overflow-hidden hover:scale-[1.05] transition-all duration-300">
+              <CardContent className="p-10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                    <p className="text-3xl font-black text-slate-900 tabular-nums">{stat.value}</p>
+                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{stat.label}</p>
+                    <p className="text-4xl font-black text-slate-900 tabular-nums">{stat.value}</p>
                   </div>
-                  <div className={`p-4 rounded-2xl ${stat.iconBg} text-white shadow-lg`}>
-                    <stat.icon size={24} strokeWidth={2.5} />
+                  <div className={`p-5 rounded-[1.25rem] ${stat.iconBg} text-white shadow-xl`}>
+                    <stat.icon size={28} strokeWidth={2.5} />
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
           {isAdmin && (
-            <Card className="border-none shadow-xl rounded-3xl overflow-hidden hover:scale-[1.02] transition-all duration-300 bg-indigo-600 text-white group cursor-pointer" onClick={() => navigate('/dashboard/results/approvals')}>
-              <CardContent className="p-8">
+            <Card
+              className="border-none shadow-xl rounded-[2rem] overflow-hidden hover:scale-[1.05] transition-all duration-300 group cursor-pointer"
+              style={{ backgroundColor: '#f59e0b' }}
+              onClick={() => navigate('/dashboard/results/approvals')}
+            >
+              <CardContent className="p-10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Pending Approvals</p>
-                    <p className="text-3xl font-black tabular-nums">{pendingCount}</p>
+                    <p className="text-[11px] font-black text-white/80 uppercase tracking-[0.2em] mb-2">Pending Approvals</p>
+                    <p className="text-4xl font-black tabular-nums text-white">{pendingCount}</p>
                   </div>
-                  <div className="p-4 rounded-2xl bg-white/20 text-white shadow-lg group-hover:scale-110 transition-transform">
-                    <ShieldAlert size={24} />
+                  <div className="p-5 rounded-[1.25rem] bg-white/20 text-white shadow-xl group-hover:scale-110 transition-transform">
+                    <ShieldAlert size={32} strokeWidth={2.5} />
                   </div>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          <Card className="border-none shadow-xl rounded-3xl overflow-hidden hover:scale-[1.02] transition-all duration-300 bg-indigo-600 text-white group cursor-pointer" onClick={() => navigate('/dashboard/results/search')}>
-            <CardContent className="p-8">
+          <Card
+            className="border-none shadow-xl rounded-[2rem] overflow-hidden hover:scale-[1.05] transition-all duration-300 group cursor-pointer"
+            style={{ backgroundColor: '#0f172a' }}
+            onClick={() => navigate('/dashboard/results/search')}
+          >
+            <CardContent className="p-10">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Search & Print</p>
-                  <p className="text-2xl font-black tabular-nums">Verification</p>
+                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Search & Print</p>
+                  <p className="text-xl font-black tracking-tight text-white leading-tight">Verification Center</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-white/20 text-white shadow-lg group-hover:scale-110 transition-transform">
-                  <Search size={24} />
+                <div className="p-5 rounded-[1.25rem] bg-indigo-600 text-white shadow-xl group-hover:scale-110 transition-transform">
+                  <Search size={32} strokeWidth={2.5} />
                 </div>
               </div>
             </CardContent>
@@ -430,7 +430,7 @@ const ResultsDashboard = () => {
                                     </Button>
                                   </Link>
                                   <Link to={`/dashboard/results/view/${getJobRouteId(job)}`}>
-                                    <Button className="h-10 px-6 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-slate-200 transition-all flex items-center gap-2 group-hover:scale-105">
+                                    <Button className="h-10 px-5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-slate-200 transition-all flex items-center gap-2 group-hover:scale-105 whitespace-nowrap">
                                       Manage Results
                                       <ArrowRight size={14} strokeWidth={3} />
                                     </Button>
@@ -441,7 +441,7 @@ const ResultsDashboard = () => {
                               {(job.result_status === 'Under Verification') && (
                                 <Button
                                   onClick={() => handleVerify(job)}
-                                  className="h-10 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-100 transition-all flex items-center gap-2"
+                                  className="h-10 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-100 transition-all flex items-center gap-2 whitespace-nowrap"
                                 >
                                   <CheckCircle2 size={14} strokeWidth={3} />
                                   Approve & Verify
@@ -449,24 +449,79 @@ const ResultsDashboard = () => {
                               )}
 
                               {(job.result_status === 'Approved') && (
-                                <Button
-                                  onClick={() => handleOpenPublish(job)}
-                                  className="h-10 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all flex items-center gap-2"
-                                >
-                                  <Send size={14} strokeWidth={3} />
-                                  Official Publication
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  {/* Allow admin to go back to import/edit stages before official publication */}
+                                  <Link to={`/dashboard/results/import/${getJobRouteId(job)}`}>
+                                    <Button variant="ghost" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Re-Import CSV">
+                                      <FileSpreadsheet size={18} />
+                                    </Button>
+                                  </Link>
+                                  <Link to={`/dashboard/results/view/${getJobRouteId(job)}`}>
+                                    <Button variant="ghost" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Manage Results">
+                                      <ArrowRight size={18} />
+                                    </Button>
+                                  </Link>
+
+                                  <Button
+                                    onClick={() => handleOpenPublish(job)}
+                                    className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
+                                  >
+                                    <Send size={14} strokeWidth={3} />
+                                    Official Publication
+                                  </Button>
+
+                                  {(isAdmin || isDirector || userRole === 'data_entry' || userRole === 'dataentry' || userRole === 'senior_admin' || userRole === 'secretary') && (
+                                    <Link to={`/dashboard/results/merit/${getJobRouteId(job)}`}>
+                                      <Button className="h-10 px-5 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap">
+                                        <LayoutDashboard size={14} />
+                                        Manage Merit
+                                      </Button>
+                                    </Link>
+                                  )}
+                                </div>
                               )}
 
                               {(job.result_status === 'Published') && (
-                                <Button
-                                  variant="outline"
-                                  onClick={() => handleDownloadGazette(job)}
-                                  className="h-10 px-6 rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
-                                >
-                                  <FileText size={14} />
-                                  View Gazette
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => handleDownloadGazette(job)}
+                                    className="h-10 px-4 rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap"
+                                  >
+                                    <FileText size={14} />
+                                    Gazette
+                                  </Button>
+
+                                  {(isAdmin || isDirector) && (
+                                    <Button
+                                      onClick={async () => {
+                                        const reason = window.prompt("Reason for withdrawal:");
+                                        if (!reason) return;
+                                        try {
+                                          toast.loading('Withdrawing publication...', { id: 'withdraw' });
+                                          await ResultsApi.withdraw(getJobRouteId(job), reason);
+                                          toast.success('Publication withdrawn', { id: 'withdraw' });
+                                          fetchActiveJobs();
+                                        } catch (err) {
+                                          toast.error('Withdrawal failed', { id: 'withdraw' });
+                                        }
+                                      }}
+                                      className="h-10 px-4 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 border border-rose-100 whitespace-nowrap"
+                                    >
+                                      <ShieldAlert size={14} />
+                                      Withdraw
+                                    </Button>
+                                  )}
+
+                                  {(isAdmin || isDirector || userRole === 'data_entry' || userRole === 'dataentry' || userRole === 'senior_admin') && (
+                                    <Link to={`/dashboard/results/merit/${getJobRouteId(job)}`}>
+                                      <Button className="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 whitespace-nowrap">
+                                        <LayoutDashboard size={14} />
+                                        Manage Merit
+                                      </Button>
+                                    </Link>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </td>
@@ -524,15 +579,15 @@ const ResultsDashboard = () => {
                           <FileSpreadsheet size={20} />
                         </div>
                         <div>
-                          <p className="text-sm font-black text-slate-800">{item.filename || item.file}</p>
+                          <p className="text-sm font-black text-slate-800">{item.job_detail?.designation || 'System Import'}</p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase">
-                            {item.processed_rows || item.rows || 0} rows processed • {item.created_at_human || item.time || 'Just now'}
+                            {item.total_rows || 0} Candidates processed • {new Date(item.created_at).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${item.status === 'completed' || item.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${item.status === 'completed' || item.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                         }`}>
-                        {item.status}
+                        {item.status?.replace('_', ' ') || 'Pending'}
                       </div>
                     </div>
                   ))
@@ -547,26 +602,9 @@ const ResultsDashboard = () => {
           </div>
 
           <div className="space-y-6">
-            <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] px-2 flex items-center gap-2">
-              <ShieldAlert size={16} className="text-rose-500" />
-              Critical Alerts
-            </h2>
-            <Card className="border-none shadow-xl bg-rose-600 text-white rounded-3xl p-8 space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <ClipboardCheck size={20} />
-                </div>
-                <h4 className="font-black uppercase tracking-tight">Pending Approval</h4>
-              </div>
-              <p className="text-xs font-bold text-rose-100 leading-relaxed">
-                Requisition #5021 (Medical Specialist) has merit ranks ready but is pending Director's final gazette signature.
-              </p>
-              <Button className="w-full bg-white text-rose-600 hover:bg-rose-50 font-black text-[10px] uppercase tracking-widest py-3">
-                Review Now
-              </Button>
-            </Card>
 
-            <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl space-y-3">
+
+            <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl space-y-3 mt-12">
               <h5 className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">System Health</h5>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>

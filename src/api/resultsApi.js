@@ -101,6 +101,40 @@ const ResultsApi = {
   },
 
   /**
+   * Scan CSV headers dynamically
+   */
+  scanCSVHeaders: async (formData) => {
+    const token = AuthService.getToken();
+    const headers = {
+      'Accept': 'application/json',
+      'X-API-KEY': API_KEY,
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE}/results/import/dynamic/scan`, {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Process CSV import with custom mappings configuration
+   */
+  processDynamicImport: async (payload) => {
+    const response = await fetch(`${API_BASE}/results/import/dynamic/process`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Finalize CSV import with hash validation
    */
   confirmImport: async (jobId, formData) => {
@@ -162,12 +196,107 @@ const ResultsApi = {
   },
 
   /**
-   * Get Award List for a job post
+   * Get subject templates for a job post
    */
-  getAwards: async (jobPostId) => {
-    const response = await fetch(`${API_BASE}/results/awards?job_post_id=${jobPostId}`, {
+  getSubjectTemplates: async (jobPostId) => {
+    const response = await fetch(`${API_BASE}/results/subjects/template?job_post_id=${jobPostId}`, {
       method: 'GET',
       headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Get Award List for a job post
+   */
+  getAwards: async (jobPostId, district = 'all') => {
+    const response = await fetch(`${API_BASE}/results/awards?job_post_id=${jobPostId}&district=${district}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Download pre-filled CSV template for interview awards
+   */
+  downloadAwardTemplate: async (jobPostId, district = 'all') => {
+    const response = await fetch(`${API_BASE}/results/awards/export-template?job_post_id=${jobPostId}&district=${district}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleBlobResponse(response);
+  },
+
+  /**
+   * Import interview awards from CSV file
+   */
+  importAwards: async (formData) => {
+    const token = AuthService.getToken();
+    const headers = {
+      'Accept': 'application/json',
+      'X-API-KEY': API_KEY,
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${API_BASE}/results/awards/import`, {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Initialize Award List from eligible candidates
+   */
+  initializeAwards: async (data) => {
+    const response = await fetch(`${API_BASE}/results/awards/initialize`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * UC-R06: Update Award Status (Senior Admin)
+   */
+  updateAwardStatus: async (awardId, data) => {
+    const response = await fetch(`${API_BASE}/results/awards/${awardId}/status`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * UC-R07: Trigger Merit Replacement (Senior Admin)
+   */
+  replaceAwardCandidate: async (awardId, data) => {
+    const response = await fetch(`${API_BASE}/results/awards/${awardId}/replace`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Patch a single Award row (Auto-save)
+   */
+  patchAward: async (id, data, version) => {
+    const headers = getHeaders();
+    if (version !== undefined) {
+      headers['If-Match'] = version.toString();
+    }
+    
+    const response = await fetch(`${API_BASE}/results/awards/${id}`, {
+      method: 'PATCH',
+      headers: headers,
+      body: JSON.stringify(data),
     });
     return handleResponse(response);
   },
@@ -225,6 +354,17 @@ const ResultsApi = {
    */
   getPublishStatus: async (jobPostId) => {
     const response = await fetch(`${API_BASE}/results/publish/${jobPostId}/status`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Get publication readiness checklist
+   */
+  getPublicationChecklist: async (jobPostId) => {
+    const response = await fetch(`${API_BASE}/results/publish/${jobPostId}/checklist`, {
       method: 'GET',
       headers: getHeaders(),
     });
@@ -352,18 +492,6 @@ const ResultsApi = {
       body: JSON.stringify(data),
     });
     return handleResponse(response);
-  },
-
-  /**
-   * Download the official Gazette PDF
-   */
-  downloadGazette: async (jobId) => {
-    const response = await fetch(`${API_BASE}/results/publish/${jobId}/pdf`, {
-      method: 'GET',
-      headers: getHeaders(),
-    });
-    if (!response.ok) throw new Error('Failed to generate Gazette PDF');
-    return response.blob();
   },
 
   /**

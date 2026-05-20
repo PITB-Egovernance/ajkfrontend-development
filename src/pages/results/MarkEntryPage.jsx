@@ -15,6 +15,8 @@ import { normalizeJobResponse, getJobRouteId, getJobApiId } from 'utils/jobMappe
  * Handles batch manual entry of candidate results with keyset pagination
  */
 
+const normalizeKey = (name) => name;
+
 const MarkEntryPage = () => {
   const navigate = useNavigate();
 
@@ -23,9 +25,10 @@ const MarkEntryPage = () => {
   const [fetchingJobs, setFetchingJobs] = useState(true);
   const [selectedJob, setSelectedJob] = useState('');
   const [examDate, setExamDate] = useState(new Date().toISOString().split('T')[0]);
-  const [isDetailed, setIsDetailed] = useState(false);
-  const [totalMaxMarks, setTotalMaxMarks] = useState(100);
-  const [passingMarks, setPassingMarks] = useState(40);
+  const [isDetailed, setIsDetailed] = useState(true); // Default to detailed
+  const [totalMaxMarks, setTotalMaxMarks] = useState(150);
+  const [passingMarks, setPassingMarks] = useState(60);
+  const [subjectTemplates, setSubjectTemplates] = useState([]);
 
   // State for Candidates List
   const [candidates, setCandidates] = useState([]);
@@ -72,7 +75,7 @@ const MarkEntryPage = () => {
 
       const newCandidates = res.data.map(c => ({
         ...c,
-        local_obtained: c.obtained_marks || '',
+        local_obtained: c.obtained_marks || 0,
         local_status: c.status || 'pass',
         local_subjects: c.marks_summary || {} // Map subjects here if detailed
       }));
@@ -87,8 +90,24 @@ const MarkEntryPage = () => {
   }, [selectedJob, debouncedSearch]);
 
   useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!selectedJob) return;
+      try {
+        const res = await ResultsApi.getSubjectTemplates(selectedJob);
+        const templates = res.data || [];
+        setSubjectTemplates(templates);
+        if (templates.length > 0) {
+          const calculatedTotal = templates.reduce((sum, t) => sum + (Number(t.max_marks) || 0), 0);
+          setTotalMaxMarks(calculatedTotal);
+          setPassingMarks(Math.ceil(calculatedTotal * 0.4));
+        }
+      } catch (err) {
+        console.error('Failed to load subjects', err);
+      }
+    };
+    fetchTemplates();
     fetchCandidates();
-  }, [fetchCandidates]);
+  }, [selectedJob, debouncedSearch, fetchCandidates]);
 
   // Auto-save logic (UC-R01 A4)
   useEffect(() => {
@@ -101,13 +120,34 @@ const MarkEntryPage = () => {
     return () => clearTimeout(timer);
   }, [dirtyRows, candidates, saving]);
 
-  // Handle Mark Change
-  const handleMarkChange = (appId, value) => {
-    setCandidates(prev => prev.map(c =>
-      c.app_id === appId ? { ...c, local_obtained: value } : c
-    ));
-    setDirtyRows(prev => new Set(prev).add(appId));
-  };
+   // Handle Mark Change
+   const handleMarkChange = (appId, subjectName, value) => {
+     setCandidates(prev => prev.map(c => {
+       if (c.app_id !== appId) return c;
+       
+       const key = normalizeKey(subjectName);
+       const currentValue = c.local_subjects[key]?.obtained ?? c.local_subjects[key] ?? 0;
+       
+       const newSubjects = { 
+         ...c.local_subjects, 
+         [key]: typeof c.local_subjects[key] === 'object' 
+           ? { ...c.local_subjects[key], obtained: value }
+           : value 
+       };
+       
+       const newTotal = Object.values(newSubjects).reduce((sum, val) => {
+         const obtained = typeof val === 'object' ? val.obtained : val;
+         return sum + (Number(obtained) || 0);
+       }, 0);
+       
+       return { 
+         ...c, 
+         local_subjects: newSubjects,
+         local_obtained: newTotal 
+       };
+     }));
+     setDirtyRows(prev => new Set(prev).add(appId));
+   };
 
   const handleStatusChange = (appId, status) => {
     setCandidates(prev => prev.map(c =>
@@ -151,7 +191,16 @@ const MarkEntryPage = () => {
           application_id: c.app_id,
           status: c.local_status,
           obtained_marks: Number(c.local_obtained),
-          subjects: []
+          subjects: subjectTemplates.map(t => {
+            const key = normalizeKey(t.subject_name);
+            const val = c.local_subjects[key];
+            const obtained = typeof val === 'object' ? val.obtained : val;
+            return {
+              subject_name: t.subject_name,
+              max_marks: t.max_marks,
+              obtained_marks: Number(obtained || 0)
+            };
+          })
         }))
       };
 
@@ -295,8 +344,13 @@ const MarkEntryPage = () => {
                 <TableCell className="bg-slate-50 font-bold text-slate-600">Roll No</TableCell>
                 <TableCell className="bg-slate-50 font-bold text-slate-600">Candidate Name</TableCell>
                 <TableCell className="bg-slate-50 font-bold text-slate-600">Marks Status</TableCell>
-                <TableCell className="bg-slate-50 font-bold text-slate-600" width="120">Status</TableCell>
-                <TableCell className="bg-slate-50 font-bold text-slate-600 text-center" width="180">Obtained Marks</TableCell>
+                <TableCell className="bg-slate-50 font-bold text-slate-600" width="100">Status</TableCell>
+                {subjectTemplates.map(t => (
+                  <TableCell key={t.id} className="bg-slate-50 font-bold text-slate-600 text-center" width="120">
+                    {t.subject_name} ({t.max_marks})
+                  </TableCell>
+                ))}
+                <TableCell className="bg-slate-50 font-bold text-slate-600 text-center" width="120">Total Obtained</TableCell>
                 <TableCell className="bg-slate-50 font-bold text-slate-600 text-center">Score %</TableCell>
               </TableRow>
             </TableHead>
@@ -349,20 +403,30 @@ const MarkEntryPage = () => {
                           <option value="withheld">WITHHELD</option>
                         </select>
                       </TableCell>
+                       {subjectTemplates.map(t => (
+                         <TableCell key={t.id} align="center">
+                           <TextField
+                             size="small"
+                             type="number"
+                             value={(() => {
+                               const val = c.local_subjects[normalizeKey(t.subject_name)];
+                               return typeof val === 'object' ? val.obtained : (val || '');
+                             })()}
+                             onChange={(e) => handleMarkChange(c.app_id, t.subject_name, e.target.value)}
+                             disabled={c.local_status === 'absent' || c.local_status === 'withheld'}
+                             inputProps={{
+                               className: "text-center font-bold tabular-nums",
+                               style: { textAlign: 'center' }
+                             }}
+                             sx={{ width: 80 }}
+                             error={Number(c.local_subjects[normalizeKey(t.subject_name)]) > t.max_marks}
+                           />
+                         </TableCell>
+                       ))}
                       <TableCell align="center">
-                        <TextField
-                          size="small"
-                          type="number"
-                          value={c.local_obtained}
-                          onChange={(e) => handleMarkChange(c.app_id, e.target.value)}
-                          disabled={c.local_status === 'absent' || c.local_status === 'withheld'}
-                          inputProps={{
-                            className: "text-center font-bold tabular-nums",
-                            style: { textAlign: 'center' }
-                          }}
-                          sx={{ width: 100 }}
-                          error={Number(c.local_obtained) > totalMaxMarks}
-                        />
+                        <div className="font-black text-lg text-slate-900 bg-slate-100/50 py-1 rounded-lg">
+                          {c.local_obtained}
+                        </div>
                       </TableCell>
                       <TableCell align="center">
                         <div className={`font-black ${Number(score) >= 40 ? 'text-emerald-600' : 'text-slate-400'}`}>

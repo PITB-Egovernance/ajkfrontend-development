@@ -18,6 +18,7 @@ const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [notify, setNotify] = useState(true);
   const [gazetteRef, setGazetteRef] = useState('');
+  const [pubType, setPubType] = useState('final_merit');
 
   if (!isOpen || !job) return null;
 
@@ -29,9 +30,12 @@ const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
 
     setLoading(true);
     try {
+      // Use helper to get correct ID (hashed or numeric)
+      const jobId = job.hash_id || job.id;
+      
       await ResultsApi.publishResults({
-        job_post_id: job.id,
-        pub_type: 'written_test',
+        job_post_id: jobId,
+        pub_type: pubType,
         gazette_ref: gazetteRef,
         notify_candidates: notify
       });
@@ -79,6 +83,19 @@ const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
             {/* Publication Settings */}
             <div className="space-y-6">
               <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Publication Type</label>
+                <select
+                  value={pubType}
+                  onChange={(e) => setPubType(e.target.value)}
+                  className="w-full px-4 py-3 bg-white border-2 border-slate-100 focus:border-indigo-500 rounded-2xl text-sm font-bold transition-all outline-none appearance-none"
+                >
+                  <option value="final_merit">Official Final Merit List</option>
+                  <option value="written_test">Written Examination Result</option>
+                  <option value="interview">Interview/Viva Voce Result</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Gazette Reference Number</label>
                 <div className="relative">
                   <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -101,6 +118,7 @@ const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
                   </div>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setNotify(!notify)}
                   className={`w-12 h-6 rounded-full transition-all relative ${notify ? 'bg-emerald-600' : 'bg-slate-300'}`}
                 >

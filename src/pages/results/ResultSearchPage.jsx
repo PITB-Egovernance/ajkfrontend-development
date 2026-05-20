@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Printer, 
-  User, 
-  FileText, 
-  ShieldCheck, 
-  Eye, 
+import {
+  Search,
+  Printer,
+  User,
+  FileText,
+  ShieldCheck,
+  Eye,
   EyeOff,
   ChevronRight,
   Edit3,
@@ -119,7 +119,7 @@ const ResultSearchPage = () => {
           <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Job Post</label>
-              <select 
+              <select
                 value={selectedJob}
                 onChange={(e) => setSelectedJob(e.target.value)}
                 className="w-full h-12 px-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700"
@@ -134,15 +134,15 @@ const ResultSearchPage = () => {
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Roll No / CNIC</label>
-              <Input 
+              <Input
                 placeholder="Enter search query..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-12 rounded-2xl border-2 border-slate-100 font-bold"
               />
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               loading={loading}
               className="h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200"
             >
@@ -169,9 +169,8 @@ const ResultSearchPage = () => {
                 <div>
                   <div className="flex items-center gap-3">
                     <h2 className="text-3xl font-black">{result.application?.candidate_name}</h2>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                      result.status === 'pass' ? 'bg-emerald-500' : 'bg-rose-500'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${result.status === 'pass' ? 'bg-emerald-500' : 'bg-rose-500'
+                      }`}>
                       {result.status}
                     </span>
                   </div>
@@ -188,7 +187,7 @@ const ResultSearchPage = () => {
                     <p className="text-xl font-black text-slate-700">
                       {showCnic ? result.application?.candidate_cnic : '•••••-•••••••-•'}
                     </p>
-                    <button 
+                    <button
                       onClick={handleToggleCnic}
                       className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500"
                     >
@@ -230,24 +229,16 @@ const ResultSearchPage = () => {
           <div className="space-y-6">
             <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white p-6 space-y-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sheet Actions</p>
-              <Button 
+              <Button
                 onClick={() => setIsPrintModalOpen(true)}
                 className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-black shadow-xl"
               >
                 <Printer className="mr-2" size={20} />
                 Generate PDF Sheet
               </Button>
-              <Button 
-                variant="outline"
-                className="w-full h-14 rounded-2xl border-2 border-slate-100 hover:bg-slate-50 font-black text-slate-700"
-                onClick={() => toast.success('Corrective Edit mode active')}
-              >
-                <Edit3 className="mr-2 text-indigo-500" size={20} />
-                Correct Marks
-              </Button>
             </Card>
 
-            <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-indigo-600 p-8 text-white relative">
+            <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-indigo-600/90 p-8 text-white relative">
               <div className="absolute -top-4 -right-4 opacity-10">
                 <ShieldCheck size={120} />
               </div>
@@ -275,7 +266,7 @@ const ResultSearchPage = () => {
             <DialogTitle className="text-2xl font-black">Choose Print Mode</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <button 
+            <button
               onClick={() => handleDownload('unofficial')}
               className="w-full p-6 rounded-2xl border-2 border-slate-100 hover:border-indigo-200 hover:bg-indigo-50 transition-all text-left group"
             >
@@ -286,12 +277,11 @@ const ResultSearchPage = () => {
               <p className="text-xs text-slate-400 font-bold">Watermarked, masked CNIC, for internal review.</p>
             </button>
 
-            <button 
+            <button
               disabled={!isAdmin}
               onClick={() => handleDownload('official')}
-              className={`w-full p-6 rounded-2xl border-2 border-slate-100 transition-all text-left group ${
-                isAdmin ? 'hover:border-indigo-200 hover:bg-indigo-50' : 'opacity-50 cursor-not-allowed'
-              }`}
+              className={`w-full p-6 rounded-2xl border-2 border-slate-100 transition-all text-left group ${isAdmin ? 'hover:border-indigo-200 hover:bg-indigo-50' : 'opacity-50 cursor-not-allowed'
+                }`}
             >
               <div className="flex justify-between items-center mb-1">
                 <div className="flex items-center gap-2">

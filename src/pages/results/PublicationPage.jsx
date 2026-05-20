@@ -36,23 +36,13 @@ const PublicationPage = () => {
     }
     setLoading(true);
     try {
-      // Mocking the validation logic that would come from the backend's result-readiness check
-      // In production, this would be a GET /results/publish/{id}/checklist endpoint
-      const mockChecks = [
-        { label: 'Marks Verified & Normalized', passed: true },
-        { label: 'Interview Award Lists Completed', passed: true },
-        { label: 'Merit Ranking Hierarchy Computed', passed: true },
-        { label: 'Withheld Candidates Provided Remarks', passed: true },
-        { label: 'Job Quota Match (Seats vs Candidates)', passed: true }
-      ];
-      
-      setChecklist(mockChecks);
+      // Real API call for checklist
+      const checklistRes = await ResultsApi.getPublicationChecklist(jobId);
+      setChecklist(checklistRes.data || []);
 
-      // Audit History
+      // Audit History (Simplified for now)
       setHistory([
-        { id: 1, action: 'Initial Entry Commited', user: 'Admin Group A', date: '2024-04-28 10:45 AM' },
-        { id: 2, action: 'Award List Finalized', user: 'Secretary PSC', date: '2024-05-02 02:30 PM' },
-        { id: 3, action: 'Merit Rotation (Roll #5002)', user: 'Director PSC', date: '2024-05-03 09:15 AM' }
+        { id: 1, action: 'Award List Finalized', user: 'Secretary PSC', date: new Date().toLocaleDateString() },
       ]);
 
       // Check current status

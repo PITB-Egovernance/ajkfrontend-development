@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, X } from 'lucide-react';
 import Button from 'components/ui/Button';
 
 /**
@@ -8,10 +8,11 @@ import Button from 'components/ui/Button';
  * 
  * @param {Object} props
  * @param {Function} props.onFileSelect - Callback when a file is chosen
+ * @param {Function} props.onPreview - Callback when the scan action is triggered
  * @param {boolean} props.loading - Loading state
  */
 
-const CSVUploadZone = ({ onFileSelect, onPreview, onCommit, loading }) => {
+const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -116,22 +117,14 @@ const CSVUploadZone = ({ onFileSelect, onPreview, onCommit, loading }) => {
               </span>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 mt-8 w-full max-w-xs">
+            <div className="flex flex-col gap-3 mt-8 w-full max-w-xs">
               <Button
-                variant="outline"
-                className="flex-1 border-slate-200 text-slate-600 font-bold"
+                variant="primary"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 text-sm uppercase tracking-wider shadow-lg shadow-emerald-100"
                 onClick={() => onPreview(selectedFile)}
                 disabled={loading}
               >
-                {loading ? 'Processing...' : 'Preview (Dry Run)'}
-              </Button>
-              <Button
-                variant="primary"
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                onClick={() => onCommit(selectedFile)}
-                disabled={loading}
-              >
-                {loading ? 'Importing...' : 'Commit'}
+                {loading ? 'Scanning File...' : 'Scan & Map Columns'}
               </Button>
             </div>
             

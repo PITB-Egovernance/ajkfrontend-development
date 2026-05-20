@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  CheckCircle2, 
-  AlertCircle, 
   Calculator,
   Save,
   Calendar,
@@ -11,7 +9,6 @@ import {
   Edit3
 } from 'lucide-react';
 import Button from 'components/ui/Button';
-import { Card } from 'components/ui/Card';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -165,7 +162,7 @@ const MarkEntryModal = ({ isOpen, onClose, candidate, jobId, onSuccess }) => {
                   {isEdit ? 'Correct Exam Marks' : 'Manual Mark Entry'}
                 </h3>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                  Candidate: {candidate.full_name} • Roll: {candidate.roll_no}
+                  Candidate: {candidate.full_name} • Ref: {candidate.application_number} • Roll: {candidate.roll_no || 'N/A'}
                 </p>
               </div>
             </div>
