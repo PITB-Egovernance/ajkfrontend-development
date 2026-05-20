@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import {
   TextField, IconButton, MenuItem, Dialog, DialogTitle,
-  DialogContent, DialogActions, Switch,
+  DialogContent, DialogActions, Menu,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
-import { Plus, ArrowLeft, Trash2, BookOpen } from 'lucide-react';
+import { Plus, ArrowLeft, MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
@@ -41,6 +41,11 @@ const DegreesManagement = () => {
   const [loading, setLoading] = useState(true);
   const [open,    setOpen]    = useState(false);
   const [editing, setEditing] = useState(null);
+  const [anchorEl,    setAnchorEl]    = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
+
+  const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
+  const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
   const [form,    setForm]    = useState(emptyForm);
   const [saving,  setSaving]  = useState(false);
   const [search,  setSearch]  = useState('');
@@ -137,6 +142,7 @@ const DegreesManagement = () => {
     } catch { toast.error('Server error'); }
   };
 
+  /* eslint-disable-next-line no-unused-vars */ // kept for future status-toggle column
   const handleToggle = async (row) => {
     const newStatus = row.status === 'active' ? 'inactive' : 'active';
     try {
@@ -163,13 +169,12 @@ const DegreesManagement = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 100,
+      width: 80,
       sortable: false,
       renderCell: (p) => (
-        <div className="flex gap-1">
-          <IconButton size="small" onClick={() => openEdit(p.row)}><BookOpen size={15} /></IconButton>
-          <IconButton size="small" onClick={() => handleDelete(p.row)} sx={{ color: 'red' }}><Trash2 size={15} /></IconButton>
-        </div>
+        <IconButton onClick={(e) => handleMenuOpen(e, p.row)}>
+          <MoreVertical size={18} />
+        </IconButton>
       ),
     },
   ];
@@ -235,6 +240,12 @@ const DegreesManagement = () => {
         <DataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={gridSx} />
+
+        {/* 3-dot action menu */}
+        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+          <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) openEdit(r); }}>Edit</MenuItem>
+          <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) handleDelete(r); }} sx={{ color: 'red' }}>Delete</MenuItem>
+        </Menu>
 
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
           <DialogTitle className="font-bold">{editing ? 'Edit Degree' : 'Add Degree'}</DialogTitle>
