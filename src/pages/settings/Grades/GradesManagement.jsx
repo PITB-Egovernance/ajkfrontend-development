@@ -264,7 +264,7 @@ const GradesManagement = () => {
         }
       }
     } catch (err) {
-      toast.error(err.message || "Server error");
+      toast.error(err.message || "Server error while saving grade");
     } finally {
       setLoading(false);
     }
@@ -290,13 +290,13 @@ const GradesManagement = () => {
       const result = await response.json();
 
       if (result.status === 200 || result.success === true) {
-        toast.success("Deleted successfully");
+        toast.success("Grade deleted successfully");
         fetchGrades(paginationModel.page, paginationModel.pageSize);
       } else {
-        toast.error(result.message || "Delete failed");
+        toast.error(result.message || "Failed to delete grade");
       }
     } catch {
-      toast.error("Server error");
+      toast.error("Server error while deleting grade");
     }
   };
 
@@ -313,7 +313,7 @@ const GradesManagement = () => {
       toast.success(`Grade marked as ${newStatus}`);
       fetchGrades(paginationModel.page, paginationModel.pageSize);
     } catch (err) {
-      toast.error(err.message || "Status update failed");
+      toast.error(err.message || "Failed to update grade status");
     }
   };
 
@@ -497,21 +497,8 @@ const GradesManagement = () => {
               }
             />
 
-            {editingGrade && (
-              <TextField
-                select
-                fullWidth
-                label="Status"
-                margin="normal"
-                value={formData.status}
-                onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value })
-                }
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
-              </TextField>
-            )}
+            {/* Status is now managed only via the row Switch toggle in the
+                grid — hidden from the edit modal to keep the form focused. */}
           </DialogContent>
 
           <DialogActions>

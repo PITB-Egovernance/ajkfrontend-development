@@ -296,12 +296,12 @@ const DesignationsManagement = () => {
       setEditingDesignation(null);
       fetchDesignations(paginationModel.page, paginationModel.pageSize);
     } else {
-      toast.error(result.message || "Operation failed");
+      toast.error(result.message || (isUpdate ? "Failed to update designation" : "Failed to create designation"));
     }
 
   } catch (error) {
     console.error("Submit Error:", error);
-    toast.error("Server error");
+    toast.error("Server error while saving designation");
   } finally {
     setLoading(false);
   }
@@ -330,14 +330,14 @@ const DesignationsManagement = () => {
       const result = await response.json();
 
       if (result.success === true || result.status === 200) {
-        toast.success("Deleted successfully");
+        toast.success("Designation deleted successfully");
         fetchDesignations(paginationModel.page, paginationModel.pageSize);
       } else {
-        toast.error(result.message || "Delete failed");
+        toast.error(result.message || "Failed to delete designation");
       }
     } catch (error) {
       console.error(error);
-      toast.error("Server error");
+      toast.error("Server error while deleting designation");
     }
   };
 
@@ -354,10 +354,10 @@ const DesignationsManagement = () => {
         toast.success(`Designation marked as ${newStatus}`);
         fetchDesignations(paginationModel.page, paginationModel.pageSize);
       } else {
-        toast.error(result.message || "Status update failed");
+        toast.error(result.message || "Failed to update designation status");
       }
     } catch {
-      toast.error("Status update failed");
+      toast.error("Server error while updating designation status");
     }
   };
 
@@ -592,22 +592,8 @@ const DesignationsManagement = () => {
             {/* Type Field */}
             
 
-            {/* Status */}
-            {editingDesignation && (
-              <TextField
-                select
-                fullWidth
-                label="Status"
-                margin="normal"
-                value={formData.status}
-                onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value })
-                }
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
-              </TextField>
-            )}
+            {/* Status is now managed only via the row Switch toggle in the
+                grid — hidden from the edit modal to keep the form focused. */}
 
           </DialogContent>
 
