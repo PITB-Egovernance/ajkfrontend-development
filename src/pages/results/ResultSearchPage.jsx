@@ -237,16 +237,6 @@ const ResultSearchPage = () => {
                 Generate PDF Sheet
               </Button>
             </Card>
-
-            <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-indigo-600/90 p-8 text-white relative">
-              <div className="absolute -top-4 -right-4 opacity-10">
-                <ShieldCheck size={120} />
-              </div>
-              <h3 className="text-xl font-black mb-2">Audit Control</h3>
-              <p className="text-indigo-100 text-sm font-medium leading-relaxed">
-                Every view, print, and CNIC reveal action is logged with your ID and IP address for security compliance.
-              </p>
-            </Card>
           </div>
         </div>
       )}
