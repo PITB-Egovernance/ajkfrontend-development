@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import {
   TextField, IconButton, Menu, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions, Switch,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, MoreVertical, Building } from 'lucide-react';
@@ -13,7 +13,8 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 
-const API_BASE = Config.productionUrl;
+// Per AJK coding standards §3.2: always use Config.apiUrl, never hardcode.
+const API_BASE = Config.apiUrl;
 
 const getHeaders = () => ({
   Authorization: `Bearer ${AuthService.getToken()}`,
@@ -54,6 +55,9 @@ const DepartmentsManagement = () => {
   const [saving,      setSaving]      = useState(false);
   const [formError,   setFormError]   = useState('');
 
+  const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
+  const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
+
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -74,7 +78,7 @@ const DepartmentsManagement = () => {
       } else {
         toast.error(result.message || 'Failed to load departments');
       }
-    } catch { toast.error('Server error'); }
+    } catch { toast.error('Server error while loading departments'); }
     finally { setLoading(false); }
   };
 
@@ -136,54 +140,29 @@ const DepartmentsManagement = () => {
         setOpenModal(false);
         fetchAll();
       } else {
-        toast.error(result.message || 'Operation failed');
+        toast.error(result.message || (isUpdate ? 'Failed to update department' : 'Failed to create department'));
       }
-    } catch { toast.error('Server error'); }
+    } catch { toast.error('Server error while saving department'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
     if (!selectedRow) return;
-    if (!await confirmDelete({ title: 'Delete Department', identifier: selectedRow.department_name })) {
-      setAnchorEl(null); return;
-    }
+    const row = selectedRow;
+    handleMenuClose();
+    if (!await confirmDelete({ title: 'Delete Department', identifier: row.department_name })) return;
     try {
-      const res    = await fetch(`${API_BASE}/settings/departments/${selectedRow.hash_id}/delete`, {
+      const res    = await fetch(`${API_BASE}/settings/departments/${row.hash_id}/delete`, {
         method: 'DELETE', headers: getHeaders(),
       });
       const result = await res.json();
       if (result.success || result.status === 200) {
-        toast.success('Deleted');
+        toast.success('Department deleted successfully');
         fetchAll();
       } else {
-        toast.error(result.message || 'Delete failed');
+        toast.error(result.message || 'Failed to delete department');
       }
-    } catch { toast.error('Server error'); }
-    finally { setAnchorEl(null); setSelectedRow(null); }
-  };
-
-  const handleToggleStatus = async (row) => {
-    const newStatus = row.status === 'active' ? 'inactive' : 'active';
-    try {
-      const res    = await fetch(`${API_BASE}/settings/departments/${row.hash_id || row.id}/update`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          department_name: row.department_name,
-          contact_person:  row.contact_person,
-          phone_number:    row.phone_number,
-          mobile_number:   row.mobile_number,
-          status:          newStatus,
-        }),
-      });
-      const result = await res.json();
-      if (res.ok || result.success || result.status === 200) {
-        toast.success(`Marked as ${newStatus}`);
-        fetchAll();
-      } else {
-        toast.error(result.message || 'Status update failed');
-      }
-    } catch { toast.error('Server error'); }
+    } catch { toast.error('Server error while deleting department'); }
   };
 
   const columns = [
@@ -201,8 +180,7 @@ const DepartmentsManagement = () => {
       width: 80,
       sortable: false,
       renderCell: (p) => (
-        <IconButton size="small"
-          onClick={(e) => { setAnchorEl(e.currentTarget); setSelectedRow(p.row); }}>
+        <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}>
           <MoreVertical size={18} />
         </IconButton>
       ),
@@ -248,11 +226,20 @@ const DepartmentsManagement = () => {
             sx={{ width: 340 }} />
         </div>
 
-        <DataGrid rows={filteredRows} columns={columns} getRowId={(r) => r.id}
-          paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={gridSx} />
+        <DataGrid
+          rows={filteredRows}
+          columns={columns}
+          getRowId={(r) => r.id}
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          pageSizeOptions={[15, 25, 50, 100]}
+          initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
+          autoHeight
+          disableRowSelectionOnClick
+          sx={gridSx}
+        />
 
-        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => { setAnchorEl(null); setSelectedRow(null); }}>
+        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
           <MenuItem onClick={() => openEdit(selectedRow)}>Edit</MenuItem>
           <MenuItem onClick={handleDelete} sx={{ color: 'red' }}>Delete</MenuItem>
         </Menu>
