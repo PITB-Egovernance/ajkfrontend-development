@@ -301,12 +301,15 @@ const AwardListPage = () => {
       return (a.id || 0) - (b.id || 0);
     });
 
+    const numPosts = parseInt(currentJob?.num_posts || currentJob?.numPosts) || 1;
+
     setAwards(sorted.map((item, index) => ({
       ...item,
-      merit_rank: index + 1
+      merit_rank: index + 1,
+      status: index < numPosts ? 'Selected' : 'Provisional'
     })));
 
-    toast.success('Ranks auto-computed!');
+    toast.success(`Ranks auto-computed! Top ${numPosts} candidate(s) set as Selected.`);
   };
 
   const handleExportCSV = () => {
@@ -486,7 +489,6 @@ const AwardListPage = () => {
               <Award className="text-emerald-500" size={28} />
               Award List Builder
             </h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Journey 2.3 • Interview Scoring Console</p>
           </div>
         </div>
 
@@ -508,7 +510,7 @@ const AwardListPage = () => {
         {/* Top Panels: Configuration Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {isInitialized && currentJob ? (
-            <Card className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/70 text-white space-y-4 flex flex-col justify-center">
+            <div className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/70 text-white space-y-4 flex flex-col justify-center">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/20 rounded-xl">
                   <Users size={22} />
@@ -536,13 +538,13 @@ const AwardListPage = () => {
                   <p className="text-xs font-bold">{lastDocDate}</p>
                 </div>
               </div>
-            </Card>
+            </div>
           ) : (
-            <Card className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/5 border-2 border-indigo-200/10 text-indigo-400 flex flex-col items-center justify-center text-center">
+            <div className="border-none shadow-xl rounded-[2rem] p-6 bg-indigo-600/5 border-2 border-indigo-200/10 text-indigo-400 flex flex-col items-center justify-center text-center">
               <Users size={28} className="mb-2 opacity-55" />
               <h4 className="font-black uppercase tracking-widest text-[9px] tracking-wider">No Active Selection</h4>
               <p className="text-[9px] mt-1 text-slate-400">Load or create a new award list below to view the context.</p>
-            </Card>
+            </div>
           )}
 
           <Card className="border-none shadow-2xl rounded-[2.5rem] p-6 space-y-4 bg-white overflow-hidden">
@@ -639,6 +641,17 @@ const AwardListPage = () => {
                 </div>
               </div>
             </div>
+
+            <div className="mt-3 pt-2.5 border-t border-white/20">
+              <span className="text-[7px] font-black text-emerald-200 block uppercase mb-1">CSV Import Hint</span>
+              <p className="text-[9px] leading-snug font-bold text-white/90">
+                For Postgraduate (MPhil/PhD): Enter <span className="underline decoration-white/30 decoration-1 font-black">2</span> (for PhD), <span className="underline decoration-white/30 decoration-1 font-black">1</span> (for MPhil), or <span className="underline decoration-white/30 decoration-1 font-black">0</span> (for none) while filling CSV file.
+              </p>
+              <p className="text-[9px] leading-snug font-bold text-white/90 mt-1.5">
+                For Matric Position, Enter <span className="underline decoration-white/30 decoration-1 font-black">1</span> (For Position) for Yes and <span className="underline decoration-white/30 decoration-1 font-black">0</span> (For No Position).
+              </p>
+            </div>
+
             <div className="pt-2.5 border-t border-white/20 mt-2.5 flex justify-between items-center">
               <span className="text-[9px] font-black text-white uppercase tracking-widest">Grand Total Limit</span>
               <span className="text-xs font-black underline decoration-2 underline-offset-4">100.0 Marks</span>
@@ -729,7 +742,7 @@ const AwardListPage = () => {
                       <th className="px-6 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Rank</th>
                       <th className="px-6 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Candidate</th>
                       <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-blue-50/40">Part-A: Academic Credentials (25)</th>
-                      <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/40">Written Exam (45)</th>
+                      <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/40">Written/MCQs Exam (45)</th>
                       <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-indigo-50/40">Interview Viva (30)</th>
                       <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest bg-emerald-50/40">Grand (100)</th>
                       <th className="px-6 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
@@ -984,10 +997,10 @@ const AwardListPage = () => {
                         </td>
 
                         <td className="px-6 py-6 text-right">
-                          <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest ${row.status === 'Selected' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100' : 'bg-slate-100 text-slate-500'
+                          <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest ${row.status?.toLowerCase() === 'selected' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100' : 'bg-slate-100 text-slate-500'
                             }`}>
-                            {row.status === 'Selected' ? <UserCheck size={14} /> : <Clock size={14} />}
-                            {row.status || 'Provisional'}
+                            {row.status?.toLowerCase() === 'selected' ? <UserCheck size={14} /> : <Clock size={14} />}
+                            {row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1).toLowerCase() : 'Provisional'}
                           </div>
                         </td>
                       </tr>

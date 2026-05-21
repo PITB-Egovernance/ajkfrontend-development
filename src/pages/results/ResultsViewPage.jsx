@@ -135,7 +135,7 @@ const ResultsViewPage = () => {
       cell: info => {
         const marks = info.getValue() || {};
         return (
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {Object.entries(marks).map(([key, val]) => (
               <div key={key} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 flex flex-col items-center min-w-[50px]">
                 <span className="text-[7px] font-black text-slate-400 uppercase leading-none mb-0.5">{key}</span>
@@ -146,33 +146,7 @@ const ResultsViewPage = () => {
           </div>
         );
       },
-      size: 250,
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: info => (
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            disabled
-            className="h-14 px-8 bg-slate-200 text-slate-400 rounded-[1.25rem] flex items-center gap-3 transition-all border-none cursor-not-allowed opacity-60"
-            onClick={() => handleEditClick(info.row.original)}
-          >
-            <Edit3 size={20} />
-            <span className="text-xs font-black uppercase tracking-[0.15em]">Enter Marks</span>
-          </Button>
-          <Button 
-            variant="ghost" 
-            disabled
-            className="h-14 w-14 p-0 bg-slate-50 text-slate-300 rounded-[1.25rem] border border-slate-200 transition-all flex items-center justify-center cursor-not-allowed opacity-60"
-            title="More Options"
-          >
-            <MoreHorizontal size={32} />
-          </Button>
-        </div>
-      ),
-      size: 220,
+      size: 500,
     }
   ], []);
 
