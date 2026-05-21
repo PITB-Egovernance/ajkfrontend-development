@@ -53,11 +53,13 @@ const PscTable = () => {
     }
   ];
 
-  const handleFilterChange = (name, value) => {
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
     setFilters(prev => ({
       ...prev,
       [name]: value
     }));
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
@@ -73,72 +75,81 @@ const PscTable = () => {
   const TOKEN = AuthService.getToken(); // Get token from AuthService
   const API_KEY = Config.apiKey;
 
-  const fetchRequisitions = async (pageNum = 0, pageSize = 10) => {
+  const headers = {
+    'Accept': 'application/json',
+    'Authorization': `Bearer ${TOKEN}`,
+    'Content-Type': 'application/json',
+    'X-API-KEY': API_KEY,
+  };
+
+  const mapItem = (item, index) => ({
+    id: item.hash_id || item.id || `psc-${index}`,
+    hash_id: item.hash_id,
+    designation: item.designation,
+    requisition_form: item.requisition_form,
+    annex_a_form: item.annex_a_form,
+    other_attachment: item.other_attachment,
+    remarks: item.remarks || '-',
+    status: item.status || 'Pending',
+  });
+
+  const fetchRequisitions = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/psc/requisitions`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
-      });
+      // First page — get total + first batch
+      const firstRes = await fetch(`${API_BASE}/psc/requisitions?page=1`, { headers });
+      if (!firstRes.ok) {
+        if (firstRes.status === 401) throw new Error('Unauthorized: Invalid or missing token.');
+        throw new Error(`HTTP error! Status: ${firstRes.status}`);
+      }
+      const firstJson = await firstRes.json();
+      if (!firstJson.success || !firstJson.data) {
+        throw new Error(firstJson.message || 'Invalid response format');
+      }
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Unauthorized: Invalid or missing token. Please check your token.');
+      const totalCount = firstJson.data.total ?? 0;
+      const lastPage   = firstJson.data.last_page ?? 1;
+      let allItems     = firstJson.data.data ?? [];
+
+      // Fetch remaining pages in parallel if any
+      if (lastPage > 1) {
+        const pagePromises = [];
+        for (let p = 2; p <= lastPage; p++) {
+          pagePromises.push(
+            fetch(`${API_BASE}/psc/requisitions?page=${p}`, { headers })
+              .then(r => r.json())
+              .then(j => j?.data?.data ?? [])
+              .catch(() => [])
+          );
         }
-        throw new Error(`HTTP error! Status: ${response.status}`);
+        const pages = await Promise.all(pagePromises);
+        allItems = allItems.concat(...pages);
       }
 
-      const result = await response.json();
+      const requisitions = allItems.map(mapItem);
+      setRows(requisitions);
+      setTotal(totalCount);
 
-      if (result.success && result.data) {
-        const requisitions = result.data.data.map((item, index) => ({
-          id: item.hash_id || item.id || `psc-${pageNum}-${index}`, // Use hash_id as primary ID
-          hash_id: item.hash_id,
-          designation: item.designation,
-          requisition_form: item.requisition_form,
-          annex_a_form: item.annex_a_form,
-          other_attachment: item.other_attachment,
-          remarks: item.remarks || '-',
-          status: item.status || 'Pending',
-        }));
-
-        setRows(requisitions);
-        setTotal(result.data.total);
-
-        // Calculate stats from current page (best effort)
-        const statuses = result.data.data.map(r => r.status || 'Pending');
-        const pendingCount = statuses.filter(s => s.toLowerCase() === 'pending').length;
-        const approvedCount = statuses.filter(s => s.toLowerCase() === 'approved').length;
-        const rejectedCount = statuses.filter(s => s.toLowerCase() === 'rejected').length;
-
-        setStats({
-          total: result.data.total,
-          pending: pendingCount,
-          approved: approvedCount,
-          rejected: rejectedCount,
-        });
-      } else {
-        throw new Error(result.message || 'Invalid response format');
-      }
+      const statuses = requisitions.map(r => (r.status || 'Pending').toLowerCase());
+      setStats({
+        total:    totalCount,
+        pending:  statuses.filter(s => s === 'pending').length,
+        approved: statuses.filter(s => s === 'approved').length,
+        rejected: statuses.filter(s => s === 'rejected').length,
+      });
     } catch (err) {
       setError(err.message);
-      console.error('Fetch error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRequisitions(paginationModel.page, paginationModel.pageSize);
+    fetchRequisitions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, []);
 
   const filteredRows = rows.filter((row) => {
     if (filters.hash_id && !row.hash_id?.toLowerCase().includes(filters.hash_id.toLowerCase())) {
@@ -217,14 +228,13 @@ const PscTable = () => {
 
       if (response.ok && result.success) {
         toast.success(`Status Updated to ${status.toUpperCase()}`);
-        fetchRequisitions(paginationModel.page); // Refresh the list
+        fetchRequisitions();
         setUpdatingRequisitionId(null);
       } else {
         toast.error(result.message || 'Failed to update status');
       }
     } catch (error) {
       toast.error('Error updating status: ' + error.message);
-      console.error('Status update error:', error);
     } finally {
       setUpdating(false);
     }
@@ -342,11 +352,10 @@ const PscTable = () => {
             rows={filteredRows}
             columns={columns}
             pagination
-            paginationMode="server"
-            rowCount={total}
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[10, 25, 50, 75, 100]}
+            initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
             loading={loading}
             disableSelectionOnClick
             autoHeight

@@ -25,7 +25,7 @@ const ApplicationDetail = () => {
       const response = await ApplicationApi.getById(id);
       const rawData = response.data?.application || response.application || response.data || response;
       
-      // Use admin-overlaid status if present, otherwise mask "submitted" as blank
+      // Admin DB is source of truth (overlaid via _admin_status). Fall back to candidate status.
       const effectiveStatus = (rawData._admin_status !== null && rawData._admin_status !== undefined)
         ? rawData._admin_status
         : (rawData.status === 'submitted' || !rawData.status ? '' : rawData.status);
@@ -81,7 +81,14 @@ const ApplicationDetail = () => {
   const handleStatusUpdate = async (status) => {
     try {
       setApplication(prev => ({ ...prev, status }));
-      await ApplicationApi.updateStatus(application.application_number, status);
+      await ApplicationApi.updateStatus(application.application_number, status, {
+        application_number: application.application_number,
+        candidate_name:    application.profile?.full_name,
+        candidate_cnic:    application.profile?.cnic,
+        candidate_email:   application.profile?.email,
+        candidate_mobile:  application.profile?.phone,
+        advertisement_no:  application.job?.title,
+      });
       toast.success(`Application marked as ${status}`);
     } catch (error) {
       toast.error('Failed to update status');

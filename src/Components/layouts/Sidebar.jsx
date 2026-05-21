@@ -188,9 +188,9 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           icon: ClipboardList,
         },
         {
-          label: "Companies",
-          path: "/dashboard/settings/companies",
-          icon: Package,
+          label: "Departments",
+          path: "/dashboard/settings/departments",
+          icon: Building2,
         },
         {
           label: "Cities",
@@ -223,9 +223,9 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
         //   icon: GraduationCap,
         // },
         {
-          label: "Departments",
-          path: "/dashboard/settings/departments",
-          icon: Building2,
+          label: "Companies",
+          path: "/dashboard/settings/companies",
+          icon: Package,
         },
       ],
     },

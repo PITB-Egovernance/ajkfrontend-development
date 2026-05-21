@@ -1,11 +1,6 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
-// Roll-number endpoints (slip generation, edit, delete, download…) aren't
-// deployed to the live admin server yet, so they hit the local backend.
-// Other admin endpoints (exam centers, halls, etc.) ARE live, so they
-// continue to use Config.apiUrl.
-const ROLL_API_BASE  = Config.rollNumberApiUrl;
 const ADMIN_API_BASE = Config.apiUrl;
 const ADMIN_API_KEY  = Config.apiKey;
 
@@ -39,7 +34,7 @@ const RollNumberApi = {
     if (params.search)           search.set('search',           params.search);
     if (params.advertisement_no) search.set('advertisement_no', params.advertisement_no);
 
-    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/shortlisted?${search}`, {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/shortlisted?${search}`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);
@@ -47,7 +42,7 @@ const RollNumberApi = {
 
   // Generate roll-number slips for selected applications
   generateSlips: async (body) => {
-    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/generate-slips`, {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generate-slips`, {
       method:  'POST',
       headers: getAdminHeaders(),
       body:    JSON.stringify(body),
@@ -57,14 +52,14 @@ const RollNumberApi = {
 
   // Download a single slip — returns the raw Response so the caller can stream the PDF blob
   downloadSlip: async (applicationNumber) => {
-    return fetch(`${ROLL_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+    return fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
       headers: getAdminHeaders(false),
     });
   },
 
   // Update an existing slip's editable fields
   updateSlip: async (applicationNumber, body) => {
-    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
       method:  'PUT',
       headers: getAdminHeaders(),
       body:    JSON.stringify(body),
@@ -74,7 +69,7 @@ const RollNumberApi = {
 
   // Delete one slip
   deleteSlip: async (applicationNumber) => {
-    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {
       method:  'DELETE',
       headers: getAdminHeaders(false),
     });
@@ -83,7 +78,7 @@ const RollNumberApi = {
 
   // Bulk delete slips
   bulkDeleteSlips: async (applicationNumbers) => {
-    const res = await fetch(`${ROLL_API_BASE}/roll-numbers/bulk-delete-slips`, {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/bulk-delete-slips`, {
       method:  'POST',
       headers: getAdminHeaders(),
       body:    JSON.stringify({ application_numbers: applicationNumbers }),
@@ -92,18 +87,18 @@ const RollNumberApi = {
   },
 
   // Exam centers + halls for the slip-generation allocation modal.
-  // These go to LOCAL because the live ExamCenter/ExamHall models still
-  // hide the numeric `id` (only hash_id is exposed). Slip generation needs
-  // the numeric id to satisfy `exists:exam_centers,id` in the FormRequest.
+  // Requires the live ExamCenter/ExamHall models to expose the numeric `id`
+  // (i.e. `'id'` removed from $hidden) so the FormRequest's
+  // `exists:exam_centers,id` rule can resolve.
   getExamCenters: async (perPage = 500) => {
-    const res = await fetch(`${ROLL_API_BASE}/settings/exam-centers?per_page=${perPage}`, {
+    const res = await fetch(`${ADMIN_API_BASE}/settings/exam-centers?per_page=${perPage}`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);
   },
 
   getHallsByCenter: async (centerId) => {
-    const res = await fetch(`${ROLL_API_BASE}/settings/exam-halls/by-center/${centerId}`, {
+    const res = await fetch(`${ADMIN_API_BASE}/settings/exam-halls/by-center/${centerId}`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);

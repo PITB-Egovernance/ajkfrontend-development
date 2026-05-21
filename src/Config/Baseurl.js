@@ -1,11 +1,6 @@
 const productionUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 const localUrl      = "http://localhost:3000";
-// const apiUrl        = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
-const apiUrl        = "http://localhost:8000/api/v1";
-
-// rollNumberApiUrl stays pointed at local — same target as apiUrl now
-// (the split mattered only when apiUrl was live).
-const rollNumberApiUrl = "http://localhost:8000/api/v1";
+const apiUrl        = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 
 // In development the CRACO proxy routes /candidate-api → candidate portal (avoids CORS).
 // In production the candidate portal must allow the admin domain via CORS headers.
@@ -21,7 +16,6 @@ const Config = {
   productionUrl,
   localUrl,
   apiUrl,
-  rollNumberApiUrl,
   candidateApiUrl,
   apiKey,
   candidateApiKey
