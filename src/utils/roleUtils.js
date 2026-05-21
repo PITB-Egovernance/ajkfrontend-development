@@ -6,6 +6,7 @@ const ROLE_ALIASES = {
   director_recruitment: 'director',
   secretary: 'secretary',
   chairman: 'chairman',
+  data_entry_officer: 'data_entry',
 };
 
 export const normalizeRole = (rawRole) => {
