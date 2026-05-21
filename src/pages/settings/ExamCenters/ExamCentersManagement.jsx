@@ -222,8 +222,6 @@ const ExamCentersManagement = () => {
   });
 
   const total        = allRows.length;
-  const activeCount  = allRows.filter((r) => (r.status ?? "active") === "active").length;
-  const inactiveCount= allRows.filter((r) => r.status === "inactive").length;
   const totalCapacity= allRows.reduce((s, r) => s + (Number(r.capacity) || 0), 0);
 
   /* ── MENU ── */
@@ -400,10 +398,8 @@ const ExamCentersManagement = () => {
         </div>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200"><CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total Centers</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{total}</h2></CardContent></Card>
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200"><CardContent className="p-5"><p className="text-sm text-emerald-700 font-medium">Active</p><h2 className="text-3xl font-bold text-emerald-900 mt-1">{activeCount}</h2></CardContent></Card>
-          <Card className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200"><CardContent className="p-5"><p className="text-sm text-red-700 font-medium">Inactive</p><h2 className="text-3xl font-bold text-red-900 mt-1">{inactiveCount}</h2></CardContent></Card>
           <Card className="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200"><CardContent className="p-5"><p className="text-sm text-violet-700 font-medium">Total Capacity</p><h2 className="text-3xl font-bold text-violet-900 mt-1">{totalCapacity.toLocaleString()}</h2></CardContent></Card>
         </div>
 
@@ -475,13 +471,6 @@ const ExamCentersManagement = () => {
                 ? cities.map((c) => <MenuItem key={c.hash_id} value={c.city}>{c.city}</MenuItem>)
                 : <MenuItem disabled value="">No cities — add cities first</MenuItem>}
             </TextField>
-            <TextField
-              fullWidth label="District" margin="normal" size="small"
-              value={formData.district_name || ""}
-              InputProps={{ readOnly: true }}
-              helperText={formData.district_name ? "" : "Auto-filled from the selected city's district"}
-              sx={{ "& .MuiInputBase-input": { color: formData.district_name ? "#1e293b" : "#94a3b8" } }}
-            />
             <TextField
               fullWidth label="Capacity (seats)" margin="normal" size="small"
               type="number" inputProps={{ min: 1 }}

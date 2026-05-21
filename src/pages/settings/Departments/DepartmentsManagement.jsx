@@ -80,8 +80,6 @@ const DepartmentsManagement = () => {
 
   useEffect(() => { fetchAll(); }, []);
 
-  const activeCount   = rows.filter((r) => r.status === 'active').length;
-  const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
 
   const filteredRows = rows.filter((r) => {
     const q = search.toLowerCase();
@@ -237,15 +235,9 @@ const DepartmentsManagement = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-6"><p className="text-sm text-blue-700 font-medium">Total Departments</p><h2 className="text-3xl font-bold text-blue-900 mt-2">{rows.length}</h2></CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
-            <CardContent className="p-6"><p className="text-sm text-emerald-700 font-medium">Active</p><h2 className="text-3xl font-bold text-emerald-900 mt-2">{activeCount}</h2></CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200">
-            <CardContent className="p-6"><p className="text-sm text-red-700 font-medium">Inactive</p><h2 className="text-3xl font-bold text-red-900 mt-2">{inactiveCount}</h2></CardContent>
           </Card>
         </div>
 

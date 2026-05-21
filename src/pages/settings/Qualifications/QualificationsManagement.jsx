@@ -71,8 +71,6 @@ const QualificationsManagement = () => {
 
   useEffect(() => { fetchAll(); }, []);
 
-  const activeCount   = rows.filter((r) => r.status === 'active').length;
-  const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
 
   const filtered = rows.filter((r) =>
     !search.trim() || r.name?.toLowerCase().includes(search.toLowerCase())
@@ -182,15 +180,9 @@ const QualificationsManagement = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{rows.length}</h2></CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
-            <CardContent className="p-5"><p className="text-sm text-emerald-700 font-medium">Active</p><h2 className="text-3xl font-bold text-emerald-900 mt-1">{activeCount}</h2></CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200">
-            <CardContent className="p-5"><p className="text-sm text-red-700 font-medium">Inactive</p><h2 className="text-3xl font-bold text-red-900 mt-1">{inactiveCount}</h2></CardContent>
           </Card>
         </div>
 
