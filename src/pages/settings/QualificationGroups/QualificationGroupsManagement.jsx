@@ -15,7 +15,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
-const API_BASE = Config.productionUrl;
+const API_BASE = Config.apiUrl;
 const getApiHeaders = () => ({
   Authorization: `Bearer ${AuthService.getToken()}`,
   Accept: 'application/json',

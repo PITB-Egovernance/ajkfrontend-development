@@ -14,7 +14,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import confirmDelete from 'components/ui/ConfirmDelete';
 
-const API_BASE = Config.apiUrl; // local — switch to Config.productionUrl after deploying backend
+const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
 const getHeaders = () => ({
   Authorization: `Bearer ${AuthService.getToken()}`,

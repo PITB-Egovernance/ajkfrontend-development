@@ -57,6 +57,17 @@ import RollSlipEditor from 'pages/roll-numbers/RollSlipEditor';
 import AwardList from 'pages/award-list/AwardList';
 import AwardListDetail from 'pages/award-list/AwardListDetail';
 
+// Results Module Imports
+import AwardListPage from 'pages/results/AwardListPage';
+import ImportResultsPage from 'pages/results/ImportResultsPage';
+import MarkEntryPage from 'pages/results/MarkEntryPage';
+import MeritManagementPage from 'pages/results/MeritManagementPage';
+import PublicationPage from 'pages/results/PublicationPage';
+import ResultsDashboard from 'pages/results/ResultsDashboard';
+import ResultsViewPage from 'pages/results/ResultsViewPage';
+import ApprovalsPage from 'pages/results/ApprovalsPage';
+import ResultSearchPage from 'pages/results/ResultSearchPage';
+
 
 function App() {
   return (
@@ -169,6 +180,59 @@ function App() {
           {/* Award List Routes */}
           <Route path="award-lists" element={<AwardList />} />
           <Route path="award-lists/:id" element={<AwardListDetail />} />
+
+          {/* Results Module Routes */}
+          <Route path="results" element={<ResultsDashboard />} />
+          <Route path="results/search" element={<ResultSearchPage />} />
+          <Route path="results/view/:jobId?" element={<ResultsViewPage />} />
+          <Route
+            path="results/approvals"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'chairman', 'secretary']}>
+                <ApprovalsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/entry"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <MarkEntryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/import/:jobId?"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <ImportResultsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/awards/:jobId?"
+            element={
+              <ProtectedRoute allowedRoles={['secretary', 'admin']}>
+                <AwardListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/merit/:jobId?"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'chairman', 'senior_admin', 'data_entry', 'dataentry']}>
+                <MeritManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/publish/:jobId?"
+            element={
+              <ProtectedRoute allowedRoles={['director', 'admin']}>
+                <PublicationPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
       </Routes>
     </Router>

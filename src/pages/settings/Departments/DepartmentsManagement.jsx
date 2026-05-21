@@ -13,7 +13,6 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 
-// Per AJK coding standards §3.2: always use Config.apiUrl, never hardcode.
 const API_BASE = Config.apiUrl;
 
 const getHeaders = () => ({

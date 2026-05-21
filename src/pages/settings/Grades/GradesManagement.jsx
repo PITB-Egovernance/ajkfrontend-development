@@ -40,7 +40,7 @@ const GradesManagement = () => {
   const navigate = useNavigate();
 
   // Use productionUrl explicitly — avoids stale apiUrl in cached bundles
-  const API_BASE = Config.productionUrl;
+  const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
   const API_KEY = Config.apiKey;
 

@@ -24,6 +24,12 @@ import {
   GraduationCap,
   BookOpen as BookOpenIcon,
   Building2,
+  TrendingUp,
+  BarChart3,
+  Eye,
+  Upload,
+  LayoutDashboard,
+  PlusCircle,
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
@@ -38,7 +44,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   const { openMenu, toggleMenu: contextToggleMenu } = sidebarContext;
   const { user } = useAuth();
   const userRole = getUserRole(user);
-  
+
   const [localOpenMenu, setLocalOpenMenu] = useState("");
   const location = useLocation();
 
@@ -142,7 +148,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
         },
       ],
     },
-    
+
     // {
     //   id: "workflow-tracking",
     //   label: "Workflow Tracking",
@@ -150,6 +156,20 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     //   path: "/dashboard/workflow-tracking",
     //   roles: ["admin"],
     // },
+    {
+      id: "results",
+      label: "Results",
+      icon: Award,
+      path: "/dashboard/results",
+      badge: null,
+    },
+    {
+      id: "workflow-tracking",
+      label: "Workflow Tracking",
+      icon: CheckCircle,
+      path: "/dashboard/workflow-tracking",
+      roles: ["admin"],
+    },
     {
       id: "settings",
       label: "Settings",
@@ -181,7 +201,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
         //   path: "/dashboard/settings/tehsils",
         //   icon: Table,
         // },
-       
+
         {
           label: "Grades",
           path: "/dashboard/settings/grades",
@@ -248,7 +268,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
 
     if (hasSubmenu) {
       return (
-        <div 
+        <div
           className="relative group"
           onMouseEnter={() => !isOpen && setShowHoverMenu(true)}
           onMouseLeave={() => !isOpen && setShowHoverMenu(false)}
@@ -317,7 +337,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
 
           {/* Hover submenu for collapsed sidebar */}
           {!isOpen && showHoverMenu && (
-            <div 
+            <div
               className="absolute left-full top-0 ml-2 min-w-[250px] z-50 animate-in fade-in slide-in-from-left-2 duration-200"
               style={{ height: 'auto' }}
             >
@@ -451,7 +471,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           isOpen ? "px-4" : "px-2",
           "h-[calc(100vh-120px)]"
         )}
-        style={{ height: 'auto', maxHeight: 'calc(100vh - 120px)' }}
+          style={{ height: 'auto', maxHeight: 'calc(100vh - 120px)' }}
         >
           {allowedMenuItems.map((item) => (
             <NavItem key={item.id} item={item} />

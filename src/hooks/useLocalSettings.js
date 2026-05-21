@@ -11,7 +11,7 @@ import { useState, useEffect } from 'react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
-const LIVE_API = Config.productionUrl;
+const LIVE_API = Config.apiUrl;
 const liveHeaders = () => ({
   Authorization: `Bearer ${AuthService.getToken()}`,
   Accept: 'application/json',
