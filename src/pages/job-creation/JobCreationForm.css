@@ -326,3 +326,34 @@
     max-width: 100%;
   }
 }
+
+/* ── Total Duration Pill ─────────────────────────────────────────
+   Bold green pill shown directly under the Closing Date field
+   and the Test Type / Application Fee row on the Advertisement
+   Create form. Reusable across both rows so the styling stays
+   consistent. */
+.job-creation-container .total-duration-pill {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #065f46;
+  font-weight: 700;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.job-creation-container .total-duration-pill .total-duration-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #047857;
+}
+
+.job-creation-container .total-duration-pill .total-duration-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #065f46;
+}

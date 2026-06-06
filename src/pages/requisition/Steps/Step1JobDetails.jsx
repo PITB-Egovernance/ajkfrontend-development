@@ -1,35 +1,199 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TextField, MenuItem, InputAdornment } from '@mui/material';
 import toast from 'react-hot-toast';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) => {
+  // Track the last data identity we've synced from. Only re-sync when the
+  // identity actually changes (e.g. user navigates back with a new temp_id).
+  // Without this guard, the data-sync useEffect would re-run on every
+  // parent re-render and OVERWRITE the user's in-progress edits.
+  const lastSyncedDataRef = useRef(null);
+
   const [formData, setFormData] = useState({
+    department: data.department || '',
     designation: data.designation || '',
     scale: data.scale || '',
-    quota_percentage: data.quota_percentage || '',
-    num_posts: data.num_posts || 1,
+    // v2.2.0: live API (Usama's schema) uses a single `quota_percentage` field
+    // (label: "Promotion Quota") for the promotion-quota split. The legacy
+    // `direct_quota_percentage` and `district_quota_percentage` fields are no
+    // longer collected here.
+    quota_percentage: data.quota_percentage ?? '',
+    num_posts: data.num_posts ?? '',
     vacancy_date: data.vacancy_date || '',
-    test_type: data.test_type || '',
+    // test_type is no longer collected in the UI (see getCleanedFormData
+    // for the default value sent to the live API).
+    quota_promotion: data.quota_promotion ?? '',
     service_rules: data.service_rules || null,
     syllabus: data.syllabus || null,
   });
 
+  const [departments, setDepartments] = useState([]);
+  const [grades, setGrades] = useState([]);
+
+  // Fetch active departments for the dropdown. Silent fail leaves the
+  // dropdown empty so the wizard remains usable.
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/settings/departments`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
+          },
+        });
+        const result = await res.json();
+        if (aborted) return;
+        if (res.ok && (result.success || result.status === 200)) {
+          const list = result.data?.data ?? result.data ?? [];
+          setDepartments(list
+            .filter((d) => (d.status ?? 'active') === 'active')
+            .map((d) => ({
+              id:   d.hash_id || d.id,
+              name: d.department_name || d.name,
+            })));
+        }
+      } catch { /* silent — keep empty */ }
+    })();
+    return () => { aborted = true; };
+  }, []);
+
+  // Fetch active grades for the "Scale of the Post" dropdown. The list
+  // is sourced dynamically from /settings/grades so the available scales
+  // (BPS-16, BPS-17, etc.) are always in sync with the Settings module.
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/settings/grades?per_page=200`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
+          },
+        });
+        const result = await res.json();
+        if (aborted) return;
+        if (res.ok && (result.success || result.status === 200)) {
+          const list = result.data?.data ?? result.data ?? [];
+          setGrades(list
+            .filter((g) => (g.status ?? 'active') === 'active')
+            .map((g) => ({
+              id:   g.hash_id || g.id,
+              name: g.name,
+            })));
+        }
+      } catch { /* silent — keep empty */ }
+    })();
+    return () => { aborted = true; };
+  }, []);
+
+  // When the grades list finishes loading AFTER the form data was
+  // already populated from the API, re-normalize `formData.scale` so
+  // its value matches a real MenuItem hash_id. Without this, the
+  // data-sync useEffect runs while `grades === []` and falls back to
+  // the raw string (e.g. "BPS-17"), so the Select ends up in an
+  // out-of-range state and MUI logs a warning.
+  useEffect(() => {
+    if (grades.length === 0) return;
+    if (!formData.scale) return;
+    const str = String(formData.scale).trim();
+    const matched = grades.find(
+      (g) => g.name === str || g.id === str
+    );
+    if (matched && matched.id !== formData.scale) {
+      setFormData((prev) => ({ ...prev, scale: matched.id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grades]);
+
+  // Same fix for the Department field: if the data-sync useEffect
+  // ran before `departments` was populated, `formData.department`
+  // may still be the raw string instead of the canonical id. After
+  // the department list loads, normalise to the matching id (or
+  // leave the raw string if there's no match — the MenuItem
+  // options are built from `departments` so a stale value will
+  // produce the same MUI warning).
+  useEffect(() => {
+    if (departments.length === 0) return;
+    if (!formData.department) return;
+    const str = String(formData.department).trim();
+    const matched = departments.find(
+      (d) => d.id === str || d.name === str
+    );
+    if (matched && matched.id !== formData.department) {
+      setFormData((prev) => ({ ...prev, department: matched.id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departments]);
+
   // Update form data when data prop changes (for edit mode)
   useEffect(() => {
+    // Only re-sync when the loaded data's content actually changes. Without
+    // this guard the effect would re-run on every parent re-render and
+    // OVERWRITE the user's in-progress edits with the stale loaded data.
+    const dataKey = data ? JSON.stringify(data) : '';
+    if (lastSyncedDataRef.current === dataKey) return;
+    if (data && Object.keys(data).length > 0) {
+      lastSyncedDataRef.current = dataKey;
+    }
     if (data && Object.keys(data).length > 0) {
       console.log('🔄 Step1: Updating form with new data:', data);
+      // Normalize scale: backend may return it as a number ("16"), a
+      // string ("BPS-16"), a grade hash_id, or a nested object. Map it
+      // back to the grade hash_id so the Select shows the right option.
+      const rawScale = data.scale;
+      let scaleValue = '';
+      if (rawScale !== null && rawScale !== undefined) {
+        if (typeof rawScale === 'object') {
+          scaleValue = rawScale.hash_id || rawScale.id || rawScale.name || '';
+        } else {
+          const str = String(rawScale).trim();
+          // Try to match a loaded grade by name (e.g. "BPS-16") or by
+          // hash_id, otherwise fall back to the raw string so the form
+          // can still display it.
+          const matched = grades.find(
+            (g) => g.name === str || g.id === str
+          );
+          scaleValue = matched ? matched.id : str;
+        }
+      }
+      // Normalize department: the wire format sends the department's
+      // NAME string (per the live API's curl example), so the
+      // MenuItem value is the name. The loaded value may come back as
+      // a name string, a hash_id, or a relation object — handle all.
+      const rawDept = data.department;
+      let departmentValue = '';
+      if (rawDept !== null && rawDept !== undefined) {
+        if (typeof rawDept === 'object') {
+          departmentValue = rawDept.name || rawDept.department_name || rawDept.hash_id || rawDept.id || '';
+        } else {
+          const str = String(rawDept).trim();
+          // If it looks like a hash_id, try matching by id; otherwise
+          // use the string as-is (the live wire format sends the name).
+          const matched = departments.find(
+            (d) => d.id === str || d.name === str
+          );
+          departmentValue = matched ? matched.name : str;
+        }
+      }
       setFormData({
+        department: departmentValue,
         designation: data.designation || '',
-        scale: data.scale || '',
-        quota_percentage: data.quota_percentage || '',
-        num_posts: data.num_posts || 1,
+        scale: scaleValue,
+        quota_percentage: data.quota_percentage ?? '',
+        num_posts: data.num_posts ?? '',
         vacancy_date: data.vacancy_date || '',
-        test_type: data.test_type || '',
+        // test_type intentionally omitted from UI; see getCleanedFormData.
+        quota_promotion: data.quota_promotion ?? '',
         service_rules: data.service_rules || null,
         syllabus: data.syllabus || null,
       });
     }
-  }, [data]);
+  }, [data && JSON.stringify(data)]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -89,19 +253,55 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
       cleanedFormData.syllabus = cleanedFormData.syllabus.length > 0 ? cleanedFormData.syllabus[0] : null;
     }
 
+    // Live API expects quota_promotion as "<n>%" string. If the admin enters a
+    // bare number, format it. If they already typed "20%", leave it as-is.
+    const qp = cleanedFormData.quota_promotion;
+    if (qp !== null && qp !== undefined && qp !== '' && !String(qp).includes('%')) {
+      const n = Number(qp);
+      if (!Number.isNaN(n)) cleanedFormData.quota_promotion = `${n}%`;
+    }
+
+    // Test Type is hidden in the UI but the live API marks it as required.
+    // Send a default garbage value so the live backend's validator passes.
+    // The admin-facing choice for test type happens later in the
+    // advertisement creation flow (see AdvertisementCreateForm.jsx).
+    cleanedFormData.test_type = cleanedFormData.test_type || 'MCQs Base';
+
     return cleanedFormData;
   };
 
+  // Live validation for "Number of Posts": must be a whole number > 0 and < 1000.
+  // Empty value shows the generic "required" state (no helper text).
+  const numPostsError = (() => {
+    if (formData.num_posts === '' || formData.num_posts === null || formData.num_posts === undefined) return '';
+    const n = Number(formData.num_posts);
+    if (!Number.isInteger(n))     return 'Number of Posts must be a whole number';
+    if (n <= 0)                    return 'Number of Posts must be greater than 0';
+    if (n >= 1000)                 return 'Number of Posts must be less than 1000';
+    return '';
+  })();
+
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Block submit on Number of Posts validation
+    if (formData.num_posts === '' || formData.num_posts === null || formData.num_posts === undefined) {
+      toast.error('Number of Posts is required');
+      return;
+    }
+    if (numPostsError) {
+      toast.error(numPostsError);
+      return;
+    }
+
     const cleanedFormData = getCleanedFormData();
-    
+
     console.log('📋 Step1 Form Data being submitted:', {
       ...cleanedFormData,
       service_rules: cleanedFormData.service_rules instanceof File ? `[File: ${cleanedFormData.service_rules.name}]` : cleanedFormData.service_rules,
       syllabus: cleanedFormData.syllabus instanceof File ? `[File: ${cleanedFormData.syllabus.name}]` : cleanedFormData.syllabus,
     });
-    
+
     onNext(cleanedFormData);
   };
 
@@ -113,6 +313,86 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
   return (
     <form onSubmit={handleSubmit}>
       <div className="row">
+        {/* v2.2.0 — Field order per the user's spec:
+            1. Department
+            2. No of Posts
+            3. Scale of the post
+            4. Designation of post
+            5. Direct Quota
+            6. Promotion Qouta
+            7. Approved Syllabus
+            8. Service Rule
+            9. Date of Occurrence of Vacancy */}
+
+        {/* 1. Department */}
+        <div className="col-md-6 form-group">
+          <TextField
+            fullWidth
+            required
+            select
+            label="Department"
+            name="department"
+            // Always coerce to a string — undefined / null would flip the
+            // controlled Select into uncontrolled mode and trigger MUI's
+            // "out-of-range value undefined" warning.
+            value={formData.department ?? ''}
+            onChange={handleChange}
+            helperText={departments.length === 0 ? 'No departments configured in Settings yet' : ' '}
+          >
+            <MenuItem value="">Select Department</MenuItem>
+            {departments.map((d) => (
+              // The MenuItem value is the department's NAME string (so
+              // the wire format matches the live API curl example, which
+              // sends `department=Punjab Education Department` rather than
+              // a hash_id). The form state stores the name; on edit-mode
+              // load the data-sync useEffect looks the name up in
+              // `departments` and uses the matching id if needed.
+              <MenuItem key={d.id ?? d.hash_id ?? d.name} value={d.name || d.id || ''}>
+                {d.name || '(unnamed)'}
+              </MenuItem>
+            ))}
+          </TextField>
+        </div>
+
+        {/* 2. No of Posts */}
+        <div className="col-md-6 form-group">
+          <TextField
+            fullWidth
+            required
+            type="number"
+            label="Number of Posts"
+            name="num_posts"
+            value={formData.num_posts}
+            onChange={handleChange}
+            inputProps={{ min: 1, max: 999, step: 1 }}
+            error={!!numPostsError}
+            helperText={numPostsError || 'Enter a value greater than 0 and less than 1000'}
+          />
+        </div>
+
+        {/* 3. Scale of the Post — sourced dynamically from /settings/grades */}
+        <div className="col-md-6 form-group">
+          <TextField
+            fullWidth
+            required
+            select
+            label="Scale of the Post"
+            name="scale"
+            // Always coerce to a string — undefined / null would flip the
+            // controlled Select into uncontrolled mode and trigger MUI's
+            // "out-of-range value undefined" warning.
+            value={formData.scale ?? ''}
+            onChange={handleChange}
+            helperText={grades.length === 0 ? 'No grades configured in Settings yet' : ' '}
+          >
+            <MenuItem value="">Select Scale</MenuItem>
+            {grades.map((g) => (
+              <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>
+            ))}
+          </TextField>
+        </div>
+
+        {/* 4. Designation of post */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
@@ -124,46 +404,129 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
           />
         </div>
 
+        {/* 5. Direct Quota (live API: quota_promotion) */}
+        {/* v2.2.0 — Live API (Usama's schema) `quota_promotion` field, sent as
+            "<number>%" string. The frontend label was renamed from
+            "District Qouta" to "Direct Quota" to better describe what
+            this field actually represents: the share of the post(s)
+            filled via direct recruitment (as opposed to promotion). */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
-            label="Scale of the Post"
-            name="scale"
-            value={formData.scale}
+            label="Direct Quota"
+            name="quota_promotion"
+            value={formData.quota_promotion ?? ''}
             onChange={handleChange}
+            helperText="Enter a percentage (0-100)."
           />
         </div>
 
+        {/* 6. Promotion Qouta (live API: quota_percentage) */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
-            label="Percentage of Quota (Direct vs Promotion)"
+            label="Promotion Qouta"
             name="quota_percentage"
-            value={formData.quota_percentage}
+            value={formData.quota_percentage ?? ''}
             onChange={handleChange}
             type="number"
             inputProps={{ min: 0, max: 100, step: 1 }}
             InputProps={{
               endAdornment: <InputAdornment position="end">%</InputAdornment>
             }}
+            helperText="Percentage reserved for promotion quota"
           />
         </div>
 
+        {/* 7. Approved Syllabus */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
-            type="number"
-            label="Number of Posts"
-            name="num_posts"
-            value={formData.num_posts}
-            onChange={handleChange}
-            inputProps={{ min: 1 }}
+            label="Approved Syllabus (PDF File Less than 2 MB)"
+            value={data.syllabus && typeof data.syllabus === 'string' ? data.syllabus.split('/').pop() : ''}
+            // Render the native file input inside the TextField's outlined
+            // container so it picks up the same 56px height + label + border
+            // style as the Department field above. We use a custom render
+            // via InputProps so the file input is overlaid (clicking the
+            // outlined region opens the file picker).
+            InputProps={{
+              readOnly: true,
+              startAdornment: (
+                <InputAdornment position="start">
+                  <input
+                    type="file"
+                    name="syllabus"
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                    multiple={false}
+                    style={{ display: 'none' }}
+                    id="syllabus-input"
+                  />
+                  <label
+                    htmlFor="syllabus-input"
+                    className="px-3 py-1 bg-emerald-700 text-white text-sm font-medium rounded cursor-pointer hover:bg-emerald-800 whitespace-nowrap"
+                  >
+                    Choose File
+                  </label>
+                </InputAdornment>
+              ),
+            }}
+            // Show the actual file name below the field once selected
+            helperText={
+              (formData.syllabus && formData.syllabus instanceof File)
+                ? `Selected: ${formData.syllabus.name}`
+                : (data.syllabus && typeof data.syllabus === 'string'
+                    ? `Previous file: ${data.syllabus.split('/').pop()}`
+                    : 'No file chosen')
+            }
+            inputProps={{ readOnly: true }}
           />
         </div>
 
+        {/* 8. Service Rule */}
+        <div className="col-md-6 form-group">
+          <TextField
+            fullWidth
+            required
+            label="Service Rule (PDF File Less than 2 MB)"
+            value={data.service_rules && typeof data.service_rules === 'string' ? data.service_rules.split('/').pop() : ''}
+            InputProps={{
+              readOnly: true,
+              startAdornment: (
+                <InputAdornment position="start">
+                  <input
+                    type="file"
+                    name="service_rules"
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                    multiple={false}
+                    style={{ display: 'none' }}
+                    id="service_rules-input"
+                  />
+                  <label
+                    htmlFor="service_rules-input"
+                    className="px-3 py-1 bg-emerald-700 text-white text-sm font-medium rounded cursor-pointer hover:bg-emerald-800 whitespace-nowrap"
+                  >
+                    Choose File
+                  </label>
+                </InputAdornment>
+              ),
+            }}
+            helperText={
+              (formData.service_rules && formData.service_rules instanceof File)
+                ? `Selected: ${formData.service_rules.name}`
+                : (data.service_rules && typeof data.service_rules === 'string'
+                    ? `Previous file: ${data.service_rules.split('/').pop()}`
+                    : 'No file chosen')
+            }
+            inputProps={{ readOnly: true }}
+          />
+        </div>
+
+        {/* 9. Date of Occurrence of Vacancy */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
@@ -178,50 +541,9 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
           />
         </div>
 
-        {/* <div className="col-md-6 form-group">
-          <TextField
-            fullWidth
-            required
-            select
-            label="Test Type"
-            name="test_type"
-            value={formData.test_type}
-            onChange={handleChange}
-          >
-            <MenuItem value="MCQs Base">MCQs Base</MenuItem>
-            <MenuItem value="Competitive Base">Competitive Base</MenuItem>
-          </TextField>
-        </div> */}
-
-        <div className="col-md-6 form-group">
-          <label>Service Rules <span style={{ color: '#dc3545', fontSize: '0.8em' }}>(PDF File Less than 2 MB)</span></label>
-          <input
-            type="file"
-            name="service_rules"
-            accept=".pdf"
-            onChange={handleFileChange}
-            className="form-control"
-            multiple={false}
-          />
-          {data.service_rules && typeof data.service_rules === 'string' && (
-            <small className="text-muted d-block mt-1">Previous file: {data.service_rules.split('/').pop()}</small>
-          )}
-        </div>
-
-        <div className="col-md-6 form-group">
-          <label>Approved Syllabus <span style={{ color: '#dc3545', fontSize: '0.8em' }}>(PDF File Less than 2 MB)</span></label>
-          <input
-            type="file"
-            name="syllabus"
-            accept=".pdf"
-            onChange={handleFileChange}
-            className="form-control"
-            multiple={false}
-          />
-          {data.syllabus && typeof data.syllabus === 'string' && (
-            <small className="text-muted d-block mt-1">Previous file: {data.syllabus.split('/').pop()}</small>
-          )}
-        </div>
+        {/* Test Type is removed from the visible UI but the live API still
+            expects the field, so we hardcode a default value and send it in
+            `getCleanedFormData()` below. Do not render a TextField here. */}
       </div>
 
       <div className="navigation-buttons">

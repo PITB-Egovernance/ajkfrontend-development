@@ -5,7 +5,20 @@ import { FileText, CheckCircle2, Plus, Trash2, Save, StickyNote, FileCheck } fro
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
 import RequisitionApi from "../../api/requisitionApi";
+import Config from "../../config/baseUrl";
+import AuthService from "../../services/authService";
 import "../job-creation/JobCreationForm.css";
+
+// Hardcoded fallback list of tests used while the live admin
+// server's /settings/tests endpoint is being populated. The
+// `id` field stores the test's hash_id (or the legacy numeric
+// code) so the wire format for the API matches what the
+// backend expects. Once the live API responds, this fallback
+// is overridden by the live data.
+const FALLBACK_TESTS = [
+  { id: '1', test_name: 'MCQs',         test_fees: 505  },
+  { id: '2', test_name: 'Written Exam', test_fees: 1010 },
+];
 
 const AdvertisementCreateForm = () => {
   const navigate = useNavigate();
@@ -28,6 +41,36 @@ const AdvertisementCreateForm = () => {
   const [termsConditions, setTermsConditions] = useState([""]);
   const [jobConfigs, setJobConfigs] = useState({});
   const [jobTitles, setJobTitles] = useState({});
+  const [examTests, setExamTests] = useState(FALLBACK_TESTS);
+
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/settings/tests`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
+          },
+        });
+        const result = await res.json();
+        if (aborted) return;
+        if (res.ok && (result.success || result.status === 200)) {
+          const list = result.data?.data ?? result.data ?? [];
+          const active = list
+            .filter((t) => (t.status ?? 'active') === 'active')
+            .map((t) => ({
+              id:        t.hash_id || String(t.id),
+              test_name: t.test_name,
+              test_fees: Number(t.test_fees ?? t.fees ?? 0),
+            }));
+          if (active.length) setExamTests(active);
+        }
+      } catch { /* keep fallback */ }
+    })();
+    return () => { aborted = true; };
+  }, []);
 
   const selectedIds = useMemo(() => {
     const raw = searchParams.get("ids");
@@ -73,15 +116,17 @@ const AdvertisementCreateForm = () => {
   const fetchAdvertisementNotes = async () => {
     try {
       const result = await AdvertisementApi.getNotes();
-      if (result.success) {
+      if (result?.success) {
         setImportantNotes(result.important_notes || "");
         const tc = Array.isArray(result.terms_conditions) && result.terms_conditions.length
             ? result.terms_conditions
             : [""];
         setTermsConditions(tc);
+      } else {
+        console.warn("Advertisement notes not available — using empty defaults.");
       }
     } catch (err) {
-        console.error("Error fetching notes:", err);
+      console.warn("Error fetching advertisement notes (non-fatal):", err);
     }
   };
 
@@ -274,7 +319,7 @@ const AdvertisementCreateForm = () => {
                     type="date"
                     value={advDate}
                     InputLabelProps={{ shrink: true }}
-                    inputProps={{ readOnly: true }}
+                    inputProps={{ readOnly: true, style: { height: 28 } }}
                     sx={fieldSx}
                   />
                 </div>
@@ -311,6 +356,8 @@ const AdvertisementCreateForm = () => {
                 </div>
               </div>
 
+              {/* ── FIX: both columns col-md-6, date input height forced to 28px
+                   so padding(14+14) + height(28) = 56px total — matches the row above ── */}
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField
@@ -322,7 +369,7 @@ const AdvertisementCreateForm = () => {
                     required
                     InputLabelProps={{ shrink: true }}
                     sx={fieldSx}
-                    inputProps={{ min: advDate }}
+                    inputProps={{ min: advDate, style: { height: 28 } }}
                     error={!!fieldErrors?.closing_date}
                     helperText={
                       Array.isArray(fieldErrors?.closing_date)
@@ -330,6 +377,20 @@ const AdvertisementCreateForm = () => {
                         : fieldErrors?.closing_date
                     }
                   />
+                  {advDate && closingDate && (() => {
+                    const start = new Date(advDate);
+                    const end   = new Date(closingDate);
+                    const days  = Math.round((end - start) / (1000 * 60 * 60 * 24));
+                    if (Number.isNaN(days) || days < 0) return null;
+                    return (
+                      <div className="total-duration-pill">
+                        <span className="total-duration-label">Total Duration:</span>
+                        <span className="total-duration-value">
+                          {days} day{days === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="col-md-6 form-group">
                   <TextField
@@ -388,41 +449,73 @@ const AdvertisementCreateForm = () => {
                         value={jobConfigs[jobId]?.testType || ""}
                         onChange={(e) => {
                           const newType = e.target.value;
-                          let newFee = "";
-                          if (newType === "1") newFee = "505";
-                          else if (newType === "2") newFee = "1010";
-                          
-                          setJobConfigs((prev) => ({
-                            ...prev,
-                            [jobId]: {
-                              ...prev[jobId],
-                              testType: newType,
-                              fee: newFee
-                            },
-                          }));
+                          const matched = examTests.find((t) => t.id === newType);
+                          setJobConfigs((prev) => {
+                            const prevFee = prev[jobId]?.fee;
+                            const prevType = prev[jobId]?.testType;
+                            const nextFee = (prevFee && prevType === newType)
+                              ? prevFee
+                              : (matched ? String(matched.test_fees) : "");
+                            return {
+                              ...prev,
+                              [jobId]: {
+                                ...prev[jobId],
+                                testType: newType,
+                                fee: nextFee,
+                              },
+                            };
+                          });
                         }}
                         sx={fieldSx}
+                        error={!!fieldErrors?.[`test_type_${jobId}`]}
+                        helperText={
+                          fieldErrors?.[`test_type_${jobId}`]
+                            ? (Array.isArray(fieldErrors[`test_type_${jobId}`])
+                                ? fieldErrors[`test_type_${jobId}`].join(", ")
+                                : fieldErrors[`test_type_${jobId}`])
+                            : "Choose the test type — fee auto-fills"
+                        }
                       >
-                        <MenuItem value="1">MCQs</MenuItem>
-                        <MenuItem value="2">Written Exam</MenuItem>
+                        <MenuItem value=""><em>— Select Test Type —</em></MenuItem>
+                        {examTests.map((t) => (
+                          <MenuItem key={t.id} value={t.id}>
+                            {t.test_name}
+                          </MenuItem>
+                        ))}
                       </TextField>
                     </div>
                     <div className="col-md-6 form-group">
                       <TextField
                         fullWidth
-                        label="Application Fee"
+                        label="Application Fee (PKR)"
                         type="number"
-                        value={jobConfigs[jobId]?.fee || ""}
-                        InputProps={{
-                          readOnly: true,
+                        value={jobConfigs[jobId]?.fee ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setJobConfigs((prev) => ({
+                            ...prev,
+                            [jobId]: {
+                              ...prev[jobId],
+                              fee: v,
+                            },
+                          }));
                         }}
-                        placeholder="Fee auto-filled"
+                        placeholder="Auto-filled from Test Type"
+                        inputProps={{ min: 0, step: "0.01" }}
                         sx={{
                           ...fieldSx,
                           "& .MuiInputBase-input": {
                             backgroundColor: "#f8fafc",
                           }
                         }}
+                        error={!!fieldErrors?.[`fee_${jobId}`]}
+                        helperText={
+                          fieldErrors?.[`fee_${jobId}`]
+                            ? (Array.isArray(fieldErrors[`fee_${jobId}`])
+                                ? fieldErrors[`fee_${jobId}`].join(", ")
+                                : fieldErrors[`fee_${jobId}`])
+                            : "Auto-filled from the chosen Test Type; editable if you need a different amount"
+                        }
                       />
                     </div>
                   </div>

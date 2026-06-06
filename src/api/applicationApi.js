@@ -140,6 +140,9 @@ const ApplicationApi = {
 
   // Single status update. Pass the row (or any object with candidate fields) as `meta`
   // so the backend can upsert the received_application stub if it doesn't yet exist.
+  // Fallback: if the single endpoint returns 404 (live backend's updateStatus path
+  // throws ModelNotFoundException when the admin row hasn't been synced yet, but
+  // bulk-status uses an upsert path that creates the stub), retry via bulk-status.
   updateStatus: async (applicationNumber, status, meta = null) => {
     const body = { status };
     if (meta) body.application = buildApplicationMeta({ ...meta, application_number: applicationNumber });
@@ -149,6 +152,26 @@ const ApplicationApi = {
       headers: getAdminHeaders(),
       body: JSON.stringify(body),
     });
+
+    // Quick success — return as normal.
+    if (response.ok) return handleResponse(response);
+
+    // On 404, the live backend's updateStatus path failed because the admin DB
+    // has no row for this application_number yet. Fall back to bulk-status, which
+    // uses updateOrCreate and can create the stub from the supplied meta.
+    if (response.status === 404) {
+      const fbResponse = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
+        method: 'PUT',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({
+          ids: [applicationNumber],
+          status,
+          applications: [buildApplicationMeta({ ...meta, application_number: applicationNumber })],
+        }),
+      });
+      return handleResponse(fbResponse);
+    }
+
     return handleResponse(response);
   },
 

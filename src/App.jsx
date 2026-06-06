@@ -42,11 +42,16 @@ import ChairmanApprovals from 'pages/approvals/ChairmanApprovals';
 import AdminWorkflowTracking from 'pages/approvals/AdminWorkflowTracking';
 import ExamCentersManagement from 'pages/settings/ExamCenters/ExamCentersManagement';
 import ExamCitiesManagement from 'pages/settings/Cities/CitiesManagement';
-import ExamHallsManagement from 'pages/settings/ExamHalls/ExamHallsManagement';
+// import ExamHallsManagement from 'pages/settings/ExamHalls/ExamHallsManagement';
+// v2.2.0: Exam Halls are no longer managed manually — only Exam Centers. The
+// page file is retained for backwards compatibility but no longer routed.
 import QualificationsManagement from 'pages/settings/Qualifications/QualificationsManagement';
 import DegreesManagement from 'pages/settings/Degrees/DegreesManagement';
 import QualificationGroupsManagement from 'pages/settings/QualificationGroups/QualificationGroupsManagement';
 import DepartmentsManagement from 'pages/settings/Departments/DepartmentsManagement';
+import NationalitiesManagement from 'pages/settings/Nationality/NationalitiesManagement';
+import TestsManagement from 'pages/settings/Tests/TestsManagement';
+import ExamFeesManagement from 'pages/settings/ExamFees/ExamFeesManagement';
 import ApplicationsList from 'pages/applications/ApplicationsList';
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
@@ -95,6 +100,9 @@ function App() {
           <Route path="requisitions/create" element={<RequisitionForm />} />
           <Route path="requisitions/edit/:id" element={<RequisitionEdit />} />
           <Route path="requisitions/preview" element={<RequisitionPreview />} />
+          {/* IMPORTANT: the more specific "edit" route must come before the
+              general ":id" route so the Edit button's link matches first. */}
+          <Route path="requisitions/:id/edit" element={<RequisitionEdit />} />
           <Route path="requisitions/:id" element={<RequisitionDetail />} />
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
           <Route path="add-notes" element={<AddNotes />} />
@@ -164,11 +172,14 @@ function App() {
           <Route path="settings/contractors" element={<ContractorsManagement />} />
           <Route path="settings/cities" element={<ExamCitiesManagement />} />
           <Route path="settings/exam-centers" element={<ExamCentersManagement />} />
-          <Route path="settings/exam-halls" element={<ExamHallsManagement />} />
+          {/* <Route path="settings/exam-halls" element={<ExamHallsManagement />} /> */}
           <Route path="settings/qualifications" element={<QualificationsManagement />} />
           <Route path="settings/degrees" element={<DegreesManagement />} />
           <Route path="settings/qualification-groups" element={<QualificationGroupsManagement />} />
           <Route path="settings/departments" element={<DepartmentsManagement />} />
+          <Route path="settings/nationalities" element={<NationalitiesManagement />} />
+          <Route path="settings/tests" element={<TestsManagement />} />
+          <Route path="settings/exam-fees" element={<ExamFeesManagement />} />
 
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />

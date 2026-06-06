@@ -30,6 +30,10 @@ const RequisitionList = () => {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [localDraftMeta, setLocalDraftMeta] = useState(null);
+  // Grades list — fetched once on mount from /settings/grades so the
+  // "Scale" column can display the actual grade name (e.g. "BPS-17")
+  // rather than the raw hash_id stored in the requisition record.
+  const [gradeOptions, setGradeOptions] = useState([]);
   const [filters, setFilters] = useState({
     id: '',
     designation: '',
@@ -106,6 +110,45 @@ const RequisitionList = () => {
       console.warn('Unable to load local draft meta:', error);
     }
   }, []);
+
+  // Fetch the grades list once on mount so the "Scale" column can render
+  // the actual grade name (e.g. "BPS-17") instead of the raw hash_id
+  // stored in the requisition record.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+          headers: {
+            Authorization: `Bearer ${TOKEN}`,
+            Accept:        'application/json',
+            'X-API-KEY':   API_KEY,
+          },
+        });
+        const result = await res.json();
+        if (result.success || result.status === 200) {
+          const list = result.data?.data ?? result.data ?? [];
+          setGradeOptions(
+            list
+              .filter((g) => (g.status ?? 'active') === 'active')
+              .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+          );
+        }
+      } catch (e) { /* silent */ }
+    })();
+  }, []);
+
+  // Resolve a stored scale value (hash_id or string) to the grade name
+  // from the loaded gradeOptions. Falls back to the raw value if no
+  // match.
+  const getScaleName = (rawScale) => {
+    if (rawScale === null || rawScale === undefined || rawScale === '') return '';
+    if (typeof rawScale === 'object') {
+      return rawScale.name || rawScale.hash_id || rawScale.id || '';
+    }
+    const str = String(rawScale).trim();
+    const matched = gradeOptions.find((g) => g.id === str || g.name === str);
+    return matched ? matched.name : str;
+  };
 
   const fetchRequisitions = async (pageNum = 0, pageSize = 10) => {
     setLoading(true);
@@ -461,7 +504,13 @@ const RequisitionList = () => {
   const columns = [
     { field: 'id', headerName: 'Ref', width: 100 },
     { field: 'designation', headerName: 'Designation', flex: 1 },
-    { field: 'scale', headerName: 'Scale', width: 150 },
+    {
+      field: 'scale', headerName: 'Scale', width: 150,
+      // Resolve the stored hash_id (e.g. "pOzq4kYWBm9l") to the actual
+      // grade name (e.g. "BPS-17") via the loaded gradeOptions list.
+      // Falls back to the raw value if no match.
+      renderCell: (params) => <span>{getScaleName(params.value) || '—'}</span>,
+    },
     { field: 'num_posts', headerName: 'Posts', width: 100 },
     {
       field: 'status',

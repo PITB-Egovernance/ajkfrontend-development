@@ -17,7 +17,13 @@ const getAdminHeaders = (json = true) => {
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error  = new Error(result.message || 'Request failed');
+    // Surface the real reason — 404 on /roll-numbers/shortlisted usually means
+    // the backend's route cache is stale (php artisan route:clear needs to run).
+    let message = result.message || `Request failed (${response.status})`;
+    if (response.status === 404) {
+      message = `${result.message ? result.message + ' — ' : ''}Endpoint not found. The backend route may be missing or its route cache may be stale. Ask the backend team to run \`php artisan optimize:clear\`.`;
+    }
+    const error  = new Error(message);
     error.status = response.status;
     error.errors = result.errors || {};
     throw error;

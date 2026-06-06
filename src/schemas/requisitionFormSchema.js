@@ -13,9 +13,20 @@ export const requisitionFormSchema = {
       type: 'required',
       message: 'Scale is required'
     },
+    // v2.2.0 — live API uses the new single `quota_percentage` field
+    // (UI label: "Promotion Quota") and the `quota_promotion` field
+    // (UI label: "District Qouta"). The legacy `direct_quota_percentage` and
+    // `district_quota_percentage` fields are still required by the live API
+    // and are mirrored from these inputs in RequisitionForm.jsx before the
+    // request is sent. Validation here runs on the new field names so the
+    // user sees errors against the visible inputs.
     quota_percentage: {
       type: 'required',
-      message: 'Quota percentage is required'
+      message: 'Promotion Quota is required'
+    },
+    quota_promotion: {
+      type: 'required',
+      message: 'District Qouta is required'
     },
     num_posts: {
       type: 'required',
@@ -27,10 +38,11 @@ export const requisitionFormSchema = {
       type: 'required',
       message: 'Vacancy date is required'
     },
-    // test_type: {
-    //   type: 'required',
-    //   message: 'Test type is required'
-    // }
+    // test_type is auto-populated in getCleanedFormData (UI field removed).
+    department: {
+      type: 'required',
+      message: 'Department is required'
+    },
   },
   
   step2: {
@@ -99,10 +111,36 @@ export const requisitionFormSchema = {
     //   message: 'Gender is required'
     // },
     district: {
-      type: 'array',
+      type: 'custom',
+      // Open Merit selection mode doesn't require per-district rows
+      // (it uses Step 1's num_posts as-is). Only enforce "at least one
+      // district" when the user is in Quota Based / Quota Wise mode.
+      // The wire format uses `merit_type` ("open_merit" | "quota_wise")
+      // but we also accept the local `selection_mode` for backwards
+      // compatibility with any caller that hasn't remapped yet.
       message: 'At least one district is required',
-      minLength: 1,
-      minMessage: 'At least one district is required'
+      validate: (value, formData) => {
+        if (!formData) return 'At least one district is required';
+        const isOpenMerit =
+          formData.selection_mode === 'open_merit' ||
+          formData.merit_type   === 'open_merit';
+        if (isOpenMerit) return null;
+        // For quota-based mode, require a non-empty array with at least
+        // one non-empty entry.
+        if (Array.isArray(value)) {
+          if (value.length === 0) return 'At least one district is required';
+          if (value.every((v) => v === '' || v === null || v === undefined)) {
+            return 'At least one district is required';
+          }
+          return null;
+        }
+        if (typeof value === 'string') {
+          const parts = value.split(',').map((s) => s.trim()).filter(Boolean);
+          if (parts.length === 0) return 'At least one district is required';
+          return null;
+        }
+        return 'At least one district is required';
+      },
     }
   }
 };
@@ -143,10 +181,16 @@ export const validateRequisitionStep = (step, data) => {
       }
     }
 
-    // Check min length for arrays
+    // Check min length for arrays — also requires at least one non-empty
+    // entry (so `[""]` doesn't pass as a valid "1 district" selection).
     if (fieldSchema.minLength !== undefined && Array.isArray(fieldValue)) {
       if (fieldValue.length < fieldSchema.minLength) {
         errors[fieldName] = fieldSchema.minMessage || fieldSchema.message;
+      } else {
+        const nonEmpty = fieldValue.filter((v) => v !== '' && v !== null && v !== undefined);
+        if (nonEmpty.length === 0) {
+          errors[fieldName] = fieldSchema.minMessage || fieldSchema.message;
+        }
       }
     }
 

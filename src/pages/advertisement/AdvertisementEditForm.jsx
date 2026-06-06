@@ -4,6 +4,11 @@ import { TextField, MenuItem } from "@mui/material";
 import { Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
+import Config from "../../config/baseUrl";
+import AuthService from "../../services/authService";
+
+const TEST_TYPE_CODE_TO_NAME = { '1': 'MCQs', '2': 'Written Exam' };
+const FALLBACK_EXAM_FEES = { 'MCQs': 505, 'Written Exam': 1010 };
 
 const AdvertisementEditForm = () => {
   const { id } = useParams();
@@ -20,6 +25,39 @@ const AdvertisementEditForm = () => {
   const [importantNotes, setImportantNotes] = useState("");
   const [termsConditions, setTermsConditions] = useState([""]);
   const [jobConfigs, setJobConfigs] = useState({});
+  const [examFees, setExamFees] = useState(FALLBACK_EXAM_FEES);
+
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/settings/exam-fees`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
+          },
+        });
+        const result = await res.json();
+        if (aborted) return;
+        if (res.ok && (result.success || result.status === 200)) {
+          const list = result.data?.data ?? result.data ?? [];
+          const byType = {};
+          list
+            .filter((f) => (f.status ?? 'active') === 'active')
+            .forEach((f) => {
+              if (f.test_type && byType[f.test_type] === undefined) {
+                byType[f.test_type] = Number(f.amount);
+              }
+            });
+          if (Object.keys(byType).length) {
+            setExamFees((prev) => ({ ...prev, ...byType }));
+          }
+        }
+      } catch { /* keep fallback */ }
+    })();
+    return () => { aborted = true; };
+  }, []);
   const [jobTitles, setJobTitles] = useState({});
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -208,7 +246,7 @@ const AdvertisementEditForm = () => {
             </div>
 
             <div className="row">
-              <div className="col-md-6 form-group">
+              <div className="col-md-4 form-group">
                 <TextField
                   fullWidth
                   label="Closing Date"
@@ -225,6 +263,23 @@ const AdvertisementEditForm = () => {
                       ? fieldErrors.closing_date.join(", ")
                       : fieldErrors?.closing_date
                   }
+                />
+              </div>
+              <div className="col-md-2 form-group">
+                <TextField
+                  fullWidth
+                  label="Total Duration"
+                  value={(() => {
+                    if (!advDate || !closingDate) return '—';
+                    const start = new Date(advDate);
+                    const end   = new Date(closingDate);
+                    const days  = Math.round((end - start) / (1000 * 60 * 60 * 24));
+                    if (Number.isNaN(days) || days < 0) return '—';
+                    return `${days} day${days === 1 ? '' : 's'}`;
+                  })()}
+                  InputProps={{ readOnly: true }}
+                  sx={{ ...fieldSx, '& .MuiInputBase-input': { backgroundColor: '#f8fafc', fontWeight: 600 } }}
+                  helperText="Auto-calculated"
                 />
               </div>
               <div className="col-md-6 form-group">
@@ -285,9 +340,10 @@ const AdvertisementEditForm = () => {
                               value={jobConfigs[jobId]?.testType || ""}
                               onChange={(e) => {
                                 const newType = e.target.value;
-                                let newFee = "";
-                                if (newType === "1") newFee = "505";
-                                else if (newType === "2") newFee = "1010";
+                                const typeName = TEST_TYPE_CODE_TO_NAME[newType];
+                                const newFee = typeName && examFees[typeName] !== undefined
+                                  ? String(examFees[typeName])
+                                  : "";
 
                                 setJobConfigs((prev) => ({
                                   ...prev,

@@ -120,7 +120,8 @@ const RollNumberManagement = () => {
         setTotal(0);
       }
     } catch (err) {
-      toast.error(err?.message || 'Server error');
+      // handleResponse in rollNumberApi.js already wraps the 404 with an actionable hint
+      toast.error(err?.message || 'Server error while loading shortlisted applications');
       setRows([]);
       setTotal(0);
     } finally {

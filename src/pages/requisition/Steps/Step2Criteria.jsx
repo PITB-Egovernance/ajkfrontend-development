@@ -216,7 +216,10 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       });
       setShowAuthority(data.equivalent_qualification === 'Yes');
     }
-  }, [data]);
+    // Use a string fingerprint of `data` as the dependency so this effect
+    // only re-runs when the loaded data's content actually changes — not
+    // on every parent re-render.
+  }, [data && JSON.stringify(data)]);
 
   // Separate effect for selectedGroups — runs after allDegrees are available
   useEffect(() => {

@@ -4,12 +4,12 @@ import { motion } from 'framer-motion';
 import { DataGrid } from '@mui/x-data-grid';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
-import { 
-  Megaphone, 
-  Eye, 
-  Calendar, 
-  Search, 
-  ChevronLeft, 
+import {
+  Megaphone,
+  Eye,
+  Calendar,
+  Search,
+  ChevronLeft,
   ChevronRight,
   FileText,
   Clock,
@@ -17,7 +17,10 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
-  X
+  X,
+  Building2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
@@ -104,6 +107,8 @@ const AdvertisementRecords = () => {
     per_page: 10,
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [groupByDept, setGroupByDept] = useState(false);
+  const [expandedDept, setExpandedDept] = useState(null);     // null = first one auto-expanded; string id = manually expanded
   const [filters, setFilters] = useState({
     adv_number: '',
     adv_date: '',
@@ -359,6 +364,35 @@ const AdvertisementRecords = () => {
     }
   ];
 
+  // Group filtered advertisements by their backend-supplied department name.
+  // If the API doesn't yet eager-load department (pre-v2.2.0 backend), every
+  // ad falls into the "Uncategorized" bucket — UI still renders correctly.
+  const groupedByDepartment = (() => {
+    const groups = new Map();
+    filteredAdvertisements.forEach((ad) => {
+      const deptId   = ad.department?.hash_id || ad.department?.id || ad.department_id || 'uncategorized';
+      const deptName = ad.department?.name || ad.department_name || 'Uncategorized';
+      if (!groups.has(deptId)) groups.set(deptId, { id: deptId, name: deptName, ads: [] });
+      groups.get(deptId).ads.push(ad);
+    });
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.name === 'Uncategorized') return 1;
+      if (b.name === 'Uncategorized') return -1;
+      return a.name.localeCompare(b.name);
+    });
+  })();
+
+  const toRow = (ad, i) => ({
+    id: ad.hash_id || ad.id || `ad-${i}`,
+    adv_number: ad.adv_number,
+    adv_date: ad.adv_date,
+    closing_date: ad.closing_date,
+    advertisement_fee: ad.advertisement_fee,
+    note: ad.note || ad.notes || ad.ad_note,
+    important_notes: ad.important_notes,
+    hash_id: ad.hash_id,
+  });
+
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="max-w-8xl mx-auto space-y-6">
@@ -368,6 +402,17 @@ const AdvertisementRecords = () => {
             <h1 className="text-2xl font-bold text-slate-900">Advertisement Records</h1>
             <p className="text-sm text-slate-500 mt-1">View and manage all advertisement records</p>
           </div>
+          <button
+            onClick={() => { setGroupByDept((v) => !v); setExpandedDept(null); }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 border transition-colors ${
+              groupByDept
+                ? 'bg-emerald-700 text-white border-emerald-700 hover:bg-emerald-800'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            <Building2 size={16} />
+            {groupByDept ? 'Showing by Department' : 'Group by Department'}
+          </button>
         </div>
 
         {/* Search Bar */}
@@ -401,17 +446,48 @@ const AdvertisementRecords = () => {
             <div className="text-slate-500">Loading...</div>
           ) : filteredAdvertisements.length === 0 ? (
             <div className="text-center text-slate-600 py-8">No Advertisements Found</div>
+          ) : groupByDept ? (
+            <div className="space-y-3">
+              {groupedByDepartment.map((group, idx) => {
+                const isOpen = expandedDept === group.id || (expandedDept === null && idx === 0);
+                return (
+                  <div key={group.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setExpandedDept(isOpen ? '__none__' : group.id)}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Building2 size={18} className="text-emerald-700" />
+                        <span className="font-semibold text-slate-900">{group.name}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium">
+                          {group.ads.length} ad{group.ads.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      {isOpen ? <ChevronUp size={18} className="text-slate-500" /> : <ChevronDown size={18} className="text-slate-500" />}
+                    </button>
+                    {isOpen && (
+                      <div className="p-3">
+                        <DataGrid
+                          rows={group.ads.map(toRow)}
+                          columns={columns}
+                          autoHeight
+                          pageSizeOptions={[10, 25, 50]}
+                          initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
+                          disableRowSelectionOnClick
+                          sx={{
+                            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+                            '& .MuiDataGrid-row': { minHeight: '52px !important' }
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ) : (
             <DataGrid
-              rows={filteredAdvertisements.map((ad, i) => ({
-                id: ad.hash_id || ad.id || `ad-${i}`,
-                adv_number: ad.adv_number,
-                adv_date: ad.adv_date,
-                closing_date: ad.closing_date,
-                advertisement_fee: ad.advertisement_fee,
-                note: ad.note || ad.notes || ad.ad_note,
-                important_notes: ad.important_notes
-              }))}
+              rows={filteredAdvertisements.map(toRow)}
               columns={columns}
               autoHeight
               pageSizeOptions={[10, 25, 50]}

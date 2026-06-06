@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { TextField, MenuItem } from '@mui/material';
 import { ArrowLeft, Save, Hash, Building2, Calendar, Clock } from 'lucide-react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -42,13 +42,11 @@ const RollSlipEditor = () => {
   const [formData, setFormData] = useState({
     roll_number:     '',
     exam_center_id:  '',
-    exam_hall_id:    '',
     seat_number:     '',
     exam_date:       '',
     attendance_time: '',
   });
   const [centers, setCenters] = useState([]);
-  const [halls,   setHalls]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
 
@@ -75,17 +73,10 @@ const RollSlipEditor = () => {
         setFormData({
           roll_number:     row.roll_number ?? '',
           exam_center_id:  row.exam_center?.id ? String(row.exam_center.id) : '',
-          exam_hall_id:    row.exam_hall?.id   ? String(row.exam_hall.id)   : '',
           seat_number:     row.seat_number ?? '',
           exam_date:       row.exam_date ?? '',
           attendance_time: parseTime24h(row.attendance_time ?? ''),
         });
-
-        if (row.exam_center?.id) {
-          const hr = await RollNumberApi.getHallsByCenter(row.exam_center.id);
-          if (!alive) return;
-          setHalls(hr.data ?? []);
-        }
       } catch (err) {
         toast.error(err?.status === 401
           ? 'Session expired — please log in again'
@@ -97,22 +88,9 @@ const RollSlipEditor = () => {
     return () => { alive = false; };
   }, [row]);
 
-  const fetchHalls = useCallback(async (centerId) => {
-    if (!centerId) { setHalls([]); return; }
-    try {
-      const r = await RollNumberApi.getHallsByCenter(centerId);
-      setHalls(r.data ?? []);
-    } catch { setHalls([]); }
-  }, []);
-
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'exam_center_id') {
-      setFormData((prev) => ({ ...prev, exam_center_id: value, exam_hall_id: '' }));
-      fetchHalls(value);
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async () => {
@@ -124,7 +102,6 @@ const RollSlipEditor = () => {
       await RollNumberApi.updateSlip(applicationNumber, {
         roll_number:     formData.roll_number.trim(),
         exam_center_id:  Number(formData.exam_center_id),
-        exam_hall_id:    formData.exam_hall_id ? Number(formData.exam_hall_id) : null,
         seat_number:     formData.seat_number?.trim() || null,
         exam_date:       formData.exam_date || null,
         attendance_time: formData.attendance_time ? formatTime12h(formData.attendance_time) : null,
@@ -196,17 +173,6 @@ const RollSlipEditor = () => {
           </TextField>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <TextField select fullWidth label="Exam Hall (optional)" margin="normal" size="small"
-              name="exam_hall_id" value={formData.exam_hall_id} onChange={handleFormChange}
-              disabled={!formData.exam_center_id || halls.length === 0}
-              helperText={!formData.exam_center_id ? 'Choose a center first' : halls.length === 0 ? 'No halls — first active hall will be picked' : ''}>
-              <MenuItem key="auto" value="">Auto (first active hall)</MenuItem>
-              {halls.map((h) => (
-                <MenuItem key={h.id} value={String(h.id)}>
-                  {h.name} {h.capacity ? `— capacity ${h.capacity}` : ''}
-                </MenuItem>
-              ))}
-            </TextField>
             <TextField fullWidth label="Seat Number (optional)" margin="normal" size="small"
               name="seat_number" value={formData.seat_number} onChange={handleFormChange}
               helperText="Optional seat assignment" />

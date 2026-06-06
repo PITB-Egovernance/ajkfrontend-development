@@ -16,6 +16,7 @@ const RequisitionDetail = () => {
   const [requisition, setRequisition] = useState(null);
   const [loading, setLoading] = useState(true);
   const [districtOptions, setDistrictOptions] = useState([]);
+  const [gradeOptions, setGradeOptions] = useState([]);
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -24,6 +25,7 @@ const RequisitionDetail = () => {
   useEffect(() => {
     fetchRequisition();
     fetchDistricts();
+    fetchGrades();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -51,18 +53,245 @@ const RequisitionDetail = () => {
     console.error("Error fetching districts:", error);
   }
 };
+
+  const fetchGrades = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: "application/json",
+          "X-API-KEY": API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setGradeOptions(
+          list
+            .filter((g) => (g.status ?? 'active') === 'active')
+            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching grades:", error);
+    }
+  };
+
+  // Resolve a stored scale value (hash_id, number, or string) to the
+  // human-readable grade name.
+  const getScaleName = (rawScale) => {
+    if (rawScale === null || rawScale === undefined || rawScale === '') return 'N/A';
+    if (typeof rawScale === 'object') {
+      return rawScale.name || rawScale.hash_id || rawScale.id || 'N/A';
+    }
+    const str = String(rawScale).trim();
+    const matched = gradeOptions.find((g) => g.id === str || g.name === str);
+    if (matched) return matched.name;
+    return str;
+  };
+
+  // Strip an optional trailing "%" and coerce to a number for display.
+  const getQuotaDisplay = (value) => {
+    if (value === null || value === undefined || value === '') return 'N/A';
+    const num = Number(String(value).replace('%', '').trim());
+    if (Number.isNaN(num)) return String(value);
+    return `${num}%`;
+  };
+
+  // Format domicile for display: handle array (hash_ids), string (single
+  // name or comma-separated names), null, etc. The live API typically
+  // returns a single name string (e.g. "Muzaffarabad") so we never
+  // want to show N/A in that case.
+  const formatDomicile = (raw) => {
+    if (raw === null || raw === undefined || raw === '') return 'N/A';
+    if (Array.isArray(raw)) {
+      const names = raw.map((d) => getDistrictName(d)).filter(Boolean);
+      return names.length ? names.join(', ') : 'N/A';
+    }
+    // String (e.g. "Muzaffarabad" or "Lahore, Karachi")
+    const str = String(raw).trim();
+    if (!str) return 'N/A';
+    if (str.includes(',')) {
+      return str.split(',').map((s) => getDistrictName(s.trim())).filter(Boolean).join(', ');
+    }
+    return getDistrictName(str);
+  };
+
+  // Convert snake_case merit_type values to human-readable labels.
+  // e.g. "quota_wise" → "Quota Wise", "open_merit" → "Open Merit"
+  const formatMeritType = (value) => {
+    if (!value) return 'N/A';
+    return String(value)
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Is the requisition using Open Merit? Sourced purely from the API
+  // (eligibility.merit_type, with a top-level fallback). The District
+  // table on the printed form changes shape based on this: Open Merit
+  // collapses all rows into a single "AJK DISTRICTS / Open Merit / N"
+  // summary, while Quota Based keeps the per-district breakdown.
+  //
+  // CRITICAL: `requisition` is `null` during the initial render before
+  // fetchRequisition resolves, so we MUST null-guard the whole chain
+  // (not just the inner `eligibility?.`) — otherwise React throws
+  // "Cannot read properties of null (reading 'eligibility')" on the
+  // very first render.
+  const isOpenMerit = requisition
+    ? ((requisition.eligibility?.merit_type ?? requisition.merit_type) === 'open_merit')
+    : false;
+
   const fetchRequisition = async () => {
     setLoading(true);
     try {
       const result = await RequisitionApi.getById(id);
-      
+
       // Handle API response format
       const responseData = result.data || result;
-      console.log('Response requyisition detail', responseData)
+      console.log('Response requisition detail', responseData)
       const data = responseData.requisition || responseData;
-      
+
       if (result.success || result.status === 200 || data) {
-        setRequisition(data || result);
+        const step1 = responseData.step1 || data.step1 || data.step1_basic_info || {};
+        const step2 = responseData.step2 || data.step2 || data.step2_qualifications || {};
+        const step3 = responseData.step3 || data.step3 || data.step3_eligibility || {};
+        const step3Districts = responseData.step3_district_quota
+          || data.step3_district_quota
+          || data.step3?.multiple_posts
+          || [];
+
+        const normalized = {
+          // Step 1 — Job Details
+          designation:     data.designation     ?? step1.designation,
+          scale:           data.scale           ?? step1.scale,
+          num_posts:       data.num_posts       ?? step1.num_posts,
+          vacancy_date:    data.vacancy_date    ?? step1.vacancy_date,
+          department: (() => {
+            if (data.department && typeof data.department === 'object') {
+              return {
+                name: data.department.name || data.department.department_name || '',
+              };
+            }
+            if (typeof data.department === 'string' && data.department) {
+              return { name: data.department };
+            }
+            if (step1.department && typeof step1.department === 'object') {
+              return {
+                name: step1.department.name || step1.department.department_name || '',
+              };
+            }
+            if (typeof step1.department === 'string' && step1.department) {
+              return { name: step1.department };
+            }
+            return { name: '' };
+          })(),
+          quota_percentage: data.quota_percentage
+            ?? data.quotaPercentage
+            ?? step1.quota_percentage,
+          quota_promotion:  data.quota_promotion  ?? step1.quota_promotion,
+          service_rules:   data.service_rules   ?? step1.service_rules,
+          syllabus:        data.syllabus        ?? step1.syllabus,
+          // Step 2 — Qualification details
+          qualification: (() => {
+            const direct = data.qualification;
+            if (direct && typeof direct === 'object') {
+              return {
+                academic_qualification:   direct.academic_qualification   ?? step2.academic_qualification,
+                equivalent_qualification:  direct.equivalent_qualification ?? step2.equivalent_qualification,
+                authority_certificate:     direct.authority_certificate    ?? step2.authority_certificate,
+                degree_equivalence:        direct.degree_equivalence       ?? step2.degree_equivalence,
+                any_other_qualification:   direct.any_other_qualification  ?? step2.any_other_qualification,
+                training_institute:        direct.training_institute       ?? step2.training_institute,
+                experience_type:           direct.experience_type          ?? step2.experience_type,
+                experience_length:         direct.experience_length        ?? step2.experience_length,
+                min_qualification:         direct.min_qualification        ?? step2.min_qualification,
+              };
+            }
+            return {
+              academic_qualification:   data.academic_qualification   ?? step2.academic_qualification,
+              equivalent_qualification:  data.equivalent_qualification ?? step2.equivalent_qualification,
+              authority_certificate:     data.authority_certificate    ?? step2.authority_certificate,
+              degree_equivalence:        data.degree_equivalence       ?? step2.degree_equivalence,
+              any_other_qualification:   data.any_other_qualification  ?? step2.any_other_qualification,
+              training_institute:        data.training_institute       ?? step2.training_institute,
+              experience_type:           data.experience_type          ?? step2.experience_type,
+              experience_length:         data.experience_length        ?? step2.experience_length,
+              min_qualification:         data.min_qualification        ?? step2.min_qualification,
+            };
+          })(),
+          // Step 3 — Eligibility details
+          eligibility: (() => {
+            const direct = data.eligibility;
+            if (direct && typeof direct === 'object') {
+              return {
+                min_age:           direct.min_age           ?? step3.min_age,
+                max_age:           direct.max_age           ?? step3.max_age,
+                age_relaxation:    direct.age_relaxation    ?? step3.age_relaxation,
+                relaxation_reason: direct.relaxation_reason ?? step3.relaxation_reason,
+                relaxation_years:  direct.relaxation_years  ?? step3.relaxation_years,
+                nationality:       direct.nationality       ?? step3.nationality,
+                domicile: (() => {
+                  const d = direct.domicile;
+                  if (Array.isArray(d)) return d;
+                  if (d && typeof d === 'object') {
+                    return d.id || d.hash_id || d.name || d.district_name || d;
+                  }
+                  if (typeof d === 'string' && d) return d;
+                  return step3.domicile
+                    ? (Array.isArray(step3.domicile)
+                        ? step3.domicile
+                        : String(step3.domicile).split(',').map((s) => s.trim()).filter(Boolean))
+                    : [];
+                })(),
+                other_conditions: direct.other_conditions ?? step3.other_conditions,
+                gender_basis:      direct.gender_basis      ?? step3.gender_basis,
+                // merit_type drives the "Quota" column in the
+                // District/Unit sub-table. Source it purely from the
+                // API (no hardcoded fallback) so the table always
+                // reflects the actual server value.
+                merit_type:        direct.merit_type        ?? step3.merit_type,
+              };
+            }
+            return {
+              min_age:           data.min_age           ?? step3.min_age,
+              max_age:           data.max_age           ?? step3.max_age,
+              age_relaxation:    data.age_relaxation    ?? step3.age_relaxation,
+              relaxation_reason: data.relaxation_reason ?? step3.relaxation_reason,
+              relaxation_years:  data.relaxation_years  ?? step3.relaxation_years,
+              nationality:       data.nationality       ?? step3.nationality,
+              domicile: (() => {
+                const d = data.domicile;
+                if (Array.isArray(d)) return d;
+                if (d && typeof d === 'object') {
+                  return d.id || d.hash_id || d.name || d.district_name || d;
+                }
+                if (typeof d === 'string' && d) return d;
+                return step3.domicile
+                  ? (Array.isArray(step3.domicile)
+                      ? step3.domicile
+                      : String(step3.domicile).split(',').map((s) => s.trim()).filter(Boolean))
+                  : [];
+              })(),
+              other_conditions: data.other_conditions ?? step3.other_conditions,
+              gender_basis:      data.gender_basis      ?? step3.gender_basis,
+              // merit_type drives the "Quota" column. Source purely
+              // from the API (no hardcoded fallback).
+              merit_type:        data.merit_type         ?? step3.merit_type,
+            };
+          })(),
+          multiple_posts: Array.isArray(step3Districts) && step3Districts.length > 0
+            ? (step3Districts[0] && typeof step3Districts[0] === 'object'
+                ? step3Districts
+                : step3Districts[0].districts.map((districtId, i) => ({
+                    district: districtId,
+                    quota:    step3Districts[0].quotas?.[i] || 'N/A',
+                    post:     step3Districts[0].posts?.[i]  || 'N/A',
+                  })))
+            : (data.multiple_posts || []),
+        };
+
+        setRequisition(normalized);
       } else {
         throw new Error(result.message || 'Invalid response');
       }
@@ -81,17 +310,18 @@ const RequisitionDetail = () => {
     return `${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`;
   };
 
-  // const getDistrictName = (hashId) => {
-  //   console.log('hashid',districtOptions)
-  //   const district = districtOptions.find((d) => d.id === hashId);
-  //   return district ? district.name : "N/A";
-  // };
-
+  // Returns the human-readable district name for a given value.
+  // Tries to match against districtOptions by hash_id first; if no match
+  // is found (or districtOptions haven't loaded yet), returns the raw value
+  // as-is — it may already be a plain name like "Muzaffarabad".
   const getDistrictName = (hashId) => {
-    if (!hashId || districtOptions.length === 0) return "N/A";
-
-    const district = districtOptions.find((d) => d.id === hashId);
-    return district ? district.name : "N/A";
+    if (!hashId) return 'N/A';
+    if (districtOptions.length > 0) {
+      const district = districtOptions.find((d) => d.id === hashId);
+      if (district) return district.name;
+    }
+    // Fall back: raw value is already a readable name string
+    return String(hashId);
   };
 
   const exportToPDF = () => {
@@ -148,7 +378,7 @@ const RequisitionDetail = () => {
         [
           '1',
           '(i) Designation or nomenclature of the Post(s)\n(ii) Scale of the Post\n(iii) Department & Class of Service\n(iv) Percentage of quota fixed\n(v) Number of posts to be filled\n(vi) Date(s) of occurrence of vacancy(s)',
-          `(i) ${requisition.designation || 'N/A'}\n(ii) ${requisition.scale || 'N/A'}\n(iii) ${requisition.department?.name || 'N/A'}\n(iv) ${requisition.quota_percentage || 'N/A'}%\n(v) ${requisition.num_posts || 'N/A'}\n(vi) Details in Annex "A"`
+          `(i) ${requisition.designation || 'N/A'}\n(ii) ${getScaleName(requisition.scale)}\n(iii) ${(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}\n(iv) Direct: ${getQuotaDisplay(requisition.quota_percentage)} | Promotion: ${getQuotaDisplay(requisition.quota_promotion)}\n(v) ${requisition.num_posts || 'N/A'}\n(vi) Details in Annex "A"`
         ],
         ['2', 'Service Rules for the Post(s) to be filled',`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}` ],
         ['3', 'Approved syllabus for the Post(s) to be filled', `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`],
@@ -168,13 +398,14 @@ const RequisitionDetail = () => {
           `(i) ${requisition.eligibility?.min_age || 'N/A'}\n(ii) ${requisition.eligibility?.max_age || 'N/A'}\n(iii) ${requisition.eligibility?.age_relaxation || 'N/A'}`
         ],
         ['7', 'Nationality', requisition.eligibility?.nationality || 'N/A'],
-        ['8', 'Domicile (Name Districts/Units)',Array.isArray(requisition?.eligibility?.domicile)
-    ? requisition.eligibility.domicile
-        .map(id => getDistrictName(id))
-        .join(', ')
-    : getDistrictName(requisition?.eligibility?.domicile)],
+        ['8', 'Domicile (Name Districts/Units)', formatDomicile(requisition?.eligibility?.domicile)],
         ['10', 'Any other condition of qualification', requisition.eligibility?.other_conditions || 'N/A'],
-        ['11', 'Gender Specific/Quota basis/Open Merit', requisition.eligibility?.gender_basis || 'N/A']
+        // Section 11: for Open Merit requisitions, the printable form
+        // shows "Open Merit" instead of the (hidden) default
+        // "Male/Female" value, matching the on-screen display.
+        ['11', 'Gender Specific/Quota basis/Open Merit', isOpenMerit
+          ? 'Open Merit'
+          : (requisition.eligibility?.gender_basis || 'N/A')]
       ];
 
       autoTable(doc, {
@@ -198,23 +429,37 @@ const RequisitionDetail = () => {
 
       yPosition = doc.lastAutoTable.finalY + 5;
 
-      // District Quota Table
-      if (requisition.multiple_posts && requisition.multiple_posts.length > 0) {
+      // District Quota Table — for Open Merit, collapse to a single
+      // "AJK DISTRICTS / Open Merit / N" row that mirrors the
+      // on-screen view; for Quota Based, keep the per-district
+      // breakdown from the API.
+      const hasMultiplePosts = requisition.multiple_posts && requisition.multiple_posts.length > 0;
+      if (isOpenMerit || hasMultiplePosts) {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
         doc.text('9. Detail of District wise quota for the posts:', marginLeft, yPosition);
         yPosition += 4;
 
-        // const districtData = requisition.multiple_posts.map(post => [
-        //   post.district || 'N/A',
-        //   post.quota || 'N/A',
-        //   post.post || 'N/A'
-        // ]);
-        const districtData = requisition.multiple_posts.map(post => [
-          getDistrictName(post.district),
-          post.quota || 'N/A',
-          post.post || 'N/A'
-        ]);
+        const districtData = isOpenMerit
+          ? [[
+              'AJK Districts',
+              formatMeritType(
+                requisition.eligibility?.merit_type
+                  ?? requisition.merit_type
+              ),
+              String(requisition.num_posts || 'N/A'),
+            ]]
+          : requisition.multiple_posts.map(post => [
+              getDistrictName(post.district),
+              // The "Quota" column shows the eligibility-level
+              // merit_type as a human-readable label. Sourced
+              // purely from the API — no hardcoded fallback.
+              formatMeritType(
+                requisition.eligibility?.merit_type
+                  ?? requisition.merit_type
+              ),
+              post.post || 'N/A'
+            ]);
 
         autoTable(doc, {
           startY: yPosition,
@@ -309,13 +554,19 @@ const RequisitionDetail = () => {
           <ArrowLeft size={18} />
           Back to List
         </button>
-        <button
-          onClick={exportToPDF}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white rounded-lg transition-colors hover:shadow-lg"
-        >
-          <Download size={18} />
-          Export PDF
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Edit button removed per request — requisitions are
+              now read-only from this page. Use the form list page
+              or the preview's "Back to Edit" if you need to make
+              changes. */}
+          <button
+            onClick={exportToPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white rounded-lg transition-colors hover:shadow-lg"
+          >
+            <Download size={18} />
+            Export PDF
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-lg p-8" style={styles.container}>
@@ -353,9 +604,9 @@ const RequisitionDetail = () => {
               </td>
               <td style={styles.tableCell}>
                 (i)&nbsp;&nbsp;{requisition.designation || 'N/A'}<span style={styles.fieldLine}></span>
-                (ii)&nbsp;&nbsp;{requisition.scale || 'N/A'}<span style={styles.fieldLine}></span>
-                (iii)&nbsp;&nbsp;{requisition.department?.name || 'N/A'}<span style={styles.fieldLine}></span>
-                (iv)&nbsp;&nbsp;{requisition.quota_percentage || 'N/A'}%<span style={styles.fieldLine}></span>
+                (ii)&nbsp;&nbsp;{getScaleName(requisition.scale)}<span style={styles.fieldLine}></span>
+                (iii)&nbsp;&nbsp;{(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}<span style={styles.fieldLine}></span>
+                (iv)&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_percentage)} (Direct)&nbsp;&nbsp;|&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_promotion)} (Promotion)<span style={styles.fieldLine}></span>
                 (v)&nbsp;&nbsp;{requisition.num_posts || 'N/A'}<span style={styles.fieldLine}></span>
                 (vi)&nbsp;&nbsp;Details in Annex "A"<span className=""></span>
               </td>
@@ -441,11 +692,7 @@ const RequisitionDetail = () => {
             <tr>
               <th style={styles.number}>8</th>
               <td style={styles.tableCell}>Domicile (Name Districts/Units)</td>
-              <td style={styles.tableCell}>{Array.isArray(requisition?.eligibility?.domicile)
-  ? requisition.eligibility.domicile
-      .map(id => getDistrictName(id))
-      .join(', ')
-  : getDistrictName(requisition?.eligibility?.domicile)}<span className=""></span></td>
+              <td style={styles.tableCell}>{formatDomicile(requisition?.eligibility?.domicile)}<span className=""></span></td>
             </tr>
 
             <tr>
@@ -453,7 +700,13 @@ const RequisitionDetail = () => {
               <td style={styles.tableCell}>Detail of District wise quota for the posts requisitioned here.</td>
               <td style={styles.tableCell}>
                 Total Posts:&nbsp;&nbsp;{requisition.num_posts || 'N/A'} <span style={styles.fieldLine}></span>
-                {requisition.multiple_posts && requisition.multiple_posts.length > 0 && (
+                {/* Open Merit: collapse the per-district breakdown into a
+                    single summary row that says "AJK DISTRICTS / Open Merit
+                    / N posts" so the printed form still has the same
+                    three-column table shape as the Quota Based case but
+                    doesn't show fake per-district rows. The total comes
+                    from Step 1's num_posts (per the user's spec). */}
+                {isOpenMerit ? (
                   <table style={styles.subTable}>
                     <thead>
                       <tr>
@@ -463,17 +716,46 @@ const RequisitionDetail = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {requisition.multiple_posts.map((post, index) => (
-                        <tr key={index}>
-                         <td style={styles.subTableCell}>
-                            {getDistrictName(post.district)}
-                          </td>
-                          <td style={styles.subTableCell}>{post.quota}</td>
-                          <td style={styles.subTableCell}>{post.post}</td>
-                        </tr>
-                      ))}
+                      <tr>
+                        <td style={styles.subTableCell}>AJK Districts</td>
+                        <td style={styles.subTableCell}>
+                          {formatMeritType(
+                            requisition.eligibility?.merit_type
+                              ?? requisition.merit_type
+                          )}
+                        </td>
+                        <td style={styles.subTableCell}>{requisition.num_posts || 'N/A'}</td>
+                      </tr>
                     </tbody>
                   </table>
+                ) : (
+                  requisition.multiple_posts && requisition.multiple_posts.length > 0 && (
+                    <table style={styles.subTable}>
+                      <thead>
+                        <tr>
+                          <th style={styles.subTableHeader}>District/Unit</th>
+                          <th style={styles.subTableHeader}>Quota</th>
+                          <th style={styles.subTableHeader}>Posts</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {requisition.multiple_posts.map((post, index) => (
+                          <tr key={index}>
+                            <td style={styles.subTableCell}>
+                              {getDistrictName(post.district)}
+                            </td>
+                            <td style={styles.subTableCell}>
+                              {formatMeritType(
+                                requisition.eligibility?.merit_type
+                                  ?? requisition.merit_type
+                              )}
+                            </td>
+                            <td style={styles.subTableCell}>{post.post ?? 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
                 )}
               </td>
             </tr>
@@ -487,7 +769,19 @@ const RequisitionDetail = () => {
             <tr>
               <th style={styles.number}>11</th>
               <td style={styles.tableCell}>Gender Specific/Quota basis/Open Merit</td>
-              <td style={styles.tableCell}>{requisition.eligibility?.gender_basis || 'N/A'}<span className=""></span></td>
+              {/* For Open Merit requisitions the per-row Gender field
+                  was hidden in Step 3 and auto-populated with
+                  "Male/Female" so the API still received a value. On
+                  the printable form, though, the user expects this row
+                  to show "Open Merit" (the actual selection mode) —
+                  not the hidden default. Source the display value
+                  purely from the API's merit_type. */}
+              <td style={styles.tableCell}>
+                {isOpenMerit
+                  ? 'Open Merit'
+                  : (requisition.eligibility?.gender_basis || 'N/A')}
+                <span className=""></span>
+              </td>
             </tr>
           </tbody>
         </table>

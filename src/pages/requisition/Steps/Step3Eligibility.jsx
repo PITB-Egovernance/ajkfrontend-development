@@ -1,7 +1,17 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TextField, MenuItem } from '@mui/material';
 import { Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
+
+// Project green theme: emerald-700 (#047857). Used for the
+// Selection-Mode radio buttons so the checked dot and ring match the
+// rest of the project (sidebar, primary buttons, action chips, etc.).
+const EMERALD_700 = '#047857';
+
+// Hardcoded fallback used until the live admin server has /settings/nationalities populated.
+const FALLBACK_NATIONALITIES = ['Pakistani/AJK'];
 
 // Age limits aligned with AJK PSC / Pakistan government service:
 // - 18 is the legal minimum employment age in Pakistan.
@@ -39,7 +49,14 @@ const validateAges = (minRaw, maxRaw) => {
   return errors;
 };
 
-const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, districtOptions = [], isEdit = false }) => {
+const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSaveDraft, districtOptions = [], isEdit = false }) => {
+  // Track the last data identity we've synced from. Only re-sync when the
+  // identity actually changes (e.g. user navigates back to Step 3 with a
+  // different temp_id). Without this guard, the useEffect would re-run
+  // whenever the parent re-renders with a new data reference (e.g. after
+  // a form state update), OVERWRITING the user's in-progress edits.
+  const lastSyncedDataRef = useRef(null);
+
   const [formData, setFormData] = useState({
     min_age: data.min_age || '',
     max_age: data.max_age || '',
@@ -50,31 +67,196 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
     domicile: data.domicile || '',
     other_conditions: data.other_conditions || '',
     gender_basis: data.gender_basis || '',
+    // selection_mode toggles whether the quota distribution table is required.
+    // 'open_merit'  → use Step 1 num_posts as-is, hide the table.
+    // 'quota_based' → fill District Quota + Promotional Quota per district.
+    selection_mode: data.selection_mode || 'quota_based',
     district: data.district || [''],
     quota: data.quota || [''],
-    post: data.post || [''],
+    post: data.post || [''],                              // District Quota posts
+    promotional_post: data.promotional_post || [''],      // Promotional Quota posts (per-district, paired)
   });
 
   const [showRelaxation, setShowRelaxation] = useState(data.age_relaxation === 'Yes');
   const [ageErrors,      setAgeErrors]      = useState({});
+  const [nationalities,  setNationalities]  = useState(FALLBACK_NATIONALITIES);
+
+  // When the user toggles between "Open Merit" and "Quota Based" in
+  // Step 3, the per-district table only makes sense in Quota Based mode.
+  // If they switch to Quota Based while the district array is empty
+  // (e.g. they had previously saved with Open Merit and are now coming
+  // back to switch to Quota Based), seed the array with a single empty
+  // row so the table renders one editable row instead of zero rows.
+  useEffect(() => {
+    if (formData.selection_mode === 'quota_based' && (!Array.isArray(formData.district) || formData.district.length === 0)) {
+      // eslint-disable-next-line no-console
+      console.log('🌱 Step3: seeding an empty district row for Quota Based mode');
+      setFormData((prev) => ({
+        ...prev,
+        district:         [''],
+        quota:            [''],
+        post:             [''],
+        promotional_post: [''],
+      }));
+    }
+  }, [formData.selection_mode]);
+
+  // When the user picks Open Merit the Gender field is hidden in the UI.
+  // To keep the live API happy we still need a value for `gender_basis`
+  // (it's a required string field on the backend), so we silently
+  // default it to "Male/Female" in form state. The user can still switch
+  // back to Quota Based and pick a different value if they want.
+  useEffect(() => {
+    if (formData.selection_mode === 'open_merit'
+        && (!formData.gender_basis || formData.gender_basis === '')) {
+      setFormData((prev) => ({ ...prev, gender_basis: 'Male/Female' }));
+    }
+  }, [formData.selection_mode, formData.gender_basis]);
+
+  // ── Local persistence: cache form state in localStorage so the per-row
+  // inputs (especially the Promotional Quota Posts column) survive any
+  // navigation or "Back to Edit" round-trip. The cache is keyed by temp_id
+  // so different requisitions don't bleed into each other.
+  useEffect(() => {
+    if (!tempId) return;
+    try {
+      const cached = localStorage.getItem(`step3_draft_${tempId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Only restore the per-row arrays (district, post, promotional_post)
+        // and the per-field values that the backend's preview endpoint
+        // doesn't return reliably. Other fields (min_age, max_age, etc.) are
+        // reloaded from the backend on remount.
+        setFormData((prev) => ({
+          ...prev,
+          district:         Array.isArray(parsed.district)         ? parsed.district         : prev.district,
+          post:             Array.isArray(parsed.post)             ? parsed.post             : prev.post,
+          promotional_post: Array.isArray(parsed.promotional_post) ? parsed.promotional_post : prev.promotional_post,
+          quota:            Array.isArray(parsed.quota)            ? parsed.quota            : prev.quota,
+        }));
+      }
+    } catch (e) { /* ignore corrupt cache */ }
+  }, [tempId]);
+
+  // Persist form state on every change so the cached version is always
+  // up-to-date with the user's edits.
+  useEffect(() => {
+    if (!tempId) return;
+    try {
+      localStorage.setItem(`step3_draft_${tempId}`, JSON.stringify({
+        district:         formData.district,
+        post:             formData.post,
+        promotional_post: formData.promotional_post,
+        quota:            formData.quota,
+      }));
+    } catch (e) { /* quota exceeded, ignore */ }
+  }, [tempId, formData.district, formData.post, formData.promotional_post, formData.quota]);
+
+  // Clear the cache when the requisition is confirmed (live API confirmed=true
+  // indicates a successful save). RequisitionForm passes this via the
+  // `confirmed` prop when the user clicks "Confirm & Save" on the preview.
+  useEffect(() => {
+    if (!tempId) return;
+    const handleBeforeUnload = () => {
+      // Don't clear on page refresh — keep the cache so the user doesn't
+      // lose their work if they accidentally hit F5.
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [tempId]);
+
+  // Pull live nationality list from Settings. Fall back to hardcoded list on error
+  // so a partial deploy (frontend updated before backend) does not break the wizard.
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/settings/nationalities`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
+          },
+        });
+        const result = await res.json();
+        if (aborted) return;
+        if (res.ok && (result.success || result.status === 200)) {
+          const list = result.data?.data ?? result.data ?? [];
+          // The /settings/nationalities endpoint returns rows with
+          // either `nationality_name` (canonical, used by the
+          // Settings page) or `name` (legacy alias). The previous
+          // code only read `n.name`, so any rows that used
+          // `nationality_name` came back as `undefined` and the
+          // dropdown rendered empty. Handle both, canonical first.
+          const names = list
+            .filter((n) => (n.status ?? 'active') === 'active')
+            .map((n) => n.nationality_name || n.name)
+            .filter(Boolean);
+          if (names.length) setNationalities(names);
+        }
+      } catch { /* keep fallback */ }
+    })();
+    return () => { aborted = true; };
+  }, []);
 
   // Update form data when data prop changes (for edit mode)
   useEffect(() => {
-    
-    const normalizedDistricts = Array.isArray(data.district)
-      ? data.district.map(d =>
-          typeof d === 'object'
-            ? d.id || d.hash_id || ''
-            : String(d)
-        )
-      : [''];
+    // Only re-sync when the loaded data's content actually changes. Without
+    // this guard the effect would re-run on every parent re-render and
+    // OVERWRITE the user's in-progress edits (e.g. typing a number in the
+    // promotional_post column) with the stale loaded data.
+    const dataKey = data ? JSON.stringify(data) : '';
+    if (lastSyncedDataRef.current === dataKey) return;
+    if (data && Object.keys(data).length > 0) {
+      lastSyncedDataRef.current = dataKey;
+    }
 
-    const normalizedDomicile =
-      typeof data.domicile === 'object'
-        ? data.domicile.id || data.domicile.hash_id || ''
+    // Districts and post counts are stored as comma-separated strings in the
+    // backend (per the user's spec). Convert them back to arrays for the form.
+    const splitCsv = (v) => {
+      if (Array.isArray(v)) return v.map(String);
+      if (v === null || v === undefined || v === '') return [''];
+      return String(v).split(',').map((s) => s.trim());
+    };
+
+    const normalizedDistricts = splitCsv(data.district).map((d) => {
+      // The backend stores district as a name (e.g. "Muzaffarabad") but the
+      // Select's MenuItem value is the district hash_id. Map the name back to
+      // the hash_id via districtOptions so the Select can show the current
+      // value. If no match is found, the user will need to re-select the
+      // district — we DON'T keep the name as the Select value because that
+      // triggers MUI's "out-of-range value" warning and breaks selection.
+      if (!d) return '';
+      const match = districtOptions.find((opt) => opt.name === d);
+      return match ? (match.hash_id || match.id) : '';
+    });
+
+    // The backend stores domicile as a name (e.g. "Muzaffarabad") but the
+    // Select's MenuItem value is the district hash_id. Map the name back to
+    // the hash_id so the Select can show the current value without the
+    // MUI "out-of-range" warning.
+    const normalizedDomicile = (() => {
+      const raw = typeof data.domicile === 'object'
+        ? data.domicile.id || data.domicile.hash_id || data.domicile.name || ''
         : data.domicile || '';
+      if (!raw) return '';
+      const match = districtOptions.find((opt) => opt.name === raw);
+      if (match) return match.hash_id || match.id;
+      // If the value already looks like a hash_id, keep it as-is.
+      if (typeof raw === 'string' && raw.length > 8) return raw;
+      return '';
+    })();
+
     if (data && Object.keys(data).length > 0) {
       console.log('🔄 Step3: Updating form with new data:', data);
+      const loadedMode = data.selection_mode || data.merit_type || 'quota_based';
+      // The live API returns an empty array (not a non-empty placeholder)
+      // for users who picked Open Merit, so we explicitly seed one empty
+      // district row whenever the user lands in Quota Based mode with an
+      // empty array. Without this, the table renders zero rows and the
+      // user is left staring at a blank "Quota Wise Post Distribution"
+      // section with no way to add districts.
+      const seedDistricts = loadedMode === 'quota_based' && normalizedDistricts.length === 0;
       setFormData({
         min_age: data.min_age || '',
         max_age: data.max_age || '',
@@ -85,13 +267,19 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
         domicile: String(normalizedDomicile),
         other_conditions: data.other_conditions || '',
         gender_basis: data.gender_basis || '',
-         district: normalizedDistricts.map(String),
-        quota: data.quota || [''],
-        post: data.post || [''],
+        selection_mode: loadedMode,
+        district: seedDistricts ? [''] : normalizedDistricts,
+        quota:    seedDistricts ? [''] : splitCsv(data.quota),
+        post:     seedDistricts ? [''] : splitCsv(data.post),
+        promotional_post: seedDistricts ? [''] : splitCsv(data.promotional_post || data.promotional_quota_post),
       });
       setShowRelaxation(data.age_relaxation === 'Yes');
     }
-  }, [data]);
+    // Use a string fingerprint of `data` as the dependency so this effect
+    // only re-runs when the loaded data's content actually changes — not
+    // on every parent re-render (which would otherwise overwrite the user's
+    // in-progress edits in the per-row number inputs).
+  }, [data && JSON.stringify(data), districtOptions]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -126,19 +314,25 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
   const someButNotAllPostsFilled =
     postsFilledCount > 0 && postsFilledCount < (formData.district?.length ?? 0);
 
-  // Sum of entered posts
+  // Combined District Quota + Promotional Quota total — both columns count toward
+  // Step 1's num_posts ceiling.
   const totalPostsEntered = (formData.post || [])
-    .reduce((sum, p) => sum + (Number(p) || 0), 0);
+    .reduce((sum, p, i) => sum + (Number(p) || 0) + (Number(formData.promotional_post?.[i]) || 0), 0);
 
-  const exceedsStepOneTotal = stepOneTotal > 0 && totalPostsEntered > stepOneTotal;
+  const exceedsStepOneTotal =
+    formData.selection_mode === 'quota_based' &&
+    stepOneTotal > 0 &&
+    totalPostsEntered > stepOneTotal;
 
   // ── Real-time row-level validation ──
   // - district required + unique across rows
-  // - posts (per row): if any row has a value, ALL rows must; non-negative int;
-  //   running sum so far cannot exceed Step 1's num_posts
+  // - district_post + promotional_post (per row): if any row has a value, ALL
+  //   rows must; non-negative int; running sum across both columns cannot
+  //   exceed Step 1's num_posts
   const rowErrors = (() => {
     const districts = formData.district || [];
     const posts     = formData.post || [];
+    const promo     = formData.promotional_post || [];
     const seen      = new Map();
     let runningSum  = 0;
 
@@ -151,21 +345,24 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
         seen.set(districtId, i);
       }
 
-      const postRaw = posts[i];
-      if (isPostFilled(postRaw)) {
-        const n = Number(postRaw);
-        if (!Number.isInteger(n) || n < 0) {
-          errors.post = 'Whole number 0 or more';
-        } else {
-          runningSum += n;
-          if (stepOneTotal > 0 && runningSum > stepOneTotal) {
-            errors.post = `Total exceeds Step 1's ${stepOneTotal} posts`;
+      const validateCell = (raw, key) => {
+        if (isPostFilled(raw)) {
+          const n = Number(raw);
+          if (!Number.isInteger(n) || n < 0) {
+            errors[key] = 'Whole number 0 or more';
+          } else {
+            runningSum += n;
+            if (stepOneTotal > 0 && runningSum > stepOneTotal) {
+              errors[key] = `Total exceeds Step 1's ${stepOneTotal} posts`;
+            }
           }
+        } else if (key === 'post' && someButNotAllPostsFilled) {
+          errors.post = 'Fill District Quota for every district, or leave them all empty';
         }
-      } else if (someButNotAllPostsFilled) {
-        // Partial fill: this row is empty while others have values
-        errors.post = 'Fill posts for every district, or leave them all empty';
-      }
+      };
+
+      validateCell(posts[i], 'post');
+      validateCell(promo[i], 'promotional_post');
 
       return errors;
     });
@@ -176,7 +373,8 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
       ...prev,
       district: [...prev.district, ''],
       quota: [...prev.quota, ''],
-      post: [...prev.post, '']
+      post: [...prev.post, ''],
+      promotional_post: [...(prev.promotional_post || []), '']
     }));
   };
 
@@ -186,7 +384,8 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
         ...prev,
         district: prev.district.filter((_, i) => i !== index),
         quota: prev.quota.filter((_, i) => i !== index),
-        post: prev.post.filter((_, i) => i !== index)
+        post: prev.post.filter((_, i) => i !== index),
+        promotional_post: (prev.promotional_post || []).filter((_, i) => i !== index)
       }));
     }
   };
@@ -201,16 +400,122 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
       return;
     }
 
-    // Block on row-level errors (duplicate districts, bad post numbers)
-    const firstRowError = rowErrors.find((re) => Object.keys(re).length > 0);
-    if (firstRowError) {
-      toast.error(firstRowError.district || firstRowError.post || 'Fix the district / post rows');
+    // Convert district hash_ids → district NAMES (the live API's
+    // `district` field expects names like "Lahore", not hash_ids).
+    const districtIds = Array.isArray(formData.district) ? formData.district : [];
+    const districtNames = districtIds.map((idOrName) => {
+      if (!idOrName) return '';
+      const match = districtOptions.find((d) => (d.hash_id || d.id) === idOrName);
+      return match ? match.name : idOrName;
+    }).filter(Boolean);
+
+    // Convert domicile hash_id → domicile NAME (the live API's `domicile`
+    // field expects "Punjab" etc., not a hash_id like "vrz7W1025noP").
+    const domicileRaw = formData.domicile;
+    let domicileName = '';
+    if (domicileRaw) {
+      const match = districtOptions.find((d) => (d.hash_id || d.id) === domicileRaw);
+      domicileName = match ? match.name : String(domicileRaw);
+    }
+
+    // Live API field aliases (Usama's v2.2.0 schema) — wire format confirmed
+    // from the live API curl reference:
+    //   - selection_mode → merit_type ("open_merit" | "quota_wise")
+    //   - quota array defaults to one "Open Merit" entry per district row
+    //     so the live API's array-length validation (quota.length must equal
+    //     district.length) passes even though the Step 3 table doesn't
+    //     expose a per-row quota selector.
+    //
+    // NOTE: The live API's Step 3 curl does NOT include `quota_promotion` at
+    // all — that field is a Step 1 string field (the District Qouta
+    // percentage like "20%"). Sending it as a per-district array from Step 3
+    // triggers "The quota promotion field must be a string" validation. We
+    // do NOT forward `quota_promotion` from Step 3.
+    const meritType = formData.selection_mode === 'open_merit' ? 'open_merit' : 'quota_wise';
+
+    // Open Merit ignores the per-district table — send empty arrays so the
+    // backend doesn't try to persist quota rows that don't apply. The
+    // Gender field is hidden in Open Merit mode, so default
+    // `gender_basis` to "Male/Female" so the live API still receives
+    // a valid value without forcing the user through a UI they don't
+    // need.
+    if (formData.selection_mode === 'open_merit') {
+      onNext({
+        min_age:             formData.min_age,
+        max_age:             formData.max_age,
+        age_relaxation:      formData.age_relaxation,
+        relaxation_reason:   formData.relaxation_reason,
+        relaxation_years:    formData.relaxation_years,
+        nationality:         formData.nationality,
+        domicile:            domicileName,
+        gender_basis:        'Male/Female',
+        merit_type:          meritType,
+        district:            [],
+        quota:               [],
+        post:                [],
+        district_quota_post:     [],
+        promotional_quota_post:  [],
+        other_conditions:   formData.other_conditions || 'N/A',
+      });
       return;
     }
 
+    // Quota Based: build the live API's per-row arrays. The frontend collects
+    // a `district` + `post` (+ optional `promotional_post`) per row but does
+    // not surface a quota-type dropdown. The live API's Step 3 curl shows
+    // `quota: ["Open Merit", "Women", "Minority"]` so we default each row's
+    // quota to "Open Merit" to match the live array-length contract.
+    const perRowQuota = districtNames.map(() => 'Open Merit');
+
+    // Quota Based: block on row-level errors (duplicate districts, bad post numbers)
+    const firstRowError = rowErrors.find((re) => Object.keys(re).length > 0);
+    if (firstRowError) {
+      toast.error(
+        firstRowError.district ||
+        firstRowError.post ||
+        firstRowError.promotional_post ||
+        'Fix the district / post rows'
+      );
+      return;
+    }
+
+    // Live API contract: per-district fields are JSON ARRAYS (not strings).
+    // Field names per the live API's validator:
+    //   - district              → array of district names
+    //   - quota                 → array of quota types
+    //   - post                  → array of post counts
+    //   - district_quota_post   → array of post counts
+    //   - promotional_quota_post → array of promotional post counts
+    //   - gender_basis          → string (required)
+    const postList = Array.isArray(formData.post) ? formData.post : [];
+    const promoList = Array.isArray(formData.promotional_post) ? formData.promotional_post : [];
+
     onNext({
-      ...formData,
-      other_conditions: formData.other_conditions || 'N/A',
+      // Strip the local-only fields (selection_mode, promotional_post) from
+      // the spread — they were kept in form state for the UI but the live
+      // API uses the live-API names (merit_type, promotional_quota_post).
+      min_age:             formData.min_age,
+      max_age:             formData.max_age,
+      age_relaxation:      formData.age_relaxation,
+      relaxation_reason:   formData.relaxation_reason,
+      relaxation_years:    formData.relaxation_years,
+      nationality:         formData.nationality,
+      domicile:            domicileName,         // live API expects a name, not hash_id
+      gender_basis:        formData.gender_basis || 'Male/Female', // required by live API for Step 3
+      merit_type:          meritType,
+      // The live API requires `district`, `quota`, and `post` as JSON arrays
+      // (per the 422 error "District data must be an array").
+      district:            districtNames,        // live API: JSON array
+      quota:               perRowQuota,          // live API: JSON array
+      post:                postList,             // live API: JSON array
+      // The per-user spec: district_quota_post and promotional_quota_post are
+      // stored as comma-separated strings (one value per district row), paired
+      // with the corresponding district by index. The preview's "District/Posts"
+      // and "Promotional Posts" rows split them back into per-district pairs
+      // using the same index.
+      district_quota_post:     postList.join(','),
+      promotional_quota_post:  promoList.join(','),
+      other_conditions:   formData.other_conditions || 'N/A',
     });
   };
 
@@ -305,7 +610,10 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
             value={formData.nationality}
             onChange={handleChange}
           >
-            <MenuItem value="Pakistani/AJK">Pakistani/AJK</MenuItem>
+            <MenuItem value="">Select Nationality</MenuItem>
+            {nationalities.map((n) => (
+              <MenuItem key={n} value={n}>{n}</MenuItem>
+            ))}
           </TextField>
         </div>
 
@@ -349,11 +657,66 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
             name="other_conditions"
             value={formData.other_conditions}
             onChange={handleChange}
-            multiline
-            rows={2}
           />
         </div>
 
+        {/* The Gender field is now rendered INSIDE the Quota Based
+            section below. When the user picks Open Merit the field is
+            hidden but `gender_basis` is auto-populated with
+            "Male/Female" on submit (see handleSubmit + the
+            selection_mode useEffect), so the live API still receives
+            a valid value without forcing the user through a UI they
+            don't need. */}
+      </div>
+
+      <h6 className="section-title" style={{ marginTop: '30px', marginBottom: '12px', fontSize: '1.05rem', fontWeight: '600' }}>Selection Mode</h6>
+
+      <div style={{ display: 'flex', gap: '24px', marginBottom: '20px', padding: '14px 18px', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <input
+            type="radio"
+            name="selection_mode"
+            value="open_merit"
+            checked={formData.selection_mode === 'open_merit'}
+            onChange={(e) => setFormData(prev => ({ ...prev, selection_mode: e.target.value }))}
+            // Project theme: emerald-700 (#047857) for the checked
+            // dot + ring. `accentColor` is a CSS property supported
+            // across all modern browsers; we also set `accent-emerald-700`
+            // as a Tailwind fallback in case the build pipeline strips
+            // inline styles.
+            style={{ accentColor: EMERALD_700 }}
+            className="accent-emerald-700"
+          />
+          <span style={{ fontWeight: 500, color: '#1e293b' }}>Open Merit</span>
+          <small style={{ color: '#64748b' }}>(uses Step 1's total posts)</small>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <input
+            type="radio"
+            name="selection_mode"
+            value="quota_based"
+            checked={formData.selection_mode === 'quota_based'}
+            onChange={(e) => setFormData(prev => ({ ...prev, selection_mode: e.target.value }))}
+            // Project theme: emerald-700 (#047857) for the checked
+            // dot + ring. See note on `accentColor` above.
+            style={{ accentColor: EMERALD_700 }}
+            className="accent-emerald-700"
+          />
+          <span style={{ fontWeight: 500, color: '#1e293b' }}>Quota Based</span>
+          <small style={{ color: '#64748b' }}>(per-district distribution required)</small>
+        </label>
+      </div>
+
+      {formData.selection_mode === 'quota_based' && (<>
+      <h6 className="section-title" style={{ marginTop: '20px', marginBottom: '20px', fontSize: '1.05rem', fontWeight: '600' }}>Quota Wise Post Distribution</h6>
+
+      {/* Gender field — only relevant in Quota Based mode, where each
+          district row can have a different gender bias. For Open Merit
+          the field is hidden and the form auto-fills
+          `gender_basis = "Male/Female"` on submit so the live API
+          still gets a valid value without forcing the user through a
+          UI they don't need. */}
+      <div className="row" style={{ marginBottom: '20px' }}>
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
@@ -370,15 +733,15 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
         </div>
       </div>
 
-      <h6 className="section-title" style={{ marginTop: '30px', marginBottom: '20px', fontSize: '1.05rem', fontWeight: '600' }}>Quota Wise Post Distribution</h6>
-
       <div className="table-responsive" style={{ marginTop: '15px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', width: '100%' }}>
         <table className="table table-bordered" style={{ marginBottom: 0, width: '100%' }}>
           <thead style={{ backgroundColor: '#006622' }}>
             <tr>
               <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>District</th>
-              {/* <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>Quota Type</th> */}
-              <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>Posts</th>
+              <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>District Quota Posts</th>
+              {/* Promotional Quota Posts column — disabled (not currently
+                  functional end-to-end with the live backend). */}
+              {/* <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem' }}>Promotional Quota Posts</th> */}
               <th style={{ color: 'white', padding: '12px 16px', fontWeight: '600', fontSize: '0.9rem', width: '140px', textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
@@ -437,6 +800,21 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
                     helperText={rowErrors[index]?.post || 'Decide later'}
                   />
                 </td>
+                {/* Promotional Quota Posts input — disabled (not currently
+                    functional end-to-end with the live backend). */}
+                {/* <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    size="small"
+                    value={formData.promotional_post?.[index] ?? ''}
+                    onChange={(e) => handleArrayChange(index, 'promotional_post', e.target.value)}
+                    placeholder="Optional"
+                    inputProps={{ min: 0 }}
+                    error={!!rowErrors[index]?.promotional_post}
+                    helperText={rowErrors[index]?.promotional_post || 'Decide later'}
+                  />
+                </td> */}
                 <td style={{ padding: '12px 16px', verticalAlign: 'middle', textAlign: 'center' }}>
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                     <button
@@ -496,6 +874,7 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
           </div>
         )}
       </div>
+      </>)}
 
       <div className="navigation-buttons">
         <button type="button" className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200" onClick={onBack}>
@@ -505,8 +884,17 @@ const Step3Eligibility = ({ data, step1Data = {}, onNext, onBack, onSaveDraft, d
           <button type="button" onClick={() => onSaveDraft?.(formData)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
             Save Draft
           </button>
+          {/*
+            The submit button label reflects the page mode. In
+            Create flow this is the last step → "Preview" (the
+            user expects to see the preview of their draft). In
+            Edit flow this is the last step → "Update" (the user
+            expects the changes to be saved in place). The parent
+            passes `isEdit` so the label stays in sync with the
+            form title ("Edit Requisition" vs "New Requisition").
+          */}
           <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
-            Preview
+            {isEdit ? 'Update' : 'Preview'}
           </button>
         </div>
       </div>

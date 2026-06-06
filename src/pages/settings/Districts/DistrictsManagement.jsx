@@ -135,8 +135,12 @@ const DistrictsManagement = () => {
 
       const result = await response.json();
 
-      if (result.status === 200) {
-        const data = result.data.data || [];
+      // Accept either the local-backend response shape ({ status: 200, data: { data: [...], total } })
+      // or the live-style shape ({ success: true, data: { data: [...], total } }).
+      if (response.ok || result.status === 200 || result.success) {
+        const payload    = result.data ?? {};
+        const data       = payload.data ?? result.data ?? [];
+        const totalCount = payload.total ?? data.length ?? 0;
 
         const formatted = data.map((item) => ({
           id: item.hash_id,
@@ -148,9 +152,9 @@ const DistrictsManagement = () => {
         }));
 
         setRows(formatted);
-        setTotal(result.data.total);
+        setTotal(totalCount);
       } else {
-        toast.error("Failed to load districts");
+        toast.error(result.message || "Failed to load districts");
       }
     } catch {
       toast.error("Server error");
@@ -207,9 +211,11 @@ const DistrictsManagement = () => {
 
       const result = await response.json();
 
-      if (result.status === 200) {
+      if (response.ok || result.status === 200 || result.success) {
         toast.success("Deleted successfully");
         fetchDistricts(paginationModel.page, paginationModel.pageSize);
+      } else {
+        toast.error(result.message || "Delete failed");
       }
     } catch {
       toast.error("Delete failed");
@@ -256,12 +262,11 @@ const DistrictsManagement = () => {
 
       const result = await response.json();
 
-      if (!isUpdate && result.status === 201) {
-        toast.success("Created successfully");
-      }
-
-      if (isUpdate && result.status === 200) {
-        toast.success("Updated successfully");
+      const ok = response.ok || result.status === 200 || result.status === 201 || result.success;
+      if (ok) {
+        toast.success(isUpdate ? "Updated successfully" : "Created successfully");
+      } else {
+        toast.error(result.message || (isUpdate ? "Update failed" : "Create failed"));
       }
 
       setOpenModal(false);

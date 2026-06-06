@@ -197,11 +197,22 @@ const ApplicationsList = () => {
   const updateStatus = async (id, status) => {
     try {
       const row = rows.find((r) => r.id === id);
-      setRows(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+      // Optimistic update — set both `status` (display) and `_admin_status` (source of truth
+      // for the effectiveStatus mapping). Without this, a later re-render (re-fetch or filter
+      // change) maps the row back to '' because the candidate portal always returns 'submitted'.
+      setRows(prev => prev.map(r => r.id === id ? { ...r, status, _admin_status: status } : r));
       await ApplicationApi.updateStatus(id, status, row);
       toast.success(`Application marked as ${status}`);
-    } catch {
-      toast.error('Failed to update status');
+    } catch (err) {
+      // Surface backend message when available — the live API's updateStatus path can
+      // return 404 "No query results for model [App\Models\ReceivedApplication]" when
+      // the admin row hasn't been synced yet. applicationApi.updateStatus already
+      // retries via /applications/bulk-status in that case, so this catch only fires
+      // if both endpoints fail.
+      const msg = err?.status === 404
+        ? 'Status update failed: admin DB has no record for this application. Both single and bulk endpoints returned 404. The backend team needs to sync the application to admin DB, or relax the route-model binding on PUT /applications/{id}/status.'
+        : (err?.message || 'Failed to update status');
+      toast.error(msg);
       fetchApplications();
     }
     handleMenuClose();
@@ -211,7 +222,9 @@ const ApplicationsList = () => {
     if (!selectionModel.length) return;
     try {
       const selectedRows = rows.filter((r) => selectionModel.includes(r.id));
-      setRows(prev => prev.map(r => selectionModel.includes(r.id) ? { ...r, status } : r));
+      // Same optimistic patch as updateStatus — also write _admin_status so the row keeps its
+      // new status across re-fetches and filter changes.
+      setRows(prev => prev.map(r => selectionModel.includes(r.id) ? { ...r, status, _admin_status: status } : r));
       await ApplicationApi.bulkUpdateStatus(selectionModel, status, selectedRows);
       toast.success(`${selectionModel.length} applications marked as ${status}`);
       setSelectionModel([]);

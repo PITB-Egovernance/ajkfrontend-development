@@ -17,6 +17,8 @@ const RequisitionPreview = () => {
   const [confirming, setConfirming] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [districtOptions, setDistrictOptions] = useState([]);
+  const [gradeOptions, setGradeOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
   const [previewData, setPreviewData] = useState({
     step1: {},
     step2: {},
@@ -32,6 +34,8 @@ const RequisitionPreview = () => {
 
   useEffect(() => {
       fetchDistricts();
+      fetchGrades();
+      fetchDepartments();
     if (!tempId) {
       toast.error('No temporary data found');
       navigate('/dashboard/requisitions');
@@ -89,10 +93,110 @@ const RequisitionPreview = () => {
     }
   };
 
+  const fetchGrades = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setGradeOptions(
+          list
+            .filter((g) => (g.status ?? 'active') === 'active')
+            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to load grades for preview');
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/departments?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setDepartmentOptions(
+          list
+            .filter((d) => (d.status ?? 'active') === 'active')
+            .map((d) => ({
+              id:   d.hash_id || d.id,
+              name: d.department_name || d.name,
+            }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to load departments for preview');
+    }
+  };
+
+  // Resolve a stored scale value (hash_id, number, or string) to the
+  // human-readable grade name. Falls back to the raw value if no match.
+  const getScaleName = (rawScale) => {
+    if (rawScale === null || rawScale === undefined || rawScale === '') return 'N/A';
+    if (typeof rawScale === 'object') {
+      return rawScale.name || rawScale.hash_id || rawScale.id || 'N/A';
+    }
+    const str = String(rawScale).trim();
+    const matched = gradeOptions.find((g) => g.id === str || g.name === str);
+    if (matched) return matched.name;
+    return str;
+  };
+
 
   const getDistrictName = (id) => {
+    // Plain name strings (e.g. "Muzaffarabad") — return as-is, since
+    // the live API often stores district values as plain names rather
+    // than hash_ids.
+    if (typeof id === 'string' && id.includes(' ')) {
+      return id;
+    }
+    if (!id) return 'N/A';
     const found = districtOptions.find(d => String(d.id) === String(id));
     return found ? found.name : id;
+  };
+
+  // Resolve a stored department value (hash_id, name, or relation object)
+  // to the human-readable department name. Falls back to the raw value
+  // if no match.
+  const getDepartmentName = (rawDept) => {
+    if (rawDept === null || rawDept === undefined || rawDept === '') return 'N/A';
+    if (typeof rawDept === 'object') {
+      return rawDept.name || rawDept.department_name || rawDept.hash_id || rawDept.id || 'N/A';
+    }
+    const str = String(rawDept).trim();
+    const matched = departmentOptions.find(
+      (d) => d.id === str || d.name === str
+    );
+    if (matched) return matched.name;
+    return str;
+  };
+
+  // Convert snake_case merit_type values to human-readable labels.
+  // e.g. "open_merit" → "Open Merit", "quota_wise" → "Quota Wise".
+  // Sourced purely from the API — no hardcoded fallback.
+  const formatMeritType = (value) => {
+    if (!value) return 'N/A';
+    return String(value)
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const loadPreviewData = async () => {
@@ -155,9 +259,15 @@ const RequisitionPreview = () => {
     } catch (error) {
       console.error('❌ Error loading preview:', error);
       toast.error('Error loading preview data: ' + error.message);
-      setTimeout(() => {
-        navigate('/dashboard/requisitions');
-      }, 2000);
+      // If the error is the SPA-shell HTML, the data WAS saved — don't bounce
+      // the user away from the page; they should still be able to click
+      // "Confirm & Save" since the data is in the live backend.
+      const isSpaShell = typeof error?.message === 'string' && /Live server is returning the admin frontend HTML/i.test(error.message);
+      if (!isSpaShell) {
+        setTimeout(() => {
+          navigate('/dashboard/requisitions');
+        }, 2000);
+      }
     } finally {
       setLoading(false);
       console.log('🏁 Preview loading ended');
@@ -183,6 +293,16 @@ const RequisitionPreview = () => {
           icon: <CheckCircle2 className="text-emerald-500" size={24} />,
           style: { fontWeight: '500' }
         });
+
+        // Clear the per-step localStorage caches so Back-to-Edit on the
+        // confirmed requisition doesn't re-populate stale draft values.
+        try {
+          Object.keys(localStorage).forEach((k) => {
+            if (k.startsWith('step3_draft_') || k.startsWith('step1_draft_') || k.startsWith('step2_draft_')) {
+              localStorage.removeItem(k);
+            }
+          });
+        } catch { /* ignore */ }
 
         setTimeout(() => {
           console.log('🔄 Redirecting to requisitions list...');
@@ -246,11 +366,19 @@ const RequisitionPreview = () => {
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Scale</TableCell>
-                  <TableCell>{step1.scale || 'N/A'}</TableCell>
+                  <TableCell>{getScaleName(step1.scale)}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Quota Percentage</TableCell>
-                  <TableCell>{step1.quota_percentage || 'N/A'}%</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Department</TableCell>
+                  <TableCell>{getDepartmentName(step1.department)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Promotion Quota</TableCell>
+                  <TableCell>{step1.quota_percentage !== '' && step1.quota_percentage != null ? `${step1.quota_percentage}%` : 'N/A'}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Direct Quota</TableCell>
+                  <TableCell>{step1.quota_promotion || 'N/A'}</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>No. of Posts</TableCell>
@@ -404,27 +532,109 @@ const RequisitionPreview = () => {
                   <TableCell>{step3.gender_basis || 'N/A'}</TableCell>
                 </TableRow>
                 <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Merit Type</TableCell>
+                  <TableCell>
+                    {formatMeritType(step3.merit_type || step3.selection_mode)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>District/Posts</TableCell>
                   <TableCell>
                     {(() => {
-                      const districts = Array.isArray(step4.districts) ? step4.districts : step4.districts ? [step4.districts] : [];
-                      const posts = Array.isArray(step4.posts) ? step4.posts : step4.posts ? [step4.posts] : [];
+                      // Backend stores district/post arrays as comma-separated
+                      // strings (per the user's spec). Also try step3_quota /
+                      // step4.quota in case the live preview returns nested objects.
+                      const csvToArr = (v) => {
+                        if (Array.isArray(v)) return v.map(String);
+                        if (v === null || v === undefined || v === '') return [];
+                        return String(v).split(',').map((s) => s.trim()).filter(Boolean);
+                      };
+                      const districts = csvToArr(step3.district).length
+                        ? csvToArr(step3.district)
+                        : csvToArr(step4.districts);
+                      const districtPosts = csvToArr(step3.district_quota_post).length
+                        ? csvToArr(step3.district_quota_post)
+                        : csvToArr(step3.post).length
+                          ? csvToArr(step3.post)
+                          : csvToArr(step4.posts);
+                      // Promotional posts are stored as a separate array,
+                      // indexed to match the district array. Show as a
+                      // separate amber pill so the two values are easy
+                      // to read at a glance.
+                      const promoPosts = csvToArr(step3.promotional_quota_post).length
+                        ? csvToArr(step3.promotional_quota_post)
+                        : csvToArr(step3.promotional_post);
+
                       if (districts.length > 0) {
                         return (
                           <div className="flex flex-wrap items-center gap-2">
                             {districts.map((d, i) => (
                               <span key={i} className="inline-flex items-center gap-1">
                                 <span className="text-slate-700">{getDistrictName(d)}/</span>
-                                <span className="inline-block bg-emerald-700 text-white px-2 py-0.5 rounded text-sm font-semibold">{posts[i] || '-'}</span>
+                                <span className="inline-block bg-emerald-700 text-white px-2 py-0.5 rounded text-sm font-semibold" title="District Quota Posts">{districtPosts[i] || '-'}</span>
+                                {promoPosts[i] && Number(promoPosts[i]) > 0 ? (
+                                  <span className="inline-block bg-amber-600 text-white px-2 py-0.5 rounded text-sm font-semibold" title="Promotional Quota Posts">+{promoPosts[i]}</span>
+                                ) : null}
                               </span>
                             )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, <span key={`sep-${i}`} className="text-slate-500">,</span>, curr], [])}
                           </div>
                         );
                       }
+
+                      // Open Merit branch: when the user picks "Open Merit"
+                      // in Step 3 they don't enter per-district posts, so
+                      // `step3.district` / `step3.post` are empty. In that
+                      // case fall back to showing the grand-total post
+                      // count from Step 1 against a generic "AJK Districts"
+                      // label so the preview still shows a meaningful
+                      // value instead of N/A.
+                      const openMeritTotal = step1?.num_posts;
+                      if (openMeritTotal !== null && openMeritTotal !== undefined && openMeritTotal !== '') {
+                        return (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1">
+                              <span className="text-slate-700">AJK DISTRICTS /</span>
+                              <span className="inline-block bg-emerald-700 text-white px-2 py-0.5 rounded text-sm font-semibold" title="Total Posts from Step 1">{openMeritTotal}</span>
+                            </span>
+                          </div>
+                        );
+                      }
+
                       return 'N/A';
                     })()}
                   </TableCell>
                 </TableRow>
+                {/* Promotional Posts row — disabled (not currently
+                    functional end-to-end with the live backend). */}
+                {/* <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Promotional Posts</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const csvToArr = (v) => {
+                        if (Array.isArray(v)) return v.map(String);
+                        if (v === null || v === undefined || v === '') return [];
+                        return String(v).split(',').map((s) => s.trim()).filter(Boolean);
+                      };
+                      // Show district name + promotional count for each row, so
+                      // the user can see which district each value applies to.
+                      const districts = csvToArr(step3.district);
+                      const promos = csvToArr(step3.promotional_quota_post).length
+                        ? csvToArr(step3.promotional_quota_post)
+                        : csvToArr(step3.promotional_post);
+                      if (promos.length === 0) return 'N/A';
+                      return promos.map((p, i) => {
+                        // Hide the row if the value is empty or zero (it's optional)
+                        if (!p || Number(p) === 0) return null;
+                        return (
+                          <span key={i} className="inline-flex items-center gap-1 mr-2">
+                            <span className="text-slate-700 text-sm">{districts[i] ? getDistrictName(districts[i]) : `Row ${i + 1}`}/</span>
+                            <span className="inline-block bg-amber-600 text-white px-2 py-0.5 rounded text-sm font-semibold">{p}</span>
+                          </span>
+                        );
+                      });
+                    })()}
+                  </TableCell>
+                </TableRow> */}
               </TableBody>
             </Table>
           </TableContainer>

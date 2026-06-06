@@ -30,6 +30,8 @@ import {
   Upload,
   LayoutDashboard,
   PlusCircle,
+  Flag,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
@@ -211,6 +213,16 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           label: "Departments",
           path: "/dashboard/settings/departments",
           icon: Building2,
+        },
+        {
+          label: "Nationalities",
+          path: "/dashboard/settings/nationalities",
+          icon: Flag,
+        },
+        {
+          label: "Exam Test & Fee",
+          path: "/dashboard/settings/tests",
+          icon: DollarSign,
         },
         {
           label: "Cities",

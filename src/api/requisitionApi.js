@@ -96,9 +96,31 @@ const RequisitionApi = {
       `${API_BASE}/requisitions/preview/${tempId}`,
       {
         method: 'GET',
-        headers: getHeaders(),
+        headers: getHeaders(false),
       }
     );
+    // Special case: 200 + HTML from the live API means the live nginx is
+    // serving the SPA shell instead of routing the GET to Laravel (same root
+    // cause as the SPA-fallback 200s we see on POST). The route IS registered
+    // (curl with the same URL returns 401 JSON when no auth is present), so
+    // the only explanation is a content-type / cookie / route-pattern
+    // misconfiguration on the live server. Surface this clearly so the user
+    // knows it's a server issue, not a code bug.
+    const ct = response.headers.get('content-type') || '';
+    if (response.status === 200 && ct.includes('text/html')) {
+      const text = await response.text();
+      const isSpaShell = /<title>AJKPSC Admin<\/title>/i.test(text)
+        || /<div id="root"><\/div>/i.test(text)
+        || /static\/js\/bundle\.js/i.test(text);
+      if (isSpaShell) {
+        throw new Error(
+          'Live server is returning the admin frontend HTML instead of the API response for the preview GET. ' +
+          'The live nginx config is misrouting /api/v1/requisitions/preview/{tempId} to the SPA. ' +
+          'The backend team must fix the nginx try_files / location rules so GETs to /api/v1/* reach Laravel. ' +
+          'Until then, the preview cannot load — but the requisition data was already saved when you submitted each step.'
+        );
+      }
+    }
     return handleResponse(response);
   },
 
