@@ -253,9 +253,9 @@ const Dashboard = () => {
   const quickLinks = [
     { label: 'Candidates', icon: Users,     link: '/dashboard/applications',          iconBg: 'bg-emerald-500' },
     { label: 'Dispatch',   icon: Send,      link: '/dashboard/dispatch/received',     iconBg: 'bg-blue-500'    },
-    { label: 'PSC Table',  icon: BarChart3, link: '/dashboard/psc-table',             iconBg: 'bg-purple-500'  },
-    { label: 'Reports',    icon: PieChart,  link: '/dashboard/requisitions',          iconBg: 'bg-amber-500'   },
-    { label: 'Approvals',  icon: Award,     link: '/dashboard/approved-requisitions', iconBg: 'bg-rose-500'    },
+    { label: 'Submitted Requisitions',  icon: BarChart3, link: '/dashboard/psc-table',             iconBg: 'bg-purple-500'  },
+    { label: 'Requisitions',    icon: PieChart,  link: '/dashboard/requisitions',          iconBg: 'bg-amber-500'   },
+    { label: 'Approved Requisitions',  icon: Award,     link: '/dashboard/approved-requisitions', iconBg: 'bg-rose-500'    },
     { label: 'Settings',   icon: Settings,  link: '/dashboard/settings',             iconBg: 'bg-slate-500'   },
   ];
 
