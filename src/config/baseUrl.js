@@ -1,7 +1,7 @@
 // LIVE BACKEND — active. The local backend is missing several tables
 // (nationalities, received_applications, dispatched-forms, ...) which causes
 // 500s on settings + workflow pages. Use the live API until local migrations catch up.
-const apiUrl = process.env.REACT_APP_API_URL || "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
+const apiUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 const productionUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 
 // LOCAL BACKEND — disabled. Uncomment to develop against the local Laravel server.

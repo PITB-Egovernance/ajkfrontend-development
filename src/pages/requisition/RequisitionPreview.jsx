@@ -23,7 +23,6 @@ const RequisitionPreview = () => {
     step1: {},
     step2: {},
     step3: {},
-    step4:{},
     serviceRule:{},
     syllabus:{},
   });
@@ -204,25 +203,25 @@ const RequisitionPreview = () => {
     console.log('📊 Loading preview data...');
     console.log('📋 Temp ID:', tempId);
 
-    try {
+    // try{
       const result = await RequisitionApi.getPreview(tempId);
       console.log('📥 Preview Response Data:', result);
 
       // Handle different response formats
-      if (result.status === 200 || result.success) {
-        const data = result.data || result;
+      if (result) {
+        const data = result || result;
         console.log('✅ Preview data loaded successfully');
-        console.log('Step 1 data:', data.step1_basic_info);
-        console.log('Step 2 data:', data.step2_qualifications);
-        console.log('Step 3 data:', data.step3_eligibility);
-        console.log('Step Files:', data.step1_files.syllabus.url);
-        console.log('District Quota:', data.step3_district_quota);
+        console.log('Step 1 data:', data.step1);
+        console.log('Step 2 data:', data.step2);
+        console.log('Step 3 data:', data.step3);
+        // console.log('Step Files:', data.step1_files.syllabus.url);
+        // console.log('District Quota:', data.step3_district_quota);
 
 
         // Defensive: Ensure service_rules and syllabus are strings, not arrays
-        const step1Data = data.step1_basic_info || {};
-        const servicerule = data.step1_files.service_rules.url || {};
-        const slb = data.step1_files.syllabus.url || {};
+        const step1Data = data.step1 || {};
+        const servicerule = data.step1.service_rules || {};
+        const slb = data.step1.syllabus || {};
         let needsRepair = false;
 
         // if (data.step1_files.service_rules && Array.isArray(data.step1_files.service_rules)) {
@@ -239,39 +238,39 @@ const RequisitionPreview = () => {
         if (needsRepair) {
           repairBackendData(step1Data);
         }
-
+         setLoading(false);
         setPreviewData({
-          step1: step1Data,
-          step2: data.step2_qualifications || {},
-          step3: data.step3_eligibility || {},
-          step4: data.step3_district_quota || {},
-          serviceRule: servicerule || {},
-          syllabus: slb || {},
+          step1: step1Data || {},
+          step2: data.step2 || {},
+          step3: data.step3 || {},
+          serviceRule: servicerule || '',
+          syllabus: slb || '',
         });
       } else {
         const errorMsg = result.error || result.message || 'Failed to load preview data';
         console.error('❌ Preview load failed:', errorMsg);
         toast.error(errorMsg);
-        setTimeout(() => {
-          navigate('/dashboard/requisitions');
-        }, 2000);
+        // setTimeout(() => {
+        //   // navigate('/dashboard/requisitions');
+        // }, 2000);
       }
-    } catch (error) {
-      console.error('❌ Error loading preview:', error);
-      toast.error('Error loading preview data: ' + error.message);
-      // If the error is the SPA-shell HTML, the data WAS saved — don't bounce
-      // the user away from the page; they should still be able to click
-      // "Confirm & Save" since the data is in the live backend.
-      const isSpaShell = typeof error?.message === 'string' && /Live server is returning the admin frontend HTML/i.test(error.message);
-      if (!isSpaShell) {
-        setTimeout(() => {
-          navigate('/dashboard/requisitions');
-        }, 2000);
-      }
-    } finally {
-      setLoading(false);
-      console.log('🏁 Preview loading ended');
-    }
+    // } catch (error) {
+    //   console.error('❌ Error loading preview:', error);
+    //   toast.error('Error loading preview data: ' + error.message);
+    //   // If the error is the SPA-shell HTML, the data WAS saved — don't bounce
+    //   // the user away from the page; they should still be able to click
+    //   // "Confirm & Save" since the data is in the live backend.
+    //   const isSpaShell = typeof error?.message === 'string' && /Live server is returning the admin frontend HTML/i.test(error.message);
+    //   // if (!isSpaShell) {
+    //   //   setTimeout(() => {
+    //   //     navigate('/dashboard/requisitions');
+    //   //   }, 2000);
+    //   // }
+    // }
+    //  finally {
+    //   setLoading(false);
+    //   console.log('🏁 Preview loading ended');
+    // }
   };
 
   const handleConfirm = async () => {
@@ -343,7 +342,7 @@ const RequisitionPreview = () => {
     );
   }
 
-  const { step1, step2, step3,step4, serviceRule,syllabus } = previewData;
+  const { step1, step2, step3, serviceRule,syllabus } = previewData;
 
   return (
     <div className="p-6 bg-white rounded-lg shadow">
@@ -539,7 +538,7 @@ const RequisitionPreview = () => {
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>District/Posts</TableCell>
-                  <TableCell>
+                  {/* <TableCell>
                     {(() => {
                       // Backend stores district/post arrays as comma-separated
                       // strings (per the user's spec). Also try step3_quota /
@@ -602,6 +601,32 @@ const RequisitionPreview = () => {
 
                       return 'N/A';
                     })()}
+                  </TableCell> */}
+                  <TableCell>
+                    {step3.district?.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {step3.district.map((district, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-2"
+                          >
+                            <span className="text-slate-700 font-medium">
+                              {district}
+                            </span>
+
+                            <span className="bg-blue-600 text-white px-2 py-1 rounded text-sm">
+                              {step3.quota?.[index] || 'N/A'}
+                            </span>
+
+                            <span className="bg-emerald-700 text-white px-2 py-1 rounded text-sm">
+                              {step3.post?.[index] || 0}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      'N/A'
+                    )}
                   </TableCell>
                 </TableRow>
                 {/* Promotional Posts row — disabled (not currently

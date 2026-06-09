@@ -606,7 +606,7 @@ const RequisitionDetail = () => {
                 (i)&nbsp;&nbsp;{requisition.designation || 'N/A'}<span style={styles.fieldLine}></span>
                 (ii)&nbsp;&nbsp;{getScaleName(requisition.scale)}<span style={styles.fieldLine}></span>
                 (iii)&nbsp;&nbsp;{(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}<span style={styles.fieldLine}></span>
-                (iv)&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_percentage)} (Direct)&nbsp;&nbsp;|&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_promotion)} (Promotion)<span style={styles.fieldLine}></span>
+                (iv)&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_percentage)} (Promotion)&nbsp;&nbsp;|&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_promotion)} (Direct)<span style={styles.fieldLine}></span>
                 (v)&nbsp;&nbsp;{requisition.num_posts || 'N/A'}<span style={styles.fieldLine}></span>
                 (vi)&nbsp;&nbsp;Details in Annex "A"<span className=""></span>
               </td>

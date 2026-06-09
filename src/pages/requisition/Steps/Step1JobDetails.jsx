@@ -335,7 +335,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
             // Always coerce to a string — undefined / null would flip the
             // controlled Select into uncontrolled mode and trigger MUI's
             // "out-of-range value undefined" warning.
-            value={formData.department ?? ''}
+            // value={formData.department ?? ''}
             onChange={handleChange}
             helperText={departments.length === 0 ? 'No departments configured in Settings yet' : ' '}
           >
