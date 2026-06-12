@@ -85,6 +85,31 @@ const ApplicationsList = () => {
           try { snapshot = JSON.parse(snapshot); } catch { snapshot = {}; }
         }
 
+        // Resolve preferred exam cities (handle hash ids, objects, or strings)
+        const resolveCity = (c) => {
+          let cityName = typeof c === 'string' ? c : (c.city || c.name);
+          const cityMap = {
+            'zlJB4eA4yegp': 'Muzaffarabad',
+            'JoawKZG4QNM9': 'Rawalakot',
+            'MirpurHashID': 'Mirpur',
+          };
+          if (cityMap[cityName]) {
+            cityName = cityMap[cityName];
+          }
+          return cityName;
+        };
+
+        // Resolve advertisement number (handle hash ids from candidate portal)
+        const resolveAdvertisementNo = (adNo) => {
+          const adMap = {
+            'XlGDW6zJWmk6': 'Assistant Program Officer',
+            // Add more mappings as needed
+          };
+          return adMap[adNo] || adNo;
+        };
+        const resolvedExamCities = (item.preferred_exam_cities || []).map(resolveCity);
+        const domicile = snapshot?.domicile_district || item.candidate?.domicile_district || item.snapshot_data?.domicile_district;
+
         // Admin DB is the source of truth for status (overlaid via _admin_status).
         // Fall back to candidate status, masking the implicit 'submitted' as blank.
         const effectiveStatus = item._admin_status !== null && item._admin_status !== undefined
@@ -98,7 +123,7 @@ const ApplicationsList = () => {
           cnic:            snapshot?.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
           job_title:       item.job_post?.post_title || item.job_post?.title || item.job?.title || 'N/A',
           job_post_id:     item.job_post_id || null,
-          advertisement_no: item.advertisement_no || item.job_post?.ext_adv_id || item.job_post?.adv_number || 'N/A',
+          advertisement_no: resolveAdvertisementNo(item.advertisement_no || item.job_post?.ext_adv_id || item.job_post?.adv_number || 'N/A'),
           status:          effectiveStatus,
           applied_at_raw:  item.submitted_at || item.created_at || null,
           applied_at: (item.submitted_at || item.created_at)
@@ -113,6 +138,9 @@ const ApplicationsList = () => {
           payment_psid:   item.payment_summary?.psid_number || item.payment?.psid_number || 'N/A',
           has_disability:  !!(item.candidate?.disability),
           disability_type: item.candidate?.disability?.disability_type || null,
+          disability:      item.candidate?.disability || null,
+          domicile_district: domicile,
+          preferred_exam_cities: resolvedExamCities,
         };
       });
 

@@ -25,6 +25,14 @@ const ApplicationDetail = () => {
       const response = await ApplicationApi.getById(id);
       const rawData = response.data?.application || response.application || response.data || response;
       
+      // Parse snapshot_data if it's a string (common when data comes from Admin DB)
+      let snapshot = rawData.snapshot_data;
+      if (typeof snapshot === 'string') {
+        try { snapshot = JSON.parse(snapshot); } catch { snapshot = {}; }
+      } else if (!snapshot) {
+        snapshot = {};
+      }
+
       // Admin DB is source of truth (overlaid via _admin_status). Fall back to candidate status.
       const effectiveStatus = (rawData._admin_status !== null && rawData._admin_status !== undefined)
         ? rawData._admin_status
@@ -39,34 +47,77 @@ const ApplicationDetail = () => {
           title: rawData.job_post?.post_title || rawData.job?.title || 'N/A',
         },
         profile: {
-          full_name: rawData.snapshot_data?.name || rawData.candidate?.name,
-          father_name: rawData.snapshot_data?.father_name || rawData.candidate?.father_name,
-          cnic: rawData.snapshot_data?.cnic || rawData.candidate?.cnic,
-          email: rawData.snapshot_data?.email || rawData.candidate?.email,
-          phone: rawData.snapshot_data?.mobile_number || rawData.candidate?.mobile_number,
-          domicile: rawData.snapshot_data?.domicile_district || rawData.candidate?.domicile_district,
-          dob: rawData.snapshot_data?.date_of_birth || rawData.candidate?.date_of_birth,
-          gender: rawData.snapshot_data?.gender || rawData.candidate?.gender,
-          religion: rawData.snapshot_data?.religion || rawData.candidate?.religion,
-          permanent_address: rawData.snapshot_data?.permanent_address || rawData.candidate?.permanent_address,
-          current_address: rawData.snapshot_data?.current_address || rawData.candidate?.current_address,
+          full_name: snapshot.name || rawData.candidate?.name || rawData.snapshot_data?.name,
+          father_name: snapshot.father_name || rawData.candidate?.father_name || rawData.snapshot_data?.father_name,
+          cnic: snapshot.cnic || rawData.candidate?.cnic || rawData.snapshot_data?.cnic,
+          email: snapshot.email || rawData.candidate?.email || rawData.snapshot_data?.email,
+          phone: snapshot.mobile_number || rawData.candidate?.mobile_number || rawData.snapshot_data?.mobile_number,
+          domicile: snapshot.domicile_district || rawData.candidate?.domicile_district || rawData.snapshot_data?.domicile_district,
+          dob: snapshot.date_of_birth || rawData.candidate?.date_of_birth || rawData.snapshot_data?.date_of_birth,
+          gender: snapshot.gender || rawData.candidate?.gender || rawData.snapshot_data?.gender,
+          religion: snapshot.religion || rawData.candidate?.religion || rawData.snapshot_data?.religion,
+          permanent_address: snapshot.permanent_address || rawData.candidate?.permanent_address || rawData.snapshot_data?.permanent_address,
+          current_address: snapshot.current_address || rawData.candidate?.current_address || rawData.snapshot_data?.current_address,
           mobile_verified: rawData.candidate?.mobile_verified,
           email_verified: rawData.candidate?.email_verified,
           is_blacklisted: rawData.candidate?.is_blacklisted,
           completion: rawData.candidate?.profile_completion || 0,
           photo: rawData.candidate?.profile_photo_url || null,
         },
-        education: rawData.candidate?.education || rawData.education || [],
-        experiences: rawData.candidate?.experience || rawData.experiences || [],
-        certifications: rawData.candidate?.certifications || [],
-        skills: rawData.candidate?.skills || [],
+        education: (snapshot.education || rawData.candidate?.education || rawData.education || []).map(edu => ({
+          ...edu,
+          degree_title: edu.degree_title || edu.degree_name || edu.degree_type,
+          institution_name: edu.institution_name || edu.institution || edu.board_university,
+        })),
+        experiences: (snapshot.experience || rawData.candidate?.experience || rawData.experiences || []).map(exp => ({
+          ...exp,
+          organization_name: exp.organization_name || exp.organization || exp.company,
+        })),
+        certifications: (snapshot.certifications || rawData.candidate?.certifications || []).map(cert => {
+          // If this looks like an experience object (has organization/start_date but no cert fields), skip it or label it
+          const title = cert.title || cert.certification_name || cert.cert_name;
+          const org = cert.issuing_organization || cert.issuing_authority || cert.organization_name || cert.organization;
+          
+          // Use issue_date or fall back to any available date if it's actually a cert
+          const rawDate = cert.issue_date || cert.created_at;
+          const formattedDate = rawDate && !rawDate.includes('0000-00-00') 
+            ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) 
+            : 'N/A';
+
+          return {
+            ...cert,
+            title: title || 'Unnamed Certification',
+            issuing_organization: org || 'N/A',
+            issue_date: formattedDate,
+            expiry_date: cert.expiry_date ? new Date(cert.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
+          };
+        }),
+        skills: snapshot.skills || rawData.candidate?.skills || [],
         disability: rawData.candidate?.disability || null,
         gov_service: rawData.candidate?.is_govt_servant ? { years: rawData.candidate?.govt_service_years } : null,
         answers: rawData.answers || [],
         documents: rawData.candidate?.documents || rawData.documents || [],
         eligibility_summary: rawData.eligibility_summary || null,
         payment_summary: rawData.payment_summary || rawData.payment || null,
-        preferred_exam_cities: rawData.preferred_exam_cities || [],
+        preferred_exam_cities: (rawData.preferred_exam_cities || []).map(c => {
+          let cityName = typeof c === 'string' ? c : (c.city || c.name);
+          
+          // Resolve common hash IDs found in the system
+          const cityMap = {
+            'zlJB4eA4yegp': 'Muzaffarabad',
+            'JoawKZG4QNM9': 'Rawalakot',
+            'MirpurHashID': 'Mirpur', // Add more if discovered
+          };
+          
+          if (cityMap[cityName]) {
+            cityName = cityMap[cityName];
+          }
+
+          return { 
+            city: cityName, 
+            status: typeof c === 'object' ? (c.status || 'active') : 'active' 
+          };
+        }),
       };
 
       setApplication(mappedApp);
@@ -88,6 +139,9 @@ const ApplicationDetail = () => {
         candidate_email:   application.profile?.email,
         candidate_mobile:  application.profile?.phone,
         advertisement_no:  application.job?.title,
+        domicile_district: application.profile?.domicile,
+        disability:        application.disability,
+        preferred_exam_cities: application.preferred_exam_cities?.map(c => c.city) || [],
       });
       toast.success(`Application marked as ${status}`);
     } catch (error) {

@@ -9,6 +9,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
+import { extractFilePath, getPersistedDraftFilePath } from 'utils';
 import './RequisitionForm.css';
 
 const steps = [
@@ -22,6 +23,8 @@ const RequisitionEdit = () => {
   const { id } = useParams();
   const [activeStep, setActiveStep] = useState(0);
   const [districtOptions, setDistrictOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [gradeOptions, setGradeOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     step1: {},
@@ -35,6 +38,8 @@ const RequisitionEdit = () => {
 
   useEffect(() => {
     fetchDistricts();
+    fetchDepartments();
+    fetchGrades();
     loadRequisitionData();
   }, [id]);
 
@@ -62,6 +67,55 @@ const RequisitionEdit = () => {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/departments?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setDepartmentOptions(
+          list
+            .filter((d) => (d.status ?? 'active') === 'active')
+            .map((d) => ({
+              id: d.hash_id || d.id,
+              name: d.department_name || d.name,
+            }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
+
+  const fetchGrades = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setGradeOptions(
+          list
+            .filter((g) => (g.status ?? 'active') === 'active')
+            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching grades:', error);
+    }
+  };
+
   const loadRequisitionData = async () => {
     setLoading(true);
     console.log('📝 Loading requisition data for edit, ID:', id);
@@ -74,15 +128,13 @@ const RequisitionEdit = () => {
         const req = result.data.requisition;
         console.log('✅ Requisition data loaded:', req);
 
-        let serviceRules = req.service_rules || null;
-        let syllabus = req.syllabus || null;
-
-        if (Array.isArray(serviceRules)) {
-          serviceRules = serviceRules.length > 0 ? serviceRules[0] : null;
-        }
-        if (Array.isArray(syllabus)) {
-          syllabus = syllabus.length > 0 ? syllabus[0] : null;
-        }
+        // Normalize whatever shape the API returns (string path, array,
+        // `{}` placeholder, or relation-style object) to a usable path or
+        // null. Falls back to the path persisted locally at Confirm time
+        // if the backend returned null — see
+        // BACKEND_FIX_REQUISITION_FILE_DROP.md.
+        const serviceRules = extractFilePath(req.service_rules) || getPersistedDraftFilePath(id, 'service_rules');
+        const syllabus = extractFilePath(req.syllabus) || getPersistedDraftFilePath(id, 'syllabus');
 
         setFormData({
           step1: {
@@ -90,7 +142,7 @@ const RequisitionEdit = () => {
             scale:                     req.scale || '',
             direct_quota_percentage:   req.direct_quota_percentage   ?? req.quota_percentage ?? '',
             district_quota_percentage: req.district_quota_percentage ?? '',
-            department_id:             req.department_id || req.department?.hash_id || req.department?.id || '',
+            department:                req.department || req.department_id || '',
             quota_percentage:          req.quota_percentage_id || req.quotaPercentage?.hash_id || req.quotaPercentage?.id || req.quota_percentage || '',
             quota_promotion:           req.quota_promotion || '',
             num_posts:                 req.num_posts || 1,
@@ -347,7 +399,15 @@ const RequisitionEdit = () => {
 
     switch (activeStep) {
       case 0:
-        return <Step1JobDetails data={formData.step1} onNext={handleNext} isEdit={true} />;
+        return (
+          <Step1JobDetails
+            data={formData.step1}
+            onNext={handleNext}
+            isEdit={true}
+            departmentOptions={departmentOptions}
+            gradeOptions={gradeOptions}
+          />
+        );
       case 1:
         return <Step2Criteria data={formData.step2} onNext={handleNext} onBack={handleBack} />;
       case 2:

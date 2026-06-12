@@ -69,6 +69,9 @@ const buildApplicationMeta = (app) => ({
   candidate_email:    app.candidate_email || app.snapshot_data?.email || null,
   candidate_mobile:   app.candidate_mobile || app.snapshot_data?.mobile_number || null,
   advertisement_no:   app.advertisement_no || app.job_post?.adv_number || app.job_post?.ext_adv_id || null,
+  domicile_district:  app.domicile_district || null,
+  disability:         app.disability || null,
+  preferred_exam_cities: app.preferred_exam_cities || [],
 });
 
 const ApplicationApi = {

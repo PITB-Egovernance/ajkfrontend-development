@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TextField, MenuItem, InputAdornment } from '@mui/material';
 import toast from 'react-hot-toast';
-import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 
-const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) => {
+const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, departmentOptions = [], gradeOptions = [] }) => {
   // Track the last data identity we've synced from. Only re-sync when the
   // identity actually changes (e.g. user navigates back with a new temp_id).
   // Without this guard, the data-sync useEffect would re-run on every
@@ -29,106 +27,54 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
     syllabus: data.syllabus || null,
   });
 
-  const [departments, setDepartments] = useState([]);
-  const [grades, setGrades] = useState([]);
-
-  // Fetch active departments for the dropdown. Silent fail leaves the
-  // dropdown empty so the wizard remains usable.
-  useEffect(() => {
-    let aborted = false;
-    (async () => {
-      try {
-        const res = await fetch(`${Config.apiUrl}/settings/departments`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept:        'application/json',
-            'X-API-KEY':   Config.apiKey,
-          },
-        });
-        const result = await res.json();
-        if (aborted) return;
-        if (res.ok && (result.success || result.status === 200)) {
-          const list = result.data?.data ?? result.data ?? [];
-          setDepartments(list
-            .filter((d) => (d.status ?? 'active') === 'active')
-            .map((d) => ({
-              id:   d.hash_id || d.id,
-              name: d.department_name || d.name,
-            })));
-        }
-      } catch { /* silent — keep empty */ }
-    })();
-    return () => { aborted = true; };
-  }, []);
-
-  // Fetch active grades for the "Scale of the Post" dropdown. The list
-  // is sourced dynamically from /settings/grades so the available scales
-  // (BPS-16, BPS-17, etc.) are always in sync with the Settings module.
-  useEffect(() => {
-    let aborted = false;
-    (async () => {
-      try {
-        const res = await fetch(`${Config.apiUrl}/settings/grades?per_page=200`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept:        'application/json',
-            'X-API-KEY':   Config.apiKey,
-          },
-        });
-        const result = await res.json();
-        if (aborted) return;
-        if (res.ok && (result.success || result.status === 200)) {
-          const list = result.data?.data ?? result.data ?? [];
-          setGrades(list
-            .filter((g) => (g.status ?? 'active') === 'active')
-            .map((g) => ({
-              id:   g.hash_id || g.id,
-              name: g.name,
-            })));
-        }
-      } catch { /* silent — keep empty */ }
-    })();
-    return () => { aborted = true; };
-  }, []);
+  // Department and grade option lists are fetched once by the parent
+  // (RequisitionForm) and passed down as props. Fetching them here as well
+  // meant every step-navigation remount (key={`step1-${dataVersion}`})
+  // re-issued /settings/departments and /settings/grades requests, which
+  // could trip the live API's rate limiter and leave these dropdowns empty
+  // ("No departments/grades configured") after a step round trip.
 
   // When the grades list finishes loading AFTER the form data was
   // already populated from the API, re-normalize `formData.scale` so
   // its value matches a real MenuItem hash_id. Without this, the
-  // data-sync useEffect runs while `grades === []` and falls back to
+  // data-sync useEffect runs while `gradeOptions === []` and falls back to
   // the raw string (e.g. "BPS-17"), so the Select ends up in an
   // out-of-range state and MUI logs a warning.
-  useEffect(() => {
-    if (grades.length === 0) return;
-    if (!formData.scale) return;
-    const str = String(formData.scale).trim();
-    const matched = grades.find(
-      (g) => g.name === str || g.id === str
-    );
-    if (matched && matched.id !== formData.scale) {
-      setFormData((prev) => ({ ...prev, scale: matched.id }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grades]);
+   useEffect(() => {
+     if (gradeOptions.length === 0) return;
+     if (!formData.scale) return;
+     const str = String(formData.scale).trim();
+     const matched = gradeOptions.find(
+       (g) => g.name === str || g.id === str
+     );
+     // Only update if matched; keep raw value otherwise to display it
+     if (matched && matched.id !== formData.scale && matched.id !== str) {
+       setFormData((prev) => ({ ...prev, scale: matched.id }));
+     }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [gradeOptions]);
 
-  // Same fix for the Department field: if the data-sync useEffect
-  // ran before `departments` was populated, `formData.department`
-  // may still be the raw string instead of the canonical id. After
-  // the department list loads, normalise to the matching id (or
-  // leave the raw string if there's no match — the MenuItem
-  // options are built from `departments` so a stale value will
-  // produce the same MUI warning).
-  useEffect(() => {
-    if (departments.length === 0) return;
-    if (!formData.department) return;
-    const str = String(formData.department).trim();
-    const matched = departments.find(
-      (d) => d.id === str || d.name === str
-    );
-    if (matched && matched.id !== formData.department) {
-      setFormData((prev) => ({ ...prev, department: matched.id }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departments]);
+// Same fix for the Department field: if the data-sync useEffect
+   // ran before `departmentOptions` was populated, `formData.department`
+   // may still be the raw string instead of the canonical id. After
+   // the department list loads, normalise to the matching id (or
+   // leave the raw string if there's no match — the MenuItem
+   // options are built from `departmentOptions` so a stale value will
+   // produce the same MUI warning).
+   useEffect(() => {
+     if (departmentOptions.length === 0) return;
+     if (!formData.department) return;
+     const str = String(formData.department).trim();
+     const matched = departmentOptions.find(
+       (d) => d.id === str || d.name === str
+     );
+     // MenuItem values are department names, so we must set the name
+     // if there's a match, otherwise leave the string as-is.
+     if (matched && matched.name !== formData.department) {
+       setFormData((prev) => ({ ...prev, department: matched.name }));
+     }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [departmentOptions]);
 
   // Update form data when data prop changes (for edit mode)
   useEffect(() => {
@@ -141,7 +87,6 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
       lastSyncedDataRef.current = dataKey;
     }
     if (data && Object.keys(data).length > 0) {
-      console.log('🔄 Step1: Updating form with new data:', data);
       // Normalize scale: backend may return it as a number ("16"), a
       // string ("BPS-16"), a grade hash_id, or a nested object. Map it
       // back to the grade hash_id so the Select shows the right option.
@@ -155,7 +100,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
           // Try to match a loaded grade by name (e.g. "BPS-16") or by
           // hash_id, otherwise fall back to the raw string so the form
           // can still display it.
-          const matched = grades.find(
+          const matched = gradeOptions.find(
             (g) => g.name === str || g.id === str
           );
           scaleValue = matched ? matched.id : str;
@@ -174,7 +119,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
           const str = String(rawDept).trim();
           // If it looks like a hash_id, try matching by id; otherwise
           // use the string as-is (the live wire format sends the name).
-          const matched = departments.find(
+          const matched = departmentOptions.find(
             (d) => d.id === str || d.name === str
           );
           departmentValue = matched ? matched.name : str;
@@ -270,6 +215,19 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
     return cleanedFormData;
   };
 
+  // If this is an existing draft (tempId set, so Step 1 has been saved at
+  // least once) and the previously uploaded service_rules file path can no
+  // longer be resolved from the loaded data — e.g. the backend returned an
+  // empty placeholder after a later re-save — require the admin to
+  // re-upload the file rather than silently continuing without one.
+  // Approved Syllabus is optional, so it gets no such check.
+  const serviceRulesMissing = !!tempId
+    && !(formData.service_rules instanceof File)
+    && !(data.service_rules && typeof data.service_rules === 'string');
+
+  const hasServiceRules = (formData.service_rules instanceof File)
+    || (typeof data.service_rules === 'string' && data.service_rules.trim() !== '');
+
   // Live validation for "Number of Posts": must be a whole number > 0 and < 1000.
   // Empty value shows the generic "required" state (no helper text).
   const numPostsError = (() => {
@@ -281,6 +239,18 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
     return '';
   })();
 
+  // Gate the Next button on every required field in this step so the admin
+  // can't advance with a half-filled form.
+  const isStep1Valid =
+    !!formData.department &&
+    formData.num_posts !== '' && formData.num_posts !== null && formData.num_posts !== undefined && !numPostsError &&
+    !!formData.scale &&
+    !!String(formData.designation || '').trim() &&
+    formData.quota_promotion !== '' && formData.quota_promotion !== null && formData.quota_promotion !== undefined &&
+    formData.quota_percentage !== '' && formData.quota_percentage !== null && formData.quota_percentage !== undefined &&
+    !!formData.vacancy_date &&
+    hasServiceRules;
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -291,6 +261,11 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
     }
     if (numPostsError) {
       toast.error(numPostsError);
+      return;
+    }
+
+    if (serviceRulesMissing) {
+      toast.error('Service Rule file could not be found — please re-upload it to continue.');
       return;
     }
 
@@ -326,27 +301,24 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
 
         {/* 1. Department */}
         <div className="col-md-6 form-group">
-          <TextField
-            fullWidth
-            required
-            select
-            label="Department"
-            name="department"
-            // Always coerce to a string — undefined / null would flip the
-            // controlled Select into uncontrolled mode and trigger MUI's
-            // "out-of-range value undefined" warning.
-            // value={formData.department ?? ''}
-            onChange={handleChange}
-            helperText={departments.length === 0 ? 'No departments configured in Settings yet' : ' '}
-          >
+<TextField
+             fullWidth
+             required
+             select
+             label="Department"
+             name="department"
+             value={formData.department ?? ''}
+             onChange={handleChange}
+             helperText={departmentOptions.length === 0 ? 'No departments configured in Settings yet' : ' '}
+           >
             <MenuItem value="">Select Department</MenuItem>
-            {departments.map((d) => (
+            {departmentOptions.map((d) => (
               // The MenuItem value is the department's NAME string (so
               // the wire format matches the live API curl example, which
               // sends `department=Punjab Education Department` rather than
               // a hash_id). The form state stores the name; on edit-mode
               // load the data-sync useEffect looks the name up in
-              // `departments` and uses the matching id if needed.
+              // `departmentOptions` and uses the matching id if needed.
               <MenuItem key={d.id ?? d.hash_id ?? d.name} value={d.name || d.id || ''}>
                 {d.name || '(unnamed)'}
               </MenuItem>
@@ -383,10 +355,10 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
             // "out-of-range value undefined" warning.
             value={formData.scale ?? ''}
             onChange={handleChange}
-            helperText={grades.length === 0 ? 'No grades configured in Settings yet' : ' '}
+            helperText={gradeOptions.length === 0 ? 'No grades configured in Settings yet' : ' '}
           >
             <MenuItem value="">Select Scale</MenuItem>
-            {grades.map((g) => (
+            {gradeOptions.map((g) => (
               <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>
             ))}
           </TextField>
@@ -440,11 +412,10 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
           />
         </div>
 
-        {/* 7. Approved Syllabus */}
+        {/* 7. Approved Syllabus (optional) */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
-            required
             label="Approved Syllabus (PDF File Less than 2 MB)"
             value={data.syllabus && typeof data.syllabus === 'string' ? data.syllabus.split('/').pop() : ''}
             // Render the native file input inside the TextField's outlined
@@ -480,7 +451,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
                 ? `Selected: ${formData.syllabus.name}`
                 : (data.syllabus && typeof data.syllabus === 'string'
                     ? `Previous file: ${data.syllabus.split('/').pop()}`
-                    : 'No file chosen')
+                    : 'No file chosen (optional)')
             }
             inputProps={{ readOnly: true }}
           />
@@ -520,8 +491,9 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
                 ? `Selected: ${formData.service_rules.name}`
                 : (data.service_rules && typeof data.service_rules === 'string'
                     ? `Previous file: ${data.service_rules.split('/').pop()}`
-                    : 'No file chosen')
+                    : (serviceRulesMissing ? 'Previous file not found — please re-upload (required)' : 'No file chosen'))
             }
+            error={serviceRulesMissing}
             inputProps={{ readOnly: true }}
           />
         </div>
@@ -552,7 +524,12 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false }) 
           <button type="button" onClick={handleSaveDraftClick} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
             Save Draft
           </button>
-          <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
+          <button
+            type="submit"
+            disabled={!isStep1Valid}
+            title={!isStep1Valid ? 'Fill in all required fields to continue' : undefined}
+            className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-emerald-950 disabled:hover:to-emerald-950"
+          >
             Next
           </button>
         </div>

@@ -9,6 +9,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
+import { extractFilePath, getPersistedDraftFilePath } from 'utils';
 
 const RequisitionDetail = () => {
   const { id } = useParams();
@@ -190,8 +191,13 @@ const RequisitionDetail = () => {
             ?? data.quotaPercentage
             ?? step1.quota_percentage,
           quota_promotion:  data.quota_promotion  ?? step1.quota_promotion,
-          service_rules:   data.service_rules   ?? step1.service_rules,
-          syllabus:        data.syllabus        ?? step1.syllabus,
+          // Normalize whatever shape the API returns (string path, array,
+          // `{}` placeholder, or relation-style object) to a usable path or
+          // null — used to decide whether to render a "View ..." link.
+          // Falls back to the path persisted locally at Confirm time if the
+          // backend returned null — see BACKEND_FIX_REQUISITION_FILE_DROP.md.
+          service_rules:   extractFilePath(data.service_rules   ?? step1.service_rules) || getPersistedDraftFilePath(id, 'service_rules'),
+          syllabus:        extractFilePath(data.syllabus        ?? step1.syllabus) || getPersistedDraftFilePath(id, 'syllabus'),
           // Step 2 — Qualification details
           qualification: (() => {
             const direct = data.qualification;
@@ -380,8 +386,12 @@ const RequisitionDetail = () => {
           '(i) Designation or nomenclature of the Post(s)\n(ii) Scale of the Post\n(iii) Department & Class of Service\n(iv) Percentage of quota fixed\n(v) Number of posts to be filled\n(vi) Date(s) of occurrence of vacancy(s)',
           `(i) ${requisition.designation || 'N/A'}\n(ii) ${getScaleName(requisition.scale)}\n(iii) ${(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}\n(iv) Direct: ${getQuotaDisplay(requisition.quota_percentage)} | Promotion: ${getQuotaDisplay(requisition.quota_promotion)}\n(v) ${requisition.num_posts || 'N/A'}\n(vi) Details in Annex "A"`
         ],
-        ['2', 'Service Rules for the Post(s) to be filled',`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}` ],
-        ['3', 'Approved syllabus for the Post(s) to be filled', `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`],
+        ['2', 'Service Rules for the Post(s) to be filled', requisition.service_rules
+          ? `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}`
+          : 'No service rule file uploaded yet'],
+        ['3', 'Approved syllabus for the Post(s) to be filled', requisition.syllabus
+          ? `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`
+          : 'No syllabus file uploaded yet'],
         [
           '4',
           'Qualification Required:\n(i) Academic\n(ii) Equivalent qualification authority\n(iii) Name degree of equivalence\n(iv) Any other Qualification\n(v) Training with institute name',
@@ -615,17 +625,25 @@ const RequisitionDetail = () => {
             <tr>
               <th style={styles.number}>2</th>
               <td style={styles.tableCell}>Service Rules for the Post(s) to be filled</td>
-              <td style={styles.tableCell}><a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
-                        View Service Rules
-                      </a></td>
+              <td style={styles.tableCell}>
+                {requisition.service_rules ? (
+                  <a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                    View Service Rules
+                  </a>
+                ) : 'No service rule file uploaded yet'}
+              </td>
             </tr>
 
             <tr>
               <th style={styles.number}>3</th>
               <td style={styles.tableCell}>Approved syllabus for the Post(s) to be filled</td>
-              <td style={styles.tableCell}><a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
-                        View Syllabus
-                      </a></td>
+              <td style={styles.tableCell}>
+                {requisition.syllabus ? (
+                  <a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                    View Syllabus
+                  </a>
+                ) : 'No syllabus file uploaded yet'}
+              </td>
             </tr>
 
             <tr>

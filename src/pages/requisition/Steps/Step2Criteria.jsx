@@ -350,6 +350,15 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
 
   // ── Validation + submit ────────────────────────────────────────────────────
 
+  // Gate the Next button on the required fields so the admin can't advance
+  // with a half-filled form. Academic Qualification is always required;
+  // Authority Certificate and Degree of Equivalence are only required when
+  // Equivalent Qualification is "Yes".
+  const isStep2Valid =
+    !!formData.academic_qualification &&
+    (formData.equivalent_qualification !== 'Yes' ||
+      (!!formData.authority_certificate && !!formData.degree_equivalence));
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -658,7 +667,9 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           </button>
           <button
             type="submit"
-            className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+            disabled={!isStep2Valid}
+            title={!isStep2Valid ? 'Fill in all required fields to continue' : undefined}
+            className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-emerald-950 disabled:hover:to-emerald-950"
           >
             Next
           </button>

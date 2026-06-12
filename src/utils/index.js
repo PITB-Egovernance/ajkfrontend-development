@@ -140,3 +140,11 @@ export {
   getApplicationOcrBatchPillClass,
   formatApplicationDocumentType,
 } from './applicationOcrUtils';
+
+// Requisition file utilities
+export {
+  extractFilePath,
+  persistDraftFilePath,
+  getPersistedDraftFilePath,
+  clearPersistedDraftFiles,
+} from './requisitionFileUtils';

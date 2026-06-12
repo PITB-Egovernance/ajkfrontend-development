@@ -9,6 +9,7 @@ import Step3Eligibility from './Steps/Step3Eligibility';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
+import { extractFilePath, persistDraftFilePath, getPersistedDraftFilePath, clearPersistedDraftFiles } from 'utils';
 import { validateRequisitionStep } from 'schemas';
 import { CheckCircle2 } from 'lucide-react';
 import './RequisitionForm.css';
@@ -28,6 +29,8 @@ const RequisitionForm = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialStepParam = Number(searchParams.get('step'));
   const [districtOptions, setDistrictOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [gradeOptions, setGradeOptions] = useState([]);
   const [activeStep, setActiveStep] = useState(
     Number.isInteger(initialStepParam) && initialStepParam >= 1 && initialStepParam <= steps.length
       ? initialStepParam - 1
@@ -46,8 +49,19 @@ const RequisitionForm = () => {
   const TOKEN = AuthService.getToken();
   const API_KEY = Config.apiKey;
 
+  // Fetch the dropdown option lists once on mount. These don't change
+  // during the wizard, so they're fetched here (not inside each step's
+  // remounting component) to avoid repeated /settings/* calls every time
+  // the user navigates between steps — which was tripping the live API's
+  // rate limiter and leaving "No departments/grades configured" after a
+  // step round trip.
   useEffect(() => {
     fetchDistricts();
+    fetchDepartments();
+    fetchGrades();
+  }, []);
+
+  useEffect(() => {
     if (tempId) {
       loadTempData();
     }
@@ -77,6 +91,55 @@ const RequisitionForm = () => {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/departments?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setDepartmentOptions(
+          list
+            .filter((d) => (d.status ?? 'active') === 'active')
+            .map((d) => ({
+              id: d.hash_id || d.id,
+              name: d.department_name || d.name,
+            }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
+
+  const fetchGrades = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setGradeOptions(
+          list
+            .filter((g) => (g.status ?? 'active') === 'active')
+            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching grades:', error);
+    }
+  };
+
   const persistDraftMeta = (draftTempId, stepIndex) => {
     if (!draftTempId) return;
     try {
@@ -90,13 +153,16 @@ const RequisitionForm = () => {
     }
   };
 
+  // Keeps the URL's temp_id/step params in sync as the user moves through
+  // the wizard. This does NOT persist to localStorage — "Resume Draft" on
+  // the requisitions list should only appear after the user explicitly
+  // clicks "Save Draft" (see persistDraftMeta / handleSaveDraft).
   const syncDraftUrl = (draftTempId, stepIndex) => {
     if (!draftTempId) return;
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set('temp_id', draftTempId);
     nextParams.set('step', String(stepIndex + 1));
     setSearchParams(nextParams, { replace: true });
-    persistDraftMeta(draftTempId, stepIndex);
   };
 
   const isStepCompleted = (stepIndex, stepData) => {
@@ -123,11 +189,35 @@ const RequisitionForm = () => {
       const result = await response.json();
       if (result.success && result.data) {
         const step1Data = result.data.step1 || {};
-        if (step1Data.service_rules && Array.isArray(step1Data.service_rules)) {
-          step1Data.service_rules = step1Data.service_rules.length > 0 ? step1Data.service_rules[0] : null;
+        step1Data.service_rules = extractFilePath(step1Data.service_rules);
+        step1Data.syllabus = extractFilePath(step1Data.syllabus);
+
+        // Re-saving step 1 (e.g. clicking "Next" without re-uploading) sends
+        // the request WITHOUT the service_rules/syllabus fields, since they're
+        // existing file paths the backend is expected to keep. If a later
+        // fetch comes back without them anyway (or with an empty `{}`
+        // placeholder, normalized to `null` above), fall back to the
+        // last-known file path so "Previous file: X" doesn't disappear after
+        // navigating away from and back to step 1.
+        if (!step1Data.service_rules && formData.step1?.service_rules) {
+          step1Data.service_rules = formData.step1.service_rules;
         }
-        if (step1Data.syllabus && Array.isArray(step1Data.syllabus)) {
-          step1Data.syllabus = step1Data.syllabus.length > 0 ? step1Data.syllabus[0] : null;
+        if (!step1Data.syllabus && formData.step1?.syllabus) {
+          step1Data.syllabus = formData.step1.syllabus;
+        }
+
+        // Final fallback: the backend's storeStep() may have permanently
+        // dropped these fields from step1_data on a prior re-save (full
+        // overwrite bug — see BACKEND_FIX_REQUISITION_FILE_DROP.md), and on
+        // a fresh page load formData.step1 above is still empty too.
+        // Recover the last-known path persisted locally when Step 1 was
+        // first saved, so the file isn't treated as missing until the user
+        // actually confirms on the Preview page.
+        if (!step1Data.service_rules) {
+          step1Data.service_rules = getPersistedDraftFilePath(tempId, 'service_rules');
+        }
+        if (!step1Data.syllabus) {
+          step1Data.syllabus = getPersistedDraftFilePath(tempId, 'syllabus');
         }
 
         const updatedFormData = {
@@ -158,6 +248,103 @@ const RequisitionForm = () => {
 
   const validateStep = (step, data) => {
     return validateRequisitionStep(step, data);
+  };
+
+  // Resolves a step1 "scale" value (grade hash_id, grade name, or raw
+  // string) to the canonical grade hash_id. The baseline loaded from the
+  // API may store the grade name while Step1JobDetails always resolves
+  // `formData.scale` to the matching gradeOptions hash_id before calling
+  // onNext — without this, the two representations of the same value would
+  // look like a change on every comparison.
+  const normalizeScale = (value) => {
+    if (value === null || value === undefined || value === '') return '';
+    const str = String(value).trim();
+    const matched = gradeOptions.find((g) => g.id === str || g.name === str);
+    return matched ? matched.id : str;
+  };
+
+  // Same idea for "department" — Step1JobDetails always resolves
+  // formData.department to the matching departmentOptions name.
+  const normalizeDepartment = (value) => {
+    if (value === null || value === undefined || value === '') return '';
+    const str = String(value).trim();
+    const matched = departmentOptions.find((d) => d.id === str || d.name === str);
+    return matched ? matched.name : str;
+  };
+
+  // getCleanedFormData() appends a trailing "%" to quota_promotion if it's
+  // missing, so "20" (loaded) and "20%" (submitted) must compare equal.
+  const normalizePercent = (value) => {
+    if (value === null || value === undefined || value === '') return '';
+    return String(value).replace(/%$/, '').trim();
+  };
+
+  // Treats null/undefined/'' as equivalent "empty", and numbers/numeric
+  // strings as equal, so type differences between the raw API response and
+  // a cleaned form submission (which the user didn't actually edit) don't
+  // register as a "change".
+  const normalizeForCompare = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number') return String(value);
+    return value;
+  };
+
+  const isEqualForCompare = (a, b) => {
+    const na = normalizeForCompare(a);
+    const nb = normalizeForCompare(b);
+    if (na === nb) return true;
+    if (Array.isArray(na) && Array.isArray(nb)) {
+      return na.length === nb.length && na.every((v, i) => isEqualForCompare(v, nb[i]));
+    }
+    if (na && nb && typeof na === 'object' && typeof nb === 'object') {
+      const keys = new Set([...Object.keys(na), ...Object.keys(nb)]);
+      return [...keys].every((k) => isEqualForCompare(na[k], nb[k]));
+    }
+    return false;
+  };
+
+  // Fields excluded from the generic per-key comparison below because they
+  // need special handling: service_rules/syllabus may be File objects,
+  // scale/department use different representations in the loaded baseline
+  // vs. the cleaned submission, test_type is a constant injected by
+  // getCleanedFormData() that never reflects a real edit, and
+  // quota_promotion gets a "%" suffix appended by getCleanedFormData().
+  const STEP1_SPECIAL_COMPARE_FIELDS = new Set(['service_rules', 'syllabus', 'scale', 'department', 'test_type', 'quota_promotion']);
+
+  // Compares the data the user is about to submit for a step against the
+  // last data that was successfully saved (or loaded) for that step. If
+  // nothing changed, handleNext can skip the /requisitions/store call
+  // entirely — re-saving identical data on every Back/Next round trip is
+  // unnecessary and was the source of the file-drop bug in
+  // BACKEND_FIX_REQUISITION_FILE_DROP.md.
+  const hasStepDataChanged = (stepKey, stepData) => {
+    const baseline = formData[stepKey];
+    if (!baseline || Object.keys(baseline).length === 0) return true;
+
+    // Only compare keys present in `stepData` — it's built from a fixed
+    // object shape (getCleanedFormData / onNext), so it covers every
+    // form-managed field. `baseline` (the raw API response) may carry extra
+    // bookkeeping fields (id, hash_id, created_at, ...) that the form never
+    // touches; comparing those would always look like a "change".
+    const special = stepKey === 'step1' ? STEP1_SPECIAL_COMPARE_FIELDS : new Set();
+    for (const key of Object.keys(stepData || {})) {
+      if (special.has(key)) continue;
+      if (!isEqualForCompare(stepData[key], baseline[key])) return true;
+    }
+
+    if (stepKey === 'step1') {
+      if (normalizeScale(stepData?.scale) !== normalizeScale(baseline.scale)) return true;
+      if (normalizeDepartment(stepData?.department) !== normalizeDepartment(baseline.department)) return true;
+      if (normalizePercent(stepData?.quota_promotion) !== normalizePercent(baseline.quota_promotion)) return true;
+
+      // service_rules/syllabus may hold File objects, which JSON.stringify
+      // would reduce to "{}" — compare via extractFilePath so a newly-picked
+      // file is always detected as a change.
+      if (extractFilePath(stepData?.service_rules) !== extractFilePath(baseline.service_rules)) return true;
+      if (extractFilePath(stepData?.syllabus) !== extractFilePath(baseline.syllabus)) return true;
+    }
+
+    return false;
   };
 
   const saveStep = async (stepData, isDraft = false) => {
@@ -198,10 +385,7 @@ const RequisitionForm = () => {
         formDataToSend.append('temp_id', tempId || '');
 
         Object.keys(stepData).forEach(key => {
-          if (STEP1_SKIPPED_FIELDS.has(key)) {
-            console.log(`  ⏭️ ${key}: skipped (not accepted by live API)`);
-            return;
-          }
+          if (STEP1_SKIPPED_FIELDS.has(key)) return;
 
           let value = stepData[key];
 
@@ -209,9 +393,12 @@ const RequisitionForm = () => {
             if (Array.isArray(value)) value = value.length > 0 ? value[0] : null;
             if (value instanceof File) {
               formDataToSend.append(key, value);
-            } else if (typeof value === 'string' && value !== '') {
-              // existing file path — skip, backend keeps it
             }
+            // Existing file path strings are omitted — the live API
+            // validates these fields as `nullable|file`, so sending the
+            // path string back would fail with a 422. The backend's
+            // storeStep() preserves the previously-uploaded file when this
+            // field is absent from the request.
             return;
           }
 
@@ -244,11 +431,6 @@ const RequisitionForm = () => {
 
         if (!formDataToSend.has('direct_quota_percentage'))   formDataToSend.set('direct_quota_percentage', 0);
         if (!formDataToSend.has('district_quota_percentage')) formDataToSend.set('district_quota_percentage', 0);
-
-        console.log('🔁 Final Step 1 FormData entries:');
-        for (const [k, v] of formDataToSend.entries()) {
-          console.log(`  ${k} =`, v instanceof File ? `[File: ${v.name}]` : v);
-        }
 
         bodyContent = formDataToSend;
       } else {
@@ -354,7 +536,22 @@ const RequisitionForm = () => {
         }
 
         const stepKey = `step${currentStepNumber}`;
-        setFormData(prev => ({ ...prev, [stepKey]: stepData }));
+        const mergedStepData = { ...stepData };
+        if (isStep1) {
+          // Don't let a missing/empty service_rules or syllabus in this
+          // submission (existing file paths aren't re-sent, see above) blank
+          // out a previously-known file path in local state.
+          mergedStepData.service_rules = extractFilePath(mergedStepData.service_rules) || formData.step1?.service_rules || null;
+          mergedStepData.syllabus = extractFilePath(mergedStepData.syllabus) || formData.step1?.syllabus || null;
+
+          // Workaround for the backend's storeStep() overwriting step1_data
+          // (and dropping these fields) on a re-save without a new upload —
+          // see BACKEND_FIX_REQUISITION_FILE_DROP.md. Persist the resolved
+          // paths so Preview can recover them even if the API forgets them.
+          persistDraftFilePath(resolvedTempId, 'service_rules', mergedStepData.service_rules);
+          persistDraftFilePath(resolvedTempId, 'syllabus', mergedStepData.syllabus);
+        }
+        setFormData(prev => ({ ...prev, [stepKey]: mergedStepData }));
         return { success: true, tempId: resolvedTempId };
 
       } else {
@@ -379,10 +576,29 @@ const RequisitionForm = () => {
   };
 
   const handleNext = async (stepData) => {
+    const stepKey = `step${activeStep + 1}`;
+    const isLastStep = activeStep === steps.length - 1;
+
+    // If this step was already saved with this exact data (e.g. the user
+    // navigated Back to this step and didn't change anything before
+    // clicking Next again), skip the redundant /requisitions/store call.
+    if (tempId && !hasStepDataChanged(stepKey, stepData)) {
+      if (isLastStep) {
+        localStorage.removeItem('requisitionDraftMeta');
+        syncDraftUrl(tempId, activeStep);
+        navigate(`/dashboard/requisitions/preview?temp_id=${tempId}`);
+      } else {
+        const nextStep = activeStep + 1;
+        setActiveStep(nextStep);
+        syncDraftUrl(tempId, nextStep);
+      }
+      return;
+    }
+
     const saveResult = await saveStep(stepData, false);
     if (saveResult.success) {
       const resolvedTempId = saveResult.tempId || tempId;
-      if (activeStep === steps.length - 1) {
+      if (isLastStep) {
         localStorage.removeItem('requisitionDraftMeta');
         if (resolvedTempId) syncDraftUrl(resolvedTempId, activeStep);
         navigate(`/dashboard/requisitions/preview?temp_id=${resolvedTempId || ''}`);
@@ -398,7 +614,12 @@ const RequisitionForm = () => {
     const saveResult = await saveStep(stepData, true);
     if (saveResult.success) {
       const resolvedTempId = saveResult.tempId || tempId;
-      if (resolvedTempId) syncDraftUrl(resolvedTempId, activeStep);
+      if (resolvedTempId) {
+        syncDraftUrl(resolvedTempId, activeStep);
+        // Only an explicit "Save Draft" click should make this requisition
+        // appear under "Resume Draft" on the requisitions list.
+        persistDraftMeta(resolvedTempId, activeStep);
+      }
     }
   };
 
@@ -420,6 +641,8 @@ const RequisitionForm = () => {
             onNext={handleNext}
             onSaveDraft={handleSaveDraft}
             tempId={tempId}
+            departmentOptions={departmentOptions}
+            gradeOptions={gradeOptions}
           />
         );
       case 1:
@@ -459,6 +682,7 @@ const RequisitionForm = () => {
     });
     if (!ok) return;
     localStorage.removeItem('requisitionDraftMeta');
+    clearPersistedDraftFiles(tempId);
     toast.success('Draft deleted');
     navigate('/dashboard/requisitions');
   };

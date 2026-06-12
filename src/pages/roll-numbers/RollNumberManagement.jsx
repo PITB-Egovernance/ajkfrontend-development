@@ -34,6 +34,7 @@ const DEFAULT_FILTERS = {
   search: '',
   advertisement_no: '',
   generated: '',
+  preferred_exam_city: '',
 };
 
 const gridSx = {
@@ -89,6 +90,18 @@ const RollNumberManagement = () => {
         const payload = result.data ?? {};
         const data    = payload.data ?? [];
 
+        // Helper to resolve city hash IDs to readable names
+        const resolveCityName = (cityInput) => {
+          const cityMap = {
+            'zlJB4eA4yegp': 'Muzaffarabad',
+            'JoawKZG4QNM9': 'Rawalakot',
+            'MirpurHashID': 'Mirpur',
+          };
+          
+          let cityName = typeof cityInput === 'string' ? cityInput : (cityInput?.city || cityInput?.name);
+          return cityMap[cityName] || cityName;
+        };
+
         const mapped = data
           .map((item) => ({
             id:                item.application_number,
@@ -103,14 +116,26 @@ const RollNumberManagement = () => {
             ocr_batch:         getApplicationOcrBatch(item.documents || []),
             has_disability:    !!item.disability,
             disability_type:   item.disability?.disability_type || null,
+            preferred_exam_cities: (item.preferred_exam_cities || []).map(resolveCityName),
             roll_number:       item.roll_number,
             exam_center:       item.exam_center,
             exam_city:         item.exam_city,
             published_at:      item.published_at,
           }))
-          .filter((row) => filters.generated === 'yes' ? !!row.roll_number
-                          : filters.generated === 'no'  ? !row.roll_number
-                          : true);
+          .filter((row) => {
+            const generatedMatch = filters.generated === 'yes' 
+              ? !!row.roll_number
+              : filters.generated === 'no' 
+                ? !row.roll_number
+                : true;
+            
+            const cityMatch = !filters.preferred_exam_city 
+              ? true 
+              : row.preferred_exam_cities.some((city) => 
+                  city.toLowerCase().includes(filters.preferred_exam_city.toLowerCase()));
+            
+            return generatedMatch && cityMatch;
+          });
 
         setRows(mapped);
         setTotal(filters.generated ? mapped.length : (payload.total ?? mapped.length));
@@ -276,6 +301,27 @@ const RollNumberManagement = () => {
     { field: 'applicant_name',     headerName: 'Applicant Name',  minWidth: 160, flex: 1.1 },
     { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
     {
+      field: 'preferred_exam_cities',
+      headerName: 'Exam City Preferences',
+      minWidth: 180,
+      flex: 1.0,
+      renderCell: (p) => {
+        const cities = p.value || [];
+        if (cities.length === 0) {
+          return <span className="text-slate-400 text-xs">Not specified</span>;
+        }
+        return (
+          <div className="flex flex-col gap-1">
+            {cities.map((city, idx) => (
+              <span key={idx} className="text-sm text-slate-700">
+                <span className="font-medium text-xs uppercase text-slate-500 mr-1">{idx + 1}.</span> {city}
+              </span>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
       field: 'roll_number',
       headerName: 'Roll Number',
       minWidth: 140,
@@ -349,12 +395,14 @@ const RollNumberManagement = () => {
               value={filters.search} onChange={handleFilterChange} sx={{ flex: '1 1 220px', minWidth: 200 }} />
             <TextField label="Advertisement No" variant="outlined" size="small" name="advertisement_no"
               value={filters.advertisement_no} onChange={handleFilterChange} sx={{ width: 160 }} />
-            <TextField select label="Roll Number" variant="outlined" size="small" name="generated"
+            <TextField label="Roll Number" variant="outlined" size="small" name="generated"
               value={filters.generated} onChange={handleFilterChange} sx={{ width: 160 }}>
               <MenuItem key="all" value="">All</MenuItem>
               <MenuItem key="yes" value="yes">Generated</MenuItem>
               <MenuItem key="no" value="no">Not Generated</MenuItem>
             </TextField>
+            <TextField label="Exam City Preferences" variant="outlined" size="small" name="preferred_exam_city"
+              value={filters.preferred_exam_city} onChange={handleFilterChange} sx={{ width: 200 }} />
             <Button variant="outline" size="md" onClick={handleClearFilters}
               className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
               title="Clear Filters" aria-label="Clear Filters">
@@ -373,10 +421,6 @@ const RollNumberManagement = () => {
           <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
             <span className="text-emerald-800 font-medium">
               {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
-              {(() => {
-                const withRoll = rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length;
-                return withRoll > 0 ? ` · ${withRoll} with roll number` : '';
-              })()}
             </span>
             <div className="flex gap-2">
               <Button onClick={openSlipGenerator} variant="primary" size="sm" className="flex items-center gap-2">
@@ -441,7 +485,7 @@ const RollNumberManagement = () => {
           <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
         </MenuItem>
         <MenuItem key="edit"
-          onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate(`/dashboard/roll-numbers/edit-slip/${row.application_number}`, { state: { row } }); }}
+          onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate('/dashboard/roll-numbers/edit-slip/' + row.application_number, { state: { row } }); }}
           disabled={!selectedRow?.roll_number}>
           <Pencil size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Edit Slip
         </MenuItem>

@@ -207,6 +207,18 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
     // promotional_post column) with the stale loaded data.
     const dataKey = data ? JSON.stringify(data) : '';
     if (lastSyncedDataRef.current === dataKey) return;
+
+    // The backend stores district/domicile as NAMES (e.g. "Muzaffarabad")
+    // but the Select's MenuItem value is the district hash_id, so they need
+    // to be mapped via districtOptions before they can be applied to
+    // formData. If districtOptions hasn't loaded yet, bail out WITHOUT
+    // marking this data as synced — once districtOptions arrives (it's a
+    // dependency below), this effect re-runs and completes the mapping.
+    // Otherwise the mapping resolves to '' (no match), gets marked as
+    // "synced", and never retries — leaving the District selects empty.
+    const hasDistrictData = Boolean(data?.district) || Boolean(data?.domicile);
+    if (hasDistrictData && districtOptions.length === 0) return;
+
     if (data && Object.keys(data).length > 0) {
       lastSyncedDataRef.current = dataKey;
     }
@@ -219,37 +231,38 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
       return String(v).split(',').map((s) => s.trim());
     };
 
-    const normalizedDistricts = splitCsv(data.district).map((d) => {
-      // The backend stores district as a name (e.g. "Muzaffarabad") but the
-      // Select's MenuItem value is the district hash_id. Map the name back to
-      // the hash_id via districtOptions so the Select can show the current
-      // value. If no match is found, the user will need to re-select the
-      // district — we DON'T keep the name as the Select value because that
-      // triggers MUI's "out-of-range value" warning and breaks selection.
-      if (!d) return '';
-      const match = districtOptions.find((opt) => opt.name === d);
-      return match ? (match.hash_id || match.id) : '';
-    });
+    // Resolve a stored district value (could be a hash_id already, a district
+    // name, or a name with different casing/whitespace) to the hash_id used
+    // by the Select's MenuItems. Falls back to the raw value so the
+    // table/Select fallback MenuItem can still render it as selected.
+    const resolveDistrictValue = (raw) => {
+      if (!raw) return '';
+      const trimmed = String(raw).trim();
+      const byId = districtOptions.find((opt) => String(opt.id) === trimmed);
+      if (byId) return byId.id;
+      const byName = districtOptions.find(
+        (opt) => String(opt.name).trim().toLowerCase() === trimmed.toLowerCase()
+      );
+      if (byName) return byName.id;
+      return trimmed;
+    };
 
-    // The backend stores domicile as a name (e.g. "Muzaffarabad") but the
-    // Select's MenuItem value is the district hash_id. Map the name back to
-    // the hash_id so the Select can show the current value without the
-    // MUI "out-of-range" warning.
+    const normalizedDistricts = splitCsv(data.district).map((d) => resolveDistrictValue(d));
+
     const normalizedDomicile = (() => {
       const raw = typeof data.domicile === 'object'
         ? data.domicile.id || data.domicile.hash_id || data.domicile.name || ''
         : data.domicile || '';
-      if (!raw) return '';
-      const match = districtOptions.find((opt) => opt.name === raw);
-      if (match) return match.hash_id || match.id;
-      // If the value already looks like a hash_id, keep it as-is.
-      if (typeof raw === 'string' && raw.length > 8) return raw;
-      return '';
+      return resolveDistrictValue(raw);
     })();
 
     if (data && Object.keys(data).length > 0) {
-      console.log('🔄 Step3: Updating form with new data:', data);
-      const loadedMode = data.selection_mode || data.merit_type || 'quota_based';
+      const rawMode = data.selection_mode || data.merit_type || 'quota_based';
+      // The live API stores the mode under `merit_type` as "quota_wise"
+      // (see handleSubmit below), but the radio buttons use "quota_based".
+      // Normalize so the correct radio stays checked after a "Back to
+      // Edit" round trip.
+      const loadedMode = rawMode === 'quota_wise' ? 'quota_based' : rawMode;
       // The live API returns an empty array (not a non-empty placeholder)
       // for users who picked Open Merit, so we explicitly seed one empty
       // district row whenever the user lands in Quota Based mode with an
@@ -367,6 +380,26 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
       return errors;
     });
   })();
+
+  // Disable the Preview/Update button while any validation error is showing
+  // on this page (age limits, or — for Quota Based — duplicate districts /
+  // bad post counts / totals exceeding Step 1's post count).
+  const hasRowErrors =
+    formData.selection_mode === 'quota_based' &&
+    rowErrors.some((re) => Object.keys(re).length > 0);
+  const hasValidationErrors = Object.keys(ageErrors).length > 0 || hasRowErrors;
+
+  // Also gate on the required fields for this step. In Quota Based mode at
+  // least one district row must be selected.
+  const hasRequiredFields =
+    formData.min_age !== '' && formData.min_age !== null && formData.min_age !== undefined &&
+    formData.max_age !== '' && formData.max_age !== null && formData.max_age !== undefined &&
+    !!formData.age_relaxation &&
+    !!formData.nationality &&
+    !!formData.domicile &&
+    (formData.selection_mode !== 'quota_based' || (formData.district || []).some(Boolean));
+
+  const isStep3Valid = hasRequiredFields && !hasValidationErrors;
 
   const addRow = () => {
     setFormData(prev => ({
@@ -647,6 +680,16 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
                 {district.name}
               </MenuItem>
             ))}
+
+            {/* Fallback so a previously-saved value that doesn't match any
+                districtOptions entry still renders as selected instead of
+                leaving the Select blank. Picking a real option replaces it. */}
+            {formData.domicile &&
+              !districtOptions.some((district) => district.id === formData.domicile) && (
+                <MenuItem value={formData.domicile}>
+                  {formData.domicile}
+                </MenuItem>
+            )}
           </TextField>
         </div>
 
@@ -769,6 +812,17 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
                         {district.name}
                       </MenuItem>
                     ))}
+
+                    {/* Fallback so a previously-saved value that doesn't match any
+                        districtOptions entry (e.g. the backend returned the district
+                        name instead of its hash_id) still renders as selected instead
+                        of leaving the Select blank. Picking a real option replaces it. */}
+                    {formData.district[index] &&
+                      !districtOptions.some((district) => district.id === formData.district[index]) && (
+                        <MenuItem value={formData.district[index]}>
+                          {formData.district[index]}
+                        </MenuItem>
+                    )}
                   </TextField>
                 </td>
                 {/* <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
@@ -893,7 +947,12 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
             passes `isEdit` so the label stays in sync with the
             form title ("Edit Requisition" vs "New Requisition").
           */}
-          <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
+          <button
+            type="submit"
+            disabled={!isStep3Valid}
+            title={!isStep3Valid ? 'Fill in all required fields and resolve the validation errors above to continue' : undefined}
+            className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-emerald-950 disabled:hover:to-emerald-950"
+          >
             {isEdit ? 'Update' : 'Preview'}
           </button>
         </div>

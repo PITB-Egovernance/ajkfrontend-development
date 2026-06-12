@@ -41,9 +41,10 @@ const RollSlipGenerator = () => {
   const [loading,    setLoading]    = useState(true);
   const [result,     setResult]     = useState(null);
 
-  // Allocation mode (v2.2.0): 'manual' = one center for everyone (legacy);
-  // 'auto' = group candidates by domicile district, assign each district's
-  // candidates to centers in that district until capacity is reached.
+  // Allocation mode (v2.2.0): 
+  // 'manual' = one center for everyone (legacy);
+  // 'auto' = group candidates by domicile district, assign each district's candidates to centers in that district until capacity is reached;
+  // 'preferred' = use candidate's preferred exam cities in order, then fallback to any remaining centers
   const [allocationMode, setAllocationMode] = useState('manual');
   const [crossDistrictPrompt, setCrossDistrictPrompt] = useState(null); // { district, overflow: number, suggestion: string } | null
   const [crossDistrictAllowed, setCrossDistrictAllowed] = useState(null); // null = ask, true/false = decided
@@ -92,29 +93,16 @@ const RollSlipGenerator = () => {
   //   does, auto mode lights up. Until then auto mode shows a clear warning.)
   // - Each exam center row needs `district_id` and `capacity`.
   const buildAllocation = useCallback((allowCrossDistrict) => {
-    // Index centers by district
-    const centersByDistrict = new Map();
-    centers.forEach((c) => {
-      const districtId = c.district_id ?? c.district?.id ?? null;
-      if (districtId == null) return;
-      if (!centersByDistrict.has(districtId)) centersByDistrict.set(districtId, []);
-      centersByDistrict.get(districtId).push({
-        id:        c.id,
-        name:      c.name,
-        district:  c.district?.name || c.district_name || '—',
-        district_id: districtId,
-        capacity:  Number(c.capacity) || 0,
-        remaining: Number(c.capacity) || 0,
-      });
-    });
-
-    // Group candidates by domicile district
-    const candidatesByDistrict = new Map();
-    applications.forEach((a) => {
-      const districtId = a.domicile_district_id ?? a.domicile?.id ?? null;
-      if (!candidatesByDistrict.has(districtId)) candidatesByDistrict.set(districtId, []);
-      candidatesByDistrict.get(districtId).push(a);
-    });
+    // Prepare centers list with remaining capacity
+    const centersList = centers.map((c) => ({
+      id:        c.id,
+      name:      c.name,
+      district:  c.district?.name || c.district_name || '—',
+      district_id: c.district_id ?? c.district?.id ?? null,
+      city:      c.city,
+      capacity:  Number(c.capacity) || 0,
+      remaining: Number(c.capacity) || 0,
+    }));
 
     // Buckets are keyed by center id so we can later submit one batch per center.
     const buckets = new Map();
@@ -129,45 +117,117 @@ const RollSlipGenerator = () => {
       center.remaining -= 1;
     };
 
-    // Pass 1: assign each candidate to a center in their own district
-    candidatesByDistrict.forEach((apps, districtId) => {
-      const districtCenters = centersByDistrict.get(districtId) ?? [];
-      apps.forEach((app) => {
-        // pick first center in this district with remaining capacity
-        const target = districtCenters.find((c) => c.remaining > 0);
+    // Handle different allocation modes
+    if (allocationMode === 'preferred') {
+      // Preferred mode: use candidate's preferred exam cities in order
+      applications.forEach((app) => {
+        let target = null;
+        const preferredCities = app.preferred_exam_cities ?? [];
+        
+        // Try each preferred city in order
+        for (const city of preferredCities) {
+          target = centersList.find((c) => 
+            c.remaining > 0 && 
+            c.city && 
+            c.city.toLowerCase() === city.toLowerCase()
+          );
+          if (target) break;
+        }
+
+        // If no preferred city found or full, try any remaining center
+        if (!target) {
+          target = centersList.find((c) => c.remaining > 0);
+        }
+
+        // If still no center, add to unallocated
         if (target) {
           assignToCenter(target, app);
         } else {
-          // Whole district is full → spillover
-          if (!crossDistrictOverflowByDistrict.has(districtId)) {
-            crossDistrictOverflowByDistrict.set(districtId, {
-              districtId,
-              districtName: app.domicile_district_name || app.domicile?.name || 'Unknown',
-              apps: [],
-            });
-          }
-          crossDistrictOverflowByDistrict.get(districtId).apps.push(app);
+          unallocated.push(app);
         }
       });
-    });
+    } else if (allocationMode === 'auto') {
+      // Auto mode: group by domicile district, but if centers don't have district info, treat it as a single pool
+      // Index centers by district
+      const centersByDistrict = new Map();
+      let hasDistrictInfo = false;
+      centersList.forEach((c) => {
+        const districtId = c.district_id;
+        if (districtId != null) {
+          hasDistrictInfo = true;
+          if (!centersByDistrict.has(districtId)) centersByDistrict.set(districtId, []);
+          centersByDistrict.get(districtId).push(c);
+        }
+      });
 
-    // Pass 2: if cross-district allowed, place overflow in any center with remaining capacity
-    if (allowCrossDistrict) {
-      const remainingCenters = [];
-      centersByDistrict.forEach((list) => list.forEach((c) => { if (c.remaining > 0) remainingCenters.push(c); }));
-      crossDistrictOverflowByDistrict.forEach(({ apps }) => {
-        apps.forEach((app) => {
-          const target = remainingCenters.find((c) => c.remaining > 0);
+      if (!hasDistrictInfo) {
+        // No district info on centers, treat all centers as one pool, no district restrictions
+        applications.forEach((app) => {
+          const target = centersList.find((c) => c.remaining > 0);
           if (target) {
             assignToCenter(target, app);
           } else {
             unallocated.push(app);
           }
         });
-      });
-    } else {
-      // not allowed → all overflow goes to "needs manual allocation"
-      crossDistrictOverflowByDistrict.forEach(({ apps }) => apps.forEach((a) => unallocated.push(a)));
+      } else {
+        // Group candidates by domicile district
+        const candidatesByDistrict = new Map();
+        applications.forEach((a) => {
+          const districtId = a.domicile_district_id ?? a.domicile?.id ?? null;
+          if (!candidatesByDistrict.has(districtId)) candidatesByDistrict.set(districtId, []);
+          candidatesByDistrict.get(districtId).push(a);
+        });
+
+        // Pass 1: assign each candidate to a center in their own district
+        candidatesByDistrict.forEach((apps, districtId) => {
+          const districtCenters = centersByDistrict.get(districtId) ?? [];
+          apps.forEach((app) => {
+            // pick first center in this district with remaining capacity
+            const target = districtCenters.find((c) => c.remaining > 0);
+            if (target) {
+              assignToCenter(target, app);
+            } else if (districtId == null) {
+              // No domicile district, try any center
+              const anyTarget = centersList.find((c) => c.remaining > 0);
+              if (anyTarget) {
+                assignToCenter(anyTarget, app);
+              } else {
+                unallocated.push(app);
+              }
+            } else {
+              // Whole district is full → spillover
+              if (!crossDistrictOverflowByDistrict.has(districtId)) {
+                crossDistrictOverflowByDistrict.set(districtId, {
+                  districtId,
+                  districtName: app.domicile_district_name || app.domicile?.name || 'No Domicile',
+                  apps: [],
+                });
+              }
+              crossDistrictOverflowByDistrict.get(districtId).apps.push(app);
+            }
+          });
+        });
+
+        // Pass 2: if cross-district allowed, place overflow in any center with remaining capacity
+        if (allowCrossDistrict) {
+          const remainingCenters = [];
+          centersByDistrict.forEach((list) => list.forEach((c) => { if (c.remaining > 0) remainingCenters.push(c); }));
+          crossDistrictOverflowByDistrict.forEach(({ apps }) => {
+            apps.forEach((app) => {
+              const target = remainingCenters.find((c) => c.remaining > 0);
+              if (target) {
+                assignToCenter(target, app);
+              } else {
+                unallocated.push(app);
+              }
+            });
+          });
+        } else {
+          // not allowed → all overflow goes to "needs manual allocation"
+          crossDistrictOverflowByDistrict.forEach(({ apps }) => apps.forEach((a) => unallocated.push(a)));
+        }
+      }
     }
 
     return {
@@ -175,11 +235,11 @@ const RollSlipGenerator = () => {
       unallocated,
       overflowDistricts: Array.from(crossDistrictOverflowByDistrict.values()),
     };
-  }, [applications, centers]);
+  }, [applications, centers, allocationMode]);
 
   // Recompute the allocation preview whenever inputs change
   useEffect(() => {
-    if (allocationMode !== 'auto') {
+    if (allocationMode === 'manual') {
       setAllocationPreview(null);
       setCrossDistrictPrompt(null);
       return;
@@ -187,7 +247,7 @@ const RollSlipGenerator = () => {
     const initial = buildAllocation(crossDistrictAllowed === true);
     setAllocationPreview(initial);
 
-    if (initial.overflowDistricts.length > 0 && crossDistrictAllowed === null) {
+    if (allocationMode === 'auto' && initial.overflowDistricts.length > 0 && crossDistrictAllowed === null) {
       const first = initial.overflowDistricts[0];
       setCrossDistrictPrompt({
         districts: initial.overflowDistricts,
@@ -203,15 +263,20 @@ const RollSlipGenerator = () => {
     if (!formData.prefix?.trim())  { toast.error('Enter a roll number prefix'); return; }
     if (!formData.starting_number) { toast.error('Enter a starting number'); return; }
 
-    // ─── AUTO MODE ───
-    if (allocationMode === 'auto') {
+    // ─── AUTO MODE OR PREFERRED MODE ───
+    if (allocationMode === 'auto' || allocationMode === 'preferred') {
       if (!allocationPreview || allocationPreview.buckets.length === 0) {
-        toast.error('No candidates could be allocated. Check candidate domicile / center capacity.');
+        toast.error('No candidates could be allocated.');
         return;
       }
-      if (allocationPreview.unallocated.length > 0 && crossDistrictAllowed !== false) {
-        toast.error('Some candidates are still unallocated — decide cross-district permission first');
-        return;
+      if (allocationPreview.unallocated.length > 0) {
+        if (allocationMode === 'auto' && crossDistrictAllowed !== false) {
+          toast.error('Some candidates are still unallocated — decide cross-district permission first');
+          return;
+        } else if (allocationMode === 'preferred') {
+          toast.error('Some candidates could not be allocated — switch to manual mode');
+          return;
+        }
       }
       setGenerating(true);
       const allSlips  = [];
@@ -240,7 +305,7 @@ const RollSlipGenerator = () => {
         toast.success(`Generated ${totalCount} roll number slip${totalCount === 1 ? '' : 's'} across ${allocationPreview.buckets.length} center${allocationPreview.buckets.length === 1 ? '' : 's'}`);
         setResult({ count: totalCount, slips: allSlips });
       } catch (err) {
-        toast.error(err?.message || 'Auto-allocation failed mid-batch');
+        toast.error(err?.message || 'Allocation failed mid-batch');
       } finally {
         setGenerating(false);
       }
@@ -378,21 +443,34 @@ const RollSlipGenerator = () => {
                 <span className="font-medium">Auto-allocate by District</span>
                 <span className="text-slate-500 text-xs">(group by candidate domicile, fill centers by capacity)</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="radio"
+                  name="allocation_mode"
+                  value="preferred"
+                  checked={allocationMode === 'preferred'}
+                  onChange={() => { setAllocationMode('preferred'); setCrossDistrictAllowed(null); }}
+                />
+                <span className="font-medium">Candidate Prefer City</span>
+                <span className="text-slate-500 text-xs">(use candidate's preferred cities in order, fallback to any remaining)</span>
+              </label>
             </div>
 
-            {/* AUTO-MODE ALLOCATION PREVIEW */}
-            {allocationMode === 'auto' && (
+            {/* ALLOCATION PREVIEW */}
+            {(allocationMode === 'auto' || allocationMode === 'preferred') && (
               <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-                <h2 className="font-semibold text-slate-800 mb-3">District-Based Allocation Preview</h2>
+                <h2 className="font-semibold text-slate-800 mb-3">
+                  {allocationMode === 'auto' ? 'District-Based' : 'Candidate Preferred City'} Allocation Preview
+                </h2>
 
-                {(!applications[0]?.domicile_district_id && !applications[0]?.domicile?.id) && (
+                {allocationMode === 'auto' && (!applications[0]?.domicile_district_id && !applications[0]?.domicile?.id) && (
                   <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
                     <AlertTriangle size={18} className="text-amber-700 mt-0.5 shrink-0" />
                     <div className="text-sm text-amber-800">
                       Candidate domicile data is not present in the selected rows.
                       Auto-allocation requires the backend's shortlisted endpoint to include
                       <code className="bg-amber-100 px-1 mx-1 rounded">domicile_district_id</code>.
-                      Until then, switch to Manual mode.
+                      Until then, switch to Manual mode or Candidate Preferred City mode.
                     </div>
                   </div>
                 )}
@@ -404,7 +482,7 @@ const RollSlipGenerator = () => {
                         <thead className="bg-slate-50">
                           <tr>
                             <th className="text-left px-3 py-2 font-semibold text-slate-700">Center</th>
-                            <th className="text-left px-3 py-2 font-semibold text-slate-700">District</th>
+                            <th className="text-left px-3 py-2 font-semibold text-slate-700">City</th>
                             <th className="text-right px-3 py-2 font-semibold text-slate-700">Capacity</th>
                             <th className="text-right px-3 py-2 font-semibold text-slate-700">Assigned</th>
                             <th className="text-right px-3 py-2 font-semibold text-slate-700">Remaining</th>
@@ -417,7 +495,7 @@ const RollSlipGenerator = () => {
                             return (
                               <tr key={b.centerId} className="border-t border-slate-100">
                                 <td className="px-3 py-2 font-medium text-slate-800">{b.centerName}</td>
-                                <td className="px-3 py-2 text-slate-600">{b.district}</td>
+                                <td className="px-3 py-2 text-slate-600">{center?.city || '—'}</td>
                                 <td className="px-3 py-2 text-right text-slate-700">{cap || '—'}</td>
                                 <td className="px-3 py-2 text-right text-emerald-700 font-semibold">{b.apps.length}</td>
                                 <td className="px-3 py-2 text-right text-slate-700">{cap ? Math.max(cap - b.apps.length, 0) : '—'}</td>
@@ -436,12 +514,12 @@ const RollSlipGenerator = () => {
                         <AlertTriangle size={18} className="text-red-700 mt-0.5 shrink-0" />
                         <div className="text-sm text-red-800">
                           <strong>{allocationPreview.unallocated.length}</strong> candidate{allocationPreview.unallocated.length === 1 ? '' : 's'} could not be allocated automatically.
-                          Switch to Manual mode to assign them, or free up capacity in their districts.
+                          Switch to Manual mode to assign them, or free up capacity.
                         </div>
                       </div>
                     )}
 
-                    {crossDistrictAllowed === true && allocationPreview.overflowDistricts.length > 0 && (
+                    {allocationMode === 'auto' && crossDistrictAllowed === true && allocationPreview.overflowDistricts.length > 0 && (
                       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
                         Cross-district spillover is enabled — overflow candidates were placed in centers outside their domicile district.
                       </div>
@@ -459,12 +537,15 @@ const RollSlipGenerator = () => {
                 <TextField select fullWidth required label="Exam Center" margin="normal" size="small"
                   name="exam_center_id" value={formData.exam_center_id} onChange={handleFormChange}>
                   <MenuItem key="none" value="">— Select center —</MenuItem>
-                  {centers.map((c) => (
-                    <MenuItem key={c.id} value={String(c.id)}>
-                      {c.name} {c.city ? `(${c.city})` : ''}
-                      {c.capacity ? ` — capacity ${c.capacity}` : ''}
-                    </MenuItem>
-                  ))}
+                  {centers.map((c) => {
+                    const capacity = Number(c.capacity) || 0;
+                    return (
+                      <MenuItem key={c.id} value={String(c.id)}>
+                        {c.name} {c.city ? `(${c.city})` : ''}
+                        {capacity > 0 ? ` — capacity ${capacity}` : ''}
+                      </MenuItem>
+                    );
+                  })}
                 </TextField>
               )}
 

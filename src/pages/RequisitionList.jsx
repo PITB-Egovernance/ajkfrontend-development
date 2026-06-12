@@ -777,12 +777,31 @@ const RequisitionList = () => {
           >
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleUploadSubmit}
             variant="contained"
-            color="primary"
             disabled={uploading || !uploadForm.requisition_form || !uploadForm.confirm_upload}
             startIcon={uploading ? <InlineLoader variant="ring" size="sm" /> : <Upload size={18} />}
+            sx={{
+              background: 'linear-gradient(to bottom right, #022c22, #064e3b, #022c22)',
+              color: '#fff',
+              fontWeight: 500,
+              textTransform: 'none',
+              borderRadius: '8px',
+              px: 3,
+              py: 1.25,
+              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s',
+              '&:hover': {
+                background: 'linear-gradient(to bottom right, #064e3b, #022c22)',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+              },
+              '&.Mui-disabled': {
+                background: 'linear-gradient(to bottom right, #022c22, #064e3b, #022c22)',
+                opacity: 0.5,
+                color: '#fff',
+              },
+            }}
           >
             {uploading ? 'Uploading...' : 'Upload Files'}
           </Button>

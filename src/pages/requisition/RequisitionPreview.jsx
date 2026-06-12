@@ -8,14 +8,17 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
+import { extractFilePath, persistDraftFilePath, getPersistedDraftFilePath, clearPersistedDraftFiles } from 'utils';
 
 const RequisitionPreview = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tempId = searchParams.get('temp_id');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showServiceRuleDialog, setShowServiceRuleDialog] = useState(false);
   const [districtOptions, setDistrictOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
@@ -43,29 +46,14 @@ const RequisitionPreview = () => {
     loadPreviewData();
   }, [tempId]);
 
-  const repairBackendData = async (sanitizedStep1Data) => {
-    console.log('🛠️ Repairing backend data (converting arrays to strings)...');
-    try {
-      const formData = new FormData();
-      formData.append('step', '1');
-      formData.append('temp_id', tempId);
-
-      // Append sanitized data
-      Object.keys(sanitizedStep1Data).forEach(key => {
-        const value = sanitizedStep1Data[key];
-        if (value !== null && value !== undefined && value !== '') {
-          formData.append(key, value);
-        }
-      });
-
-      await RequisitionApi.create(formData);
-      console.log('✅ Backend data repaired successfully');
-    } catch (err) {
-      console.error('❌ Failed to repair backend data:', err);
-      toast.error('Failed to repair data format. Please go back and edit Step 1.');
+  // Once the preview has loaded, if no Service Rule file is on record for
+  // Step 1, prompt the admin to go back and upload it — Confirm & Save is
+  // disabled below until this is resolved.
+  useEffect(() => {
+    if (!loading && !loadError && !previewData.serviceRule) {
+      setShowServiceRuleDialog(true);
     }
-  };
-
+  }, [loading, loadError, previewData.serviceRule]);
 
   const fetchDistricts = async () => {
     try {
@@ -200,77 +188,52 @@ const RequisitionPreview = () => {
 
   const loadPreviewData = async () => {
     setLoading(true);
-    console.log('📊 Loading preview data...');
-    console.log('📋 Temp ID:', tempId);
+    setLoadError(null);
 
-    // try{
+    try {
       const result = await RequisitionApi.getPreview(tempId);
-      console.log('📥 Preview Response Data:', result);
 
       // Handle different response formats
       if (result) {
         const data = result || result;
-        console.log('✅ Preview data loaded successfully');
-        console.log('Step 1 data:', data.step1);
-        console.log('Step 2 data:', data.step2);
-        console.log('Step 3 data:', data.step3);
-        // console.log('Step Files:', data.step1_files.syllabus.url);
-        // console.log('District Quota:', data.step3_district_quota);
 
-
-        // Defensive: Ensure service_rules and syllabus are strings, not arrays
         const step1Data = data.step1 || {};
-        const servicerule = data.step1.service_rules || {};
-        const slb = data.step1.syllabus || {};
-        let needsRepair = false;
+        // Workaround for the backend's storeStep() dropping service_rules/
+        // syllabus from step1_data on a re-save without a new upload — see
+        // BACKEND_FIX_REQUISITION_FILE_DROP.md. Fall back to the path
+        // persisted locally when Step 1 was first saved.
+        const servicerule = extractFilePath(step1Data.service_rules) || getPersistedDraftFilePath(tempId, 'service_rules');
+        const slb = extractFilePath(step1Data.syllabus) || getPersistedDraftFilePath(tempId, 'syllabus');
 
-        // if (data.step1_files.service_rules && Array.isArray(data.step1_files.service_rules)) {
-        //   console.warn('⚠️ service_rules is an array, converting to string:', data.step1_files.service_rules);
-        //   data.step1_files.service_rules = data.step1_files.service_rules.length > 0 ? data.step1_files.service_rules[0] : null;
-        //   needsRepair = true;
-        // }
-        // if (data.step1_files.syllabus && Array.isArray(data.step1_files.syllabus)) {
-        //   console.warn('⚠️ syllabus is an array, converting to string:', data.step1_files.syllabus);
-        //   data.step1_files.syllabus = data.step1_files.syllabus.length > 0 ? data.step1_files.syllabus[0] : null;
-        //   needsRepair = true;
-        // }
-
-        if (needsRepair) {
-          repairBackendData(step1Data);
-        }
-         setLoading(false);
         setPreviewData({
-          step1: step1Data || {},
+          step1: step1Data,
           step2: data.step2 || {},
           step3: data.step3 || {},
-          serviceRule: servicerule || '',
-          syllabus: slb || '',
+          serviceRule: servicerule,
+          syllabus: slb,
         });
       } else {
-        const errorMsg = result.error || result.message || 'Failed to load preview data';
+        const errorMsg = result?.error || result?.message || 'Failed to load preview data';
         console.error('❌ Preview load failed:', errorMsg);
         toast.error(errorMsg);
-        // setTimeout(() => {
-        //   // navigate('/dashboard/requisitions');
-        // }, 2000);
+        setLoadError(errorMsg);
       }
-    // } catch (error) {
-    //   console.error('❌ Error loading preview:', error);
-    //   toast.error('Error loading preview data: ' + error.message);
-    //   // If the error is the SPA-shell HTML, the data WAS saved — don't bounce
-    //   // the user away from the page; they should still be able to click
-    //   // "Confirm & Save" since the data is in the live backend.
-    //   const isSpaShell = typeof error?.message === 'string' && /Live server is returning the admin frontend HTML/i.test(error.message);
-    //   // if (!isSpaShell) {
-    //   //   setTimeout(() => {
-    //   //     navigate('/dashboard/requisitions');
-    //   //   }, 2000);
-    //   // }
-    // }
-    //  finally {
-    //   setLoading(false);
-    //   console.log('🏁 Preview loading ended');
-    // }
+    } catch (error) {
+      console.error('❌ Error loading preview:', error);
+
+      // Laravel's default rate-limit response is HTTP 429 with the message
+      // "Too Many Attempts." — surface a friendly, actionable message and a
+      // Retry button instead of letting it bubble up as an uncaught error.
+      const isRateLimited = error?.status === 429 || /too many attempts/i.test(error?.message || '');
+      const message = isRateLimited
+        ? "Too many requests — please wait a moment and click Retry."
+        : (error?.message || 'Error loading preview data');
+
+      toast.error(message);
+      setLoadError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleConfirm = async () => {
@@ -293,6 +256,18 @@ const RequisitionPreview = () => {
           style: { fontWeight: '500' }
         });
 
+        // Carry the resolved service_rules/syllabus paths over to the
+        // confirmed requisition's hash_id, so RequisitionDetail can show
+        // "View Service Rules"/"View Syllabus" even if the backend's
+        // confirm() persisted null for these columns (same root cause as
+        // BACKEND_FIX_REQUISITION_FILE_DROP.md — step1_data had already
+        // lost the file paths by the time confirm() ran).
+        const confirmedHashId = result.data?.job_detail?.job_detail_id;
+        if (confirmedHashId) {
+          persistDraftFilePath(confirmedHashId, 'service_rules', previewData.serviceRule);
+          persistDraftFilePath(confirmedHashId, 'syllabus', previewData.syllabus);
+        }
+
         // Clear the per-step localStorage caches so Back-to-Edit on the
         // confirmed requisition doesn't re-populate stale draft values.
         try {
@@ -301,6 +276,7 @@ const RequisitionPreview = () => {
               localStorage.removeItem(k);
             }
           });
+          clearPersistedDraftFiles(tempId);
         } catch { /* ignore */ }
 
         setTimeout(() => {
@@ -338,6 +314,19 @@ const RequisitionPreview = () => {
     return (
       <div className="p-6 bg-white rounded-lg shadow">
         <InlineLoader text="Loading preview..." variant="ring" size="lg" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-6 bg-white rounded-lg shadow text-center">
+        <Typography variant="body1" className="mb-4 text-red-600">
+          {loadError}
+        </Typography>
+        <Button variant="contained" onClick={loadPreviewData}>
+          Retry
+        </Button>
       </div>
     );
   }
@@ -395,8 +384,8 @@ const RequisitionPreview = () => {
                   <TableCell sx={{ fontWeight: 'bold' }}>Service Rules</TableCell>
                   <TableCell>
                     {serviceRule ? (
-                      <a href={`${serviceRule}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
-                        View PDF
+                      <a href={`https://api-admin-ajkpsc.punjab.gov.pk/${serviceRule}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                        View Service Rules
                       </a>
                     ) : 'No service rule file uploaded yet'}
                   </TableCell>
@@ -405,8 +394,8 @@ const RequisitionPreview = () => {
                   <TableCell sx={{ fontWeight: 'bold' }}>Syllabus</TableCell>
                   <TableCell>
                     {syllabus ? (
-                      <a href={`${syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
-                        View PDF
+                      <a href={`https://api-admin-ajkpsc.punjab.gov.pk/${syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                        View Syllabus
                       </a>
                     ) : 'No syllabus file uploaded yet'}
                   </TableCell>
@@ -614,16 +603,21 @@ const RequisitionPreview = () => {
                               {district}
                             </span>
 
-                            <span className="bg-blue-600 text-white px-2 py-1 rounded text-sm">
-                              {step3.quota?.[index] || 'N/A'}
-                            </span>
-
                             <span className="bg-emerald-700 text-white px-2 py-1 rounded text-sm">
                               {step3.post?.[index] || 0}
                             </span>
                           </span>
                         ))}
                       </div>
+                    ) : (step3.merit_type === 'open_merit' || step3.selection_mode === 'open_merit') ? (
+                      // Open Merit: no per-district breakdown was entered, so show
+                      // the grand-total post count from Step 1 against "All Districts".
+                      <span className="inline-flex items-center gap-2">
+                        <span className="text-slate-700 font-medium">All Districts</span>
+                        <span className="bg-emerald-700 text-white px-2 py-1 rounded text-sm">
+                          {step1.num_posts || 0}
+                        </span>
+                      </span>
                     ) : (
                       'N/A'
                     )}
@@ -678,12 +672,19 @@ const RequisitionPreview = () => {
         <Button
           variant="contained"
           onClick={() => setShowConfirmDialog(true)}
-          disabled={confirming}
+          disabled={confirming || !serviceRule}
+          title={!serviceRule ? 'Service Rule file is required — go back to Step 1 and upload it to continue' : undefined}
           sx={{ backgroundColor: '#0B5E3C', '&:hover': { backgroundColor: '#084a2e' } }}
         >
           {confirming ? 'Confirming...' : 'Confirm & Save'}
         </Button>
       </div>
+
+      {!serviceRule && (
+        <Typography variant="body2" className="text-center mt-2 text-red-600">
+          Service Rule file is missing. Please go back to Step 1 and upload the Service Rule to enable Confirm & Save.
+        </Typography>
+      )}
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
@@ -712,6 +713,36 @@ const RequisitionPreview = () => {
               sx={{ backgroundColor: '#0B5E3C', '&:hover': { backgroundColor: '#084a2e' } }}
             >
               {confirming ? 'Confirming...' : 'Yes, Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Service Rule Missing Dialog */}
+      <Dialog open={showServiceRuleDialog} onOpenChange={setShowServiceRuleDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-red-700">
+              Service Rule Required
+            </DialogTitle>
+            <DialogDescription className="text-base pt-4 text-gray-700">
+              This requisition cannot be confirmed because no Service Rule file has been uploaded. Please go back to Step 1 and upload the Service Rule file to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6">
+            <Button
+              variant="outlined"
+              onClick={() => setShowServiceRuleDialog(false)}
+              sx={{ borderColor: '#6b7280', color: '#6b7280' }}
+            >
+              Close
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => navigate(`/dashboard/requisitions/create?temp_id=${tempId}&step=1`)}
+              sx={{ backgroundColor: '#0B5E3C', '&:hover': { backgroundColor: '#084a2e' } }}
+            >
+              Go to Step 1
             </Button>
           </DialogFooter>
         </DialogContent>
