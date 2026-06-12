@@ -133,23 +133,23 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
         // },
       ],
     },
-    {
-      id: "dispatch",
-      label: "Dispatch",
-      icon: Send,
-      submenu: [
-        {
-          label: "List of Received",
-          path: "/dashboard/dispatch/received",
-          icon: Package,
-        },
-        {
-          label: "Sent",
-          path: "/dashboard/dispatch/sent",
-          icon: Send,
-        },
-      ],
-    },
+    // {
+    //   id: "dispatch",
+    //   label: "Dispatch",
+    //   icon: Send,
+    //   submenu: [
+    //     {
+    //       label: "List of Received",
+    //       path: "/dashboard/dispatch/received",
+    //       icon: Package,
+    //     },
+    //     {
+    //       label: "Sent",
+    //       path: "/dashboard/dispatch/sent",
+    //       icon: Send,
+    //     },
+    //   ],
+    // },
 
     // {
     //   id: "workflow-tracking",

@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TextField } from '@mui/material';
 import { useAuth } from 'context/AuthContext';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from 'components/ui/Card';
-import { User, Mail, Phone, MapPin, Save, Lock, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Save, Lock, ArrowLeft, KeyRound } from 'lucide-react';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -34,6 +36,60 @@ const Profile = () => {
     next: '',
     confirm: '',
   });
+
+  const [passkey, setPasskey] = useState(['', '', '', '']);
+  const [generatingPasskey, setGeneratingPasskey] = useState(false);
+  const passkeyRefs = useRef([]);
+
+  const onPasskeyChange = (index, value) => {
+    if (!/^\d?$/.test(value)) return;
+    setPasskey((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+    if (value && index < passkeyRefs.current.length - 1) {
+      passkeyRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const onPasskeyKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !passkey[index] && index > 0) {
+      passkeyRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const generatePasskey = async (e) => {
+    e.preventDefault();
+    if (passkey.some((d) => d === '')) {
+      toast.error('Please enter all 4 digits');
+      return;
+    }
+
+    setGeneratingPasskey(true);
+    try {
+      const res = await fetch(`${Config.apiUrl}/store-passkey`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${AuthService.getToken()}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ passkey: passkey.join('') }),
+      });
+      const result = await res.json();
+      if (res.ok && (result.success || result.status === 200)) {
+        toast.success('Passkey generated successfully');
+        setPasskey(['', '', '', '']);
+      } else {
+        toast.error(result.message || 'Failed to generate passkey');
+      }
+    } catch {
+      toast.error('Failed to generate passkey');
+    } finally {
+      setGeneratingPasskey(false);
+    }
+  };
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -145,7 +201,7 @@ const Profile = () => {
       <Card>
         <CardHeader className="bg-slate-50">
           <CardTitle className="flex items-center gap-2">
-            <Lock size={18} className="text-emerald-700" /> Security
+            <Lock size={18} className="text-emerald-700" /> Change Password
           </CardTitle>
         </CardHeader>
         <form onSubmit={changePassword}>
@@ -175,6 +231,43 @@ const Profile = () => {
           <CardFooter>
             <Button type="submit" className="gap-2">
               <Save size={16} /> Update Password
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+
+      {/* Passkey */}
+      <Card>
+        <CardHeader className="bg-slate-50">
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound size={18} className="text-emerald-700" /> Passkey
+          </CardTitle>
+        </CardHeader>
+        <form onSubmit={generatePasskey}>
+          <CardContent>
+            <p className="text-sm text-slate-500 mb-3">Enter a 4-digit passkey to secure your account.</p>
+            <div className="flex gap-3">
+              {passkey.map((digit, index) => (
+                <TextField
+                  key={index}
+                  inputRef={(el) => (passkeyRefs.current[index] = el)}
+                  value={digit}
+                  onChange={(e) => onPasskeyChange(index, e.target.value)}
+                  onKeyDown={(e) => onPasskeyKeyDown(index, e)}
+                  inputProps={{
+                    maxLength: 1,
+                    inputMode: 'numeric',
+                    pattern: '[0-9]*',
+                    style: { textAlign: 'center', fontSize: '1.25rem' },
+                  }}
+                  sx={{ width: 56 }}
+                />
+              ))}
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" className="gap-2" disabled={generatingPasskey}>
+              <KeyRound size={16} /> {generatingPasskey ? 'Generating...' : 'Generate Passkey'}
             </Button>
           </CardFooter>
         </form>
