@@ -11,9 +11,7 @@ const localUrl      = "http://localhost:3000";
 
 // In development the CRACO proxy routes /candidate-api → candidate portal (avoids CORS).
 // In production the candidate portal must allow the admin domain via CORS headers.
-const candidateApiUrl = process.env.NODE_ENV === 'development'
-  ? '/candidate-api/api/candidate'
-  : 'https://api-candidate-ajkpsc.punjab.gov.pk/api/candidate';
+const candidateApiUrl = 'https://api-candidate-ajkpsc.punjab.gov.pk/api/candidate';
 
 const candidateApiKey = "admin-secret-key-123";
 
