@@ -9,7 +9,14 @@ import toast from 'react-hot-toast';
  *   if (!confirmed) return;
  *   // proceed with delete...
  */
-const confirmDelete = ({ title = 'Confirm Delete', message, identifier, warning = 'This action cannot be undone.' }) => {
+const confirmDelete = ({
+  title = 'Confirm Delete',
+  message,
+  identifier,
+  warning = 'This action cannot be undone.',
+  confirmLabel = 'Delete',
+  confirmColor = 'bg-red-600 hover:bg-red-700',
+}) => {
   return new Promise((resolve) => {
     toast((t) => (
       <div className="flex flex-col gap-3">
@@ -29,9 +36,9 @@ const confirmDelete = ({ title = 'Confirm Delete', message, identifier, warning 
           </button>
           <button
             onClick={() => { toast.dismiss(t.id); resolve(true); }}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+            className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors ${confirmColor}`}
           >
-            Delete
+            {confirmLabel}
           </button>
         </div>
       </div>

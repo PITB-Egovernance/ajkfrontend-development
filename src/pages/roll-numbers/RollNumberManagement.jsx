@@ -172,12 +172,27 @@ const RollNumberManagement = () => {
   };
 
   // ── Generate slip flow (navigates to the full-page generator) ──────────
-  const openSlipGenerator = (explicitSelection = null) => {
+  const openSlipGenerator = async (explicitSelection = null) => {
     const ids = Array.isArray(explicitSelection) ? explicitSelection : selectedIds;
     if (!ids || ids.length === 0) {
       toast.error('Select at least one shortlisted candidate');
       return;
     }
+
+    // Bulk generation touches many candidates at once — confirm first, same as bulk deletion.
+    // Single-candidate generation (from the row menu) proceeds straight through.
+    if (ids.length > 1) {
+      const ok = await confirmDelete({
+        title:        'Generate Roll Number Slips',
+        message:      `Generate roll number slips for ${ids.length} selected candidates?`,
+        identifier:   `${ids.length} candidates`,
+        warning:      '',
+        confirmLabel: 'Generate',
+        confirmColor: 'bg-emerald-600 hover:bg-emerald-700',
+      });
+      if (!ok) return;
+    }
+
     const selectedApps = rows.filter((r) => ids.includes(r.id));
     navigate('/dashboard/roll-numbers/generate-slips', {
       state: { applications: selectedApps },
