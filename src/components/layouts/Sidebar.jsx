@@ -95,6 +95,23 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       ],
     },
     {
+      id: "employees",
+      label: "Employees",
+      icon: Users,
+      submenu: [
+        // {
+        //   label: "Register Employees",
+        //   path: "/dashboard/employees",
+        //   icon: PlusCircle,
+        // },
+        {
+          label: "All Employees",
+          path: "/dashboard/employees/list",
+          icon: ClipboardList,
+        },
+      ],
+    },
+    {
       id: "requisitions",
       label: "Requisitions",
       icon: ClipboardList,

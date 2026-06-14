@@ -61,6 +61,9 @@ import RollSlipGenerator from 'pages/roll-numbers/RollSlipGenerator';
 import RollSlipEditor from 'pages/roll-numbers/RollSlipEditor';
 import AwardList from 'pages/award-list/AwardList';
 import AwardListDetail from 'pages/award-list/AwardListDetail';
+import EmployeesLanding from 'pages/employees/EmployeesLanding';
+import EmployeeRegistrationForm from 'pages/employees/EmployeeRegistrationForm';
+import EmployeeList from 'pages/employees/EmployeeList';
 
 // Results Module Imports
 import AwardListPage from 'pages/results/AwardListPage';
@@ -191,6 +194,11 @@ function App() {
           {/* Award List Routes */}
           <Route path="award-lists" element={<AwardList />} />
           <Route path="award-lists/:id" element={<AwardListDetail />} />
+
+          {/* Employee Management Routes */}
+          <Route path="employees" element={<EmployeesLanding />} />
+          <Route path="employees/create" element={<EmployeeRegistrationForm />} />
+          <Route path="employees/list" element={<EmployeeList />} />
 
           {/* Results Module Routes */}
           <Route path="results" element={<ResultsDashboard />} />
