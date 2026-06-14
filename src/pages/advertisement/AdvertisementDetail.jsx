@@ -40,6 +40,7 @@ const AdvertisementDetail = () => {
   const [selectedJobId, setSelectedJobId] = useState('');
   const [districtOptions, setDistrictOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
+  const [testTypeOptions, setTestTypeOptions] = useState([]);
 
   const API_ROOT = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
   const API_BASE = Config.apiUrl;
@@ -51,6 +52,7 @@ const AdvertisementDetail = () => {
     fetchAdvertisementDetails();
     fetchDistricts();
     fetchGrades();
+    fetchTestTypes();
   }, [id]);
 
   const fetchGrades = async () => {
@@ -97,6 +99,28 @@ const AdvertisementDetail = () => {
     }
   };
 
+  const fetchTestTypes = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/tests`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: "application/json",
+          "X-API-KEY": API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success) {
+        const list = result.data?.data ?? result.data ?? [];
+        setTestTypeOptions(list.map((t) => ({
+          id: t.hash_id || String(t.id),
+          name: t.test_name,
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching test types:", error);
+    }
+  };
+
   const fetchAdvertisementDetails = async () => {
     setLoading(true);
     try {
@@ -140,6 +164,15 @@ const AdvertisementDetail = () => {
     const str = String(rawScale).trim();
     const matched = gradeOptions.find((g) => g.id === str || g.name === str);
     return matched ? matched.name : str;
+  };
+
+  const LEGACY_TEST_TYPE_NAMES = { '1': 'MCQs', '2': 'Written Exam' };
+
+  const getTestTypeName = (testType) => {
+    if (!testType) return 'N/A';
+    if (LEGACY_TEST_TYPE_NAMES[testType]) return LEGACY_TEST_TYPE_NAMES[testType];
+    const test = testTypeOptions.find((t) => t.id === testType);
+    return test ? test.name : testType;
   };
 
   const formatDate = (dateStr) => {
@@ -323,7 +356,7 @@ const AdvertisementDetail = () => {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
                   {[
                     { label: 'Vacancy Date', value: selectedJob.vacancy_date || 'N/A', icon: Calendar, color: 'text-emerald-700', bg: 'bg-emerald-50' },
-                    { label: 'Test Type', value: selectedJob.pivot?.test_type === "1" ? "MCQs" : selectedJob.pivot?.test_type === "2" ? "Written Exam" : "N/A", icon: FileText, color: 'text-emerald-700', bg: 'bg-emerald-50' },
+                    { label: 'Test Type', value: getTestTypeName(selectedJob.pivot?.test_type), icon: FileText, color: 'text-emerald-700', bg: 'bg-emerald-50' },
                     { label: 'Approval Status', value: selectedJob.status?.toUpperCase(), icon: CheckCircle2, color: 'text-emerald-700', bg: 'bg-emerald-50' },
                     { label: 'Workflow Status', value: selectedJob.current_status?.replace('_', ' ')?.toUpperCase() || 'N/A', icon: Layout, color: 'text-emerald-700', bg: 'bg-emerald-50' },
                   ].map((stat, i) => (
