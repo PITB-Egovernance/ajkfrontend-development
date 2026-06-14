@@ -24,6 +24,8 @@ import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import RollNumberApi from 'api/rollNumberApi';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import {
   getApplicationOcrBatch,
   getApplicationOcrBatchLabel,
@@ -75,6 +77,95 @@ const RollNumberManagement = () => {
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
+  // ── Advertisement hash → readable text resolution ──────────────────────
+  // "Stub" shortlisted applications (no admin-side advertisement linked yet)
+  // come back from /roll-numbers/shortlisted with advertisement_no = null.
+  // Resolve it the same way /dashboard/applications does: pull the candidate
+  // portal's advertisement_no (a hash_id) for this application_number, then
+  // map that hash → adv_number via the admin /advertisements list.
+  const [advertisementMap, setAdvertisementMap] = useState({});
+  const [candidateAdvMap,  setCandidateAdvMap]  = useState({});
+
+  const fetchAdvertisements = useCallback(async () => {
+    try {
+      const headers = {
+        Accept: 'application/json',
+        'X-API-KEY': Config.apiKey,
+        Authorization: `Bearer ${AuthService.getToken()}`,
+      };
+
+      const firstRes  = await fetch(`${Config.apiUrl}/advertisements?per_page=100`, { headers });
+      const firstJson = await firstRes.json();
+      const firstPage = firstJson?.data?.data ?? [];
+      const lastPage  = firstJson?.data?.last_page ?? 1;
+
+      let allAds = firstPage;
+      if (lastPage > 1) {
+        const pages = await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetch(`${Config.apiUrl}/advertisements?per_page=100&page=${i + 2}`, { headers })
+              .then((r) => r.json())
+              .then((j) => j?.data?.data ?? [])
+              .catch(() => [])
+          )
+        );
+        allAds = allAds.concat(...pages);
+      }
+
+      const map = {};
+      allAds.forEach((ad) => {
+        if (ad.hash_id) map[ad.hash_id] = ad.adv_number;
+        (ad.job_details || []).forEach((job) => {
+          if (job?.hash_id) map[job.hash_id] = ad.adv_number;
+        });
+      });
+      setAdvertisementMap(map);
+    } catch (err) {
+      console.error('Failed to load advertisements for resolving advertisement numbers');
+    }
+  }, []);
+
+  const fetchCandidateAdvertisements = useCallback(async () => {
+    try {
+      const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
+      const res  = await fetch(`${Config.candidateApiUrl}/applications?per_page=100`, { headers });
+      const json = await res.json();
+      const items = json?.data?.data ?? json?.data ?? [];
+
+      const map = {};
+      items.forEach((a) => {
+        const advNo = a.job_post?.ext_adv_id ?? a.advertisement_no ?? a.job_post?.adv_number ?? null;
+        map[a.application_number] = {
+          advertisement_no: advNo,
+          job_title: a.job_post?.post_title || null,
+        };
+      });
+      setCandidateAdvMap(map);
+    } catch (err) {
+      console.error('Failed to load candidate applications for advertisement resolution');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAdvertisements();
+    fetchCandidateAdvertisements();
+  }, [fetchAdvertisements, fetchCandidateAdvertisements]);
+
+  // Resolve a shortlisted item's advertisement number, falling back to the
+  // candidate-portal hash → admin advertisement map, then the portal's job title.
+  const resolveAdvertisementNo = useCallback((item) => {
+    if (item.advertisement_no) return item.advertisement_no;
+
+    const candidate = candidateAdvMap[item.application_number];
+    if (!candidate) return 'N/A';
+
+    if (candidate.advertisement_no && advertisementMap[candidate.advertisement_no]) {
+      return advertisementMap[candidate.advertisement_no];
+    }
+
+    return candidate.job_title || candidate.advertisement_no || 'N/A';
+  }, [advertisementMap, candidateAdvMap]);
+
   // ── Data ────────────────────────────────────────────────────────────────
   const fetchShortlisted = useCallback(async () => {
     setLoading(true);
@@ -108,8 +199,8 @@ const RollNumberManagement = () => {
             application_number: item.application_number,
             applicant_name:    item.candidate_name || 'N/A',
             cnic:              item.candidate_cnic || 'N/A',
-            job_title:         item.job_title || 'N/A',
-            advertisement_no:  item.advertisement_no || 'N/A',
+            job_title:         item.job_title || candidateAdvMap[item.application_number]?.job_title || 'N/A',
+            advertisement_no:  resolveAdvertisementNo(item),
             advertisement_id:  item.advertisement_id,
             applied_at:        item.applied_at ? new Date(item.applied_at).toLocaleDateString() : 'N/A',
             payment_status:    item.payment_status || 'N/A',
@@ -152,7 +243,7 @@ const RollNumberManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel.page, paginationModel.pageSize, filters]);
+  }, [paginationModel.page, paginationModel.pageSize, filters, candidateAdvMap, resolveAdvertisementNo]);
 
   useEffect(() => {
     const t = setTimeout(fetchShortlisted, 300);

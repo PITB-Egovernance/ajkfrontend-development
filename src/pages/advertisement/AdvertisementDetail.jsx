@@ -39,6 +39,7 @@ const AdvertisementDetail = () => {
   const [loading, setLoading] = useState(true);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [districtOptions, setDistrictOptions] = useState([]);
+  const [gradeOptions, setGradeOptions] = useState([]);
 
   const API_ROOT = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
   const API_BASE = Config.apiUrl;
@@ -49,7 +50,31 @@ const AdvertisementDetail = () => {
   useEffect(() => {
     fetchAdvertisementDetails();
     fetchDistricts();
+    fetchGrades();
   }, [id]);
+
+  const fetchGrades = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: "application/json",
+          "X-API-KEY": API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setGradeOptions(
+          list
+            .filter((g) => (g.status ?? 'active') === 'active')
+            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching grades:", error);
+    }
+  };
 
   const fetchDistricts = async () => {
     try {
@@ -102,6 +127,19 @@ const AdvertisementDetail = () => {
     if (!hashId || districtOptions.length === 0) return hashId || "N/A";
     const district = districtOptions.find((d) => d.id === hashId);
     return district ? district.name : hashId;
+  };
+
+  // Resolve a stored scale value (hash_id, number, or string) to the
+  // human-readable grade name (e.g. "BPS-17"). The grade name already
+  // includes the "BPS-"/"BS-" prefix, so it's rendered as-is.
+  const getScaleName = (rawScale) => {
+    if (rawScale === null || rawScale === undefined || rawScale === '') return 'N/A';
+    if (typeof rawScale === 'object') {
+      return rawScale.name || rawScale.hash_id || rawScale.id || 'N/A';
+    }
+    const str = String(rawScale).trim();
+    const matched = gradeOptions.find((g) => g.id === str || g.name === str);
+    return matched ? matched.name : str;
   };
 
   const formatDate = (dateStr) => {
@@ -218,7 +256,7 @@ const AdvertisementDetail = () => {
             >
               {advertisement.job_details?.map((job) => (
                 <option key={job.hash_id} value={job.hash_id}>
-                  {job.designation} (BPS-{job.scale}) — {job.num_posts} Positions
+                  {job.designation} ({getScaleName(job.scale)}) — {job.num_posts} Positions
                 </option>
               ))}
             </select>
@@ -255,7 +293,7 @@ const AdvertisementDetail = () => {
                     <div className="flex flex-wrap gap-3 pt-2">
                       <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/10">
                         <Layers size={16} className="text-emerald-300" />
-                        <span className="text-sm font-bold">BPS-{selectedJob.scale}</span>
+                        <span className="text-sm font-bold">{getScaleName(selectedJob.scale)}</span>
                       </div>
                       <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/10">
                         <Users size={16} className="text-blue-300" />

@@ -264,7 +264,6 @@ const PscTable = () => {
 
   const columns = [
     { field: 'hash_id', headerName: 'Ref', width: 120 },
-    { field: 'designation', headerName: 'Designation', minWidth: 200, flex: 1 },
     { field: 'requisition_form', headerName: 'Requisition Form', width: 180, renderCell: (params) => renderFileLink(params.value) },
     { field: 'annex_a_form', headerName: 'Annex-A Form', width: 180, renderCell: (params) => renderFileLink(params.value) },
     { field: 'other_attachment', headerName: 'Other Attachment', width: 180, renderCell: (params) => renderFileLink(params.value) },

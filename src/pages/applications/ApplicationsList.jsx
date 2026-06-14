@@ -5,6 +5,8 @@ import { Eye, CheckCircle, XCircle, MoreVertical, RefreshCw, FilterX } from 'luc
 import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from 'components/ui/Loader';
 import Button from 'components/ui/Button';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import ApplicationApi from 'api/applicationApi';
 import toast from 'react-hot-toast';
 import {
@@ -43,6 +45,58 @@ const ApplicationsList = () => {
   const [selectionModel, setSelectionModel] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [advertisementMap, setAdvertisementMap] = useState({});
+
+  const API_BASE = Config.apiUrl;
+  const TOKEN = AuthService.getToken();
+  const API_KEY = Config.apiKey;
+
+  // Map job-detail / advertisement hash ids -> human-readable advertisement
+  // number (e.g. "Advertisement 5-26"), so the candidate-portal's
+  // `advertisement_no` (which is actually a job-detail hash id) can be
+  // resolved to readable text instead of a raw hash.
+  const fetchAdvertisements = useCallback(async () => {
+    try {
+      const headers = {
+        Accept: 'application/json',
+        'X-API-KEY': API_KEY,
+        Authorization: `Bearer ${TOKEN}`,
+      };
+
+      const firstRes  = await fetch(`${API_BASE}/advertisements?per_page=100`, { headers });
+      const firstJson = await firstRes.json();
+      const firstPage = firstJson?.data?.data ?? [];
+      const lastPage  = firstJson?.data?.last_page ?? 1;
+
+      let allAds = firstPage;
+      if (lastPage > 1) {
+        const pages = await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetch(`${API_BASE}/advertisements?per_page=100&page=${i + 2}`, { headers })
+              .then((r) => r.json())
+              .then((j) => j?.data?.data ?? [])
+              .catch(() => [])
+          )
+        );
+        allAds = allAds.concat(...pages);
+      }
+
+      const map = {};
+      allAds.forEach((ad) => {
+        if (ad.hash_id) map[ad.hash_id] = ad.adv_number;
+        (ad.job_details || []).forEach((job) => {
+          if (job?.hash_id) map[job.hash_id] = ad.adv_number;
+        });
+      });
+      setAdvertisementMap(map);
+    } catch (err) {
+      console.error('Failed to load advertisements for resolving advertisement numbers');
+    }
+  }, [API_BASE, TOKEN, API_KEY]);
+
+  useEffect(() => {
+    fetchAdvertisements();
+  }, [fetchAdvertisements]);
 
   // Derive unique jobs from loaded rows — useMemo avoids extra state + double-render.
   const jobs = useMemo(() => {
@@ -101,6 +155,8 @@ const ApplicationsList = () => {
 
         // Resolve advertisement number (handle hash ids from candidate portal)
         const resolveAdvertisementNo = (adNo) => {
+          if (!adNo) return 'N/A';
+          if (advertisementMap[adNo]) return advertisementMap[adNo];
           const adMap = {
             'XlGDW6zJWmk6': 'Assistant Program Officer',
             // Add more mappings as needed
@@ -123,7 +179,7 @@ const ApplicationsList = () => {
           cnic:            snapshot?.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
           job_title:       item.job_post?.post_title || item.job_post?.title || item.job?.title || 'N/A',
           job_post_id:     item.job_post_id || null,
-          advertisement_no: resolveAdvertisementNo(item.advertisement_no || item.job_post?.ext_adv_id || item.job_post?.adv_number || 'N/A'),
+          advertisement_no: resolveAdvertisementNo(item.job_post?.ext_adv_id || item.advertisement_no || item.job_post?.adv_number || 'N/A'),
           status:          effectiveStatus,
           applied_at_raw:  item.submitted_at || item.created_at || null,
           applied_at: (item.submitted_at || item.created_at)
@@ -184,7 +240,7 @@ const ApplicationsList = () => {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel, filters]);
+  }, [paginationModel, filters, advertisementMap]);
 
   useEffect(() => {
     const timer = setTimeout(fetchApplications, 500);

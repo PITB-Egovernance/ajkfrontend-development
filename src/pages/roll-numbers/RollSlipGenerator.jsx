@@ -95,7 +95,11 @@ const RollSlipGenerator = () => {
   const buildAllocation = useCallback((allowCrossDistrict) => {
     // Prepare centers list with remaining capacity
     const centersList = centers.map((c) => ({
-      id:        c.id,
+      // Prefer the numeric id (validated as `integer|exists:exam_centers,id`
+      // by the backend today). Fall back to hash_id for environments where the
+      // exam-centers API doesn't expose a numeric id — works once the backend's
+      // hash_id-decode in prepareForValidation() is deployed.
+      id:        c.id ?? c.hash_id,
       name:      c.name,
       district:  c.district?.name || c.district_name || '—',
       district_id: c.district_id ?? c.district?.id ?? null,
@@ -289,7 +293,7 @@ const RollSlipGenerator = () => {
         for (const bucket of allocationPreview.buckets) {
           const body = {
             application_numbers: bucket.apps.map((a) => a.application_number ?? a.id),
-            exam_center_id:      Number(bucket.centerId),
+            exam_center_id:      bucket.centerId,
             prefix:              formData.prefix.trim(),
             starting_number:     nextNumber,
             format:              formData.format,
@@ -319,7 +323,7 @@ const RollSlipGenerator = () => {
     try {
       const body = {
         application_numbers: applicationNumbers,
-        exam_center_id:      Number(formData.exam_center_id),
+        exam_center_id:      formData.exam_center_id,
         prefix:              formData.prefix.trim(),
         starting_number:     Number(formData.starting_number),
         format:              formData.format,
@@ -519,7 +523,7 @@ const RollSlipGenerator = () => {
                         </thead>
                         <tbody>
                           {allocationPreview.buckets.map((b) => {
-                            const center = centers.find((c) => c.id === b.centerId);
+                            const center = centers.find((c) => (c.id ?? c.hash_id) === b.centerId);
                             const cap    = Number(center?.capacity) || 0;
                             return (
                               <tr key={b.centerId} className="border-t border-slate-100">
@@ -568,8 +572,11 @@ const RollSlipGenerator = () => {
                   <MenuItem key="none" value="">— Select center —</MenuItem>
                   {centers.map((c) => {
                     const capacity = Number(c.capacity) || 0;
+                    // Prefer numeric id (works with current backend validation);
+                    // fall back to hash_id once the backend decodes hash ids too.
+                    const value = c.id != null ? String(c.id) : c.hash_id;
                     return (
-                      <MenuItem key={c.id} value={String(c.id)}>
+                      <MenuItem key={value} value={value}>
                         {c.name} {c.city ? `(${c.city})` : ''}
                         {capacity > 0 ? ` — capacity ${capacity}` : ''}
                       </MenuItem>
