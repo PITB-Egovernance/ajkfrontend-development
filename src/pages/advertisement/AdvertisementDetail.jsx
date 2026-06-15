@@ -31,6 +31,13 @@ import Config from 'config/baseUrl';
 
 import AuthService from 'services/authService';
 
+const STATUS_BADGES = {
+  active:              { label: 'Active',             className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
+  temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-100 text-amber-700' },
+  permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-100 text-red-700' },
+  reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-100 text-blue-700' },
+};
+
 const AdvertisementDetail = () => {
   /* ── HOOKS & STATE ── */
   const { id } = useParams();
@@ -245,11 +252,9 @@ const AdvertisementDetail = () => {
                   {advertisement.hash_id}
                 </span>
                 <span className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-widest border ${
-                  new Date(advertisement.closing_date) > new Date() 
-                    ? 'bg-blue-50 border-blue-100 text-blue-700' 
-                    : 'bg-red-50 border-red-100 text-red-700'
+                  (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).className
                 }`}>
-                  {new Date(advertisement.closing_date) > new Date() ? 'Active Record' : 'Archived'}
+                  {(STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).label}
                 </span>
               </div>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">{advertisement.adv_number}</h1>
@@ -272,6 +277,18 @@ const AdvertisementDetail = () => {
                 {formatDate(advertisement.adv_date)}
               </div>
             </div>
+            {advertisement.status === 'temporary_closed' && advertisement.extend_date && (
+              <>
+                <div className="w-px h-10 bg-slate-200 hidden md:block"></div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Extend Date</span>
+                  <div className="text-sm font-black text-slate-700 flex items-center gap-2">
+                    <div className="p-1.5 bg-amber-50 rounded-lg"><Clock size={14} className="text-amber-600" /></div>
+                    {formatDate(advertisement.extend_date)}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

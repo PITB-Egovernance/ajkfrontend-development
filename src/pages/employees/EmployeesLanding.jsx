@@ -12,6 +12,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import ExcelUploadZone from 'components/employees/ExcelUploadZone';
+import EmployeeService from 'services/EmployeeService';
 
 const TEMPLATE_HEADERS = ['Full Name', 'CNIC', 'Email', 'Mobile Number', 'Designation', 'Scale'];
 
@@ -41,11 +42,11 @@ const EmployeesLanding = () => {
     }
     setImporting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      toast.success(
-        `"${selectedFile.name}" received. Bulk import will be processed once the import API is integrated.`
-      );
+      const result = await EmployeeService.importUsers(selectedFile);
+      toast.success(result?.message || `"${selectedFile.name}" imported successfully`);
       setSelectedFile(null);
+    } catch (error) {
+      toast.error(error.message || 'Failed to import employees');
     } finally {
       setImporting(false);
     }

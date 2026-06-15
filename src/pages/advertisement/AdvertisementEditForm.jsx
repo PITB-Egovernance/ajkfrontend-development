@@ -11,6 +11,13 @@ import "../job-creation/JobCreationForm.css";
 const TEST_TYPE_CODE_TO_NAME = { '1': 'MCQs', '2': 'Written Exam' };
 const FALLBACK_EXAM_FEES = { 'MCQs': 505, 'Written Exam': 1010 };
 
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'temporary_closed', label: 'Temporary Closed' },
+  { value: 'permanently_closed', label: 'Permanently Closed' },
+  { value: 'reopen', label: 'Reopen' },
+];
+
 const AdvertisementEditForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -27,6 +34,8 @@ const AdvertisementEditForm = () => {
   const [termsConditions, setTermsConditions] = useState([""]);
   const [jobConfigs, setJobConfigs] = useState({});
   const [examFees, setExamFees] = useState(FALLBACK_EXAM_FEES);
+  const [status, setStatus] = useState("active");
+  const [extendDate, setExtendDate] = useState("");
 
   useEffect(() => {
     let aborted = false;
@@ -74,6 +83,8 @@ const AdvertisementEditForm = () => {
           setAdvertisementFee(data.advertisement_fee || "");
           setNote(data.note || data.notes || data.ad_note || "");
           setImportantNotes(data.important_notes || "");
+          setStatus(data.status || "active");
+          setExtendDate(data.extend_date?.split("T")[0] || "");
 
           let terms = [""];
           if (data.terms_conditions) {
@@ -139,6 +150,14 @@ const AdvertisementEditForm = () => {
       toast.error("Closing date must be after the advertisement date");
       return;
     }
+    if (status === "temporary_closed" && !extendDate) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        extend_date: ["Extend date is required when status is Temporary Closed"],
+      }));
+      toast.error("Extend date is required when status is Temporary Closed");
+      return;
+    }
 
     const filteredTerms = termsConditions.filter((t) => t.trim().length > 0);
 
@@ -159,6 +178,8 @@ const AdvertisementEditForm = () => {
         note: note || "",
         important_notes: importantNotes || "",
         terms_conditions: filteredTerms,
+        status,
+        extend_date: status === "temporary_closed" ? (extendDate || null) : null,
         job_fees: JSON.stringify(feesPayload),
         job_test_types: JSON.stringify(testTypesPayload)
       };
@@ -307,6 +328,58 @@ const AdvertisementEditForm = () => {
                     }
                   />
                 </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField
+                    select
+                    fullWidth
+                    label="Status"
+                    value={status}
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      setStatus(newStatus);
+                      if (newStatus !== "temporary_closed") {
+                        setExtendDate("");
+                      }
+                    }}
+                    sx={fieldSx}
+                    error={!!fieldErrors?.status}
+                    helperText={
+                      Array.isArray(fieldErrors?.status)
+                        ? fieldErrors.status.join(", ")
+                        : fieldErrors?.status
+                    }
+                  >
+                    {STATUS_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </div>
+                {status === "temporary_closed" && (
+                  <div className="col-md-6 form-group">
+                    <TextField
+                      fullWidth
+                      label="Extend Date"
+                      type="date"
+                      value={extendDate}
+                      onChange={(e) => setExtendDate(e.target.value)}
+                      required
+                      InputLabelProps={{ shrink: true }}
+                      sx={fieldSx}
+                      inputProps={{ min: closingDate, style: { height: 28 } }}
+                      error={!!fieldErrors?.extend_date}
+                      helperText={
+                        Array.isArray(fieldErrors?.extend_date)
+                          ? fieldErrors.extend_date.join(", ")
+                          : fieldErrors?.extend_date || "Date until which the advertisement is temporarily closed"
+                      }
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

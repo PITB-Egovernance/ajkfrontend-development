@@ -9,16 +9,16 @@ import {
   Plus,
   Upload,
   MoreVertical,
-  Copy,
-  Mail,
+  Eye,
 } from 'lucide-react';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
-import { getEmployees, toggleEmployeeStatus, DEFAULT_PASSWORD } from 'utils/employeeStorage';
+import EmployeeDetailsModal from 'components/employees/EmployeeDetailsModal';
+import EmployeeService from 'services/EmployeeService';
 
 const FILTER_CONFIG = [
-  { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by full name' },
+  { name: 'username', label: 'Username', type: 'text', placeholder: 'Filter by username' },
   { name: 'cnic', label: 'CNIC', type: 'text', placeholder: 'Filter by CNIC' },
   { name: 'email', label: 'Email', type: 'text', placeholder: 'Filter by email' },
   {
@@ -32,7 +32,7 @@ const FILTER_CONFIG = [
   },
 ];
 
-const EMPTY_FILTERS = { full_name: '', cnic: '', email: '', status: '' };
+const EMPTY_FILTERS = { username: '', cnic: '', email: '', status: '' };
 
 const gridSx = {
   border: 'none',
@@ -41,7 +41,20 @@ const gridSx = {
   '& .MuiDataGrid-row': { minHeight: '56px !important' },
 };
 
-const ActionCell = ({ employee, onCopyCredentials, onSendCredentials }) => {
+const mapUser = (user, idx) => ({
+  id: user?.hash_id || user?.id || `user-${idx}`,
+  hash_id: user?.hash_id || user?.id,
+  username: user?.username || '-',
+  cnic: user?.cnic || '-',
+  email: user?.email || '-',
+  father_husband_name: user?.father_husband_name || '-',
+  designation: user?.designation || '-',
+  grade: user?.grade || '-',
+  status: user?.status || 'inactive',
+  status_job: user?.status_job || '-',
+});
+
+const ActionCell = ({ employee, onViewDetails }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
@@ -86,11 +99,8 @@ const ActionCell = ({ employee, onCopyCredentials, onSendCredentials }) => {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={(e) => { handleClose(e); onCopyCredentials(employee); }}>
-          <Copy className="w-4 h-4" /> Copy Credentials
-        </MenuItem>
-        <MenuItem onClick={(e) => { handleClose(e); onSendCredentials(employee); }}>
-          <Mail className="w-4 h-4" /> Send Email Credentials
+        <MenuItem onClick={(e) => { handleClose(e); onViewDetails(employee); }}>
+          <Eye className="w-4 h-4" /> View / Edit Details
         </MenuItem>
       </Menu>
     </div>
@@ -100,32 +110,61 @@ const ActionCell = ({ employee, onCopyCredentials, onSendCredentials }) => {
 const EmployeeList = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [selectedHashId, setSelectedHashId] = useState(null);
 
-  useEffect(() => {
-    setEmployees(getEmployees());
-  }, []);
-
-  const handleToggleStatus = (employee) => {
-    const updated = toggleEmployeeStatus(employee.id);
-    setEmployees(updated);
-    const newStatus = employee.status === 'active' ? 'inactive' : 'active';
-    toast.success(`${employee.full_name} marked as ${newStatus}`);
-  };
-
-  const handleCopyCredentials = async (employee) => {
-    const text = `Email: ${employee.email}\nPassword: ${DEFAULT_PASSWORD}`;
+  const fetchEmployees = async () => {
+    setLoading(true);
     try {
-      await navigator.clipboard.writeText(text);
-      toast.success('Credentials copied to clipboard');
-    } catch {
-      toast.error('Failed to copy credentials');
+      const result = await EmployeeService.getUsers({ per_page: 100 });
+      setEmployees(result.data.map(mapUser));
+    } catch (error) {
+      toast.error(error.message || 'Failed to load employees');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSendCredentials = (employee) => {
-    toast.success(`Credentials sent to ${employee.email}`);
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  const handleToggleStatus = async (employee) => {
+    const newStatus = employee.status === 'active' ? 'inactive' : 'active';
+    try {
+      await EmployeeService.updateUser(employee.hash_id, { status: newStatus });
+      setEmployees((prev) =>
+        prev.map((emp) => (emp.id === employee.id ? { ...emp, status: newStatus } : emp))
+      );
+      toast.success(`${employee.username} marked as ${newStatus}`);
+    } catch (error) {
+      toast.error(error.message || 'Failed to update employee status');
+    }
+  };
+
+  const handleViewDetails = (employee) => {
+    setSelectedHashId(employee.hash_id);
+  };
+
+  const handleEmployeeUpdated = (updated) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.hash_id === updated.hash_id
+          ? {
+              ...emp,
+              email: updated.email ?? emp.email,
+              father_husband_name: updated.father_husband_name ?? emp.father_husband_name,
+              mobile: updated.mobile ?? emp.mobile,
+              domicile: updated.domicile ?? emp.domicile,
+              designation: updated.designation ?? emp.designation,
+              grade: updated.grade ?? emp.grade,
+              status: updated.status ?? emp.status,
+            }
+          : emp
+      )
+    );
   };
 
   const handleFilterChange = (e) => {
@@ -141,13 +180,13 @@ const EmployeeList = () => {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       const matchesSearch =
-        emp.full_name?.toLowerCase().includes(term) ||
+        emp.username?.toLowerCase().includes(term) ||
         emp.cnic?.toLowerCase().includes(term) ||
         emp.email?.toLowerCase().includes(term);
       if (!matchesSearch) return false;
     }
 
-    if (filters.full_name && !emp.full_name?.toLowerCase().includes(filters.full_name.toLowerCase())) return false;
+    if (filters.username && !emp.username?.toLowerCase().includes(filters.username.toLowerCase())) return false;
     if (filters.cnic && !emp.cnic?.toLowerCase().includes(filters.cnic.toLowerCase())) return false;
     if (filters.email && !emp.email?.toLowerCase().includes(filters.email.toLowerCase())) return false;
     if (filters.status && emp.status !== filters.status) return false;
@@ -159,9 +198,11 @@ const EmployeeList = () => {
   const inactiveCount = employees.filter((e) => e.status !== 'active').length;
 
   const columns = [
-    { field: 'full_name', headerName: 'Full Name', flex: 1, minWidth: 180 },
+    { field: 'username', headerName: 'Username', flex: 1, minWidth: 160 },
     { field: 'cnic', headerName: 'CNIC', flex: 0.8, minWidth: 150 },
     { field: 'email', headerName: 'Email', flex: 1, minWidth: 220 },
+    { field: 'designation', headerName: 'Designation', flex: 0.8, minWidth: 150 },
+    { field: 'grade', headerName: 'Grade', width: 100 },
     {
       field: 'status',
       headerName: 'Status',
@@ -188,11 +229,7 @@ const EmployeeList = () => {
       sortable: false,
       filterable: false,
       renderCell: (params) => (
-        <ActionCell
-          employee={params.row}
-          onCopyCredentials={handleCopyCredentials}
-          onSendCredentials={handleSendCredentials}
-        />
+        <ActionCell employee={params.row} onViewDetails={handleViewDetails} />
       ),
     },
   ];
@@ -252,7 +289,7 @@ const EmployeeList = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search by name, CNIC or email..."
+              placeholder="Search by username, CNIC or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
@@ -274,6 +311,7 @@ const EmployeeList = () => {
           <DataGrid
             rows={filteredEmployees}
             columns={columns}
+            loading={loading}
             autoHeight
             pageSizeOptions={[10, 25, 50]}
             initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
@@ -282,6 +320,13 @@ const EmployeeList = () => {
           />
         </div>
       </div>
+
+      <EmployeeDetailsModal
+        open={!!selectedHashId}
+        hashId={selectedHashId}
+        onClose={() => setSelectedHashId(null)}
+        onUpdated={handleEmployeeUpdated}
+      />
     </div>
   );
 };
