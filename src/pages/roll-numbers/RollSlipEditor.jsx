@@ -72,7 +72,7 @@ const RollSlipEditor = () => {
 
         setFormData({
           roll_number:     row.roll_number ?? '',
-          exam_center_id:  row.exam_center?.id ? String(row.exam_center.id) : '',
+          exam_center_id:  row.exam_center_id ? String(row.exam_center_id) : '',
           seat_number:     row.seat_number ?? '',
           exam_date:       row.exam_date ?? '',
           attendance_time: parseTime24h(row.attendance_time ?? ''),

@@ -210,7 +210,12 @@ const RollNumberManagement = () => {
             preferred_exam_cities: (item.preferred_exam_cities || []).map(resolveCityName),
             roll_number:       item.roll_number,
             exam_center:       item.exam_center,
+            exam_center_id:    item.exam_center_id,
             exam_city:         item.exam_city,
+            exam_hall_id:      item.exam_hall_id,
+            seat_number:       item.seat_number,
+            exam_date:         item.exam_date,
+            attendance_time:   item.attendance_time,
             published_at:      item.published_at,
           }))
           .filter((row) => {
