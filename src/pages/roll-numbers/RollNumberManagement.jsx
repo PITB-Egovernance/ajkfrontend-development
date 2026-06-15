@@ -410,6 +410,8 @@ const RollNumberManagement = () => {
   const columns = [
     { field: 'application_number', headerName: 'Ref ID',          minWidth: 110, flex: 0.8 },
     { field: 'applicant_name',     headerName: 'Applicant Name',  minWidth: 160, flex: 1.1 },
+    { field: 'advertisement_no',     headerName: 'Advertisement Number',  minWidth: 160, flex: 1.1 },
+    { field: 'job_title',     headerName: 'Job Advertisement',  minWidth: 160, flex: 1.1 },
     { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
     {
       field: 'preferred_exam_cities',
