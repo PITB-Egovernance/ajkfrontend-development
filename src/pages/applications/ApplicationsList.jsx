@@ -129,6 +129,7 @@ const ApplicationsList = () => {
       };
       const response = await ApplicationApi.getAll(params);
 
+      console.log("response", response);
       const payload    = response?.data || response;
       const data       = payload?.data || response.data?.data || response.data || [];
       const totalCount = payload?.total || response.meta?.total || response.total || data.length || 0;
@@ -166,6 +167,13 @@ const ApplicationsList = () => {
         const resolvedExamCities = (item.preferred_exam_cities || []).map(resolveCity);
         const domicile = snapshot?.domicile_district || item.candidate?.domicile_district || item.snapshot_data?.domicile_district;
 
+        // Pull candidate photo, CNIC-front and CNIC-back document images so they can be
+        // shown in the list and forwarded to the admin DB on status updates.
+        const documents = item.candidate?.documents || item.documents || [];
+        const cnicFrontDoc = documents.find((doc) => doc.doc_type === 'cnic_front');
+        const cnicBackDoc = documents.find((doc) => doc.doc_type === 'cnic_back');
+        const photoDoc = documents.find((doc) => doc.doc_type === 'photo');
+
         // Admin DB is the source of truth for status (overlaid via _admin_status).
         // Fall back to candidate status, masking the implicit 'submitted' as blank.
         const effectiveStatus = item._admin_status !== null && item._admin_status !== undefined
@@ -197,6 +205,9 @@ const ApplicationsList = () => {
           disability:      item.candidate?.disability || null,
           domicile_district: domicile,
           preferred_exam_cities: resolvedExamCities,
+          cnic_front_url: cnicFrontDoc?.file_url || null,
+          cnic_back_url: cnicBackDoc?.file_url || null,
+          photo_url: photoDoc?.file_url || item.candidate?.profile_photo_url || null,
         };
       });
 
@@ -281,11 +292,30 @@ const ApplicationsList = () => {
   const updateStatus = async (id, status) => {
     try {
       const row = rows.find((r) => r.id === id);
+      const payloadRow = {
+      ...row,
+      candidate_cnic: row?.cnic,
+      cnic_front_path: row?.cnic_front_path,
+      cnic_back_path: row?.cnic_back_path,
+      photo_path: row?.photo_path,
+      profile_photo_path: row?.profile_photo_path,
+      profile_photo_url: row?.profile_photo_url,
+    };
+
+    console.log("Payload", payloadRow)
       // Optimistic update — set both `status` (display) and `_admin_status` (source of truth
       // for the effectiveStatus mapping). Without this, a later re-render (re-fetch or filter
       // change) maps the row back to '' because the candidate portal always returns 'submitted'.
-      setRows(prev => prev.map(r => r.id === id ? { ...r, status, _admin_status: status } : r));
-      await ApplicationApi.updateStatus(id, status, row);
+      // setRows(prev => prev.map(r => r.id === id ? { ...r, status, _admin_status: status } : r));
+      setRows(prev =>
+      prev.map(r =>
+        r.id === id ? { ...r, status, _admin_status: status } : r
+      )
+    );
+      // await ApplicationApi.updateStatus(id, status, row);
+      // toast.success(`Application marked as ${status}`);
+      await ApplicationApi.updateStatus(id, status, payloadRow);
+
       toast.success(`Application marked as ${status}`);
     } catch (err) {
       // Surface backend message when available — the live API's updateStatus path can
@@ -305,10 +335,22 @@ const ApplicationsList = () => {
   const handleBulkStatusUpdate = async (status) => {
     if (!selectionModel.length) return;
     try {
-      const selectedRows = rows.filter((r) => selectionModel.includes(r.id));
+      // const selectedRows = rows.filter((r) => selectionModel.includes(r.id));
+      const selectedRows = rows
+      .filter((r) => selectionModel.includes(r.id))
+      .map(row => ({
+        ...row,
+        candidate_cnic: row?.cnic,
+        cnic_front_path: row?.cnic_front_path,
+        cnic_back_path: row?.cnic_back_path,
+        photo_path: row?.photo_path,
+        profile_photo_path: row?.profile_photo_path,
+        profile_photo_url: row?.profile_photo_url,
+      }));
       // Same optimistic patch as updateStatus — also write _admin_status so the row keeps its
       // new status across re-fetches and filter changes.
       setRows(prev => prev.map(r => selectionModel.includes(r.id) ? { ...r, status, _admin_status: status } : r));
+      // await ApplicationApi.bulkUpdateStatus(selectionModel, status, selectedRows);
       await ApplicationApi.bulkUpdateStatus(selectionModel, status, selectedRows);
       toast.success(`${selectionModel.length} applications marked as ${status}`);
       setSelectionModel([]);
@@ -326,6 +368,28 @@ const ApplicationsList = () => {
 
   const columns = [
     { field: 'id',               headerName: 'Ref ID',           minWidth: 100 },
+    // {
+    //   field: 'photo_url',
+    //   headerName: 'Photo',
+    //   minWidth: 70,
+    //   sortable: false,
+    //   renderCell: (params) => params.value ? (
+    //     <a href={params.value} target="_blank" rel="noopener noreferrer">
+    //       <img src={params.value} alt="Candidate" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+    //     </a>
+    //   ) : <span className="text-slate-400 text-xs">—</span>,
+    // },
+    // {
+    //   field: 'cnic_front_url',
+    //   headerName: 'CNIC Front',
+    //   minWidth: 90,
+    //   sortable: false,
+    //   renderCell: (params) => params.value ? (
+    //     <a href={params.value} target="_blank" rel="noopener noreferrer">
+    //       <img src={params.value} alt="CNIC Front" className="w-14 h-10 rounded object-cover border border-slate-200" />
+    //     </a>
+    //   ) : <span className="text-slate-400 text-xs">—</span>,
+    // },
     { field: 'applicant_name',   headerName: 'Applicant Name',   minWidth: 150 },
     { field: 'cnic',             headerName: 'CNIC',             minWidth: 150 },
     { field: 'job_title',        headerName: 'Job Advertisement', minWidth: 170 },

@@ -62,16 +62,63 @@ const overlayAdminStatuses = async (result) => {
 
 // Minimal candidate metadata shipped with every status write so the admin can
 // upsert a row even when the application has never been pushed to admin DB.
-const buildApplicationMeta = (app) => ({
+// const buildApplicationMeta = (app) => ({
+//   application_number: app.application_number || app.id,
+//   candidate_name:     app.applicant_name || app.candidate_name || app.snapshot_data?.name || null,
+//   candidate_cnic:     app.cnic || app.candidate_cnic || app.snapshot_data?.cnic || null,
+//   candidate_email:    app.candidate_email || app.snapshot_data?.email || null,
+//   candidate_mobile:   app.candidate_mobile || app.snapshot_data?.mobile_number || null,
+//   advertisement_no:   app.advertisement_no || app.job_post?.adv_number || app.job_post?.ext_adv_id || null,
+//   domicile_district:  app.domicile_district || null,
+//   disability:         app.disability || null,
+//   preferred_exam_cities: app.preferred_exam_cities || [],
+//   candidate_cnic_front: app.cnic_front_url || null,
+//   candidate_cnic_back:  app.cnic_back_url || null,
+//   candidate_photo:      app.photo_url || null,
+// });
+
+const buildApplicationMeta = (app = {}) => ({
   application_number: app.application_number || app.id,
-  candidate_name:     app.applicant_name || app.candidate_name || app.snapshot_data?.name || null,
-  candidate_cnic:     app.cnic || app.candidate_cnic || app.snapshot_data?.cnic || null,
-  candidate_email:    app.candidate_email || app.snapshot_data?.email || null,
-  candidate_mobile:   app.candidate_mobile || app.snapshot_data?.mobile_number || null,
-  advertisement_no:   app.advertisement_no || app.job_post?.adv_number || app.job_post?.ext_adv_id || null,
-  domicile_district:  app.domicile_district || null,
-  disability:         app.disability || null,
+
+  candidate_name:
+    app.applicant_name || app.candidate_name || app.snapshot_data?.name || null,
+
+  candidate_cnic:
+    app.cnic || app.candidate_cnic || app.snapshot_data?.cnic || null,
+
+  candidate_email:
+    app.candidate_email || app.snapshot_data?.email || null,
+
+  candidate_mobile:
+    app.candidate_mobile || app.snapshot_data?.mobile_number || null,
+
+  advertisement_no:
+    app.advertisement_no || app.job_post?.adv_number || app.job_post?.ext_adv_id || null,
+
+  domicile_district: app.domicile_district || null,
+  disability: app.disability || null,
   preferred_exam_cities: app.preferred_exam_cities || [],
+
+  // CNIC / Photo fields from ApplicationList.jsx
+  candidate_cnic_front:
+    app.cnic_front_path || app.cnic_front_url || null,
+
+  candidate_cnic_back:
+    app.cnic_back_path || app.cnic_back_url || null,
+
+  candidate_photo:
+    app.profile_photo_path ||
+    app.photo_path ||
+    app.profile_photo_url ||
+    app.photo_url ||
+    null,
+
+  // Optional: send separate fields also
+  cnic_front_path: app.cnic_front_path || null,
+  cnic_back_path: app.cnic_back_path || null,
+  photo_path: app.photo_path || null,
+  profile_photo_path: app.profile_photo_path || null,
+  profile_photo_url: app.profile_photo_url || null,
 });
 
 const ApplicationApi = {
@@ -146,53 +193,109 @@ const ApplicationApi = {
   // Fallback: if the single endpoint returns 404 (live backend's updateStatus path
   // throws ModelNotFoundException when the admin row hasn't been synced yet, but
   // bulk-status uses an upsert path that creates the stub), retry via bulk-status.
-  updateStatus: async (applicationNumber, status, meta = null) => {
-    const body = { status };
-    if (meta) body.application = buildApplicationMeta({ ...meta, application_number: applicationNumber });
+  // updateStatus: async (applicationNumber, status, meta = null) => {
+  //   const body = { status };
+  //   if (meta) body.application = buildApplicationMeta({ ...meta, application_number: applicationNumber });
 
-    const response = await fetch(`${ADMIN_API_BASE}/applications/${applicationNumber}/status`, {
+  //   const response = await fetch(`${ADMIN_API_BASE}/applications/${applicationNumber}/status`, {
+  //     method: 'PUT',
+  //     headers: getAdminHeaders(),
+  //     body: JSON.stringify(body),
+  //   });
+
+  //   // Quick success — return as normal.
+  //   if (response.ok) return handleResponse(response);
+
+  //   // On 404, the live backend's updateStatus path failed because the admin DB
+  //   // has no row for this application_number yet. Fall back to bulk-status, which
+  //   // uses updateOrCreate and can create the stub from the supplied meta.
+  //   if (response.status === 404) {
+  //     const fbResponse = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
+  //       method: 'PUT',
+  //       headers: getAdminHeaders(),
+  //       body: JSON.stringify({
+  //         ids: [applicationNumber],
+  //         status,
+  //         applications: [buildApplicationMeta({ ...meta, application_number: applicationNumber })],
+  //       }),
+  //     });
+  //     return handleResponse(fbResponse);
+  //   }
+
+  //   return handleResponse(response);
+  // },
+
+  updateStatus: async (applicationNumber, status, meta = null) => {
+  const applicationMeta = buildApplicationMeta({
+    ...meta,
+    application_number: applicationNumber,
+  });
+
+  const body = {
+    status,
+    application: applicationMeta,
+  };
+
+  console.log('Update Status API Body:', body);
+
+  const response = await fetch(`${ADMIN_API_BASE}/applications/${applicationNumber}/status`, {
+    method: 'PUT',
+    headers: getAdminHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (response.ok) return handleResponse(response);
+
+  if (response.status === 404) {
+    const fbResponse = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
       method: 'PUT',
       headers: getAdminHeaders(),
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        ids: [applicationNumber],
+        status,
+        applications: [applicationMeta],
+      }),
     });
 
-    // Quick success — return as normal.
-    if (response.ok) return handleResponse(response);
+    return handleResponse(fbResponse);
+  }
 
-    // On 404, the live backend's updateStatus path failed because the admin DB
-    // has no row for this application_number yet. Fall back to bulk-status, which
-    // uses updateOrCreate and can create the stub from the supplied meta.
-    if (response.status === 404) {
-      const fbResponse = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
-        method: 'PUT',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({
-          ids: [applicationNumber],
-          status,
-          applications: [buildApplicationMeta({ ...meta, application_number: applicationNumber })],
-        }),
-      });
-      return handleResponse(fbResponse);
-    }
-
-    return handleResponse(response);
-  },
+  return handleResponse(response);
+},
 
   // Bulk status update. Pass `applications` (array of row objects) so the backend
   // can upsert any stubs that don't yet exist in the admin DB.
+  // bulkUpdateStatus: async (applicationNumbers, status, applications = []) => {
+  //   const body = {
+  //     ids: applicationNumbers,
+  //     status,
+  //     applications: applications.map(buildApplicationMeta),
+  //   };
+  //   const response = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
+  //     method: 'PUT',
+  //     headers: getAdminHeaders(),
+  //     body: JSON.stringify(body),
+  //   });
+  //   return handleResponse(response);
+  // },
+
   bulkUpdateStatus: async (applicationNumbers, status, applications = []) => {
-    const body = {
-      ids: applicationNumbers,
-      status,
-      applications: applications.map(buildApplicationMeta),
-    };
-    const response = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
-      method: 'PUT',
-      headers: getAdminHeaders(),
-      body: JSON.stringify(body),
-    });
-    return handleResponse(response);
-  },
+  const body = {
+    ids: applicationNumbers,
+    status,
+    applications: applications.map(buildApplicationMeta),
+  };
+
+  console.log('Bulk Status API Body:', body);
+
+  const response = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
+    method: 'PUT',
+    headers: getAdminHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  return handleResponse(response);
+},
 };
 
 export default ApplicationApi;
