@@ -36,6 +36,7 @@ const STATUS_BADGES = {
   temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-100 text-amber-700' },
   permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-100 text-red-700' },
   reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-100 text-blue-700' },
+  extend_date:         { label: 'Extended',           className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
 };
 
 const AdvertisementDetail = () => {
@@ -277,7 +278,7 @@ const AdvertisementDetail = () => {
                 {formatDate(advertisement.adv_date)}
               </div>
             </div>
-            {advertisement.status === 'temporary_closed' && advertisement.extend_date && (
+            {advertisement.status === 'extend_date' && advertisement.extend_date && (
               <>
                 <div className="w-px h-10 bg-slate-200 hidden md:block"></div>
                 <div className="flex flex-col items-end">

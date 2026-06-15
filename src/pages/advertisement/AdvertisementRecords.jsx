@@ -35,6 +35,7 @@ const STATUS_BADGES = {
   temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-200 text-amber-700' },
   permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-200 text-red-700' },
   reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-200 text-blue-700' },
+  extend_date:         { label: 'Extended',           className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
 };
 
 const ActionCell = ({ ad, onView, onEdit, onDelete }) => {
@@ -148,7 +149,8 @@ const AdvertisementRecords = () => {
         { value: 'active', label: 'Active' },
         { value: 'temporary_closed', label: 'Temporary Closed' },
         { value: 'permanently_closed', label: 'Permanently Closed' },
-        { value: 'reopen', label: 'Reopen' }
+        { value: 'reopen', label: 'Reopen' },
+        { value: 'extend_date', label: 'Extended' }
       ]
     }
   ];

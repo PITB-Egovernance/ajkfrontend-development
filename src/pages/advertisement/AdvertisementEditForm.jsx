@@ -16,6 +16,7 @@ const STATUS_OPTIONS = [
   { value: 'temporary_closed', label: 'Temporary Closed' },
   { value: 'permanently_closed', label: 'Permanently Closed' },
   { value: 'reopen', label: 'Reopen' },
+  { value: 'extend_date', label: 'Extend Date' },
 ];
 
 const AdvertisementEditForm = () => {
@@ -150,14 +151,6 @@ const AdvertisementEditForm = () => {
       toast.error("Closing date must be after the advertisement date");
       return;
     }
-    if (status === "temporary_closed" && !extendDate) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        extend_date: ["Extend date is required when status is Temporary Closed"],
-      }));
-      toast.error("Extend date is required when status is Temporary Closed");
-      return;
-    }
 
     const filteredTerms = termsConditions.filter((t) => t.trim().length > 0);
 
@@ -179,7 +172,7 @@ const AdvertisementEditForm = () => {
         important_notes: importantNotes || "",
         terms_conditions: filteredTerms,
         status,
-        extend_date: status === "temporary_closed" ? (extendDate || null) : null,
+        extend_date: status === "extend_date" ? (extendDate || null) : null,
         job_fees: JSON.stringify(feesPayload),
         job_test_types: JSON.stringify(testTypesPayload)
       };
@@ -340,7 +333,7 @@ const AdvertisementEditForm = () => {
                     onChange={(e) => {
                       const newStatus = e.target.value;
                       setStatus(newStatus);
-                      if (newStatus !== "temporary_closed") {
+                      if (newStatus !== "extend_date") {
                         setExtendDate("");
                       }
                     }}
@@ -359,7 +352,7 @@ const AdvertisementEditForm = () => {
                     ))}
                   </TextField>
                 </div>
-                {status === "temporary_closed" && (
+                {status === "extend_date" && (
                   <div className="col-md-6 form-group">
                     <TextField
                       fullWidth
@@ -367,7 +360,6 @@ const AdvertisementEditForm = () => {
                       type="date"
                       value={extendDate}
                       onChange={(e) => setExtendDate(e.target.value)}
-                      required
                       InputLabelProps={{ shrink: true }}
                       sx={fieldSx}
                       inputProps={{ min: closingDate, style: { height: 28 } }}
@@ -375,7 +367,7 @@ const AdvertisementEditForm = () => {
                       helperText={
                         Array.isArray(fieldErrors?.extend_date)
                           ? fieldErrors.extend_date.join(", ")
-                          : fieldErrors?.extend_date || "Date until which the advertisement is temporarily closed"
+                          : fieldErrors?.extend_date || "Advertisement stays open until this date, beyond the closing date"
                       }
                     />
                   </div>
