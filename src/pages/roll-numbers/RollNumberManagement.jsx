@@ -398,6 +398,13 @@ const RollNumberManagement = () => {
     openSlipGenerator([appNum]);
   };
 
+  // ── Selection-aware generation state (for bulk action bar) ─────────────
+  const selectedRows = useMemo(
+    () => rows.filter((r) => selectedIds.includes(r.id)),
+    [rows, selectedIds]
+  );
+  const hasGeneratedSelected = selectedRows.some((r) => r.roll_number);
+
   // ── Stats ───────────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
     total:        rows.length,
@@ -531,20 +538,29 @@ const RollNumberManagement = () => {
 
         {/* BULK BAR */}
         {selectedIds.length > 0 && (
-          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
-            <span className="text-emerald-800 font-medium">
-              {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
-            </span>
-            <div className="flex gap-2">
-              <Button onClick={openSlipGenerator} variant="primary" size="sm" className="flex items-center gap-2">
-                <Send size={14} /> Generate Roll No Slip
-              </Button>
-              <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
-                className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
-                disabled={rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
-                <Trash2 size={14} /> Delete Roll No Slip
-              </Button>
+          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-emerald-800 font-medium">
+                {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
+              </span>
+              <div className="flex gap-2">
+                {!hasGeneratedSelected && (
+                  <Button onClick={openSlipGenerator} variant="primary" size="sm" className="flex items-center gap-2">
+                    <Send size={14} /> Generate Roll No Slip
+                  </Button>
+                )}
+                <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
+                  className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
+                  disabled={rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
+                  <Trash2 size={14} /> Delete Roll No Slip
+                </Button>
+              </div>
             </div>
+            {hasGeneratedSelected && (
+              <p className="text-amber-700 text-xs font-medium mt-2">
+                You have selected an already generated roll no slip. Please deselect it, or delete it to re-generate.
+              </p>
+            )}
           </div>
         )}
 
@@ -594,9 +610,11 @@ const RollNumberManagement = () => {
         <MenuItem key="view" onClick={handleView}>
           <Eye size={16} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
         </MenuItem>
-        <MenuItem key="generate" onClick={handleGenerateOne} disabled={!!selectedRow?.roll_number}>
-          <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
-        </MenuItem>
+        {!selectedRow?.roll_number && (
+          <MenuItem key="generate" onClick={handleGenerateOne}>
+            <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
+          </MenuItem>
+        )}
         <MenuItem key="edit"
           onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate('/dashboard/roll-numbers/edit-slip/' + row.application_number, { state: { row } }); }}
           disabled={!selectedRow?.roll_number}>

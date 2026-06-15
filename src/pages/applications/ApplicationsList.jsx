@@ -366,6 +366,14 @@ const ApplicationsList = () => {
     return STATUS_COLORS[key] ?? 'bg-gray-100 text-gray-700';
   };
 
+  // ── Selection-aware shortlist state (for bulk action bar) ───────────────
+  const selectedRows = useMemo(
+    () => rows.filter((r) => selectionModel.includes(r.id)),
+    [rows, selectionModel]
+  );
+  const anyShortlisted = selectedRows.some((r) => (r.status || '').toLowerCase() === 'shortlisted');
+  const allShortlisted = selectedRows.length > 0 && selectedRows.every((r) => (r.status || '').toLowerCase() === 'shortlisted');
+
   const columns = [
     { field: 'id',               headerName: 'Ref ID',           minWidth: 100 },
     // {
@@ -531,16 +539,30 @@ const ApplicationsList = () => {
 
         {/* Bulk Actions */}
         {selectionModel.length > 0 && (
-          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
-            <span className="text-emerald-800 font-medium">{selectionModel.length} applications selected</span>
-            <div className="flex gap-2">
-              <Button onClick={() => handleBulkStatusUpdate('Shortlisted')} variant="primary" size="sm">
-                Shortlist Selected
-              </Button>
-              <Button onClick={() => handleBulkStatusUpdate('Rejected')} variant="destructive" size="sm">
-                Reject Selected
-              </Button>
+          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-emerald-800 font-medium">{selectionModel.length} applications selected</span>
+              <div className="flex gap-2">
+                {!anyShortlisted && (
+                  <Button onClick={() => handleBulkStatusUpdate('Shortlisted')} variant="primary" size="sm">
+                    Shortlist Selected
+                  </Button>
+                )}
+                {anyShortlisted && (
+                  <Button onClick={() => handleBulkStatusUpdate('submitted')} variant="outline" size="sm">
+                    Unshortlist Selected
+                  </Button>
+                )}
+                <Button onClick={() => handleBulkStatusUpdate('Rejected')} variant="destructive" size="sm">
+                  Reject Selected
+                </Button>
+              </div>
             </div>
+            {anyShortlisted && !allShortlisted && (
+              <p className="text-amber-700 text-xs font-medium mt-2">
+                You have selected an already shortlisted application. Please unshortlist it before shortlisting the rest.
+              </p>
+            )}
           </div>
         )}
 
@@ -612,14 +634,17 @@ const ApplicationsList = () => {
         <MenuItem onClick={handleView}>
           <Eye size={18} style={{ marginRight: '8px' }} className="text-blue-600" /> View Details
         </MenuItem>
-        <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Shortlisted')}>
-          <CheckCircle size={18} style={{ marginRight: '8px' }} className="text-green-600" /> Mark Shortlisted
-        </MenuItem>
+        {selectedRow?.status?.toLowerCase() === 'shortlisted' ? (
+          <MenuItem onClick={() => updateStatus(selectedRow?.id, 'submitted')}>
+            <RefreshCw size={18} style={{ marginRight: '8px' }} className="text-yellow-600" /> Unshortlist
+          </MenuItem>
+        ) : (
+          <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Shortlisted')}>
+            <CheckCircle size={18} style={{ marginRight: '8px' }} className="text-green-600" /> Mark Shortlisted
+          </MenuItem>
+        )}
         <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Rejected')}>
           <XCircle size={18} style={{ marginRight: '8px' }} className="text-red-600" /> Mark Rejected
-        </MenuItem>
-        <MenuItem onClick={() => updateStatus(selectedRow?.id, 'submitted')}>
-          <RefreshCw size={18} style={{ marginRight: '8px' }} className="text-yellow-600" /> Unshortlist (Reset)
         </MenuItem>
       </Menu>
     </div>
