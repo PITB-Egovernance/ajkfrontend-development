@@ -398,6 +398,8 @@ const AdvertisementRecords = () => {
     note: ad.note || ad.notes || ad.ad_note,
     important_notes: ad.important_notes,
     hash_id: ad.hash_id,
+    status: ad.status,
+    extend_date: ad.extend_date,
   });
 
   return (

@@ -508,10 +508,6 @@ const RequisitionPreview = () => {
                   <TableCell>{step3.nationality || 'N/A'}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Domicile</TableCell>
-                  <TableCell>{getDistrictName(step3.domicile) || 'N/A'}</TableCell>
-                </TableRow>
-                <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Other Conditions</TableCell>
                   <TableCell>{step3.other_conditions || 'N/A'}</TableCell>
                 </TableRow>

@@ -396,7 +396,6 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
     formData.max_age !== '' && formData.max_age !== null && formData.max_age !== undefined &&
     !!formData.age_relaxation &&
     !!formData.nationality &&
-    !!formData.domicile &&
     (formData.selection_mode !== 'quota_based' || (formData.district || []).some(Boolean));
 
   const isStep3Valid = hasRequiredFields && !hasValidationErrors;
@@ -647,49 +646,6 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
             {nationalities.map((n) => (
               <MenuItem key={n} value={n}>{n}</MenuItem>
             ))}
-          </TextField>
-        </div>
-
-        <div className="col-md-6 form-group">
-          {/* <TextField
-            fullWidth
-            required
-            label="Domicile (Name Districts/Units)"
-            name="domicile"
-            value={formData.domicile}
-            onChange={handleChange}
-          /> */}
-          <TextField
-            fullWidth
-            required
-            select
-            label="Select Domicile"
-            name="domicile"
-            value={formData.domicile || ''}
-            onChange={(e) =>
-              setFormData(prev => ({
-                ...prev,
-                domicile: e.target.value
-              }))
-            }
-          >
-            <MenuItem value="">Select District</MenuItem>
-
-            {districtOptions.map((district) => (
-              <MenuItem key={district.id} value={district.id}>
-                {district.name}
-              </MenuItem>
-            ))}
-
-            {/* Fallback so a previously-saved value that doesn't match any
-                districtOptions entry still renders as selected instead of
-                leaving the Select blank. Picking a real option replaces it. */}
-            {formData.domicile &&
-              !districtOptions.some((district) => district.id === formData.domicile) && (
-                <MenuItem value={formData.domicile}>
-                  {formData.domicile}
-                </MenuItem>
-            )}
           </TextField>
         </div>
 
