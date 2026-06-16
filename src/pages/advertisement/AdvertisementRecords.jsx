@@ -30,6 +30,14 @@ import { Menu, MenuItem, IconButton, TextField } from '@mui/material';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { Link } from 'react-router-dom';
 
+const STATUS_BADGES = {
+  active:              { label: 'Active',             className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+  temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-200 text-amber-700' },
+  permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-200 text-red-700' },
+  reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-200 text-blue-700' },
+  extend_date:         { label: 'Extended',           className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+};
+
 const ActionCell = ({ ad, onView, onEdit, onDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -139,7 +147,10 @@ const AdvertisementRecords = () => {
       type: 'select',
       options: [
         { value: 'active', label: 'Active' },
-        { value: 'closed', label: 'Closed' }
+        { value: 'temporary_closed', label: 'Temporary Closed' },
+        { value: 'permanently_closed', label: 'Permanently Closed' },
+        { value: 'reopen', label: 'Reopen' },
+        { value: 'extend_date', label: 'Extended' }
       ]
     }
   ];
@@ -277,7 +288,7 @@ const AdvertisementRecords = () => {
     }
 
     if (filters.status) {
-      const adStatus = new Date(ad.closing_date) > new Date() ? 'active' : 'closed';
+      const adStatus = ad.status || 'active';
       if (adStatus !== filters.status) return false;
     }
 
@@ -331,17 +342,13 @@ const AdvertisementRecords = () => {
     {
       field: 'status',
       headerName: 'Status',
-      width: 120,
+      width: 150,
       renderCell: (params) => {
-        const isActive = new Date(params.row.closing_date) > new Date();
+        const badge = STATUS_BADGES[params.row.status] || STATUS_BADGES.active;
         return (
           <div className="flex items-center h-full">
-            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-              isActive 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                : 'bg-red-50 border-red-200 text-red-700'
-            }`}>
-              {isActive ? 'Active' : 'Closed'}
+            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${badge.className}`}>
+              {badge.label}
             </span>
           </div>
         );
@@ -391,6 +398,8 @@ const AdvertisementRecords = () => {
     note: ad.note || ad.notes || ad.ad_note,
     important_notes: ad.important_notes,
     hash_id: ad.hash_id,
+    status: ad.status,
+    extend_date: ad.extend_date,
   });
 
   return (

@@ -224,7 +224,6 @@ const RequisitionEdit = () => {
       if (!data.max_age || data.max_age < data.min_age) errors.max_age = 'Maximum age must be greater than minimum age';
       if (!data.age_relaxation) errors.age_relaxation = 'Age relaxation is required';
       if (!data.nationality) errors.nationality = 'Nationality is required';
-      if (!data.domicile?.trim()) errors.domicile = 'Domicile is required';
       if (!data.gender_basis) errors.gender_basis = 'Gender is required';
     }
 

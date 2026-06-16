@@ -31,6 +31,14 @@ import Config from 'config/baseUrl';
 
 import AuthService from 'services/authService';
 
+const STATUS_BADGES = {
+  active:              { label: 'Active',             className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
+  temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-100 text-amber-700' },
+  permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-100 text-red-700' },
+  reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-100 text-blue-700' },
+  extend_date:         { label: 'Extended',           className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
+};
+
 const AdvertisementDetail = () => {
   /* ── HOOKS & STATE ── */
   const { id } = useParams();
@@ -39,6 +47,8 @@ const AdvertisementDetail = () => {
   const [loading, setLoading] = useState(true);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [districtOptions, setDistrictOptions] = useState([]);
+  const [gradeOptions, setGradeOptions] = useState([]);
+  const [testTypeOptions, setTestTypeOptions] = useState([]);
 
   const API_ROOT = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
   const API_BASE = Config.apiUrl;
@@ -49,7 +59,32 @@ const AdvertisementDetail = () => {
   useEffect(() => {
     fetchAdvertisementDetails();
     fetchDistricts();
+    fetchGrades();
+    fetchTestTypes();
   }, [id]);
+
+  const fetchGrades = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: "application/json",
+          "X-API-KEY": API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setGradeOptions(
+          list
+            .filter((g) => (g.status ?? 'active') === 'active')
+            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching grades:", error);
+    }
+  };
 
   const fetchDistricts = async () => {
     try {
@@ -69,6 +104,28 @@ const AdvertisementDetail = () => {
       }
     } catch (error) {
       console.error("Error fetching districts:", error);
+    }
+  };
+
+  const fetchTestTypes = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/tests`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: "application/json",
+          "X-API-KEY": API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success) {
+        const list = result.data?.data ?? result.data ?? [];
+        setTestTypeOptions(list.map((t) => ({
+          id: t.hash_id || String(t.id),
+          name: t.test_name,
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching test types:", error);
     }
   };
 
@@ -102,6 +159,28 @@ const AdvertisementDetail = () => {
     if (!hashId || districtOptions.length === 0) return hashId || "N/A";
     const district = districtOptions.find((d) => d.id === hashId);
     return district ? district.name : hashId;
+  };
+
+  // Resolve a stored scale value (hash_id, number, or string) to the
+  // human-readable grade name (e.g. "BPS-17"). The grade name already
+  // includes the "BPS-"/"BS-" prefix, so it's rendered as-is.
+  const getScaleName = (rawScale) => {
+    if (rawScale === null || rawScale === undefined || rawScale === '') return 'N/A';
+    if (typeof rawScale === 'object') {
+      return rawScale.name || rawScale.hash_id || rawScale.id || 'N/A';
+    }
+    const str = String(rawScale).trim();
+    const matched = gradeOptions.find((g) => g.id === str || g.name === str);
+    return matched ? matched.name : str;
+  };
+
+  const LEGACY_TEST_TYPE_NAMES = { '1': 'MCQs', '2': 'Written Exam' };
+
+  const getTestTypeName = (testType) => {
+    if (!testType) return 'N/A';
+    if (LEGACY_TEST_TYPE_NAMES[testType]) return LEGACY_TEST_TYPE_NAMES[testType];
+    const test = testTypeOptions.find((t) => t.id === testType);
+    return test ? test.name : testType;
   };
 
   const formatDate = (dateStr) => {
@@ -174,11 +253,9 @@ const AdvertisementDetail = () => {
                   {advertisement.hash_id}
                 </span>
                 <span className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-widest border ${
-                  new Date(advertisement.closing_date) > new Date() 
-                    ? 'bg-blue-50 border-blue-100 text-blue-700' 
-                    : 'bg-red-50 border-red-100 text-red-700'
+                  (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).className
                 }`}>
-                  {new Date(advertisement.closing_date) > new Date() ? 'Active Record' : 'Archived'}
+                  {(STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).label}
                 </span>
               </div>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">{advertisement.adv_number}</h1>
@@ -201,6 +278,18 @@ const AdvertisementDetail = () => {
                 {formatDate(advertisement.adv_date)}
               </div>
             </div>
+            {advertisement.status === 'extend_date' && advertisement.extend_date && (
+              <>
+                <div className="w-px h-10 bg-slate-200 hidden md:block"></div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Extend Date</span>
+                  <div className="text-sm font-black text-slate-700 flex items-center gap-2">
+                    <div className="p-1.5 bg-amber-50 rounded-lg"><Clock size={14} className="text-amber-600" /></div>
+                    {formatDate(advertisement.extend_date)}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -218,7 +307,7 @@ const AdvertisementDetail = () => {
             >
               {advertisement.job_details?.map((job) => (
                 <option key={job.hash_id} value={job.hash_id}>
-                  {job.designation} (BPS-{job.scale}) — {job.num_posts} Positions
+                  {job.designation} ({getScaleName(job.scale)}) — {job.num_posts} Positions
                 </option>
               ))}
             </select>
@@ -255,7 +344,7 @@ const AdvertisementDetail = () => {
                     <div className="flex flex-wrap gap-3 pt-2">
                       <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/10">
                         <Layers size={16} className="text-emerald-300" />
-                        <span className="text-sm font-bold">BPS-{selectedJob.scale}</span>
+                        <span className="text-sm font-bold">{getScaleName(selectedJob.scale)}</span>
                       </div>
                       <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/10">
                         <Users size={16} className="text-blue-300" />
@@ -285,7 +374,7 @@ const AdvertisementDetail = () => {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
                   {[
                     { label: 'Vacancy Date', value: selectedJob.vacancy_date || 'N/A', icon: Calendar, color: 'text-emerald-700', bg: 'bg-emerald-50' },
-                    { label: 'Test Type', value: selectedJob.pivot?.test_type === "1" ? "MCQs" : selectedJob.pivot?.test_type === "2" ? "Written Exam" : "N/A", icon: FileText, color: 'text-emerald-700', bg: 'bg-emerald-50' },
+                    { label: 'Test Type', value: getTestTypeName(selectedJob.pivot?.test_type), icon: FileText, color: 'text-emerald-700', bg: 'bg-emerald-50' },
                     { label: 'Approval Status', value: selectedJob.status?.toUpperCase(), icon: CheckCircle2, color: 'text-emerald-700', bg: 'bg-emerald-50' },
                     { label: 'Workflow Status', value: selectedJob.current_status?.replace('_', ' ')?.toUpperCase() || 'N/A', icon: Layout, color: 'text-emerald-700', bg: 'bg-emerald-50' },
                   ].map((stat, i) => (

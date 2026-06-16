@@ -28,6 +28,8 @@ const ApprovedRequisitions = () => {
     status: ''
   });
 
+  const [gradeOptions, setGradeOptions] = useState([]);
+
   const filterConfig = [
     { name: 'hash_id', label: 'Ref', type: 'text', placeholder: 'Filter by ref' },
     { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
@@ -194,6 +196,47 @@ const ApprovedRequisitions = () => {
     }
   };
 
+  const fetchGrades = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setGradeOptions(
+          list
+            .filter((g) => (g.status ?? 'active') === 'active')
+            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to load grades');
+    }
+  };
+
+  // Resolve a stored scale value (hash_id, number, or string) to the
+  // human-readable grade name (e.g. "BPS-17"). Falls back to the raw
+  // value if no match is found.
+  const getScaleName = (rawScale) => {
+    if (rawScale === null || rawScale === undefined || rawScale === '') return 'N/A';
+    if (typeof rawScale === 'object') {
+      return rawScale.name || rawScale.hash_id || rawScale.id || 'N/A';
+    }
+    const str = String(rawScale).trim();
+    const matched = gradeOptions.find((g) => g.id === str || g.name === str);
+    return matched ? matched.name : str;
+  };
+
+  useEffect(() => {
+    fetchGrades();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     fetchApproved(paginationModel.page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,7 +249,7 @@ const ApprovedRequisitions = () => {
     if (filters.designation && !row.designation?.toLowerCase().includes(filters.designation.toLowerCase())) {
       return false;
     }
-    if (filters.scale && !String(row.scale).toLowerCase().includes(filters.scale.toLowerCase())) {
+    if (filters.scale && !getScaleName(row.scale).toLowerCase().includes(filters.scale.toLowerCase())) {
       return false;
     }
     if (filters.quota_percentage && !String(row.quota_percentage).toLowerCase().includes(filters.quota_percentage.toLowerCase())) {
@@ -235,7 +278,12 @@ const ApprovedRequisitions = () => {
   const columns = [
     { field: 'id', headerName: 'Ref', width: 90 },
     { field: 'designation', headerName: 'Designation', flex: 1, minWidth: 200 },
-    { field: 'scale', headerName: 'Scale', width: 140 },
+    {
+      field: 'scale',
+      headerName: 'Scale',
+      width: 140,
+      renderCell: (params) => getScaleName(params.value),
+    },
     { field: 'quota_percentage', headerName: 'Quota %', width: 110 },
     { field: 'num_posts', headerName: 'Posts', width: 100 },
     { field: 'vacancy_date', headerName: 'Vacancy Date', width: 140 },

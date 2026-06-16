@@ -5,6 +5,8 @@ import { Eye, CheckCircle, XCircle, MoreVertical, RefreshCw, FilterX } from 'luc
 import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from 'components/ui/Loader';
 import Button from 'components/ui/Button';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import ApplicationApi from 'api/applicationApi';
 import toast from 'react-hot-toast';
 import {
@@ -43,6 +45,58 @@ const ApplicationsList = () => {
   const [selectionModel, setSelectionModel] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [advertisementMap, setAdvertisementMap] = useState({});
+
+  const API_BASE = Config.apiUrl;
+  const TOKEN = AuthService.getToken();
+  const API_KEY = Config.apiKey;
+
+  // Map job-detail / advertisement hash ids -> human-readable advertisement
+  // number (e.g. "Advertisement 5-26"), so the candidate-portal's
+  // `advertisement_no` (which is actually a job-detail hash id) can be
+  // resolved to readable text instead of a raw hash.
+  const fetchAdvertisements = useCallback(async () => {
+    try {
+      const headers = {
+        Accept: 'application/json',
+        'X-API-KEY': API_KEY,
+        Authorization: `Bearer ${TOKEN}`,
+      };
+
+      const firstRes  = await fetch(`${API_BASE}/advertisements?per_page=100`, { headers });
+      const firstJson = await firstRes.json();
+      const firstPage = firstJson?.data?.data ?? [];
+      const lastPage  = firstJson?.data?.last_page ?? 1;
+
+      let allAds = firstPage;
+      if (lastPage > 1) {
+        const pages = await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetch(`${API_BASE}/advertisements?per_page=100&page=${i + 2}`, { headers })
+              .then((r) => r.json())
+              .then((j) => j?.data?.data ?? [])
+              .catch(() => [])
+          )
+        );
+        allAds = allAds.concat(...pages);
+      }
+
+      const map = {};
+      allAds.forEach((ad) => {
+        if (ad.hash_id) map[ad.hash_id] = ad.adv_number;
+        (ad.job_details || []).forEach((job) => {
+          if (job?.hash_id) map[job.hash_id] = ad.adv_number;
+        });
+      });
+      setAdvertisementMap(map);
+    } catch (err) {
+      console.error('Failed to load advertisements for resolving advertisement numbers');
+    }
+  }, [API_BASE, TOKEN, API_KEY]);
+
+  useEffect(() => {
+    fetchAdvertisements();
+  }, [fetchAdvertisements]);
 
   // Derive unique jobs from loaded rows — useMemo avoids extra state + double-render.
   const jobs = useMemo(() => {
@@ -75,6 +129,7 @@ const ApplicationsList = () => {
       };
       const response = await ApplicationApi.getAll(params);
 
+      console.log("response", response);
       const payload    = response?.data || response;
       const data       = payload?.data || response.data?.data || response.data || [];
       const totalCount = payload?.total || response.meta?.total || response.total || data.length || 0;
@@ -101,6 +156,8 @@ const ApplicationsList = () => {
 
         // Resolve advertisement number (handle hash ids from candidate portal)
         const resolveAdvertisementNo = (adNo) => {
+          if (!adNo) return 'N/A';
+          if (advertisementMap[adNo]) return advertisementMap[adNo];
           const adMap = {
             'XlGDW6zJWmk6': 'Assistant Program Officer',
             // Add more mappings as needed
@@ -109,6 +166,13 @@ const ApplicationsList = () => {
         };
         const resolvedExamCities = (item.preferred_exam_cities || []).map(resolveCity);
         const domicile = snapshot?.domicile_district || item.candidate?.domicile_district || item.snapshot_data?.domicile_district;
+
+        // Pull candidate photo, CNIC-front and CNIC-back document images so they can be
+        // shown in the list and forwarded to the admin DB on status updates.
+        const documents = item.candidate?.documents || item.documents || [];
+        const cnicFrontDoc = documents.find((doc) => doc.doc_type === 'cnic_front');
+        const cnicBackDoc = documents.find((doc) => doc.doc_type === 'cnic_back');
+        const photoDoc = documents.find((doc) => doc.doc_type === 'photo');
 
         // Admin DB is the source of truth for status (overlaid via _admin_status).
         // Fall back to candidate status, masking the implicit 'submitted' as blank.
@@ -123,7 +187,7 @@ const ApplicationsList = () => {
           cnic:            snapshot?.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
           job_title:       item.job_post?.post_title || item.job_post?.title || item.job?.title || 'N/A',
           job_post_id:     item.job_post_id || null,
-          advertisement_no: resolveAdvertisementNo(item.advertisement_no || item.job_post?.ext_adv_id || item.job_post?.adv_number || 'N/A'),
+          advertisement_no: resolveAdvertisementNo(item.job_post?.ext_adv_id || item.advertisement_no || item.job_post?.adv_number || 'N/A'),
           status:          effectiveStatus,
           applied_at_raw:  item.submitted_at || item.created_at || null,
           applied_at: (item.submitted_at || item.created_at)
@@ -141,6 +205,9 @@ const ApplicationsList = () => {
           disability:      item.candidate?.disability || null,
           domicile_district: domicile,
           preferred_exam_cities: resolvedExamCities,
+          cnic_front_url: cnicFrontDoc?.file_url || null,
+          cnic_back_url: cnicBackDoc?.file_url || null,
+          photo_url: photoDoc?.file_url || item.candidate?.profile_photo_url || null,
         };
       });
 
@@ -184,7 +251,7 @@ const ApplicationsList = () => {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel, filters]);
+  }, [paginationModel, filters, advertisementMap]);
 
   useEffect(() => {
     const timer = setTimeout(fetchApplications, 500);
@@ -225,11 +292,30 @@ const ApplicationsList = () => {
   const updateStatus = async (id, status) => {
     try {
       const row = rows.find((r) => r.id === id);
+      const payloadRow = {
+      ...row,
+      candidate_cnic: row?.cnic,
+      cnic_front_path: row?.cnic_front_path,
+      cnic_back_path: row?.cnic_back_path,
+      photo_path: row?.photo_path,
+      profile_photo_path: row?.profile_photo_path,
+      profile_photo_url: row?.profile_photo_url,
+    };
+
+    console.log("Payload", payloadRow)
       // Optimistic update — set both `status` (display) and `_admin_status` (source of truth
       // for the effectiveStatus mapping). Without this, a later re-render (re-fetch or filter
       // change) maps the row back to '' because the candidate portal always returns 'submitted'.
-      setRows(prev => prev.map(r => r.id === id ? { ...r, status, _admin_status: status } : r));
-      await ApplicationApi.updateStatus(id, status, row);
+      // setRows(prev => prev.map(r => r.id === id ? { ...r, status, _admin_status: status } : r));
+      setRows(prev =>
+      prev.map(r =>
+        r.id === id ? { ...r, status, _admin_status: status } : r
+      )
+    );
+      // await ApplicationApi.updateStatus(id, status, row);
+      // toast.success(`Application marked as ${status}`);
+      await ApplicationApi.updateStatus(id, status, payloadRow);
+
       toast.success(`Application marked as ${status}`);
     } catch (err) {
       // Surface backend message when available — the live API's updateStatus path can
@@ -249,10 +335,22 @@ const ApplicationsList = () => {
   const handleBulkStatusUpdate = async (status) => {
     if (!selectionModel.length) return;
     try {
-      const selectedRows = rows.filter((r) => selectionModel.includes(r.id));
+      // const selectedRows = rows.filter((r) => selectionModel.includes(r.id));
+      const selectedRows = rows
+      .filter((r) => selectionModel.includes(r.id))
+      .map(row => ({
+        ...row,
+        candidate_cnic: row?.cnic,
+        cnic_front_path: row?.cnic_front_path,
+        cnic_back_path: row?.cnic_back_path,
+        photo_path: row?.photo_path,
+        profile_photo_path: row?.profile_photo_path,
+        profile_photo_url: row?.profile_photo_url,
+      }));
       // Same optimistic patch as updateStatus — also write _admin_status so the row keeps its
       // new status across re-fetches and filter changes.
       setRows(prev => prev.map(r => selectionModel.includes(r.id) ? { ...r, status, _admin_status: status } : r));
+      // await ApplicationApi.bulkUpdateStatus(selectionModel, status, selectedRows);
       await ApplicationApi.bulkUpdateStatus(selectionModel, status, selectedRows);
       toast.success(`${selectionModel.length} applications marked as ${status}`);
       setSelectionModel([]);
@@ -268,8 +366,38 @@ const ApplicationsList = () => {
     return STATUS_COLORS[key] ?? 'bg-gray-100 text-gray-700';
   };
 
+  // ── Selection-aware shortlist state (for bulk action bar) ───────────────
+  const selectedRows = useMemo(
+    () => rows.filter((r) => selectionModel.includes(r.id)),
+    [rows, selectionModel]
+  );
+  const anyShortlisted = selectedRows.some((r) => (r.status || '').toLowerCase() === 'shortlisted');
+  const allShortlisted = selectedRows.length > 0 && selectedRows.every((r) => (r.status || '').toLowerCase() === 'shortlisted');
+
   const columns = [
     { field: 'id',               headerName: 'Ref ID',           minWidth: 100 },
+    // {
+    //   field: 'photo_url',
+    //   headerName: 'Photo',
+    //   minWidth: 70,
+    //   sortable: false,
+    //   renderCell: (params) => params.value ? (
+    //     <a href={params.value} target="_blank" rel="noopener noreferrer">
+    //       <img src={params.value} alt="Candidate" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+    //     </a>
+    //   ) : <span className="text-slate-400 text-xs">—</span>,
+    // },
+    // {
+    //   field: 'cnic_front_url',
+    //   headerName: 'CNIC Front',
+    //   minWidth: 90,
+    //   sortable: false,
+    //   renderCell: (params) => params.value ? (
+    //     <a href={params.value} target="_blank" rel="noopener noreferrer">
+    //       <img src={params.value} alt="CNIC Front" className="w-14 h-10 rounded object-cover border border-slate-200" />
+    //     </a>
+    //   ) : <span className="text-slate-400 text-xs">—</span>,
+    // },
     { field: 'applicant_name',   headerName: 'Applicant Name',   minWidth: 150 },
     { field: 'cnic',             headerName: 'CNIC',             minWidth: 150 },
     { field: 'job_title',        headerName: 'Job Advertisement', minWidth: 170 },
@@ -411,16 +539,30 @@ const ApplicationsList = () => {
 
         {/* Bulk Actions */}
         {selectionModel.length > 0 && (
-          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
-            <span className="text-emerald-800 font-medium">{selectionModel.length} applications selected</span>
-            <div className="flex gap-2">
-              <Button onClick={() => handleBulkStatusUpdate('Shortlisted')} variant="primary" size="sm">
-                Shortlist Selected
-              </Button>
-              <Button onClick={() => handleBulkStatusUpdate('Rejected')} variant="destructive" size="sm">
-                Reject Selected
-              </Button>
+          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-emerald-800 font-medium">{selectionModel.length} applications selected</span>
+              <div className="flex gap-2">
+                {!anyShortlisted && (
+                  <Button onClick={() => handleBulkStatusUpdate('Shortlisted')} variant="primary" size="sm">
+                    Shortlist Selected
+                  </Button>
+                )}
+                {anyShortlisted && (
+                  <Button onClick={() => handleBulkStatusUpdate('submitted')} variant="outline" size="sm">
+                    Unshortlist Selected
+                  </Button>
+                )}
+                <Button onClick={() => handleBulkStatusUpdate('Rejected')} variant="destructive" size="sm">
+                  Reject Selected
+                </Button>
+              </div>
             </div>
+            {anyShortlisted && !allShortlisted && (
+              <p className="text-amber-700 text-xs font-medium mt-2">
+                You have selected an already shortlisted application. Please unshortlist it before shortlisting the rest.
+              </p>
+            )}
           </div>
         )}
 
@@ -492,14 +634,17 @@ const ApplicationsList = () => {
         <MenuItem onClick={handleView}>
           <Eye size={18} style={{ marginRight: '8px' }} className="text-blue-600" /> View Details
         </MenuItem>
-        <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Shortlisted')}>
-          <CheckCircle size={18} style={{ marginRight: '8px' }} className="text-green-600" /> Mark Shortlisted
-        </MenuItem>
+        {selectedRow?.status?.toLowerCase() === 'shortlisted' ? (
+          <MenuItem onClick={() => updateStatus(selectedRow?.id, 'submitted')}>
+            <RefreshCw size={18} style={{ marginRight: '8px' }} className="text-yellow-600" /> Unshortlist
+          </MenuItem>
+        ) : (
+          <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Shortlisted')}>
+            <CheckCircle size={18} style={{ marginRight: '8px' }} className="text-green-600" /> Mark Shortlisted
+          </MenuItem>
+        )}
         <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Rejected')}>
           <XCircle size={18} style={{ marginRight: '8px' }} className="text-red-600" /> Mark Rejected
-        </MenuItem>
-        <MenuItem onClick={() => updateStatus(selectedRow?.id, 'submitted')}>
-          <RefreshCw size={18} style={{ marginRight: '8px' }} className="text-yellow-600" /> Unshortlist (Reset)
         </MenuItem>
       </Menu>
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin } from 'lucide-react';
+import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin, RefreshCw } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
 import Button from 'components/ui/Button';
 import ApplicationApi from 'api/applicationApi';
@@ -569,11 +569,23 @@ const ApplicationDetail = () => {
           </Button>
           
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => handleStatusUpdate('Shortlisted')} variant="primary" size="sm" className="gap-2">
+            <Button
+              onClick={() => handleStatusUpdate('Shortlisted')}
+              variant="primary"
+              size="sm"
+              className="gap-2"
+              disabled={application.status?.toLowerCase() === 'shortlisted'}
+            >
               <CheckCircle size={18} /> Shortlist
             </Button>
-            <Button onClick={() => handleStatusUpdate('Interview')} variant="outline" size="sm" className="gap-2">
-              <Clock size={18} /> Interview
+            <Button
+              onClick={() => handleStatusUpdate('submitted')}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={application.status?.toLowerCase() !== 'shortlisted'}
+            >
+              <RefreshCw size={18} /> Unshortlist
             </Button>
             <Button onClick={() => handleStatusUpdate('Rejected')} variant="destructive" size="sm" className="gap-2">
               <XCircle size={18} /> Reject

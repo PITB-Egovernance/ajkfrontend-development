@@ -95,7 +95,11 @@ const RollSlipGenerator = () => {
   const buildAllocation = useCallback((allowCrossDistrict) => {
     // Prepare centers list with remaining capacity
     const centersList = centers.map((c) => ({
-      id:        c.id,
+      // Prefer the numeric id (validated as `integer|exists:exam_centers,id`
+      // by the backend today). Fall back to hash_id for environments where the
+      // exam-centers API doesn't expose a numeric id — works once the backend's
+      // hash_id-decode in prepareForValidation() is deployed.
+      id:        c.id ?? c.hash_id,
       name:      c.name,
       district:  c.district?.name || c.district_name || '—',
       district_id: c.district_id ?? c.district?.id ?? null,
@@ -289,7 +293,7 @@ const RollSlipGenerator = () => {
         for (const bucket of allocationPreview.buckets) {
           const body = {
             application_numbers: bucket.apps.map((a) => a.application_number ?? a.id),
-            exam_center_id:      Number(bucket.centerId),
+            exam_center_id:      bucket.centerId,
             prefix:              formData.prefix.trim(),
             starting_number:     nextNumber,
             format:              formData.format,
@@ -319,7 +323,7 @@ const RollSlipGenerator = () => {
     try {
       const body = {
         application_numbers: applicationNumbers,
-        exam_center_id:      Number(formData.exam_center_id),
+        exam_center_id:      formData.exam_center_id,
         prefix:              formData.prefix.trim(),
         starting_number:     Number(formData.starting_number),
         format:              formData.format,
@@ -419,41 +423,70 @@ const RollSlipGenerator = () => {
         {!result && (
           <>
             {/* MODE TOGGLE */}
-            <div className="bg-white rounded-xl shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+            <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
               <span className="font-semibold text-slate-700 text-sm">Allocation Mode:</span>
-              <label className="flex items-center gap-2 cursor-pointer text-sm">
-                <input
-                  type="radio"
-                  name="allocation_mode"
-                  value="manual"
-                  checked={allocationMode === 'manual'}
-                  onChange={() => { setAllocationMode('manual'); setCrossDistrictAllowed(null); }}
-                />
-                <span className="font-medium">Manual</span>
-                <span className="text-slate-500 text-xs">(one center for all selected)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-sm">
-                <input
-                  type="radio"
-                  name="allocation_mode"
-                  value="auto"
-                  checked={allocationMode === 'auto'}
-                  onChange={() => { setAllocationMode('auto'); setCrossDistrictAllowed(null); }}
-                />
-                <span className="font-medium">Auto-allocate by District</span>
-                <span className="text-slate-500 text-xs">(group by candidate domicile, fill centers by capacity)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-sm">
-                <input
-                  type="radio"
-                  name="allocation_mode"
-                  value="preferred"
-                  checked={allocationMode === 'preferred'}
-                  onChange={() => { setAllocationMode('preferred'); setCrossDistrictAllowed(null); }}
-                />
-                <span className="font-medium">Candidate Prefer City</span>
-                <span className="text-slate-500 text-xs">(use candidate's preferred cities in order, fallback to any remaining)</span>
-              </label>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label
+                  className={`flex items-start gap-2 cursor-pointer text-sm rounded-lg border px-3 py-2.5 transition-colors ${
+                    allocationMode === 'manual'
+                      ? 'border-emerald-300 bg-emerald-50 ring-1 ring-emerald-300'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="allocation_mode"
+                    value="manual"
+                    checked={allocationMode === 'manual'}
+                    onChange={() => { setAllocationMode('manual'); setCrossDistrictAllowed(null); }}
+                    className="mt-0.5 accent-emerald-700"
+                  />
+                  <span>
+                    <span className="font-medium text-emerald-950">Manual</span>
+                    <span className="block text-slate-500 text-xs">(one center for all selected)</span>
+                  </span>
+                </label>
+                <label
+                  className={`flex items-start gap-2 cursor-pointer text-sm rounded-lg border px-3 py-2.5 transition-colors ${
+                    allocationMode === 'auto'
+                      ? 'border-emerald-300 bg-emerald-50 ring-1 ring-emerald-300'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="allocation_mode"
+                    value="auto"
+                    checked={allocationMode === 'auto'}
+                    onChange={() => { setAllocationMode('auto'); setCrossDistrictAllowed(null); }}
+                    className="mt-0.5 accent-emerald-700"
+                  />
+                  <span>
+                    <span className="font-medium text-emerald-950">Auto-allocate by District</span>
+                    <span className="block text-slate-500 text-xs">(group by candidate domicile, fill centers by capacity)</span>
+                  </span>
+                </label>
+                <label
+                  className={`flex items-start gap-2 cursor-pointer text-sm rounded-lg border px-3 py-2.5 transition-colors ${
+                    allocationMode === 'preferred'
+                      ? 'border-emerald-300 bg-emerald-50 ring-1 ring-emerald-300'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="allocation_mode"
+                    value="preferred"
+                    checked={allocationMode === 'preferred'}
+                    onChange={() => { setAllocationMode('preferred'); setCrossDistrictAllowed(null); }}
+                    className="mt-0.5 accent-emerald-700"
+                  />
+                  <span>
+                    <span className="font-medium text-emerald-950">Candidate Prefer City</span>
+                    <span className="block text-slate-500 text-xs">(use candidate's preferred cities in order, fallback to any remaining)</span>
+                  </span>
+                </label>
+              </div>
             </div>
 
             {/* ALLOCATION PREVIEW */}
@@ -490,7 +523,7 @@ const RollSlipGenerator = () => {
                         </thead>
                         <tbody>
                           {allocationPreview.buckets.map((b) => {
-                            const center = centers.find((c) => c.id === b.centerId);
+                            const center = centers.find((c) => (c.id ?? c.hash_id) === b.centerId);
                             const cap    = Number(center?.capacity) || 0;
                             return (
                               <tr key={b.centerId} className="border-t border-slate-100">
@@ -539,8 +572,11 @@ const RollSlipGenerator = () => {
                   <MenuItem key="none" value="">— Select center —</MenuItem>
                   {centers.map((c) => {
                     const capacity = Number(c.capacity) || 0;
+                    // Prefer numeric id (works with current backend validation);
+                    // fall back to hash_id once the backend decodes hash ids too.
+                    const value = c.id != null ? String(c.id) : c.hash_id;
                     return (
-                      <MenuItem key={c.id} value={String(c.id)}>
+                      <MenuItem key={value} value={value}>
                         {c.name} {c.city ? `(${c.city})` : ''}
                         {capacity > 0 ? ` — capacity ${capacity}` : ''}
                       </MenuItem>

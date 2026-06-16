@@ -72,7 +72,7 @@ const RollSlipEditor = () => {
 
         setFormData({
           roll_number:     row.roll_number ?? '',
-          exam_center_id:  row.exam_center?.id ? String(row.exam_center.id) : '',
+          exam_center_id:  row.exam_center_id ? String(row.exam_center_id) : '',
           seat_number:     row.seat_number ?? '',
           exam_date:       row.exam_date ?? '',
           attendance_time: parseTime24h(row.attendance_time ?? ''),
@@ -101,7 +101,7 @@ const RollSlipEditor = () => {
     try {
       await RollNumberApi.updateSlip(applicationNumber, {
         roll_number:     formData.roll_number.trim(),
-        exam_center_id:  Number(formData.exam_center_id),
+        exam_center_id:  formData.exam_center_id,
         seat_number:     formData.seat_number?.trim() || null,
         exam_date:       formData.exam_date || null,
         attendance_time: formData.attendance_time ? formatTime12h(formData.attendance_time) : null,
@@ -165,11 +165,16 @@ const RollSlipEditor = () => {
           <TextField select fullWidth required label="Exam Center" margin="normal" size="small"
             name="exam_center_id" value={formData.exam_center_id} onChange={handleFormChange}>
             <MenuItem key="none" value="">— Select center —</MenuItem>
-            {centers.map((c) => (
-              <MenuItem key={c.id} value={String(c.id)}>
-                {c.name} {c.city ? `(${c.city})` : ''}
-              </MenuItem>
-            ))}
+            {centers.map((c) => {
+              // Prefer numeric id (works with current backend validation);
+              // fall back to hash_id once the backend decodes hash ids too.
+              const value = c.id != null ? String(c.id) : c.hash_id;
+              return (
+                <MenuItem key={value} value={value}>
+                  {c.name} {c.city ? `(${c.city})` : ''}
+                </MenuItem>
+              );
+            })}
           </TextField>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

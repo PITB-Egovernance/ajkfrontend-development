@@ -24,6 +24,8 @@ import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import RollNumberApi from 'api/rollNumberApi';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import {
   getApplicationOcrBatch,
   getApplicationOcrBatchLabel,
@@ -75,6 +77,95 @@ const RollNumberManagement = () => {
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
+  // ── Advertisement hash → readable text resolution ──────────────────────
+  // "Stub" shortlisted applications (no admin-side advertisement linked yet)
+  // come back from /roll-numbers/shortlisted with advertisement_no = null.
+  // Resolve it the same way /dashboard/applications does: pull the candidate
+  // portal's advertisement_no (a hash_id) for this application_number, then
+  // map that hash → adv_number via the admin /advertisements list.
+  const [advertisementMap, setAdvertisementMap] = useState({});
+  const [candidateAdvMap,  setCandidateAdvMap]  = useState({});
+
+  const fetchAdvertisements = useCallback(async () => {
+    try {
+      const headers = {
+        Accept: 'application/json',
+        'X-API-KEY': Config.apiKey,
+        Authorization: `Bearer ${AuthService.getToken()}`,
+      };
+
+      const firstRes  = await fetch(`${Config.apiUrl}/advertisements?per_page=100`, { headers });
+      const firstJson = await firstRes.json();
+      const firstPage = firstJson?.data?.data ?? [];
+      const lastPage  = firstJson?.data?.last_page ?? 1;
+
+      let allAds = firstPage;
+      if (lastPage > 1) {
+        const pages = await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetch(`${Config.apiUrl}/advertisements?per_page=100&page=${i + 2}`, { headers })
+              .then((r) => r.json())
+              .then((j) => j?.data?.data ?? [])
+              .catch(() => [])
+          )
+        );
+        allAds = allAds.concat(...pages);
+      }
+
+      const map = {};
+      allAds.forEach((ad) => {
+        if (ad.hash_id) map[ad.hash_id] = ad.adv_number;
+        (ad.job_details || []).forEach((job) => {
+          if (job?.hash_id) map[job.hash_id] = ad.adv_number;
+        });
+      });
+      setAdvertisementMap(map);
+    } catch (err) {
+      console.error('Failed to load advertisements for resolving advertisement numbers');
+    }
+  }, []);
+
+  const fetchCandidateAdvertisements = useCallback(async () => {
+    try {
+      const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
+      const res  = await fetch(`${Config.candidateApiUrl}/applications?per_page=100`, { headers });
+      const json = await res.json();
+      const items = json?.data?.data ?? json?.data ?? [];
+
+      const map = {};
+      items.forEach((a) => {
+        const advNo = a.job_post?.ext_adv_id ?? a.advertisement_no ?? a.job_post?.adv_number ?? null;
+        map[a.application_number] = {
+          advertisement_no: advNo,
+          job_title: a.job_post?.post_title || null,
+        };
+      });
+      setCandidateAdvMap(map);
+    } catch (err) {
+      console.error('Failed to load candidate applications for advertisement resolution');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAdvertisements();
+    fetchCandidateAdvertisements();
+  }, [fetchAdvertisements, fetchCandidateAdvertisements]);
+
+  // Resolve a shortlisted item's advertisement number, falling back to the
+  // candidate-portal hash → admin advertisement map, then the portal's job title.
+  const resolveAdvertisementNo = useCallback((item) => {
+    if (item.advertisement_no) return item.advertisement_no;
+
+    const candidate = candidateAdvMap[item.application_number];
+    if (!candidate) return 'N/A';
+
+    if (candidate.advertisement_no && advertisementMap[candidate.advertisement_no]) {
+      return advertisementMap[candidate.advertisement_no];
+    }
+
+    return candidate.job_title || candidate.advertisement_no || 'N/A';
+  }, [advertisementMap, candidateAdvMap]);
+
   // ── Data ────────────────────────────────────────────────────────────────
   const fetchShortlisted = useCallback(async () => {
     setLoading(true);
@@ -108,8 +199,8 @@ const RollNumberManagement = () => {
             application_number: item.application_number,
             applicant_name:    item.candidate_name || 'N/A',
             cnic:              item.candidate_cnic || 'N/A',
-            job_title:         item.job_title || 'N/A',
-            advertisement_no:  item.advertisement_no || 'N/A',
+            job_title:         item.job_title || candidateAdvMap[item.application_number]?.job_title || 'N/A',
+            advertisement_no:  resolveAdvertisementNo(item),
             advertisement_id:  item.advertisement_id,
             applied_at:        item.applied_at ? new Date(item.applied_at).toLocaleDateString() : 'N/A',
             payment_status:    item.payment_status || 'N/A',
@@ -119,7 +210,12 @@ const RollNumberManagement = () => {
             preferred_exam_cities: (item.preferred_exam_cities || []).map(resolveCityName),
             roll_number:       item.roll_number,
             exam_center:       item.exam_center,
+            exam_center_id:    item.exam_center_id,
             exam_city:         item.exam_city,
+            exam_hall_id:      item.exam_hall_id,
+            seat_number:       item.seat_number,
+            exam_date:         item.exam_date,
+            attendance_time:   item.attendance_time,
             published_at:      item.published_at,
           }))
           .filter((row) => {
@@ -152,7 +248,7 @@ const RollNumberManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel.page, paginationModel.pageSize, filters]);
+  }, [paginationModel.page, paginationModel.pageSize, filters, candidateAdvMap, resolveAdvertisementNo]);
 
   useEffect(() => {
     const t = setTimeout(fetchShortlisted, 300);
@@ -172,12 +268,27 @@ const RollNumberManagement = () => {
   };
 
   // ── Generate slip flow (navigates to the full-page generator) ──────────
-  const openSlipGenerator = (explicitSelection = null) => {
+  const openSlipGenerator = async (explicitSelection = null) => {
     const ids = Array.isArray(explicitSelection) ? explicitSelection : selectedIds;
     if (!ids || ids.length === 0) {
       toast.error('Select at least one shortlisted candidate');
       return;
     }
+
+    // Bulk generation touches many candidates at once — confirm first, same as bulk deletion.
+    // Single-candidate generation (from the row menu) proceeds straight through.
+    if (ids.length > 1) {
+      const ok = await confirmDelete({
+        title:        'Generate Roll Number Slips',
+        message:      `Generate roll number slips for ${ids.length} selected candidates?`,
+        identifier:   `${ids.length} candidates`,
+        warning:      '',
+        confirmLabel: 'Generate',
+        confirmColor: 'bg-emerald-600 hover:bg-emerald-700',
+      });
+      if (!ok) return;
+    }
+
     const selectedApps = rows.filter((r) => ids.includes(r.id));
     navigate('/dashboard/roll-numbers/generate-slips', {
       state: { applications: selectedApps },
@@ -287,6 +398,13 @@ const RollNumberManagement = () => {
     openSlipGenerator([appNum]);
   };
 
+  // ── Selection-aware generation state (for bulk action bar) ─────────────
+  const selectedRows = useMemo(
+    () => rows.filter((r) => selectedIds.includes(r.id)),
+    [rows, selectedIds]
+  );
+  const hasGeneratedSelected = selectedRows.some((r) => r.roll_number);
+
   // ── Stats ───────────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
     total:        rows.length,
@@ -299,6 +417,8 @@ const RollNumberManagement = () => {
   const columns = [
     { field: 'application_number', headerName: 'Ref ID',          minWidth: 110, flex: 0.8 },
     { field: 'applicant_name',     headerName: 'Applicant Name',  minWidth: 160, flex: 1.1 },
+    { field: 'advertisement_no',     headerName: 'Advertisement Number',  minWidth: 160, flex: 1.1 },
+    { field: 'job_title',     headerName: 'Job Advertisement',  minWidth: 160, flex: 1.1 },
     { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
     {
       field: 'preferred_exam_cities',
@@ -418,20 +538,29 @@ const RollNumberManagement = () => {
 
         {/* BULK BAR */}
         {selectedIds.length > 0 && (
-          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 flex items-center justify-between shadow-sm">
-            <span className="text-emerald-800 font-medium">
-              {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
-            </span>
-            <div className="flex gap-2">
-              <Button onClick={openSlipGenerator} variant="primary" size="sm" className="flex items-center gap-2">
-                <Send size={14} /> Generate Roll No Slip
-              </Button>
-              <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
-                className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
-                disabled={rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
-                <Trash2 size={14} /> Delete Roll No Slip
-              </Button>
+          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-emerald-800 font-medium">
+                {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
+              </span>
+              <div className="flex gap-2">
+                {!hasGeneratedSelected && (
+                  <Button onClick={openSlipGenerator} variant="primary" size="sm" className="flex items-center gap-2">
+                    <Send size={14} /> Generate Roll No Slip
+                  </Button>
+                )}
+                <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
+                  className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
+                  disabled={rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
+                  <Trash2 size={14} /> Delete Roll No Slip
+                </Button>
+              </div>
             </div>
+            {hasGeneratedSelected && (
+              <p className="text-amber-700 text-xs font-medium mt-2">
+                You have selected an already generated roll no slip. Please deselect it, or delete it to re-generate.
+              </p>
+            )}
           </div>
         )}
 
@@ -481,9 +610,11 @@ const RollNumberManagement = () => {
         <MenuItem key="view" onClick={handleView}>
           <Eye size={16} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
         </MenuItem>
-        <MenuItem key="generate" onClick={handleGenerateOne} disabled={!!selectedRow?.roll_number}>
-          <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
-        </MenuItem>
+        {!selectedRow?.roll_number && (
+          <MenuItem key="generate" onClick={handleGenerateOne}>
+            <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
+          </MenuItem>
+        )}
         <MenuItem key="edit"
           onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate('/dashboard/roll-numbers/edit-slip/' + row.application_number, { state: { row } }); }}
           disabled={!selectedRow?.roll_number}>
