@@ -181,7 +181,7 @@ const ResultsApi = {
   },
 
   /**
-   * Download CSV Template for Result Import
+   * Download CSV/Excel Template for Result Import
    */
   downloadTemplate: async (jobPostId = null) => {
     let url = `${API_BASE}/results/import/template`;
@@ -192,7 +192,26 @@ const ResultsApi = {
       method: 'GET',
       headers: getHeaders(),
     });
-    return handleBlobResponse(response);
+    
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      const error = new Error(result.message || result.error || 'Download failed');
+      error.status = response.status;
+      throw error;
+    }
+    
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = 'Result_Template.xlsx';
+    if (disposition && disposition.indexOf('attachment') !== -1) {
+      const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+      const matches = filenameRegex.exec(disposition);
+      if (matches != null && matches[1]) { 
+        filename = matches[1].replace(/['"]/g, '');
+      }
+    }
+    
+    return { blob, filename };
   },
 
   /**
@@ -535,6 +554,18 @@ const ResultsApi = {
     const response = await fetch(`${API_BASE}/results/${jobId}/finalize`, {
       method: 'POST',
       headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Execute bulk verification action (approve / reject / mark_absent)
+   */
+  bulkAction: async (data) => {
+    const response = await fetch(`${API_BASE}/results/bulk-action`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
     });
     return handleResponse(response);
   },

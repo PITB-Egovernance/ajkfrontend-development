@@ -171,12 +171,12 @@ const ResultsViewPage = () => {
   const handleDownloadTemplate = async () => {
     try {
       toast.loading('Generating template...', { id: 'download' });
-      const blob = await ResultsApi.downloadTemplate(jobId);
+      const { blob, filename } = await ResultsApi.downloadTemplate(jobId);
       
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `Result_Template_${jobId}.csv`);
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();

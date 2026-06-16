@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/Card';
 import Button from 'components/ui/Button';
-import { 
-  ArrowLeft, 
-  Download, 
-  Send, 
-  AlertTriangle, 
-  HelpCircle, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle, 
-  RefreshCw 
+import {
+  ArrowLeft,
+  Download,
+  Send,
+  AlertTriangle,
+  HelpCircle,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ResultsApi from 'api/resultsApi';
@@ -42,16 +42,16 @@ const ImportResultsPage = () => {
   const handleDownloadTemplate = async () => {
     try {
       toast.loading('Generating dynamic template...', { id: 'template-download' });
-      const blob = await ResultsApi.downloadTemplate(jobId);
+      const { blob, filename } = await ResultsApi.downloadTemplate(jobId);
       const url = window.URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `AJKPSC_Template_${jobId}.csv`);
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+
       toast.success('Template generated successfully', { id: 'template-download' });
     } catch (err) {
       toast.error('Failed to generate template', { id: 'template-download' });
@@ -68,21 +68,21 @@ const ImportResultsPage = () => {
       toast.error('Please select a file first');
       return;
     }
-    
+
     setLoading(true);
     setLastError(null);
     setPreviewData(null);
     const formData = new FormData();
     formData.append('csv_file', file);
     formData.append('job_post_id', jobId);
-    
+
     try {
       toast.loading('Scanning CSV headers...', { id: 'csv-scan' });
-      
+
       // Step 1: Scan headers & upload to temporary sandbox
       const response = await ResultsApi.scanCSVHeaders(formData);
       const payload = response.data || response;
-      
+
       // Step 2: Save state for mapper dialog
       setScannedHeaders(payload.headers || []);
       setScannedSubjects(payload.subjects || []);
@@ -90,7 +90,7 @@ const ImportResultsPage = () => {
       setSelectedFile(file);
 
       toast.success('CSV headers scanned successfully.', { id: 'csv-scan' });
-      
+
       // Step 3: Open Column Mapping Modal
       setIsMapperOpen(true);
     } catch (err) {
@@ -108,7 +108,7 @@ const ImportResultsPage = () => {
     setIsMapperOpen(false);
     setLoading(true);
     setLastError(null);
-    
+
     const payload = {
       temp_file_id: config.temp_file_id,
       job_post_id: jobId,
@@ -119,10 +119,10 @@ const ImportResultsPage = () => {
 
     try {
       toast.loading('Running dry-run validation checks on CSV rows...', { id: 'csv-dryrun' });
-      
+
       const res = await ResultsApi.processDynamicImport(payload);
       const responseData = res.data || res;
-      
+
       setPreviewData({
         rows: responseData.rows || [],
         summary: responseData.summary || {},
@@ -163,12 +163,12 @@ const ImportResultsPage = () => {
 
     try {
       toast.loading('Writing candidate scores securely to database...', { id: 'csv-finalize' });
-      
+
       const res = await ResultsApi.processDynamicImport(payload);
       const summary = res.summary || res.data || {};
-      
+
       toast.success(`Successfully imported ${summary.imported} candidate results!`, { id: 'csv-finalize' });
-      
+
       setTimeout(() => {
         navigate('/dashboard/results');
       }, 1500);
@@ -190,19 +190,19 @@ const ImportResultsPage = () => {
 
   return (
     <div className="p-8 bg-slate-50 min-h-screen">
-      <div className="max-w-6xl mx-auto space-y-10">
-        
+      <div className="max-w-8xl mx-auto space-y-10">
+
         {/* Navigation & Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
-            <button 
+            <button
               onClick={() => {
                 if (previewData) {
                   setPreviewData(null);
                 } else {
                   navigate(-1);
                 }
-              }} 
+              }}
               className="p-3 bg-white rounded-2xl shadow-sm border border-slate-200 text-slate-600 hover:text-emerald-600 transition-all"
             >
               <ArrowLeft size={22} />
@@ -216,10 +216,10 @@ const ImportResultsPage = () => {
               </p>
             </div>
           </div>
-          
+
           {!previewData && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleDownloadTemplate}
               className="h-auto py-3 px-6 border-emerald-500 text-emerald-700 bg-emerald-50/30 hover:bg-emerald-500 hover:text-white font-black text-xs uppercase tracking-widest shadow-sm transition-all"
             >
@@ -231,7 +231,7 @@ const ImportResultsPage = () => {
         {/* Phase 3: Visual Dry-Run Preview Table View */}
         {previewData ? (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-10 animate-in fade-in zoom-in-95 duration-300">
-            
+
             {/* Left Column: Visual Table Grid */}
             <div className="lg:col-span-3 space-y-8">
               <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white border border-slate-100">
@@ -243,7 +243,7 @@ const ImportResultsPage = () => {
                     </div>
                     {previewData.success ? (
                       <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-black uppercase tracking-widest shadow-inner">
-                        <CheckCircle2 size={16} /> All Slates Clean
+                        <CheckCircle2 size={16} /> ALL CLEAR
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-xs font-black uppercase tracking-widest animate-pulse shadow-inner">
@@ -257,26 +257,22 @@ const ImportResultsPage = () => {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-wider">
-                          <th className="py-5 px-6 text-center w-16">Row</th>
                           <th className="py-5 px-6">Candidate Details</th>
                           <th className="py-5 px-6">Subject Breakdown</th>
-                          <th className="py-5 px-6 text-center">Score / Status</th>
-                          <th className="py-5 px-6">Audits & Warnings</th>
+                          <th className="py-5 px-6 text-center">Percentage</th>
+                          <th className="py-5 px-6 text-center">Exam Status</th>
+                          <th className="py-5 px-6">Row Validation</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-xs">
                         {previewData.rows.map((row, idx) => {
                           const hasErrors = row.status === 'error' || (row.errors && row.errors.length > 0);
                           return (
-                            <tr 
-                              key={idx} 
-                              className={`hover:bg-slate-50/30 transition-colors ${
-                                hasErrors ? 'bg-rose-50/10' : ''
-                              }`}
+                            <tr
+                              key={idx}
+                              className={`hover:bg-slate-50/30 transition-colors ${hasErrors ? 'bg-rose-50/10' : ''
+                                }`}
                             >
-                              {/* Row Num */}
-                              <td className="py-5 px-6 text-center font-black text-slate-400">{row.row_num}</td>
-                              
                               {/* Candidate Key & Name */}
                               <td className="py-5 px-6">
                                 <div className="flex flex-col items-start gap-1.5">
@@ -286,14 +282,14 @@ const ImportResultsPage = () => {
                                   <p className="font-extrabold text-slate-800 text-sm tracking-tight">{row.candidate_name}</p>
                                 </div>
                               </td>
- 
+
                               {/* Subject Breakdown */}
                               <td className="py-5 px-6">
                                 <div className="flex flex-wrap gap-2">
                                   {row.subjects.map((sub, sIdx) => {
                                     let tagClass = 'bg-emerald-50/70 text-emerald-700 border-emerald-100/80';
                                     let obtainedText = `${sub.obtained_marks} / ${sub.max_marks}`;
- 
+
                                     if (sub.status === 'missing') {
                                       tagClass = 'bg-rose-50 text-rose-700 border-rose-100 animate-pulse';
                                       obtainedText = 'Missing';
@@ -304,10 +300,10 @@ const ImportResultsPage = () => {
                                       tagClass = 'bg-rose-100/50 text-rose-800 border-rose-200';
                                       obtainedText = `${sub.obtained_marks} (Exceeds Max ${sub.max_marks})`;
                                     }
- 
+
                                     return (
-                                      <span 
-                                        key={sIdx} 
+                                      <span
+                                        key={sIdx}
                                         className={`px-3 py-1 border rounded-full font-bold text-[10px] flex items-center gap-1.5 transition-all hover:scale-105 hover:bg-white shadow-sm ${tagClass}`}
                                       >
                                         <span className="opacity-70 font-semibold uppercase text-[9px] tracking-wider">{sub.subject_name}:</span>
@@ -317,17 +313,36 @@ const ImportResultsPage = () => {
                                   })}
                                 </div>
                               </td>
- 
+
                               {/* Obtained Score & Percentage */}
-                              <td className="py-5 px-6 text-center">
-                                <div className="inline-flex flex-col items-center bg-indigo-50/40 border border-indigo-100/50 rounded-2xl px-4 py-2">
-                                  <span className="text-base font-black text-slate-800 tabular-nums">{row.obtained_marks}</span>
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Obtained</span>
-                                  <div className="h-px w-6 bg-slate-200 my-1"></div>
-                                  <span className="text-[10px] font-black text-indigo-600">{row.percentage}% Score</span>
-                                </div>
+                              <td className="py-5 px-6 text-center font-black text-slate-800 text-sm tabular-nums">
+                                {row.percentage !== null ? `${Number(row.percentage).toFixed(2)}%` : '—'}
                               </td>
- 
+
+                              {/* Exam Status */}
+                              <td className="py-5 px-6 text-center">
+                                {row.status === 'pass' && (
+                                  <span className="inline-flex items-center px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full text-[10px] font-black uppercase tracking-wider font-extrabold">
+                                    PASSED
+                                  </span>
+                                )}
+                                {row.status === 'fail' && (
+                                  <span className="inline-flex items-center px-3 py-1 bg-rose-50 border border-rose-200 text-rose-800 rounded-full text-[10px] font-black uppercase tracking-wider font-extrabold">
+                                    FAILED
+                                  </span>
+                                )}
+                                {row.status === 'absent' && (
+                                  <span className="inline-flex items-center px-3 py-1 bg-slate-100 border border-slate-300 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-wider font-extrabold">
+                                    ABSENT
+                                  </span>
+                                )}
+                                {row.status === 'error' && (
+                                  <span className="inline-flex items-center px-3 py-1 bg-rose-950 border border-rose-800 text-rose-300 rounded-full text-[10px] font-black uppercase tracking-wider font-extrabold">
+                                    ERROR
+                                  </span>
+                                )}
+                              </td>
+
                               {/* Audit Validation Status & Error List */}
                               <td className="py-5 px-6">
                                 {hasErrors ? (
@@ -342,8 +357,8 @@ const ImportResultsPage = () => {
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200/60 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
-                                    <CheckCircle2 size={12} className="text-emerald-500" /> Passed
+                                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200/60 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm font-extrabold">
+                                    <CheckCircle2 size={12} className="text-emerald-500" /> Row Clean
                                   </span>
                                 )}
                               </td>
@@ -356,14 +371,14 @@ const ImportResultsPage = () => {
                 </CardContent>
               </Card>
             </div>
- 
+
             {/* Right Column: Dry-Run Action Panel */}
             <div className="space-y-8">
-              
+
               {/* Summary Stats Card */}
               <Card className="border-none shadow-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-3xl overflow-hidden border border-white/5">
                 <CardHeader className="bg-slate-900/60 p-6 border-b border-white/5">
-                  <CardTitle className="text-sm font-black flex items-center gap-2.5 tracking-tight uppercase">
+                  <CardTitle className="text-sm font-black flex items-center gap-2.5 tracking-tight uppercase text-white">
                     <Send size={16} className="text-indigo-400" /> Dry-Run Stats
                   </CardTitle>
                 </CardHeader>
@@ -378,7 +393,7 @@ const ImportResultsPage = () => {
                       <p className="text-2xl font-black text-emerald-400">{previewData.summary.imported ?? 0}</p>
                     </div>
                   </div>
- 
+
                   <div className="p-4 bg-white/[0.03] border border-white/[0.05] rounded-2xl space-y-1 hover:bg-white/[0.05] transition-all">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Failed Rows</p>
                     <p className={`text-2xl font-black ${previewData.summary.failed > 0 ? 'text-rose-400 animate-pulse' : 'text-slate-400'}`}>
@@ -387,7 +402,7 @@ const ImportResultsPage = () => {
                   </div>
                 </CardContent>
               </Card>
- 
+
               {/* Execution Actions Card */}
               <Card className="border-none shadow-2xl bg-white rounded-3xl overflow-hidden p-6 space-y-6 border border-slate-100">
                 {previewData.success ? (
@@ -395,8 +410,8 @@ const ImportResultsPage = () => {
                     <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl text-emerald-800 text-xs font-bold leading-relaxed shadow-inner">
                       🚀 <strong>Pristine Slates!</strong> All candidate rows passed parsing checks, and match active candidate registrations perfectly. You are ready to save!
                     </div>
-                    
-                    <Button 
+
+                    <Button
                       onClick={handleFinalSubmit}
                       disabled={loading}
                       className="w-full h-auto py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 rounded-2xl transition-all"
@@ -410,8 +425,8 @@ const ImportResultsPage = () => {
                       <p className="font-extrabold uppercase text-[10px] text-rose-700 tracking-wider">⚠️ Action Required</p>
                       <p>The visual sandbox detected broken cells or empty marks. You must fix the empty/invalid fields in your CSV spreadsheet or adjust column maps before saving!</p>
                     </div>
- 
-                    <Button 
+
+                    <Button
                       onClick={() => setIsMapperOpen(true)}
                       className="w-full h-auto py-4 px-6 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs uppercase tracking-widest shadow-md rounded-2xl transition-all"
                     >
@@ -419,8 +434,8 @@ const ImportResultsPage = () => {
                     </Button>
                   </div>
                 )}
- 
-                <Button 
+
+                <Button
                   variant="outline"
                   onClick={handleReset}
                   disabled={loading}
@@ -429,18 +444,18 @@ const ImportResultsPage = () => {
                   <RefreshCw size={14} className="mr-2" /> Start Over / Upload New
                 </Button>
               </Card>
- 
+
             </div>
           </div>
         ) : (
           /* Phase 1 & 2: Upload CSV View */
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-            
+
             {/* Main CSV Select Zone */}
             <div className="lg:col-span-3 space-y-10">
               <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white">
                 <CardContent className="p-0">
-                  <CSVUploadZone 
+                  <CSVUploadZone
                     onFileSelect={(file) => {
                       setSelectedFile(file);
                       setLastError(null);
@@ -478,7 +493,7 @@ const ImportResultsPage = () => {
                   )}
 
                   <div className="flex justify-end mt-2">
-                    <Button 
+                    <Button
                       onClick={() => handlePreview(selectedFile)}
                       disabled={loading}
                       className="bg-red-600 hover:bg-red-700 text-white font-black text-[10px] uppercase tracking-widest px-8 py-3 rounded-xl shadow-lg shadow-red-200"
@@ -504,31 +519,30 @@ const ImportResultsPage = () => {
                 <CardContent className="p-8 space-y-10 relative">
                   {/* Step connectors */}
                   <div className="absolute left-10 top-10 bottom-10 w-0.5 bg-slate-800"></div>
-                  
+
                   {[
-                    { 
-                      step: 1, 
-                      title: 'Select CSV File', 
+                    {
+                      step: 1,
+                      title: 'Select CSV File',
                       desc: 'Choose or drop candidate results CSV sheet.',
-                      active: !selectedFile 
+                      active: !selectedFile
                     },
-                    { 
-                      step: 2, 
-                      title: 'Map CSV Columns', 
+                    {
+                      step: 2,
+                      title: 'Map CSV Columns',
                       desc: 'Align student IDs & dynamic subject marks columns.',
-                      active: !!selectedFile && !lastError 
+                      active: !!selectedFile && !lastError
                     },
-                    { 
-                      step: 3, 
-                      title: 'Visual Dry-Run Report', 
+                    {
+                      step: 3,
+                      title: 'Visual Dry-Run Report',
                       desc: 'Audit mapped marks rows inside a transactional sandbox.',
-                      active: !!selectedFile && !!lastError 
+                      active: !!selectedFile && !!lastError
                     }
                   ].map((s) => (
                     <div key={s.step} className={`flex gap-6 relative z-10 transition-opacity ${s.active ? 'opacity-100' : 'opacity-40'}`}>
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                        s.active ? 'bg-emerald-50 text-slate-900 shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-500'
-                      }`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${s.active ? 'bg-emerald-50 text-slate-900 shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-500'
+                        }`}>
                         {s.step}
                       </div>
                       <div>
@@ -547,8 +561,8 @@ const ImportResultsPage = () => {
                 <p className="text-xs text-slate-600 font-bold leading-relaxed italic">
                   "Detailed mode requires specific subject columns. Summary mode only needs a 'marks' column."
                 </p>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="w-full text-[10px] font-black uppercase text-emerald-600 hover:bg-emerald-50 p-0 h-auto justify-start"
                 >
                   View Format Guide →

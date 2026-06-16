@@ -73,8 +73,8 @@ import MeritManagementPage from 'pages/results/MeritManagementPage';
 import PublicationPage from 'pages/results/PublicationPage';
 import ResultsDashboard from 'pages/results/ResultsDashboard';
 import ResultsViewPage from 'pages/results/ResultsViewPage';
-import ApprovalsPage from 'pages/results/ApprovalsPage';
 import ResultSearchPage from 'pages/results/ResultSearchPage';
+import VerificationPage from 'pages/results/VerificationPage';
 
 
 function App() {
@@ -205,10 +205,10 @@ function App() {
           <Route path="results/search" element={<ResultSearchPage />} />
           <Route path="results/view/:jobId?" element={<ResultsViewPage />} />
           <Route
-            path="results/approvals"
+            path="results/verification/:jobId?"
             element={
               <ProtectedRoute allowedRoles={['admin', 'chairman', 'secretary']}>
-                <ApprovalsPage />
+                <VerificationPage />
               </ProtectedRoute>
             }
           />

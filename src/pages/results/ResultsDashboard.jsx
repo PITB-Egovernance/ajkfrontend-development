@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import {
@@ -13,8 +13,6 @@ import {
   ShieldAlert,
   Search,
   Plus,
-  FileDown,
-  CheckCircle2,
   FileText,
   Award
 } from 'lucide-react';
@@ -33,7 +31,6 @@ import MarkApprovalConsole from 'components/results/MarkApprovalConsole';
  */
 
 const ResultsDashboard = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const userRole = getUserRole(user);
 
@@ -81,15 +78,6 @@ const ResultsDashboard = () => {
     }
   };
 
-  const fetchPendingApprovals = async () => {
-    try {
-      const res = await ResultsApi.getPendingMarkEdits();
-      setPendingCount(res.data?.length || 0);
-    } catch (err) {
-      console.error('Failed to fetch pending approvals');
-    }
-  };
-
   const fetchStats = async () => {
     try {
       const res = await ResultsApi.getStats();
@@ -100,6 +88,8 @@ const ResultsDashboard = () => {
           if (s.label === 'Published Results') return { ...s, value: res.data.published_results || 0 };
           return s;
         }));
+        // Update awaiting-verification card from the same stats call
+        setPendingCount(res.data.under_verification ?? 0);
       }
     } catch (err) {
       console.error('Failed to fetch stats', err);
@@ -110,24 +100,7 @@ const ResultsDashboard = () => {
     fetchActiveJobs();
     fetchImportHistory();
     fetchStats();
-    if (isAdmin) {
-      fetchPendingApprovals();
-    }
   }, [isAdmin]);
-
-  const handleVerify = async (job) => {
-    const confirm = window.confirm(`Are you sure you want to officially APPROVE and VERIFY results for ${job.designation}? This will allow official publication.`);
-    if (!confirm) return;
-
-    try {
-      toast.loading('Verifying results...', { id: 'verify-task' });
-      await ResultsApi.verifyResults(getJobRouteId(job));
-      toast.success('Results verified and approved!', { id: 'verify-task' });
-      fetchActiveJobs(); // Refresh list
-    } catch (err) {
-      toast.error(err.message || 'Verification failed', { id: 'verify-task' });
-    }
-  };
 
   const handleOpenPublish = (job) => {
     setSelectedJob(job);
@@ -138,24 +111,6 @@ const ResultsDashboard = () => {
     setPublishModalOpen(false);
     fetchActiveJobs();
     toast.success('Results published successfully!');
-  };
-
-  const handleDownloadTemplate = async () => {
-    try {
-      toast.loading('Downloading template...', { id: 'dash-template' });
-      const blob = await ResultsApi.downloadTemplate();
-      const url = window.URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'AJKPSC_Results_Template.csv');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast.success('Template downloaded', { id: 'dash-template' });
-    } catch (err) {
-      toast.error('Failed to download template', { id: 'dash-template' });
-    }
   };
 
   const handleDownloadGazette = async (job) => {
@@ -195,8 +150,8 @@ const ResultsDashboard = () => {
     },
     {
       title: 'Verification Queue',
-      desc: 'Review & approve mark corrections',
-      link: '/dashboard/results/approvals',
+      desc: 'Review & approve candidate results',
+      link: '/dashboard/results/verification',
       icon: ShieldAlert,
       iconBg: 'bg-indigo-600',
       show: isAdmin
@@ -259,17 +214,17 @@ const ResultsDashboard = () => {
           ))}
           {isAdmin && (
             <Card
-              className="border-none shadow-xl rounded-[2rem] overflow-hidden hover:scale-[1.05] transition-all duration-300 group cursor-pointer"
+              className="border-none shadow-xl rounded-[2rem] overflow-hidden"
               style={{ backgroundColor: '#f59e0b' }}
-              onClick={() => navigate('/dashboard/results/approvals')}
             >
               <CardContent className="p-10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[11px] font-black text-white/80 uppercase tracking-[0.2em] mb-2">Pending Approvals</p>
+                    <p className="text-[11px] font-black text-white/80 uppercase tracking-[0.2em] mb-2">Awaiting Verification</p>
                     <p className="text-4xl font-black tabular-nums text-white">{pendingCount}</p>
+                    <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mt-1">Records in queue</p>
                   </div>
-                  <div className="p-5 rounded-[1.25rem] bg-white/20 text-white shadow-xl group-hover:scale-110 transition-transform">
+                  <div className="p-5 rounded-[1.25rem] bg-white/20 text-white shadow-xl">
                     <ShieldAlert size={32} strokeWidth={2.5} />
                   </div>
                 </div>
@@ -277,23 +232,24 @@ const ResultsDashboard = () => {
             </Card>
           )}
 
-          <Card
-            className="border-none shadow-xl rounded-[2rem] overflow-hidden hover:scale-[1.05] transition-all duration-300 group cursor-pointer"
-            style={{ backgroundColor: '#0f172a' }}
-            onClick={() => navigate('/dashboard/results/search')}
-          >
-            <CardContent className="p-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Search & Print</p>
-                  <p className="text-xl font-black tracking-tight text-white leading-tight">Verification Center</p>
+          <Link to="/dashboard/results/search" className="group">
+            <Card
+              className="border-none shadow-xl rounded-[2rem] overflow-hidden hover:scale-[1.05] transition-all duration-300 cursor-pointer"
+              style={{ backgroundColor: '#0f172a' }}
+            >
+              <CardContent className="p-10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Search & Print</p>
+                    <p className="text-xl font-black tracking-tight text-white leading-tight">Verification Center</p>
+                  </div>
+                  <div className="p-5 rounded-[1.25rem] bg-indigo-600 text-white shadow-xl group-hover:scale-110 transition-transform">
+                    <Search size={32} strokeWidth={2.5} />
+                  </div>
                 </div>
-                <div className="p-5 rounded-[1.25rem] bg-indigo-600 text-white shadow-xl group-hover:scale-110 transition-transform">
-                  <Search size={32} strokeWidth={2.5} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Quick Actions */}
