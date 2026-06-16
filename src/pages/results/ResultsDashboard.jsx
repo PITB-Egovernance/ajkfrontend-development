@@ -420,36 +420,37 @@ const ResultsDashboard = () => {
                               )}
 
                               {(job.result_status === 'Approved') && (
-                                <div className="flex items-center gap-2">
-                                  {/* Allow admin to go back to import/edit stages before official publication */}
-                                  <Link to={`/dashboard/results/import/${getJobRouteId(job)}`}>
-                                    <Button variant="ghost" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Re-Import CSV">
-                                      <FileSpreadsheet size={18} />
-                                    </Button>
-                                  </Link>
-                                  <Link to={`/dashboard/results/view/${getJobRouteId(job)}`}>
-                                    <Button variant="ghost" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Manage Results">
-                                      <ArrowRight size={18} />
-                                    </Button>
-                                  </Link>
+                                 <div className="flex items-center gap-2">
+                                   {/* Allow admin to go back to import/edit stages before official publication */}
+                                   <Link to={`/dashboard/results/import/${getJobRouteId(job)}`}>
+                                     <Button variant="ghost" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Re-Import CSV">
+                                       <FileSpreadsheet size={18} />
+                                     </Button>
+                                   </Link>
+                                   <Link to={`/dashboard/results/view/${getJobRouteId(job)}`}>
+                                     <Button variant="ghost" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Manage Results">
+                                       <ArrowRight size={18} />
+                                     </Button>
+                                   </Link>
 
-                                  <Button
-                                    onClick={() => handleOpenPublish(job)}
-                                    className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
-                                  >
-                                    <Send size={14} strokeWidth={3} />
-                                    Official Publication
-                                  </Button>
+                                   <Link to={`/dashboard/results/shortlist/${getJobRouteId(job)}`}>
+                                     <Button
+                                       className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
+                                     >
+                                       <Send size={14} strokeWidth={3} />
+                                       Prepare Shortlist
+                                     </Button>
+                                   </Link>
 
-                                  {(isAdmin || isDirector || userRole === 'data_entry' || userRole === 'dataentry' || userRole === 'senior_admin' || userRole === 'secretary') && (
-                                    <Link to={`/dashboard/results/merit/${getJobRouteId(job)}`}>
-                                      <Button className="h-10 px-5 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap">
-                                        <LayoutDashboard size={14} />
-                                        Manage Merit
-                                      </Button>
-                                    </Link>
-                                  )}
-                                </div>
+                                   {(isAdmin || isDirector || userRole === 'data_entry' || userRole === 'dataentry' || userRole === 'senior_admin' || userRole === 'secretary') && (
+                                     <Link to={`/dashboard/results/merit/${getJobRouteId(job)}`}>
+                                       <Button className="h-10 px-5 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap">
+                                         <LayoutDashboard size={14} />
+                                         Manage Merit
+                                       </Button>
+                                     </Link>
+                                   )}
+                                 </div>
                               )}
 
                               {(job.result_status === 'Published') && (

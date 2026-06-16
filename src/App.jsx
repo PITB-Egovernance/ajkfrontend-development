@@ -75,6 +75,7 @@ import ResultsDashboard from 'pages/results/ResultsDashboard';
 import ResultsViewPage from 'pages/results/ResultsViewPage';
 import ResultSearchPage from 'pages/results/ResultSearchPage';
 import VerificationPage from 'pages/results/VerificationPage';
+import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
 
 
 function App() {
@@ -249,6 +250,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['director', 'admin']}>
                 <PublicationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/shortlist/:jobId"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'director']}>
+                <InterviewShortlistPage />
               </ProtectedRoute>
             }
           />

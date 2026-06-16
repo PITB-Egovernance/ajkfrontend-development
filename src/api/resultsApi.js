@@ -569,6 +569,39 @@ const ResultsApi = {
     });
     return handleResponse(response);
   },
+
+  /**
+   * Get eligible candidates for shortlisting
+   */
+  getShortlist: async (jobId) => {
+    const response = await fetch(`${API_BASE}/results/${jobId}/shortlist`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Get preview of the shortlist based on 2n + 1 formula
+   */
+  getShortlistPreview: async (jobId) => {
+    const response = await fetch(`${API_BASE}/results/${jobId}/shortlist/preview`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Publish Provisional Merit List and auto-populate Award List
+   */
+  publishShortlist: async (jobId) => {
+    const response = await fetch(`${API_BASE}/results/${jobId}/shortlist/publish`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
 };
 
 export default ResultsApi;
