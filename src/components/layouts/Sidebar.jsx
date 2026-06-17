@@ -32,6 +32,7 @@ import {
   PlusCircle,
   Flag,
   DollarSign,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
@@ -178,7 +179,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     {
       id: "results",
       label: "Results",
-      icon: Award,
+      icon: ClipboardCheck,
       path: "/dashboard/results",
       badge: null,
     },
