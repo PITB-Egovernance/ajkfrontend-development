@@ -6,7 +6,7 @@ import {
   InputAdornment, IconButton, Tooltip,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
-import { Plus, Search, X, RefreshCw, ExternalLink, Download } from 'lucide-react';
+import { Plus, Search, X, RefreshCw, ExternalLink, Download, Edit2 } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
@@ -44,6 +44,13 @@ export default function AwardList() {
   const [form, setForm]           = useState(defaultForm);
   const [saving, setSaving]       = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Edit State
+  const [editOpen, setEditOpen]           = useState(false);
+  const [editingListId, setEditingListId] = useState(null);
+  const [editForm, setEditForm]           = useState(defaultForm);
+  const [editSaving, setEditSaving]       = useState(false);
+  const [editFormError, setEditFormError] = useState('');
 
   const fetchAds = useCallback(async () => {
     try {
@@ -95,6 +102,45 @@ export default function AwardList() {
       setFormError(err.message ?? 'Failed to create award list.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleOpenEdit = (row) => {
+    setEditingListId(row.id);
+    setEditForm({
+      advertisement_id: row.advertisement_id || '',
+      post_title: row.post_title || '',
+      department: row.department || '',
+      district: row.district || '',
+      case_number: row.case_number || '',
+      interview_date: row.interview_date ? row.interview_date.split('T')[0] : '',
+      total_posts: row.total_posts || '',
+    });
+    setEditFormError('');
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editForm.post_title || !editForm.total_posts) {
+      setEditFormError('Post Title and Total Posts are required.');
+      return;
+    }
+    setEditSaving(true);
+    setEditFormError('');
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${editingListId}/update`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(editForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message ?? 'Failed');
+      setEditOpen(false);
+      fetchList();
+    } catch (err) {
+      setEditFormError(err.message ?? 'Failed to update award list.');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -161,7 +207,7 @@ export default function AwardList() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 110,
+      width: 140,
       sortable: false,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -172,6 +218,15 @@ export default function AwardList() {
               onClick={() => navigate(`/dashboard/award-lists/${row.id}`)}
             >
               <ExternalLink size={16} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Edit Header Details">
+            <IconButton
+              size="small"
+              color="secondary"
+              onClick={() => handleOpenEdit(row)}
+            >
+              <Edit2 size={16} />
             </IconButton>
           </Tooltip>
           <Tooltip title="Export CSV">
@@ -218,35 +273,30 @@ export default function AwardList() {
             startAdornment: (
               <InputAdornment position="start"><Search size={16} /></InputAdornment>
             ),
-            endAdornment: search && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => { setSearch(''); setPage(0); }}>
-                  <X size={14} />
-                </IconButton>
-              </InputAdornment>
-            ),
           }}
         />
       </Box>
 
-      {/* Grid */}
-      <Box sx={{ height: 520 }}>
+      {/* DataGrid */}
+      <Box sx={{ height: 600, width: '100%', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 1, overflow: 'hidden' }}>
         <DataGrid
           rows={rows}
           columns={columns}
-          rowCount={total}
           loading={loading}
           paginationMode="server"
+          rowCount={total}
           paginationModel={{ page, pageSize }}
-          onPaginationModelChange={({ page: p, pageSize: ps }) => { setPage(p); setPageSize(ps); }}
-          pageSizeOptions={[15, 25, 50, 100]}
+          onPaginationModelChange={(model) => {
+            setPage(model.page);
+            setPageSize(model.pageSize);
+          }}
+          pageSizeOptions={[15, 30, 50]}
           disableRowSelectionOnClick
-          density="compact"
-          sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
+          sx={{ border: 'none' }}
         />
       </Box>
 
-      {/* Create Dialog */}
+      {/* Create Modal */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>New Award List</DialogTitle>
         <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -331,6 +381,79 @@ export default function AwardList() {
             startIcon={saving ? <CircularProgress size={16} /> : <Plus size={16} />}
           >
             Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Details Modal */}
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Award List Details</DialogTitle>
+        <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {editFormError && (
+            <Typography color="error" variant="body2">{editFormError}</Typography>
+          )}
+          <TextField
+            label="Post Title"
+            value={editForm.post_title}
+            onChange={(e) => setEditForm((f) => ({ ...f, post_title: e.target.value }))}
+            required
+            fullWidth
+            size="small"
+          />
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField
+              label="Department"
+              value={editForm.department}
+              onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="District"
+              value={editForm.district}
+              onChange={(e) => setEditForm((f) => ({ ...f, district: e.target.value }))}
+              fullWidth
+              size="small"
+            />
+          </Box>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField
+              label="Case Number"
+              value={editForm.case_number}
+              onChange={(e) => setEditForm((f) => ({ ...f, case_number: e.target.value }))}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="Total Posts"
+              type="number"
+              value={editForm.total_posts}
+              onChange={(e) => setEditForm((f) => ({ ...f, total_posts: e.target.value }))}
+              required
+              fullWidth
+              size="small"
+              inputProps={{ min: 1 }}
+            />
+          </Box>
+          <TextField
+            label="Interview Date"
+            type="date"
+            value={editForm.interview_date}
+            onChange={(e) => setEditForm((f) => ({ ...f, interview_date: e.target.value }))}
+            fullWidth
+            size="small"
+            InputLabelProps={{ shrink: true }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditOpen(false)} disabled={editSaving}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleUpdate}
+            disabled={editSaving}
+            startIcon={editSaving ? <CircularProgress size={16} /> : null}
+          >
+            Save Changes
           </Button>
         </DialogActions>
       </Dialog>

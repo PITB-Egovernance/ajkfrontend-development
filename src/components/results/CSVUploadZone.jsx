@@ -44,11 +44,12 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
   };
 
   const validateAndSetFile = (file) => {
-    if (file.name.toLowerCase().endsWith('.csv')) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls')) {
       setSelectedFile(file);
       onFileSelect(file);
     } else {
-      alert("Please upload a valid CSV file (.csv)");
+      alert("Please upload a valid CSV, XLSX, or XLS file.");
     }
   };
 
@@ -77,15 +78,15 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
       onDragOver={handleDrag}
       onDrop={handleDrop}
       role="region"
-      aria-label="CSV file upload area"
+      aria-label="Result file upload area"
     >
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv"
+        accept=".csv,.xlsx,.xls"
         className="hidden"
         onChange={handleChange}
-        aria-label="Select CSV file for results import"
+        aria-label="Select spreadsheet file for results import"
       />
 
       <div className="flex flex-col items-center justify-center text-center">
@@ -145,7 +146,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
             
             <h3 className="text-xl font-bold text-slate-900">Import Result Data</h3>
             <p className="text-slate-500 mt-2 max-w-xs mx-auto leading-relaxed">
-              Drag and drop your result CSV file here or click the button below.
+              Drag and drop your result sheet file here or click the button below.
             </p>
             
             <Button
@@ -158,7 +159,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
             </Button>
             
             <p className="text-xs text-slate-400 mt-6 font-medium">
-              Only .csv files are supported. Maximum size 10MB.
+              Only .csv, .xlsx, .xls files are supported. Maximum size 10MB.
             </p>
 
             {dragActive && (
@@ -168,7 +169,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
                 className="absolute inset-0 flex items-center justify-center bg-emerald-500/10 rounded-2xl pointer-events-none"
               >
                 <p className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl animate-bounce">
-                  Drop CSV file here
+                  Drop file here
                 </p>
               </div>
             )}
