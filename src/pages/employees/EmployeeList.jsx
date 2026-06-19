@@ -18,9 +18,11 @@ import EmployeeDetailsModal from 'components/employees/EmployeeDetailsModal';
 import EmployeeService from 'services/EmployeeService';
 
 const FILTER_CONFIG = [
-  { name: 'username', label: 'Username', type: 'text', placeholder: 'Filter by username' },
+  { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by full name' },
   { name: 'cnic', label: 'CNIC', type: 'text', placeholder: 'Filter by CNIC' },
   { name: 'email', label: 'Email', type: 'text', placeholder: 'Filter by email' },
+  { name: 'mobile', label: 'Mobile Number', type: 'text', placeholder: 'Filter by mobile' },
+  { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
   {
     name: 'status',
     label: 'Status',
@@ -32,7 +34,7 @@ const FILTER_CONFIG = [
   },
 ];
 
-const EMPTY_FILTERS = { username: '', cnic: '', email: '', status: '' };
+const EMPTY_FILTERS = { full_name: '', cnic: '', email: '', mobile: '', designation: '', status: '' };
 
 const gridSx = {
   border: 'none',
@@ -44,12 +46,13 @@ const gridSx = {
 const mapUser = (user, idx) => ({
   id: user?.hash_id || user?.id || `user-${idx}`,
   hash_id: user?.hash_id || user?.id,
-  username: user?.username || '-',
+  full_name: user?.username || user?.name || user?.full_name || '-',
   cnic: user?.cnic || '-',
   email: user?.email || '-',
+  mobile: user?.mobile || user?.phone || '-',
   father_husband_name: user?.father_husband_name || '-',
   designation: user?.designation || '-',
-  grade: user?.grade || '-',
+  scale: user?.scale || user?.grade || '-',
   status: user?.status || 'inactive',
   status_job: user?.status_job || '-',
 });
@@ -154,12 +157,12 @@ const EmployeeList = () => {
         emp.hash_id === updated.hash_id
           ? {
               ...emp,
+              full_name: updated.name || updated.full_name || emp.full_name,
               email: updated.email ?? emp.email,
-              father_husband_name: updated.father_husband_name ?? emp.father_husband_name,
               mobile: updated.mobile ?? emp.mobile,
-              domicile: updated.domicile ?? emp.domicile,
+              father_husband_name: updated.father_husband_name ?? emp.father_husband_name,
               designation: updated.designation ?? emp.designation,
-              grade: updated.grade ?? emp.grade,
+              scale: updated.scale || updated.grade || emp.scale,
               status: updated.status ?? emp.status,
             }
           : emp
@@ -180,15 +183,18 @@ const EmployeeList = () => {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       const matchesSearch =
-        emp.username?.toLowerCase().includes(term) ||
+        emp.full_name?.toLowerCase().includes(term) ||
         emp.cnic?.toLowerCase().includes(term) ||
-        emp.email?.toLowerCase().includes(term);
+        emp.email?.toLowerCase().includes(term) ||
+        emp.mobile?.toLowerCase().includes(term);
       if (!matchesSearch) return false;
     }
 
-    if (filters.username && !emp.username?.toLowerCase().includes(filters.username.toLowerCase())) return false;
+    if (filters.full_name && !emp.full_name?.toLowerCase().includes(filters.full_name.toLowerCase())) return false;
     if (filters.cnic && !emp.cnic?.toLowerCase().includes(filters.cnic.toLowerCase())) return false;
     if (filters.email && !emp.email?.toLowerCase().includes(filters.email.toLowerCase())) return false;
+    if (filters.mobile && !emp.mobile?.toLowerCase().includes(filters.mobile.toLowerCase())) return false;
+    if (filters.designation && !emp.designation?.toLowerCase().includes(filters.designation.toLowerCase())) return false;
     if (filters.status && emp.status !== filters.status) return false;
 
     return true;
@@ -198,11 +204,12 @@ const EmployeeList = () => {
   const inactiveCount = employees.filter((e) => e.status !== 'active').length;
 
   const columns = [
-    { field: 'username', headerName: 'Username', flex: 1, minWidth: 160 },
-    { field: 'cnic', headerName: 'CNIC', flex: 0.8, minWidth: 150 },
-    { field: 'email', headerName: 'Email', flex: 1, minWidth: 220 },
-    { field: 'designation', headerName: 'Designation', flex: 0.8, minWidth: 150 },
-    { field: 'grade', headerName: 'Grade', width: 100 },
+    { field: 'full_name',   headerName: 'Full Name',     flex: 1,   minWidth: 160 },
+    { field: 'cnic',        headerName: 'CNIC',          flex: 0.8, minWidth: 150 },
+    { field: 'email',       headerName: 'Email',         flex: 1,   minWidth: 200 },
+    { field: 'mobile',      headerName: 'Mobile Number', width: 150 },
+    { field: 'designation', headerName: 'Designation',   flex: 0.8, minWidth: 150 },
+    { field: 'scale',       headerName: 'Scale',         width: 100 },
     {
       field: 'status',
       headerName: 'Status',
@@ -289,7 +296,7 @@ const EmployeeList = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search by username, CNIC or email..."
+              placeholder="Search by name, CNIC, email or mobile..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"

@@ -129,12 +129,35 @@ class EmployeeService {
 
     const result = await safeJson(response);
 
+    // ── HTTP-level failure ────────────────────────────────────────────────────
     if (!response.ok) {
       const error = new Error(result?.message || 'Failed to import employees');
       error.status = response.status;
-      error.errors = result?.errors || {};
+      const rawErrors = result?.errors || {};
+      error.errors = rawErrors;
+      error.errorLines = Object.entries(rawErrors).flatMap(([field, messages]) =>
+        (Array.isArray(messages) ? messages : [messages]).map((msg) => `• ${field}: ${msg}`)
+      );
       throw error;
     }
+
+    // ── Body-level hard failure: success === false with no usable data ────────
+    if (result?.success === false) {
+      const error = new Error(result?.message || 'Import failed');
+      error.status = response.status;
+      error.errors = result?.errors || {};
+      error.errorLines = Object.entries(result?.errors || {}).flatMap(([field, messages]) =>
+        (Array.isArray(messages) ? messages : [messages]).map((msg) => `• ${field}: ${msg}`)
+      );
+      throw error;
+    }
+
+    // ── Normalise the response so the UI always gets consistent fields ────────
+    // API shape: { success, message, data: { total_rows, imported, failed, failures[] } }
+    result._totalRows = result?.data?.total_rows ?? null;
+    result._imported  = result?.data?.imported   ?? null;
+    result._failed    = result?.data?.failed      ?? 0;
+    result._failures  = Array.isArray(result?.data?.failures) ? result.data.failures : [];
 
     return result;
   }
