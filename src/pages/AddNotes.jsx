@@ -1,281 +1,379 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
+import { DataGrid } from '@mui/x-data-grid';
 import {
-  Plus,
-  X,
-  Save,
-  FileText,
-  CheckCircle2,
-  AlertCircle,
-  Trash2,
-} from 'lucide-react';
-import { TextField } from '@mui/material';
+  TextField, IconButton, Menu, MenuItem,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+} from '@mui/material';
+import { Card, CardContent } from 'components/ui/Card';
+import { Plus, ArrowLeft, MoreVertical, BookOpenText } from 'lucide-react';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { InlineLoader } from 'components/ui/Loader';
 
-const AddNotes = () => {
-  const [loading, setLoading] = useState(false);
-  const [advertisementNotes, setAdvertisementNotes] = useState({
-    important_notes: '',
-    terms_conditions: [''],
-  });
+const API_BASE = Config.apiUrl;
 
-  const fetchAdvertisementNotes = async () => {
+const getHeaders = () => ({
+  Authorization: `Bearer ${AuthService.getToken()}`,
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  'X-API-KEY': Config.apiKey,
+});
+
+const gridSx = {
+  border: 'none',
+  '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc' },
+  '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+  '& .MuiDataGrid-row':              { minHeight: '52px !important' },
+  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: '#ecfdf5' },
+  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: '#d1fae5' },
+};
+
+const TermsConditions = () => {
+  const navigate = useNavigate();
+
+  /* ── raw data from API ──────────────────────── */
+  const [importantNotes, setImportantNotes] = useState('');
+  const [rawTerms, setRawTerms] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState({ important_note: '', terms_conditions: '' });
+
+  const filterConfig = [
+    { name: 'important_note', label: 'Important Note', type: 'text', placeholder: 'Filter by important note' },
+    { name: 'terms_conditions', label: 'Terms & Conditions', type: 'text', placeholder: 'Filter by terms' },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ important_note: '', terms_conditions: '' });
+  };
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+
+  /* ── context menu ───────────────────────────── */
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
+
+  /* ── add/edit dialog ────────────────────────── */
+  const [openModal, setOpenModal] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
+  const [noteInput, setNoteInput] = useState('');
+  const [termInput, setTermInput] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleMenuOpen = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
+  const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
+
+  /* ── build rows: each term is a row, important_note shown alongside ── */
+  const buildRows = () => {
+    return rawTerms.map((t, i) => ({
+      id: `term_${i}`,
+      important_note: importantNotes,
+      terms_conditions: t,
+    }));
+  };
+
+  /* ── Fetch ──────────────────────────────────── */
+  const fetchNotes = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${Config.apiUrl}/advertisements/notes`, {
-        headers: {
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setAdvertisementNotes({
-          important_notes: result.important_notes || '',
-          terms_conditions:
-            result.terms_conditions?.length > 0
-              ? result.terms_conditions
-              : [''],
-        });
+      const res = await fetch(`${API_BASE}/advertisements/approved-requisitions`, { headers: getHeaders() });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        const payload = result.data || result;
+        const notes = payload.notes || payload;
+        setImportantNotes(notes.important_notes || '');
+        const terms = notes.terms_conditions;
+        setRawTerms(Array.isArray(terms) && terms.length > 0 ? terms : []);
       } else {
-        toast.error('Failed to load notes', { duration: 3000 });
+        toast.error(result.message || 'Failed to load data');
       }
-    } catch {
-      toast.error('Failed to load notes', { duration: 3000 });
+    } catch (err) {
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchAdvertisementNotes();
-  }, []);
+  useEffect(() => { fetchNotes(); }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const terms = advertisementNotes.terms_conditions.filter(
-      (t) => t.trim().length > 0
-    );
-
-    if (!advertisementNotes.important_notes.trim() || terms.length === 0) {
-      toast.error('Important notes and at least one term are required', {
-        duration: 3000,
-      });
-      return;
+  /* ── Save helper ─────────────────────────────── */
+  const saveToServer = async (newNotes, newTerms) => {
+    const filtered = newTerms.filter((t) => t.trim().length > 0);
+    if (!newNotes.trim() || filtered.length === 0) {
+      toast.error('Important notes and at least one term are required');
+      return false;
     }
-
-    setLoading(true);
-    const toastId = toast.loading('Saving...', { duration: 3000 });
-
     try {
-      const response = await fetch(`${Config.apiUrl}/advertisements/notes`, {
+      const res = await fetch(`${API_BASE}/advertisements/notes`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: getHeaders(),
         body: JSON.stringify({
-          important_notes: advertisementNotes.important_notes.trim(),
-          terms_conditions: terms,
+          important_notes: newNotes.trim(),
+          terms_conditions: filtered,
         }),
       });
+      const result = await res.json();
+      return res.ok && result.success;
+    } catch { return false; }
+  };
 
-      if (response.ok) {
-        toast.success('Notes saved successfully', {
-          id: toastId,
-          duration: 3000,
-        });
-        fetchAdvertisementNotes();
+  /* ── Open Add dialog ────────────────────────── */
+  const openAdd = () => {
+    setEditingRow(null);
+    setNoteInput(importantNotes || '');
+    setTermInput('');
+    setOpenModal(true);
+  };
+
+  /* ── Open Edit dialog ───────────────────────── */
+  const openEdit = (row) => {
+    setEditingRow(row);
+    setNoteInput(importantNotes || '');
+    setTermInput(row.terms_conditions || '');
+    setOpenModal(true);
+    handleMenuClose();
+  };
+
+  /* ── Submit Add / Edit ──────────────────────── */
+  const handleSubmit = async () => {
+    if (!noteInput.trim()) { toast.error('Important Notes is required'); return; }
+
+    setSaving(true);
+    try {
+      let newNotes = noteInput.trim();
+      let newTerms = [...rawTerms];
+
+      if (!editingRow) {
+        /* ── ADD mode: add the new term, keep existing ── */
+        if (termInput.trim()) {
+          newTerms.push(termInput.trim());
+        }
       } else {
-        toast.error('Failed to save notes', {
-          id: toastId,
-          duration: 3000,
-        });
+        /* ── EDIT mode ─────────────────────────── */
+        const idx = parseInt(editingRow.id.split('_')[1], 10);
+        if (termInput.trim()) {
+          newTerms[idx] = termInput.trim();
+        }
       }
-    } catch {
-      toast.error('Error saving notes', {
-        id: toastId,
-        duration: 3000,
-      });
-    } finally {
-      setLoading(false);
-    }
+
+      // if no term was added/edited and we had none before, fail
+      if (newTerms.filter((t) => t.trim()).length === 0) {
+        toast.error('At least one term is required');
+        setSaving(false);
+        return;
+      }
+
+      const ok = await saveToServer(newNotes, newTerms);
+      if (ok) {
+        toast.success(editingRow ? 'Updated successfully' : 'Added successfully');
+        setOpenModal(false);
+        fetchNotes();
+      } else {
+        toast.error('Failed to save');
+      }
+    } catch { toast.error('Server error'); }
+    finally { setSaving(false); }
   };
 
-  const updateTerm = (index, value) => {
-    const updated = [...advertisementNotes.terms_conditions];
-    updated[index] = value;
-    setAdvertisementNotes({ ...advertisementNotes, terms_conditions: updated });
+  /* ── Delete ──────────────────────────────────── */
+  const handleDelete = async () => {
+    if (!selectedRow) return;
+    const row = selectedRow;
+    handleMenuClose();
+
+    if (!(await confirmDelete({
+      title: 'Delete Terms & Conditions',
+      identifier: row.terms_conditions.substring(0, 60) + (row.terms_conditions.length > 60 ? '…' : ''),
+    }))) return;
+
+    try {
+      const idx = parseInt(row.id.split('_')[1], 10);
+      const newTerms = [...rawTerms];
+      newTerms.splice(idx, 1);
+      if (newTerms.length === 0) {
+        toast.error('At least one term is required');
+        return;
+      }
+
+      const ok = await saveToServer(importantNotes, newTerms);
+      if (ok) {
+        toast.success('Terms & Conditions deleted');
+        fetchNotes();
+      } else {
+        toast.error('Failed to delete');
+      }
+    } catch { toast.error('Server error'); }
   };
 
-  const addTerm = () => {
-    setAdvertisementNotes({
-      ...advertisementNotes,
-      terms_conditions: [...advertisementNotes.terms_conditions, ''],
-    });
-  };
+  /* ── Filter + columns ───────────────────────── */
+  const allRows = buildRows();
+  const filteredRows = allRows.filter((r) => {
+    // basic search
+    const q = search.toLowerCase();
+    const searchMatch = !q ||
+      r.important_note?.toLowerCase().includes(q) ||
+      r.terms_conditions?.toLowerCase().includes(q);
+    if (!searchMatch) return false;
+    // advanced filters
+    if (filters.important_note && !r.important_note?.toLowerCase().includes(filters.important_note.toLowerCase())) return false;
+    if (filters.terms_conditions && !r.terms_conditions?.toLowerCase().includes(filters.terms_conditions.toLowerCase())) return false;
+    return true;
+  });
 
-  const removeTerm = (index) => {
-    const filtered = advertisementNotes.terms_conditions.filter(
-      (_, i) => i !== index
-    );
-    setAdvertisementNotes({
-      ...advertisementNotes,
-      terms_conditions: filtered.length ? filtered : [''],
-    });
-  };
+  const columns = [
+    {
+      field: 'important_note', headerName: 'Important Note', flex: 1, minWidth: 250,
+      renderCell: (p) => (
+        <span className="text-sm text-slate-700 line-clamp-2">{p.value || <span className="text-slate-400 italic">—</span>}</span>
+      ),
+    },
+    {
+      field: 'terms_conditions', headerName: 'Terms & Conditions', flex: 1, minWidth: 250,
+      renderCell: (p) => (
+        <span className="text-sm text-slate-700 line-clamp-2">{p.value}</span>
+      ),
+    },
+    {
+      field: 'actions', headerName: 'Actions', width: 80, sortable: false,
+      renderCell: (p) => (
+        <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}>
+          <MoreVertical size={18} />
+        </IconButton>
+      ),
+    },
+  ];
+
+  if (loading) return <InlineLoader text="Loading terms & conditions..." variant="ring" size="lg" />;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6">
+
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">
-            Advertisement Notes
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage important notes and terms & conditions
-          </p>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <button onClick={() => navigate('/dashboard/settings')}
+              className="text-sm text-gray-600 flex items-center mb-2">
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <BookOpenText size={22} className="text-emerald-700" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">Terms & Conditions</h1>
+                <p className="text-sm text-slate-500">Manage advertisement notes and terms</p>
+              </div>
+            </div>
+          </div>
+          <button onClick={openAdd}
+            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+            <Plus size={15} /> Add
+          </button>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm p-6 flex justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Important Notes</p>
-              <p className="text-3xl font-bold text-emerald-600">
-                {advertisementNotes.important_notes ? 1 : 0}
-              </p>
-            </div>
-            <FileText className="w-10 h-10 text-emerald-400" />
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6 flex justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Terms & Conditions</p>
-              <p className="text-3xl font-bold text-emerald-600">
-                {
-                  advertisementNotes.terms_conditions.filter((t) => t.trim())
-                    .length
-                }
-              </p>
-            </div>
-            <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200">
+            <CardContent className="p-6">
+              <p className="text-sm text-amber-700 font-medium">Important Note</p>
+              <h2 className="text-3xl font-bold text-amber-900 mt-2">{importantNotes ? 1 : 0}</h2>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
+            <CardContent className="p-6">
+              <p className="text-sm text-emerald-700 font-medium">Terms & Conditions</p>
+              <h2 className="text-3xl font-bold text-emerald-900 mt-2">{rawTerms.length}</h2>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Form */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="bg-emerald-950 px-6 py-4 rounded-t-lg">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Advertisement Information
-            </h2>
-          </div>
+        {/* Advanced Filter */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Notes & Terms"
+        />
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Important Notes */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-semibold">Important Notes</h3>
+        {/* Unified Table */}
+        <DataGrid
+          rows={filteredRows}
+          columns={columns}
+          getRowId={(r) => r.id}
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          pageSizeOptions={[15, 25, 50, 100]}
+          initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
+          autoHeight
+          disableRowSelectionOnClick
+          sx={gridSx}
+        />
+
+        {/* Context Menu */}
+        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+          <MenuItem onClick={() => openEdit(selectedRow)}>Edit</MenuItem>
+          <MenuItem onClick={handleDelete} sx={{ color: 'red' }}>Delete</MenuItem>
+        </Menu>
+
+        {/* Add / Edit Dialog — two fields side by side */}
+        <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="md" fullWidth>
+          <DialogTitle className="font-bold">
+            {editingRow ? 'Edit' : 'Add'} Notes & Terms
+          </DialogTitle>
+          <DialogContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+              {/* Left — Important Notes */}
+              <div>
+                <p className="text-xs font-semibold text-amber-700 mb-1">Important Note</p>
+                <TextField
+                  fullWidth multiline rows={8} size="small"
+                  label="Important Note"
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  placeholder="Enter important notes..."
+                />
               </div>
-              <TextField
-                fullWidth
-                multiline
-                rows={5}
-                label="Important Notes"
-                value={advertisementNotes.important_notes}
-                onChange={(e) =>
-                  setAdvertisementNotes({
-                    ...advertisementNotes,
-                    important_notes: e.target.value,
-                  })
-                }
-              />
-            </div>
-
-            {/* Terms */}
-            <div className="border-t pt-6">
-              <div className="flex justify-between mb-4">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                  Terms & Conditions
-                </h3>
-                <button
-                  type="button"
-                  onClick={addTerm}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-900 text-white rounded-lg"
-                >
-                  <Plus size={16} /> Add Term
-                </button>
+              {/* Right — Terms & Conditions */}
+              <div>
+                <p className="text-xs font-semibold text-emerald-700 mb-1">Terms & Conditions</p>
+                <TextField
+                  fullWidth multiline rows={8} size="small"
+                  label={editingRow ? 'Edit Terms & Conditions' : 'New Terms & Conditions'}
+                  value={termInput}
+                  onChange={(e) => setTermInput(e.target.value)}
+                  placeholder={editingRow
+                    ? 'Update term text...'
+                    : 'Enter new term...'}
+                />
               </div>
-
-              <AnimatePresence>
-                {advertisementNotes.terms_conditions.map((term, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex gap-3 mb-4"
-                  >
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={3}
-                      label={`Term ${index + 1}`}
-                      value={term}
-                      onChange={(e) => updateTerm(index, e.target.value)}
-                    />
-                    {advertisementNotes.terms_conditions.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeTerm(index)}
-                        className="text-red-600 mt-2"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
             </div>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+            <button onClick={() => setOpenModal(false)} disabled={saving}
+              className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">
+              Cancel
+            </button>
+            <button onClick={handleSubmit} disabled={saving}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg text-sm disabled:opacity-60">
+              {saving ? 'Saving…' : editingRow ? 'Update' : 'Save'}
+            </button>
+          </DialogActions>
+        </Dialog>
 
-            {/* Actions */}
-            <div className="border-t pt-6 flex gap-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 bg-emerald-900 text-white py-3 rounded-lg flex justify-center items-center gap-2"
-              >
-                {loading ? 'Saving...' : <><Save size={16} /> Save Notes</>}
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setAdvertisementNotes({
-                    important_notes: '',
-                    terms_conditions: [''],
-                  })
-                }
-                className="border px-6 py-3 rounded-lg"
-              >
-                <X size={16} /> Clear
-              </button>
-            </div>
-          </form>
-        </div>
       </div>
     </div>
   );
 };
 
-export default AddNotes;
+export default TermsConditions;

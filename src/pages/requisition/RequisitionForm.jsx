@@ -31,6 +31,7 @@ const RequisitionForm = () => {
   const [districtOptions, setDistrictOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
+  const [designationOptions, setDesignationOptions] = useState([]);
   const [activeStep, setActiveStep] = useState(
     Number.isInteger(initialStepParam) && initialStepParam >= 1 && initialStepParam <= steps.length
       ? initialStepParam - 1
@@ -59,6 +60,7 @@ const RequisitionForm = () => {
     fetchDistricts();
     fetchDepartments();
     fetchGrades();
+    fetchDesignations();
   }, []);
 
   useEffect(() => {
@@ -140,6 +142,29 @@ const RequisitionForm = () => {
     }
   };
 
+  const fetchDesignations = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/designations?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setDesignationOptions(
+          list
+            .filter((d) => (d.status ?? 'active') === 'active')
+            .map((d) => ({ id: d.hash_id || d.id, name: d.name }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching designations:', error);
+    }
+  };
+
   const persistDraftMeta = (draftTempId, stepIndex) => {
     if (!draftTempId) return;
     try {
@@ -191,6 +216,7 @@ const RequisitionForm = () => {
         const step1Data = result.data.step1 || {};
         step1Data.service_rules = extractFilePath(step1Data.service_rules);
         step1Data.syllabus = extractFilePath(step1Data.syllabus);
+        step1Data.service_rules_text = step1Data.service_rules_text || step1Data.service_rule_text || '';
 
         // Re-saving step 1 (e.g. clicking "Next" without re-uploading) sends
         // the request WITHOUT the service_rules/syllabus fields, since they're
@@ -336,6 +362,7 @@ const RequisitionForm = () => {
       if (normalizeScale(stepData?.scale) !== normalizeScale(baseline.scale)) return true;
       if (normalizeDepartment(stepData?.department) !== normalizeDepartment(baseline.department)) return true;
       if (normalizePercent(stepData?.quota_promotion) !== normalizePercent(baseline.quota_promotion)) return true;
+      if (stepData?.service_rules_text !== baseline.service_rules_text) return true;
 
       // service_rules/syllabus may hold File objects, which JSON.stringify
       // would reduce to "{}" — compare via extractFilePath so a newly-picked
@@ -543,6 +570,7 @@ const RequisitionForm = () => {
           // out a previously-known file path in local state.
           mergedStepData.service_rules = extractFilePath(mergedStepData.service_rules) || formData.step1?.service_rules || null;
           mergedStepData.syllabus = extractFilePath(mergedStepData.syllabus) || formData.step1?.syllabus || null;
+          mergedStepData.service_rules_text = mergedStepData.service_rules_text || mergedStepData.service_rule_text || formData.step1?.service_rules_text || formData.step1?.service_rule_text || '';
 
           // Workaround for the backend's storeStep() overwriting step1_data
           // (and dropping these fields) on a re-save without a new upload —
@@ -591,6 +619,7 @@ const RequisitionForm = () => {
         const nextStep = activeStep + 1;
         setActiveStep(nextStep);
         syncDraftUrl(tempId, nextStep);
+        persistDraftMeta(tempId, nextStep);
       }
       return;
     }
@@ -605,7 +634,10 @@ const RequisitionForm = () => {
       } else {
         const nextStep = activeStep + 1;
         setActiveStep(nextStep);
-        if (resolvedTempId) syncDraftUrl(resolvedTempId, nextStep);
+        if (resolvedTempId) {
+          syncDraftUrl(resolvedTempId, nextStep);
+          persistDraftMeta(resolvedTempId, nextStep);
+        }
       }
     }
   };
@@ -643,6 +675,7 @@ const RequisitionForm = () => {
             tempId={tempId}
             departmentOptions={departmentOptions}
             gradeOptions={gradeOptions}
+            designationOptions={designationOptions}
           />
         );
       case 1:

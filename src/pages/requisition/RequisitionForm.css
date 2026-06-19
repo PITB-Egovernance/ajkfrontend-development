@@ -223,11 +223,20 @@
   margin-left: -15px;
 }
 
+.requisition-form-container .col-md-6,
+.requisition-form-container .col-md-12 {
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
 .requisition-form-container .col-md-6 {
   flex: 0 0 50%;
   max-width: 50%;
-  padding-right: 15px;
-  padding-left: 15px;
+}
+
+.requisition-form-container .col-md-12 {
+  flex: 0 0 100%;
+  max-width: 100%;
 }
 
 .requisition-form-container .section-title {
@@ -348,3 +357,34 @@
     max-width: 100%;
   }
 }
+
+/* Footnote Styles */
+.requisition-form-container .footnote-container {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 8px;
+  background-color: rgba(236, 253, 245, 0.6); /* emerald-50/60 equivalent */
+  border: 1px solid rgba(167, 243, 208, 0.7); /* emerald-200/70 equivalent */
+  color: #064e3b; /* emerald-900 */
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.requisition-form-container .footnote-label {
+  color: #047857; /* emerald-700 */
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.requisition-form-container .footnote-text {
+  line-height: 1.5;
+  color: #065f46; /* emerald-800 */
+  margin: 0;
+}
+

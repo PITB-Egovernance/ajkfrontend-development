@@ -4,7 +4,7 @@ import {
   FileText,
   ClipboardList,
   ChevronDown,
-  StickyNote,
+  BookOpenText,
   Megaphone,
   BookOpen,
   CheckCircle,
@@ -133,11 +133,6 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           path: "/dashboard/approved-requisitions",
           icon: CheckCircle,
         },
-        // {
-        //   label: "Add Notes",
-        //   path: "/dashboard/add-notes",
-        //   icon: StickyNote,
-        // },
         {
           label: "Advertisements",
           path: "/dashboard/advertisement-records",
@@ -275,6 +270,11 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           label: "Companies",
           path: "/dashboard/settings/companies",
           icon: Package,
+        },
+        {
+          label: "Terms & Conditions",
+          path: "/dashboard/settings/terms-conditions",
+          icon: BookOpenText,
         },
       ],
     },
@@ -450,7 +450,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
-          className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40 no-print"
         />
       )}
 

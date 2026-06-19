@@ -21,11 +21,11 @@ const ApprovedRequisitions = () => {
   const [filters, setFilters] = useState({
     hash_id: '',
     designation: '',
+    department: '',
     scale: '',
     quota_percentage: '',
     num_posts: '',
     vacancy_date: '',
-    status: ''
   });
 
   const [gradeOptions, setGradeOptions] = useState([]);
@@ -33,20 +33,11 @@ const ApprovedRequisitions = () => {
   const filterConfig = [
     { name: 'hash_id', label: 'Ref', type: 'text', placeholder: 'Filter by ref' },
     { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
+    { name: 'department', label: 'Department', type: 'text', placeholder: 'Filter by department' },
     { name: 'scale', label: 'Scale', type: 'text', placeholder: 'Filter by scale' },
     { name: 'quota_percentage', label: 'Quota %', type: 'text', placeholder: 'Filter by quota' },
     { name: 'num_posts', label: 'Posts', type: 'text', placeholder: 'Filter by posts' },
     { name: 'vacancy_date', label: 'Vacancy Date', type: 'date' },
-    {
-      name: 'status',
-      label: 'Status',
-      type: 'select',
-      options: [
-        { value: 'Approved', label: 'Approved' },
-        { value: 'Pending', label: 'Pending' },
-        { value: 'Rejected', label: 'Rejected' }
-      ]
-    }
   ];
 
   const handleFilterChange = (e) => {
@@ -61,11 +52,11 @@ const ApprovedRequisitions = () => {
     setFilters({
       hash_id: '',
       designation: '',
+      department: '',
       scale: '',
       quota_percentage: '',
       num_posts: '',
       vacancy_date: '',
-      status: ''
     });
   };
 
@@ -114,6 +105,7 @@ const ApprovedRequisitions = () => {
             id: item.hash_id || item.id || `approved-req-${pageNum}-${index}`,
             hash_id: item.hash_id,
             designation: item.designation,
+            department: typeof item.department === 'object' ? (item.department?.name || item.department?.department_name || '') : (item.department || ''),
             scale: item.scale,
             quota_percentage: item.quota_percentage,
             num_posts: item.num_posts,
@@ -135,6 +127,7 @@ const ApprovedRequisitions = () => {
               id: item.hash_id || item.id || `psc-approved-${index}`,
               hash_id: item.hash_id,
               designation: item.designation,
+              department: typeof item.department === 'object' ? (item.department?.name || item.department?.department_name || '') : (item.department || ''),
               scale: item.scale,
               quota_percentage: item.quota_percentage,
               num_posts: item.num_posts,
@@ -249,6 +242,9 @@ const ApprovedRequisitions = () => {
     if (filters.designation && !row.designation?.toLowerCase().includes(filters.designation.toLowerCase())) {
       return false;
     }
+    if (filters.department && !row.department?.toLowerCase().includes(filters.department.toLowerCase())) {
+      return false;
+    }
     if (filters.scale && !getScaleName(row.scale).toLowerCase().includes(filters.scale.toLowerCase())) {
       return false;
     }
@@ -259,9 +255,6 @@ const ApprovedRequisitions = () => {
       return false;
     }
     if (filters.vacancy_date && row.vacancy_date !== filters.vacancy_date) {
-      return false;
-    }
-    if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
       return false;
     }
     return true;
@@ -277,16 +270,21 @@ const ApprovedRequisitions = () => {
 
   const columns = [
     { field: 'id', headerName: 'Ref', width: 90 },
-    { field: 'designation', headerName: 'Designation', flex: 1, minWidth: 200 },
+    { field: 'designation', headerName: 'Designation', flex: 1, minWidth: 150 },
+    { field: 'department', headerName: 'Department', flex: 1, minWidth: 150 },
     {
       field: 'scale',
       headerName: 'Scale',
-      width: 140,
+      width: 120,
       renderCell: (params) => getScaleName(params.value),
     },
     { field: 'quota_percentage', headerName: 'Quota %', width: 110 },
-    { field: 'num_posts', headerName: 'Posts', width: 100 },
+    { field: 'num_posts', headerName: 'Requisitioned Posts', width: 150 },
     { field: 'vacancy_date', headerName: 'Vacancy Date', width: 140 },
+    {
+      field: 'created_at', headerName: 'Created At', width: 140,
+      renderCell: (params) => params.value ? new Date(params.value).toLocaleDateString() : '—',
+    },
     {
       field: 'status',
       headerName: 'Status',

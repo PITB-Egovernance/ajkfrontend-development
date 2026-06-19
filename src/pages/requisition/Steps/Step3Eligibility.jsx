@@ -78,6 +78,13 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
   });
 
   const [showRelaxation, setShowRelaxation] = useState(data.age_relaxation === 'Yes');
+  const [isOtherRelaxation, setIsOtherRelaxation] = useState(
+    !!data.relaxation_reason && data.relaxation_reason !== 'Government Employee'
+  );
+  const [customRelaxation, setCustomRelaxation] = useState(
+    data.relaxation_reason && data.relaxation_reason !== 'Government Employee' && data.relaxation_reason !== 'Other'
+      ? data.relaxation_reason : ''
+  );
   const [ageErrors,      setAgeErrors]      = useState({});
   const [nationalities,  setNationalities]  = useState(FALLBACK_NATIONALITIES);
 
@@ -87,10 +94,15 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
   // (e.g. they had previously saved with Open Merit and are now coming
   // back to switch to Quota Based), seed the array with a single empty
   // row so the table renders one editable row instead of zero rows.
+  //
+  // CRITICAL: Skip the first run so loaded data is not wiped on mount.
+  const isInitialMountRef = useRef(true);
   useEffect(() => {
-    if (formData.selection_mode === 'quota_based' && (!Array.isArray(formData.district) || formData.district.length === 0)) {
-      // eslint-disable-next-line no-console
-      console.log('🌱 Step3: seeding an empty district row for Quota Based mode');
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+    if (formData.selection_mode === 'quota_based') {
       setFormData((prev) => ({
         ...prev,
         district:         [''],
@@ -99,19 +111,8 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
         promotional_post: [''],
       }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.selection_mode]);
-
-  // When the user picks Open Merit the Gender field is hidden in the UI.
-  // To keep the live API happy we still need a value for `gender_basis`
-  // (it's a required string field on the backend), so we silently
-  // default it to "Male/Female" in form state. The user can still switch
-  // back to Quota Based and pick a different value if they want.
-  useEffect(() => {
-    if (formData.selection_mode === 'open_merit'
-        && (!formData.gender_basis || formData.gender_basis === '')) {
-      setFormData((prev) => ({ ...prev, gender_basis: 'Male/Female' }));
-    }
-  }, [formData.selection_mode, formData.gender_basis]);
 
   // ── Local persistence: cache form state in localStorage so the per-row
   // inputs (especially the Promotional Quota Posts column) survive any
@@ -295,7 +296,12 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
   }, [data && JSON.stringify(data), districtOptions]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    
+    if (name === 'min_age' || name === 'max_age') {
+      value = value.replace(/[^0-9]/g, '').slice(0, 2);
+    }
+
     setFormData(prev => {
       const next = { ...prev, [name]: value };
       if (name === 'min_age' || name === 'max_age') {
@@ -441,15 +447,6 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
       return match ? match.name : idOrName;
     }).filter(Boolean);
 
-    // Convert domicile hash_id → domicile NAME (the live API's `domicile`
-    // field expects "Punjab" etc., not a hash_id like "vrz7W1025noP").
-    const domicileRaw = formData.domicile;
-    let domicileName = '';
-    if (domicileRaw) {
-      const match = districtOptions.find((d) => (d.hash_id || d.id) === domicileRaw);
-      domicileName = match ? match.name : String(domicileRaw);
-    }
-
     // Live API field aliases (Usama's v2.2.0 schema) — wire format confirmed
     // from the live API curl reference:
     //   - selection_mode → merit_type ("open_merit" | "quota_wise")
@@ -467,11 +464,8 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
 
     // Open Merit ignores the per-district table — send empty arrays so the
     // backend doesn't try to persist quota rows that don't apply. The
-    // Gender field is hidden in Open Merit mode, so default
-    // `gender_basis` to "Male/Female" so the live API still receives
-    // a valid value without forcing the user through a UI they don't
-    // need.
     if (formData.selection_mode === 'open_merit') {
+      const allDistrictNames = districtOptions.map((d) => d.name);
       onNext({
         min_age:             formData.min_age,
         max_age:             formData.max_age,
@@ -479,11 +473,11 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
         relaxation_reason:   formData.relaxation_reason,
         relaxation_years:    formData.relaxation_years,
         nationality:         formData.nationality,
-        domicile:            domicileName,
-        gender_basis:        'Male/Female',
+        domicile:            'AJK',
+        gender_basis:        formData.gender_basis || 'Male/Female',
         merit_type:          meritType,
-        district:            [],
-        quota:               [],
+        district:            allDistrictNames,
+        quota:               allDistrictNames.map(() => 'Open Merit'),
         post:                [],
         district_quota_post:     [],
         promotional_quota_post:  [],
@@ -532,7 +526,7 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
       relaxation_reason:   formData.relaxation_reason,
       relaxation_years:    formData.relaxation_years,
       nationality:         formData.nationality,
-      domicile:            domicileName,         // live API expects a name, not hash_id
+      domicile:            'AJK',
       gender_basis:        formData.gender_basis || 'Male/Female', // required by live API for Step 3
       merit_type:          meritType,
       // The live API requires `district`, `quota`, and `post` as JSON arrays
@@ -609,13 +603,74 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
                 select
                 label="Reason for Age Relaxation"
                 name="relaxation_reason"
-                value={formData.relaxation_reason}
-                onChange={handleChange}
+                value={isOtherRelaxation ? '__other__' : formData.relaxation_reason}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '__other__') {
+                    setIsOtherRelaxation(true);
+                  } else {
+                    setIsOtherRelaxation(false);
+                    setCustomRelaxation('');
+                    setFormData((prev) => ({ ...prev, relaxation_reason: val }));
+                  }
+                }}
               >
-                <MenuItem value="Disability">Disability</MenuItem>
                 <MenuItem value="Government Employee">Government Employee</MenuItem>
-                <MenuItem value="Other">Other</MenuItem>
+                {!isOtherRelaxation && formData.relaxation_reason && formData.relaxation_reason !== 'Government Employee' && (
+                  <MenuItem value={formData.relaxation_reason}>{formData.relaxation_reason}</MenuItem>
+                )}
+                <MenuItem value="__other__" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                  Other (specify)
+                </MenuItem>
               </TextField>
+              {isOtherRelaxation && (
+                <div className="mt-2 flex gap-2 items-center animate-in fade-in duration-200">
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Custom Reason"
+                    value={customRelaxation}
+                    onChange={(e) => setCustomRelaxation(e.target.value)}
+                    placeholder="e.g. Ex-Serviceman"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const trimmed = customRelaxation.trim();
+                        if (trimmed) {
+                          setFormData((prev) => ({ ...prev, relaxation_reason: trimmed }));
+                          setIsOtherRelaxation(false);
+                          setCustomRelaxation('');
+                        }
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = customRelaxation.trim();
+                      if (trimmed) {
+                        setFormData((prev) => ({ ...prev, relaxation_reason: trimmed }));
+                        setIsOtherRelaxation(false);
+                        setCustomRelaxation('');
+                      }
+                    }}
+                    className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded-lg whitespace-nowrap"
+                  >
+                    Add &amp; Set
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOtherRelaxation(false);
+                      setCustomRelaxation('');
+                    }}
+                    className="px-3 py-2 border border-slate-300 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="col-md-6 form-group">
@@ -652,20 +707,27 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
+            select
+            label="Gender"
+            name="gender_basis"
+            value={formData.gender_basis}
+            onChange={handleChange}
+          >
+            <MenuItem value="Male">Male</MenuItem>
+            <MenuItem value="Female">Female</MenuItem>
+            <MenuItem value="Male/Female">Male and Female</MenuItem>
+          </TextField>
+        </div>
+
+        <div className="col-md-6 form-group">
+          <TextField
+            fullWidth
             label="Any Other Conditions"
             name="other_conditions"
             value={formData.other_conditions}
             onChange={handleChange}
           />
         </div>
-
-        {/* The Gender field is now rendered INSIDE the Quota Based
-            section below. When the user picks Open Merit the field is
-            hidden but `gender_basis` is auto-populated with
-            "Male/Female" on submit (see handleSubmit + the
-            selection_mode useEffect), so the live API still receives
-            a valid value without forcing the user through a UI they
-            don't need. */}
       </div>
 
       <h6 className="section-title" style={{ marginTop: '30px', marginBottom: '12px', fontSize: '1.05rem', fontWeight: '600' }}>Selection Mode</h6>
@@ -709,29 +771,6 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
       {formData.selection_mode === 'quota_based' && (<>
       <h6 className="section-title" style={{ marginTop: '20px', marginBottom: '20px', fontSize: '1.05rem', fontWeight: '600' }}>Quota Wise Post Distribution</h6>
 
-      {/* Gender field — only relevant in Quota Based mode, where each
-          district row can have a different gender bias. For Open Merit
-          the field is hidden and the form auto-fills
-          `gender_basis = "Male/Female"` on submit so the live API
-          still gets a valid value without forcing the user through a
-          UI they don't need. */}
-      <div className="row" style={{ marginBottom: '20px' }}>
-        <div className="col-md-6 form-group">
-          <TextField
-            fullWidth
-            select
-            label="Gender"
-            name="gender_basis"
-            value={formData.gender_basis}
-            onChange={handleChange}
-          >
-            <MenuItem value="Male">Male</MenuItem>
-            <MenuItem value="Female">Female</MenuItem>
-            <MenuItem value="Male/Female">Male and Female</MenuItem>
-          </TextField>
-        </div>
-      </div>
-
       <div className="table-responsive" style={{ marginTop: '15px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', width: '100%' }}>
         <table className="table table-bordered" style={{ marginBottom: 0, width: '100%' }}>
           <thead style={{ backgroundColor: '#006622' }}>
@@ -763,11 +802,18 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
                   >
                     <MenuItem value="">Select District</MenuItem>
 
-                    {districtOptions.map((district) => (
-                      <MenuItem key={district.id} value={district.id}>
-                        {district.name}
-                      </MenuItem>
-                    ))}
+                    {districtOptions
+                      .filter((district) => {
+                        const selectedInOtherRows = formData.district
+                          .filter((_, i) => i !== index)
+                          .includes(district.id);
+                        return !selectedInOtherRows;
+                      })
+                      .map((district) => (
+                        <MenuItem key={district.id} value={district.id}>
+                          {district.name}
+                        </MenuItem>
+                      ))}
 
                     {/* Fallback so a previously-saved value that doesn't match any
                         districtOptions entry (e.g. the backend returned the district
@@ -886,14 +932,33 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
       </div>
       </>)}
 
+
+
       <div className="navigation-buttons">
         <button type="button" className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200" onClick={onBack}>
           Previous
         </button>
         <div className="flex gap-2">
-          <button type="button" onClick={() => onSaveDraft?.(formData)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
-            Save Draft
-          </button>
+          {!isEdit && (
+            <button type="button" onClick={() => {
+              const meritType = formData.selection_mode === 'open_merit' ? 'open_merit' : 'quota_wise';
+              const allDistrictNames = districtOptions.map((d) => d.name);
+              const draftData = {
+                ...formData,
+                merit_type: meritType,
+                domicile: 'AJK',
+              };
+              if (formData.selection_mode === 'open_merit') {
+                draftData.district = allDistrictNames;
+                draftData.quota = allDistrictNames.map(() => 'Open Merit');
+              }
+              delete draftData.selection_mode;
+              delete draftData.promotional_post;
+              onSaveDraft?.(draftData);
+            }} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
+              Save Draft
+            </button>
+          )}
           {/*
             The submit button label reflects the page mode. In
             Create flow this is the last step → "Preview" (the

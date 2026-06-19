@@ -25,6 +25,7 @@ const RequisitionEdit = () => {
   const [districtOptions, setDistrictOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
+  const [designationOptions, setDesignationOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     step1: {},
@@ -40,6 +41,7 @@ const RequisitionEdit = () => {
     fetchDistricts();
     fetchDepartments();
     fetchGrades();
+    fetchDesignations();
     loadRequisitionData();
   }, [id]);
 
@@ -116,6 +118,29 @@ const RequisitionEdit = () => {
     }
   };
 
+  const fetchDesignations = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/designations?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setDesignationOptions(
+          list
+            .filter((d) => (d.status ?? 'active') === 'active')
+            .map((d) => ({ id: d.hash_id || d.id, name: d.name }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching designations:', error);
+    }
+  };
+
   const loadRequisitionData = async () => {
     setLoading(true);
     console.log('📝 Loading requisition data for edit, ID:', id);
@@ -149,6 +174,7 @@ const RequisitionEdit = () => {
             vacancy_date:              req.vacancy_date || '',
             test_type:                 req.test_type || '',
             service_rules:             serviceRules,
+            service_rules_text:        req.service_rules_text || '',
             syllabus:                  syllabus,
           },
           step2: {
@@ -174,7 +200,12 @@ const RequisitionEdit = () => {
             other_conditions:  req.eligibility?.other_conditions || '',
             gender_basis:      req.eligibility?.gender_basis || '',
             merit_type:        req.eligibility?.merit_type || '',
-            selection_mode:    req.eligibility?.merit_type || 'quota_based',
+            selection_mode:    (() => {
+              const mt = req.eligibility?.merit_type;
+              if (mt === 'open_merit') return 'open_merit';
+              if (mt === 'quota_wise') return 'quota_based';
+              return mt || 'quota_based';
+            })(),
             district:          req.multiple_posts?.map(p => p.district) || [''],
             quota:             req.multiple_posts?.map(p => p.quota)    || [''],
             post:              req.multiple_posts?.map(p => p.post)     || [''],
@@ -210,12 +241,7 @@ const RequisitionEdit = () => {
       // wire format anymore — checking them caused the
       // "Direct/District quota percentage is required" false
       // positive that blocked the live edit form from saving.
-      if (data.quota_percentage === '' || data.quota_percentage === undefined || data.quota_percentage === null)
-        errors.quota_percentage = 'Direct quota percentage is required';
-      if (data.quota_promotion === '' || data.quota_promotion === undefined || data.quota_promotion === null)
-        errors.quota_promotion = 'Promotion quota percentage is required';
-      if (!data.num_posts || data.num_posts < 1) errors.num_posts = 'Number of posts is required';
-      if (!data.vacancy_date?.trim()) errors.vacancy_date = 'Vacancy date is required';
+      if (!data.num_posts || data.num_posts < 1) errors.num_posts = 'No. of Posts Requisitioned is required';
     } else if (step === 1) {
       if (!data.academic_qualification) errors.academic_qualification = 'Academic qualification is required';
       if (!data.degree_equivalence) errors.degree_equivalence = 'Degree equivalence is required';
@@ -405,6 +431,7 @@ const RequisitionEdit = () => {
             isEdit={true}
             departmentOptions={departmentOptions}
             gradeOptions={gradeOptions}
+            designationOptions={designationOptions}
           />
         );
       case 1:
@@ -416,6 +443,7 @@ const RequisitionEdit = () => {
             onNext={handleNext}
             onBack={handleBack}
             isEdit={true}
+            tempId={id}
             districtOptions={districtOptions}
           />
         );

@@ -37,16 +37,16 @@ const RequisitionList = () => {
   const [filters, setFilters] = useState({
     id: '',
     designation: '',
+    department: '',
     scale: '',
-    num_posts: '',
     status: ''
   });
 
   const filterConfig = [
     { name: 'id', label: 'Ref', type: 'text', placeholder: 'Filter by ref' },
     { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
+    { name: 'department', label: 'Department', type: 'text', placeholder: 'Filter by department' },
     { name: 'scale', label: 'Scale', type: 'text', placeholder: 'Filter by scale' },
-    { name: 'num_posts', label: 'Posts', type: 'text', placeholder: 'Filter by posts' },
     {
       name: 'status',
       label: 'Status',
@@ -72,8 +72,8 @@ const RequisitionList = () => {
     setFilters({
       id: '',
       designation: '',
+      department: '',
       scale: '',
-      num_posts: '',
       status: ''
     });
   };
@@ -187,6 +187,7 @@ const RequisitionList = () => {
           temp_id: item.temp_id || item.tempId || item.tempID || item.draft_temp_id || '',
           current_step: item.current_step || item.step || item.currentStep || null,
           designation: item.designation,
+          department: typeof item.department === 'object' ? (item.department?.name || item.department?.department_name || '') : (item.department || ''),
           scale: item.scale,
           num_posts: item.num_posts,
           status: item.status || (item.temp_id ? 'Draft' : 'Pending'),
@@ -224,10 +225,10 @@ const RequisitionList = () => {
       if (filters.designation && !row.designation?.toLowerCase().includes(filters.designation.toLowerCase())) {
         return false;
       }
-      if (filters.scale && !String(row.scale).toLowerCase().includes(filters.scale.toLowerCase())) {
+      if (filters.department && !row.department?.toLowerCase().includes(filters.department.toLowerCase())) {
         return false;
       }
-      if (filters.num_posts && !String(row.num_posts).toLowerCase().includes(filters.num_posts.toLowerCase())) {
+      if (filters.scale && !getScaleName(row.scale).toLowerCase().includes(filters.scale.toLowerCase())) {
         return false;
       }
       if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
@@ -504,14 +505,15 @@ const RequisitionList = () => {
   const columns = [
     { field: 'id', headerName: 'Ref', width: 100 },
     { field: 'designation', headerName: 'Designation', flex: 1 },
+    { field: 'department', headerName: 'Department', flex: 1 },
     {
-      field: 'scale', headerName: 'Scale', width: 150,
+      field: 'scale', headerName: 'Scale', width: 120,
       // Resolve the stored hash_id (e.g. "pOzq4kYWBm9l") to the actual
       // grade name (e.g. "BPS-17") via the loaded gradeOptions list.
       // Falls back to the raw value if no match.
       renderCell: (params) => <span>{getScaleName(params.value) || '—'}</span>,
     },
-    { field: 'num_posts', headerName: 'Posts', width: 100 },
+    { field: 'num_posts', headerName: 'Requisitioned Posts', width: 150 },
     {
       field: 'status',
       headerName: 'Status',

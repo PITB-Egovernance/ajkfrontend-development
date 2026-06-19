@@ -85,41 +85,35 @@ const AdvertisementCreateForm = () => {
     }
   }, [searchParams]);
 
-  const computeNextAdvNumber = async () => {
-    try {
-      const result = await AdvertisementApi.getAll();
-      const yy = String(new Date().getFullYear()).slice(-2);
-      let next = 1;
-      if (result?.success && Array.isArray(result?.data?.data)) {
-        const nums = result.data.data
-          .map((ad) => ad.adv_number)
-          .filter((v) => typeof v === "string")
-          .map((v) => {
-            const m = v.match(/Advertisement\s+(\d+)-(\d+)/i);
-            if (!m) return null;
-            return { n: parseInt(m[1], 10), yy: m[2] };
-          })
-          .filter(Boolean)
-          .filter((item) => item.yy === yy)
-          .map((item) => item.n);
-        if (nums.length) {
-          next = Math.max(...nums) + 1;
-        }
-      }
-      return `Advertisement ${next}-${yy}`;
-    } catch {
-      const yy = String(new Date().getFullYear()).slice(-2);
-      return `Advertisement 1-${yy}`;
+  const [existingAdvNumbers, setExistingAdvNumbers] = useState([]);
+
+  const getNextAdvNumber = (list) => {
+    const yy = String(new Date().getFullYear()).slice(-2);
+    let next = 1;
+    const nums = list
+      .map((v) => {
+        const m = v.match(/Advertisement\s+(\d+)-(\d+)/i);
+        if (!m) return null;
+        return { n: parseInt(m[1], 10), yy: m[2] };
+      })
+      .filter(Boolean)
+      .filter((item) => item.yy === yy)
+      .map((item) => item.n);
+    if (nums.length) {
+      next = Math.max(...nums) + 1;
     }
+    return `Advertisement ${next}-${yy}`;
   };
 
   const fetchAdvertisementNotes = async () => {
     try {
-      const result = await AdvertisementApi.getNotes();
+      const result = await AdvertisementApi.getApprovedRequisitions();
       if (result?.success) {
-        setImportantNotes(result.important_notes || "");
-        const tc = Array.isArray(result.terms_conditions) && result.terms_conditions.length
-            ? result.terms_conditions
+        const payload = result.data || result;
+        const notes = payload.notes || payload;
+        setImportantNotes(notes.important_notes || "");
+        const tc = Array.isArray(notes.terms_conditions) && notes.terms_conditions.length
+            ? notes.terms_conditions
             : [""];
         setTermsConditions(tc);
       } else {
@@ -132,8 +126,20 @@ const AdvertisementCreateForm = () => {
 
   useEffect(() => {
     (async () => {
-      const n = await computeNextAdvNumber();
-      setAdvNumber(n);
+      try {
+        const result = await AdvertisementApi.getAll();
+        if (result?.success && Array.isArray(result?.data?.data)) {
+          const list = result.data.data.map((ad) => ad.adv_number).filter(Boolean);
+          setExistingAdvNumbers(list);
+          setAdvNumber(getNextAdvNumber(list));
+        } else {
+          const yy = String(new Date().getFullYear()).slice(-2);
+          setAdvNumber(`Advertisement 1-${yy}`);
+        }
+      } catch (err) {
+        const yy = String(new Date().getFullYear()).slice(-2);
+        setAdvNumber(`Advertisement 1-${yy}`);
+      }
       fetchAdvertisementNotes();
     })();
   }, []);
@@ -207,6 +213,14 @@ const AdvertisementCreateForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFieldErrors({});
+    if (existingAdvNumbers.some(num => num.toLowerCase().trim() === advNumber.toLowerCase().trim())) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        adv_number: ["This advertisement number already exists. Please choose a unique number."],
+      }));
+      toast.error("Advertisement number already exists");
+      return;
+    }
     if (!closingDate) {
       toast.error("Closing date is required");
       return;
@@ -265,8 +279,7 @@ const AdvertisementCreateForm = () => {
       if (err.errors) {
           setFieldErrors(err.errors);
           if (err.errors.adv_number) {
-              const nextAdv = await computeNextAdvNumber();
-              setAdvNumber(nextAdv);
+              setAdvNumber(getNextAdvNumber(existingAdvNumbers));
           }
       }
       toast.error(err.message || "Failed to create advertisement", {
@@ -319,7 +332,8 @@ const AdvertisementCreateForm = () => {
                     type="date"
                     value={advDate}
                     InputLabelProps={{ shrink: true }}
-                    inputProps={{ readOnly: true, style: { height: 28 } }}
+                    onChange={(e) => setAdvDate(e.target.value)}
+                    inputProps={{ style: { height: 28 } }}
                     sx={fieldSx}
                   />
                 </div>
@@ -328,6 +342,22 @@ const AdvertisementCreateForm = () => {
                     fullWidth
                     label="Advertisement Number"
                     value={advNumber}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAdvNumber(val);
+                      if (existingAdvNumbers.some(num => num.toLowerCase().trim() === val.toLowerCase().trim())) {
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          adv_number: ["This advertisement number already exists. Please choose a unique number."]
+                        }));
+                      } else {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.adv_number;
+                          return next;
+                        });
+                      }
+                    }}
                     sx={fieldSx}
                     error={!!fieldErrors?.adv_number}
                     helperText={
@@ -340,9 +370,13 @@ const AdvertisementCreateForm = () => {
                     <button
                       type="button"
                       className="btn btn-prev"
-                      onClick={async () => {
-                        const n = await computeNextAdvNumber();
-                        setAdvNumber(n);
+                      onClick={() => {
+                        setAdvNumber(getNextAdvNumber(existingAdvNumbers));
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.adv_number;
+                          return next;
+                        });
                       }}
                       style={{
                         display: "inline-flex",
@@ -365,16 +399,26 @@ const AdvertisementCreateForm = () => {
                     label="Closing Date"
                     type="date"
                     value={closingDate}
-                    onChange={(e) => setClosingDate(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setClosingDate(val);
+                      if (val && advDate && val <= advDate) {
+                        setFieldErrors((prev) => ({ ...prev, closing_date: ['Closing date must be after the advertisement date (same date not allowed)'] }));
+                      } else {
+                        setFieldErrors((prev) => { const next = { ...prev }; delete next.closing_date; return next; });
+                      }
+                    }}
                     required
                     InputLabelProps={{ shrink: true }}
                     sx={fieldSx}
-                    inputProps={{ min: advDate, style: { height: 28 } }}
-                    error={!!fieldErrors?.closing_date}
+                    inputProps={{ min: advDate ? (() => { const d = new Date(advDate); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })() : undefined, style: { height: 28 } }}
+                    error={!!(fieldErrors?.closing_date || (closingDate && advDate && closingDate <= advDate))}
                     helperText={
-                      Array.isArray(fieldErrors?.closing_date)
-                        ? fieldErrors.closing_date.join(", ")
-                        : fieldErrors?.closing_date
+                      (closingDate && advDate && closingDate <= advDate)
+                        ? 'Closing date must be after advertisement date (same date not allowed)'
+                        : Array.isArray(fieldErrors?.closing_date)
+                          ? fieldErrors.closing_date.join(", ")
+                          : (fieldErrors?.closing_date || '')
                     }
                   />
                   {advDate && closingDate && (() => {

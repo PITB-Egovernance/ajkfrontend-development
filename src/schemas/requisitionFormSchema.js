@@ -21,12 +21,10 @@ export const requisitionFormSchema = {
     // request is sent. Validation here runs on the new field names so the
     // user sees errors against the visible inputs.
     quota_percentage: {
-      type: 'required',
-      message: 'Promotion Quota is required'
+      type: 'optional'
     },
     quota_promotion: {
-      type: 'required',
-      message: 'District Qouta is required'
+      type: 'optional'
     },
     num_posts: {
       type: 'required',
@@ -35,8 +33,7 @@ export const requisitionFormSchema = {
       minMessage: 'Number of posts must be at least 1'
     },
     vacancy_date: {
-      type: 'required',
-      message: 'Vacancy date is required'
+      type: 'optional'
     },
     // test_type is auto-populated in getCleanedFormData (UI field removed).
     department: {

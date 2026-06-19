@@ -21,6 +21,7 @@ import {
   Building2,
   ChevronDown,
   ChevronUp,
+  Send,
 } from 'lucide-react';
 
 import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
@@ -36,9 +37,10 @@ const STATUS_BADGES = {
   permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-200 text-red-700' },
   reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-200 text-blue-700' },
   extend_date:         { label: 'Extended',           className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+  published:           { label: 'Published',          className: 'bg-green-50 border-green-200 text-green-700' },
 };
 
-const ActionCell = ({ ad, onView, onEdit, onDelete }) => {
+const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
@@ -92,6 +94,9 @@ const ActionCell = ({ ad, onView, onEdit, onDelete }) => {
         <MenuItem onClick={(e) => { handleClose(e); onEdit(ad.id); }}>
           <Pencil className="w-4 h-4" /> Edit
         </MenuItem>
+        <MenuItem onClick={(e) => { handleClose(e); onPublish(ad); }}>
+          <Send className="w-4 h-4" /> Publish
+        </MenuItem>
         <MenuItem 
           onClick={(e) => { handleClose(e); onDelete(ad.id); }}
           sx={{ color: '#ef4444 !important' }}
@@ -122,6 +127,13 @@ const AdvertisementRecords = () => {
     adv_date: '',
     closing_date: '',
     status: ''
+  });
+  const [publishModal, setPublishModal] = useState({
+    open: false,
+    ad: null,
+    secretary_name: '',
+    publish_date: '',
+    loading: false,
   });
 
   const filterConfig = [
@@ -170,6 +182,50 @@ const AdvertisementRecords = () => {
       closing_date: '',
       status: ''
     });
+  };
+
+  const openPublishModal = (ad) => {
+    setPublishModal({
+      open: true,
+      ad,
+      secretary_name: '',
+      publish_date: new Date().toISOString().split('T')[0],
+      loading: false,
+    });
+  };
+
+  const closePublishModal = () => {
+    setPublishModal(prev => ({ ...prev, open: false, ad: null }));
+  };
+
+  const handlePublish = async () => {
+    if (!publishModal.secretary_name.trim()) {
+      toast.error('Please enter the secretary name');
+      return;
+    }
+    if (!publishModal.publish_date) {
+      toast.error('Please select a publish date');
+      return;
+    }
+    setPublishModal(prev => ({ ...prev, loading: true }));
+    try {
+      const result = await AdvertisementApi.update(publishModal.ad.id, {
+        closing_date: publishModal.ad.closing_date,
+        secretary_name: publishModal.secretary_name,
+        publish_date: publishModal.publish_date,
+      });
+      if (result.success) {
+        toast.success(result.message || 'Advertisement published successfully');
+        closePublishModal();
+        fetchAdvertisements(pagination.current_page);
+      } else {
+        toast.error(result.message || 'Failed to publish advertisement');
+      }
+    } catch (error) {
+      toast.error(error.message || 'Error publishing advertisement');
+    } finally {
+      setPublishModal(prev => ({ ...prev, loading: false }));
+    }
   };
 
   useEffect(() => {
@@ -340,11 +396,32 @@ const AdvertisementRecords = () => {
           : params.value
     },
     {
+      field: 'publish_date',
+      headerName: 'Publication Date',
+      width: 160,
+      renderCell: (params) => {
+        if (!params.value) return <span className="text-slate-400 text-xs">Not Published</span>;
+        const d = new Date(params.value);
+        return <span className="text-sm font-medium text-slate-700">{d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>;
+      }
+    },
+    {
+      field: 'secretary_name',
+      headerName: 'Secretary Name',
+      width: 160,
+      renderCell: (params) => {
+        if (!params.value) return <span className="text-slate-400 text-xs">—</span>;
+        return <span className="text-sm text-slate-700">{params.value}</span>;
+      }
+    },
+    {
       field: 'status',
       headerName: 'Status',
       width: 150,
       renderCell: (params) => {
-        const badge = STATUS_BADGES[params.row.status] || STATUS_BADGES.active;
+        const isPublished = !!params.row.publish_date;
+        const statusKey = isPublished ? 'published' : (params.row.status || 'active');
+        const badge = STATUS_BADGES[statusKey] || STATUS_BADGES.active;
         return (
           <div className="flex items-center h-full">
             <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${badge.className}`}>
@@ -366,6 +443,7 @@ const AdvertisementRecords = () => {
           onView={viewAdvertisement} 
           onEdit={editAdvertisement} 
           onDelete={deleteAdvertisement}
+          onPublish={openPublishModal}
         />
       )
     }
@@ -394,6 +472,8 @@ const AdvertisementRecords = () => {
     adv_number: ad.adv_number,
     adv_date: ad.adv_date,
     closing_date: ad.closing_date,
+    publish_date: ad.publish_date,
+    secretary_name: ad.secretary_name,
     advertisement_fee: ad.advertisement_fee,
     note: ad.note || ad.notes || ad.ad_note,
     important_notes: ad.important_notes,
@@ -559,6 +639,95 @@ const AdvertisementRecords = () => {
           </div>
         )}
       </div>
+
+      {/* Publish Modal */}
+      {publishModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-lg">
+                  <Send className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Publish Advertisement</h2>
+                  <p className="text-xs text-emerald-200">
+                    {publishModal.ad?.adv_number || ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closePublishModal}
+                className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Secretary Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={publishModal.secretary_name}
+                  onChange={(e) => setPublishModal(prev => ({ ...prev, secretary_name: e.target.value }))}
+                  placeholder="Enter secretary name"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Publish Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={publishModal.publish_date}
+                  onChange={(e) => setPublishModal(prev => ({ ...prev, publish_date: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <button
+                onClick={closePublishModal}
+                disabled={publishModal.loading}
+                className="px-5 py-2.5 border border-slate-200 rounded-lg text-slate-700 font-medium text-sm hover:bg-slate-100 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePublish}
+                disabled={publishModal.loading}
+                className="px-5 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white rounded-lg font-medium text-sm shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {publishModal.loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Publish
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

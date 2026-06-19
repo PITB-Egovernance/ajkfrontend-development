@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Typography, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { InlineLoader } from 'components/ui/Loader';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from 'components/ui/Dialog';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Printer } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
@@ -333,8 +333,23 @@ const RequisitionPreview = () => {
 
   const { step1, step2, step3, serviceRule,syllabus } = previewData;
 
+  const handlePrint = () => {
+    document.body.classList.add('printing-preview');
+    window.print();
+    document.body.classList.remove('printing-preview');
+  };
+
   return (
-    <div className="p-6 bg-white rounded-lg shadow">
+    <div className="p-6 bg-white rounded-lg shadow" id="requisition-preview">
+      <style>{`
+        @media print {
+          body.printing-preview * { visibility: hidden; }
+          body.printing-preview #requisition-preview,
+          body.printing-preview #requisition-preview * { visibility: visible; }
+          body.printing-preview #requisition-preview { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+          body.printing-preview .no-print { display: none !important; }
+        }
+      `}</style>
       <Typography variant="h5" className="font-semibold mb-6 text-center">
         Requisition Preview
       </Typography>
@@ -369,11 +384,11 @@ const RequisitionPreview = () => {
                   <TableCell>{step1.quota_promotion || 'N/A'}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>No. of Posts</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>No. of Posts Requisitioned</TableCell>
                   <TableCell>{step1.num_posts || 'N/A'}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Date of Vacancy</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Date of Availability of Vacancy</TableCell>
                   <TableCell>{step1.vacancy_date || 'N/A'}</TableCell>
                 </TableRow>
                 {/* <TableRow>
@@ -384,18 +399,22 @@ const RequisitionPreview = () => {
                   <TableCell sx={{ fontWeight: 'bold' }}>Service Rules</TableCell>
                   <TableCell>
                     {serviceRule ? (
-                      <a href={`https://api-admin-ajkpsc.punjab.gov.pk/${serviceRule}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
-                        View Service Rules
+                      <a href={`https://api-admin-ajkpsc.punjab.gov.pk/${serviceRule}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">
+                        {`https://api-admin-ajkpsc.punjab.gov.pk/${serviceRule}`}
                       </a>
                     ) : 'No service rule file uploaded yet'}
                   </TableCell>
                 </TableRow>
                 <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Service Rule (Text)</TableCell>
+                  <TableCell style={{ whiteSpace: 'pre-wrap' }}>{step1.service_rules_text || step1.service_rule_text || 'N/A'}</TableCell>
+                </TableRow>
+                <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Syllabus</TableCell>
                   <TableCell>
                     {syllabus ? (
-                      <a href={`https://api-admin-ajkpsc.punjab.gov.pk/${syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
-                        View Syllabus
+                      <a href={`https://api-admin-ajkpsc.punjab.gov.pk/${syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">
+                        {`https://api-admin-ajkpsc.punjab.gov.pk/${syllabus}`}
                       </a>
                     ) : 'No syllabus file uploaded yet'}
                   </TableCell>
@@ -417,7 +436,26 @@ const RequisitionPreview = () => {
               <TableBody>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold', width: '250px' }}>Academic Qualification</TableCell>
-                  <TableCell>{step2.academic_qualification || 'N/A'}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const raw = step2.academic_qualification || '';
+                      const qualNames = Array.isArray(raw)
+                        ? raw
+                        : raw.split(',').map(q => q.trim()).filter(Boolean);
+                      if (qualNames.length > 0) {
+                        return (
+                          <div className="flex flex-wrap gap-1.5">
+                            {qualNames.map((name, idx) => (
+                              <span key={idx} className="inline-block bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-sm font-medium">
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return 'N/A';
+                    })()}
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Equivalent Qualification</TableCell>
@@ -462,7 +500,34 @@ const RequisitionPreview = () => {
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Experience Length</TableCell>
-                  <TableCell>{step2.experience_length || 0} years</TableCell>
+                  <TableCell>
+                    {step2.qualification_experience && Object.keys(step2.qualification_experience).length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(step2.qualification_experience).map(([qual, yrs]) => (
+                          <span key={qual} className="inline-block bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-sm font-medium">
+                            {qual}: {yrs} years
+                          </span>
+                        ))}
+                      </div>
+                    ) : (() => {
+                      const raw = step2.experience_length || '';
+                      const expParts = Array.isArray(raw)
+                        ? raw
+                        : raw.split(',').map(e => e.trim()).filter(Boolean);
+                      if (expParts.length > 0) {
+                        return (
+                          <div className="flex flex-wrap gap-1.5">
+                            {expParts.map((exp, idx) => (
+                              <span key={idx} className="inline-block bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-sm font-medium">
+                                {exp}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return 'N/A';
+                    })()}
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Minimum Qualification</TableCell>
@@ -588,32 +653,33 @@ const RequisitionPreview = () => {
                     })()}
                   </TableCell> */}
                   <TableCell>
-                    {step3.district?.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {step3.district.map((district, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center gap-2"
-                          >
-                            <span className="text-slate-700 font-medium">
+                    {(step3.merit_type === 'open_merit' || step3.selection_mode === 'open_merit') && step3.district?.length > 0 ? (
+                      <div>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {step3.district.map((district, index) => (
+                            <span key={index} className="inline-block bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-sm font-medium">
                               {district}
                             </span>
-
+                          ))}
+                        </div>
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-slate-500 text-sm">Total Posts:</span>
+                          <span className="bg-emerald-700 text-white px-2 py-1 rounded text-sm">
+                            {step1.num_posts || 0}
+                          </span>
+                        </span>
+                      </div>
+                    ) : step3.district?.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {step3.district.map((district, index) => (
+                          <span key={index} className="inline-flex items-center gap-2">
+                            <span className="text-slate-700 font-medium">{district}</span>
                             <span className="bg-emerald-700 text-white px-2 py-1 rounded text-sm">
                               {step3.post?.[index] || 0}
                             </span>
                           </span>
                         ))}
                       </div>
-                    ) : (step3.merit_type === 'open_merit' || step3.selection_mode === 'open_merit') ? (
-                      // Open Merit: no per-district breakdown was entered, so show
-                      // the grand-total post count from Step 1 against "All Districts".
-                      <span className="inline-flex items-center gap-2">
-                        <span className="text-slate-700 font-medium">All Districts</span>
-                        <span className="bg-emerald-700 text-white px-2 py-1 rounded text-sm">
-                          {step1.num_posts || 0}
-                        </span>
-                      </span>
                     ) : (
                       'N/A'
                     )}
@@ -657,13 +723,21 @@ const RequisitionPreview = () => {
       </Card>
 
       {/* Action Buttons */}
-      <div className="flex justify-center gap-4 mt-6">
+      <div className="flex justify-center gap-4 mt-6 no-print">
         <Button
           variant="outlined"
           onClick={() => navigate(`/dashboard/requisitions/create?temp_id=${tempId}`)}
           sx={{ borderColor: '#6b7280', color: '#6b7280' }}
         >
           Back to Edit
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={handlePrint}
+          startIcon={<Printer size={18} />}
+          sx={{ borderColor: '#0B5E3C', color: '#0B5E3C' }}
+        >
+          Print
         </Button>
         <Button
           variant="contained"
@@ -676,7 +750,7 @@ const RequisitionPreview = () => {
         </Button>
       </div>
 
-      {!serviceRule && (
+      {!serviceRule && !confirming && (
         <Typography variant="body2" className="text-center mt-2 text-red-600">
           Service Rule file is missing. Please go back to Step 1 and upload the Service Rule to enable Confirm & Save.
         </Typography>

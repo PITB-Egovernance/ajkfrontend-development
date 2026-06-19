@@ -163,6 +163,8 @@ const RequisitionDetail = () => {
           || [];
 
         const normalized = {
+          // Preserve the hash_id from the URL params and/or API response
+          hash_id: data.hash_id ?? data.id ?? id,
           // Step 1 — Job Details
           designation:     data.designation     ?? step1.designation,
           scale:           data.scale           ?? step1.scale,
@@ -197,6 +199,7 @@ const RequisitionDetail = () => {
           // Falls back to the path persisted locally at Confirm time if the
           // backend returned null — see BACKEND_FIX_REQUISITION_FILE_DROP.md.
           service_rules:   extractFilePath(data.service_rules   ?? step1.service_rules) || getPersistedDraftFilePath(id, 'service_rules'),
+          service_rules_text: data.service_rules_text ?? step1.service_rules_text ?? null,
           syllabus:        extractFilePath(data.syllabus        ?? step1.syllabus) || getPersistedDraftFilePath(id, 'syllabus'),
           // Step 2 — Qualification details
           qualification: (() => {
@@ -383,12 +386,13 @@ const RequisitionDetail = () => {
       const tableData = [
         [
           '1',
-          '(i) Designation or nomenclature of the Post(s)\n(ii) Scale of the Post\n(iii) Department & Class of Service\n(iv) Percentage of quota fixed\n(v) Number of posts to be filled\n(vi) Date(s) of occurrence of vacancy(s)',
+          '(i) Designation or nomenclature of the Post(s)\n(ii) Scale of the Post\n(iii) Department & Class of Service\n(iv) Percentage of quota fixed\n(v) Number of posts to be filled\n(vi) Date(s) of availability of vacancy(s)',
           `(i) ${requisition.designation || 'N/A'}\n(ii) ${getScaleName(requisition.scale)}\n(iii) ${(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}\n(iv) Direct: ${getQuotaDisplay(requisition.quota_percentage)} | Promotion: ${getQuotaDisplay(requisition.quota_promotion)}\n(v) ${requisition.num_posts || 'N/A'}\n(vi) Details in Annex "A"`
         ],
-        ['2', 'Service Rules for the Post(s) to be filled', requisition.service_rules
+        ['2', 'Service Rules for the Post(s) to be filled', (requisition.service_rules
           ? `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}`
-          : 'No service rule file uploaded yet'],
+          : 'No service rule file uploaded yet')
+          + (requisition.service_rules_text ? `\n\n${requisition.service_rules_text}` : '')],
         ['3', 'Approved syllabus for the Post(s) to be filled', requisition.syllabus
           ? `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`
           : 'No syllabus file uploaded yet'],
@@ -452,28 +456,27 @@ const RequisitionDetail = () => {
 
         const districtData = isOpenMerit
           ? [[
-              'AJK Districts',
               formatMeritType(
                 requisition.eligibility?.merit_type
                   ?? requisition.merit_type
               ),
+              requisition.multiple_posts && requisition.multiple_posts.length > 0
+                ? requisition.multiple_posts.map(p => getDistrictName(p.district)).join(', ')
+                : districtOptions.map(d => d.name).join(', ') || 'All AJK Districts',
               String(requisition.num_posts || 'N/A'),
             ]]
           : requisition.multiple_posts.map(post => [
-              getDistrictName(post.district),
-              // The "Quota" column shows the eligibility-level
-              // merit_type as a human-readable label. Sourced
-              // purely from the API — no hardcoded fallback.
               formatMeritType(
                 requisition.eligibility?.merit_type
                   ?? requisition.merit_type
               ),
+              getDistrictName(post.district),
               post.post || 'N/A'
             ]);
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['District/Unit', 'Quota', 'Posts']],
+          head: [['Quota', 'District/Unit', 'Posts']],
           body: districtData,
           theme: 'grid',
           styles: { 
@@ -609,10 +612,10 @@ const RequisitionDetail = () => {
                 (iii) Department & Class of Service<span style={styles.fieldLine}></span>
                 (iv) Percentage of quota fixed for direct recruitment viz-a-viz promotion quota (Quote Rules)<span style={styles.fieldLine}></span>
                 (v) Number of posts to be filled through direct recruitment as (iv) above on permanent basis<span style={styles.fieldLine}></span>
-                (vi) Date(s) of occurrence of vacancy(s) OR Period from __________ to __________
+                (vi) Date(s) of availability of vacancy(s) OR Period from __________ to __________
                 <p style={{ marginBottom: '10px' }}></p>
               </td>
-              <td style={styles.tableCell}>
+              <td style={styles.tableCellValue}>
                 (i)&nbsp;&nbsp;{requisition.designation || 'N/A'}<span style={styles.fieldLine}></span>
                 (ii)&nbsp;&nbsp;{getScaleName(requisition.scale)}<span style={styles.fieldLine}></span>
                 (iii)&nbsp;&nbsp;{(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}<span style={styles.fieldLine}></span>
@@ -625,19 +628,22 @@ const RequisitionDetail = () => {
             <tr>
               <th style={styles.number}>2</th>
               <td style={styles.tableCell}>Service Rules for the Post(s) to be filled</td>
-              <td style={styles.tableCell}>
+              <td style={styles.tableCellValue}>
                 {requisition.service_rules ? (
                   <a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
                     View Service Rules
                   </a>
                 ) : 'No service rule file uploaded yet'}
+                {requisition.service_rules_text && (
+                  <div style={{ whiteSpace: 'pre-wrap', marginTop: 8 }}>{requisition.service_rules_text}</div>
+                )}
               </td>
             </tr>
 
             <tr>
               <th style={styles.number}>3</th>
               <td style={styles.tableCell}>Approved syllabus for the Post(s) to be filled</td>
-              <td style={styles.tableCell}>
+              <td style={styles.tableCellValue}>
                 {requisition.syllabus ? (
                   <a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
                     View Syllabus
@@ -657,7 +663,7 @@ const RequisitionDetail = () => {
                 (v) Training with the name of training institute.
                 <p style={{ marginBottom: '10px' }}></p>
               </td>
-              <td style={styles.tableCell}>
+              <td style={styles.tableCellValue}>
                 <br />
                 (i)&nbsp;&nbsp;{requisition.qualification?.academic_qualification || 'N/A'}<span style={styles.fieldLine}></span>
                 (ii)&nbsp;&nbsp;{requisition.qualification?.equivalent_qualification || 'N/A'}<span style={{ ...styles.fieldLine, marginTop: '22px' }}></span>
@@ -676,7 +682,7 @@ const RequisitionDetail = () => {
                 (iii) Minimum academic qualification after acquisition of which the prescribed experience shall be counted<span style={styles.fieldLine}></span>
                 <br /><b>Note:</b> Only those experience certificates shall be accepted, which shall be in accordance with Rule Notification # AJKPSC/1-2017/1077-10782 approved by AJK PSC. (Rules Attached)
               </td>
-              <td style={styles.tableCell}>
+              <td style={styles.tableCellValue}>
                 <br />
                 (i)&nbsp;&nbsp;{requisition.qualification?.experience_type || 'N/A'}<span style={styles.fieldLine}></span>
                 (ii)&nbsp;&nbsp;{requisition.qualification?.experience_length || 'N/A'}<span style={styles.fieldLine}></span>
@@ -693,7 +699,7 @@ const RequisitionDetail = () => {
                 (iii) Relaxation, if any, approved by the Government
                 <p style={{ marginBottom: '10px' }}></p>
               </td>
-              <td style={styles.tableCell}>
+              <td style={styles.tableCellValue}>
                 <br />
                 (i)&nbsp;&nbsp;{requisition.eligibility?.min_age || 'N/A'}<span style={styles.fieldLine}></span>
                 (ii)&nbsp;&nbsp;{requisition.eligibility?.max_age || 'N/A'}<span style={styles.fieldLine}></span>
@@ -704,19 +710,19 @@ const RequisitionDetail = () => {
             <tr>
               <th style={styles.number}>7</th>
               <td style={styles.tableCell}>Nationality</td>
-              <td style={styles.tableCell}>{requisition.eligibility?.nationality || 'N/A'}<span className=""></span></td>
+              <td style={styles.tableCellValue}>{requisition.eligibility?.nationality || 'N/A'}<span className=""></span></td>
             </tr>
 
             <tr>
               <th style={styles.number}>8</th>
               <td style={styles.tableCell}>Domicile (Name Districts/Units)</td>
-              <td style={styles.tableCell}>{formatDomicile(requisition?.eligibility?.domicile)}<span className=""></span></td>
+              <td style={styles.tableCellValue}>{formatDomicile(requisition?.eligibility?.domicile)}<span className=""></span></td>
             </tr>
 
             <tr>
               <th style={styles.number}>9</th>
               <td style={styles.tableCell}>Detail of District wise quota for the posts requisitioned here.</td>
-              <td style={styles.tableCell}>
+              <td style={styles.tableCellValue}>
                 Total Posts:&nbsp;&nbsp;{requisition.num_posts || 'N/A'} <span style={styles.fieldLine}></span>
                 {/* Open Merit: collapse the per-district breakdown into a
                     single summary row that says "AJK DISTRICTS / Open Merit
@@ -728,21 +734,25 @@ const RequisitionDetail = () => {
                   <table style={styles.subTable}>
                     <thead>
                       <tr>
-                        <th style={styles.subTableHeader}>District/Unit</th>
                         <th style={styles.subTableHeader}>Quota</th>
+                        <th style={styles.subTableHeader}>District/Unit</th>
                         <th style={styles.subTableHeader}>Posts</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={styles.subTableCell}>AJK Districts</td>
-                        <td style={styles.subTableCell}>
+                        <td style={{ ...styles.subTableCell, fontSize: '11px', whiteSpace: 'nowrap' }}>
                           {formatMeritType(
                             requisition.eligibility?.merit_type
                               ?? requisition.merit_type
                           )}
                         </td>
-                        <td style={styles.subTableCell}>{requisition.num_posts || 'N/A'}</td>
+                        <td style={{ ...styles.subTableCell, fontSize: '11px', textAlign: 'center' }}>
+                          {requisition.multiple_posts && requisition.multiple_posts.length > 0
+                            ? requisition.multiple_posts.map(p => getDistrictName(p.district)).join(', ')
+                            : districtOptions.map(d => d.name).join(', ') || 'All AJK Districts'}
+                        </td>
+                        <td style={{ ...styles.subTableCell, fontSize: '11px' }}>{requisition.num_posts || 'N/A'}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -751,8 +761,8 @@ const RequisitionDetail = () => {
                     <table style={styles.subTable}>
                       <thead>
                         <tr>
-                          <th style={styles.subTableHeader}>District/Unit</th>
                           <th style={styles.subTableHeader}>Quota</th>
+                          <th style={styles.subTableHeader}>District/Unit</th>
                           <th style={styles.subTableHeader}>Posts</th>
                         </tr>
                       </thead>
@@ -760,13 +770,13 @@ const RequisitionDetail = () => {
                         {requisition.multiple_posts.map((post, index) => (
                           <tr key={index}>
                             <td style={styles.subTableCell}>
-                              {getDistrictName(post.district)}
-                            </td>
-                            <td style={styles.subTableCell}>
                               {formatMeritType(
                                 requisition.eligibility?.merit_type
                                   ?? requisition.merit_type
                               )}
+                            </td>
+                            <td style={styles.subTableCell}>
+                              {getDistrictName(post.district)}
                             </td>
                             <td style={styles.subTableCell}>{post.post ?? 'N/A'}</td>
                           </tr>
@@ -781,7 +791,7 @@ const RequisitionDetail = () => {
             <tr>
               <th style={styles.number}>10</th>
               <td style={styles.tableCell}>Any other condition of qualification, etc. not covered by the above mentioned details</td>
-              <td style={styles.tableCell}>{requisition.eligibility?.other_conditions || 'N/A'}</td>
+              <td style={styles.tableCellValue}>{requisition.eligibility?.other_conditions || 'N/A'}</td>
             </tr>
 
             <tr>
@@ -794,7 +804,7 @@ const RequisitionDetail = () => {
                   to show "Open Merit" (the actual selection mode) —
                   not the hidden default. Source the display value
                   purely from the API's merit_type. */}
-              <td style={styles.tableCell}>
+              <td style={styles.tableCellValue}>
                 {isOpenMerit
                   ? 'Open Merit'
                   : (requisition.eligibility?.gender_basis || 'N/A')}
@@ -860,6 +870,7 @@ const styles = {
   table: {
     width: '100%',
     borderCollapse: 'collapse',
+    tableLayout: 'fixed',
     marginTop: '10px',
     border: '1px solid #000',
   },
@@ -868,6 +879,14 @@ const styles = {
     padding: '6px 8px',
     verticalAlign: 'top',
     fontSize: '14px',
+    width: '50%',
+  },
+  tableCellValue: {
+    border: '1px solid #000',
+    padding: '6px 8px',
+    verticalAlign: 'top',
+    fontSize: '14px',
+    width: '45%',
   },
   number: {
     width: '30px',
@@ -910,7 +929,7 @@ const styles = {
     border: '1px solid #000',
     padding: '4px',
     textAlign: 'center',
-    fontSize: '14px',
+    fontSize: '10spx',
   },
   certified: {
     marginTop: '25px',

@@ -2,16 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TextField, MenuItem, InputAdornment } from '@mui/material';
 import toast from 'react-hot-toast';
 
-const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, departmentOptions = [], gradeOptions = [] }) => {
+const OTHER_DESIGNATION = '__other__';
+
+const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, departmentOptions = [], gradeOptions = [], designationOptions = [] }) => {
   // Track the last data identity we've synced from. Only re-sync when the
   // identity actually changes (e.g. user navigates back with a new temp_id).
   // Without this guard, the data-sync useEffect would re-run on every
   // parent re-render and OVERWRITE the user's in-progress edits.
   const lastSyncedDataRef = useRef(null);
 
+  const initialDesignation = data.designation || '';
+  const isInitialOther = initialDesignation && designationOptions.length > 0
+    && !designationOptions.some((d) => d.name === initialDesignation);
+
+  const [isOtherDesignation, setIsOtherDesignation] = useState(false);
+  const [customDesignation, setCustomDesignation] = useState(isInitialOther ? initialDesignation : '');
+
   const [formData, setFormData] = useState({
     department: data.department || '',
-    designation: data.designation || '',
+    designation: isInitialOther ? OTHER_DESIGNATION : initialDesignation,
     scale: data.scale || '',
     // v2.2.0: live API (Usama's schema) uses a single `quota_percentage` field
     // (label: "Promotion Quota") for the promotion-quota split. The legacy
@@ -24,6 +33,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
     // for the default value sent to the live API).
     quota_promotion: data.quota_promotion ?? '',
     service_rules: data.service_rules || null,
+    service_rules_text: data.service_rules_text || data.service_rule_text || '',
     syllabus: data.syllabus || null,
   });
 
@@ -53,6 +63,22 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
      }
      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [gradeOptions]);
+
+  useEffect(() => {
+    if (designationOptions.length === 0) return;
+    if (!formData.designation || formData.designation === OTHER_DESIGNATION) return;
+    const str = String(formData.designation).trim();
+    const matched = designationOptions.find((d) => d.name === str);
+    if (matched) {
+      setFormData((prev) => ({ ...prev, designation: matched.name }));
+      setIsOtherDesignation(false);
+    } else if (str) {
+      setFormData((prev) => ({ ...prev, designation: OTHER_DESIGNATION }));
+      setCustomDesignation(str);
+      setIsOtherDesignation(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [designationOptions]);
 
 // Same fix for the Department field: if the data-sync useEffect
    // ran before `departmentOptions` was populated, `formData.department`
@@ -135,6 +161,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
         // test_type intentionally omitted from UI; see getCleanedFormData.
         quota_promotion: data.quota_promotion ?? '',
         service_rules: data.service_rules || null,
+        service_rules_text: data.service_rules_text || data.service_rule_text || '',
         syllabus: data.syllabus || null,
       });
     }
@@ -188,6 +215,10 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
   const getCleanedFormData = () => {
     const cleanedFormData = { ...formData };
 
+    if (cleanedFormData.designation === OTHER_DESIGNATION) {
+      cleanedFormData.designation = customDesignation.trim();
+    }
+
     if (Array.isArray(cleanedFormData.service_rules)) {
       console.warn('⚠️ Step1: service_rules is an array, converting:', cleanedFormData.service_rules);
       cleanedFormData.service_rules = cleanedFormData.service_rules.length > 0 ? cleanedFormData.service_rules[0] : null;
@@ -211,6 +242,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
     // The admin-facing choice for test type happens later in the
     // advertisement creation flow (see AdvertisementCreateForm.jsx).
     cleanedFormData.test_type = cleanedFormData.test_type || 'MCQs Base';
+    cleanedFormData.service_rules_text = formData.service_rules_text || '';
 
     return cleanedFormData;
   };
@@ -228,14 +260,14 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
   const hasServiceRules = (formData.service_rules instanceof File)
     || (typeof data.service_rules === 'string' && data.service_rules.trim() !== '');
 
-  // Live validation for "Number of Posts": must be a whole number > 0 and < 1000.
+  // Live validation for "No. of Posts Requisitioned": must be a whole number > 0 and < 1000.
   // Empty value shows the generic "required" state (no helper text).
   const numPostsError = (() => {
     if (formData.num_posts === '' || formData.num_posts === null || formData.num_posts === undefined) return '';
     const n = Number(formData.num_posts);
-    if (!Number.isInteger(n))     return 'Number of Posts must be a whole number';
-    if (n <= 0)                    return 'Number of Posts must be greater than 0';
-    if (n >= 1000)                 return 'Number of Posts must be less than 1000';
+    if (!Number.isInteger(n))     return 'No. of Posts Requisitioned must be a whole number';
+    if (n <= 0)                    return 'No. of Posts Requisitioned must be greater than 0';
+    if (n >= 1000)                 return 'No. of Posts Requisitioned must be less than 1000';
     return '';
   })();
 
@@ -245,18 +277,15 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
     !!formData.department &&
     formData.num_posts !== '' && formData.num_posts !== null && formData.num_posts !== undefined && !numPostsError &&
     !!formData.scale &&
-    !!String(formData.designation || '').trim() &&
-    formData.quota_promotion !== '' && formData.quota_promotion !== null && formData.quota_promotion !== undefined &&
-    formData.quota_percentage !== '' && formData.quota_percentage !== null && formData.quota_percentage !== undefined &&
-    !!formData.vacancy_date &&
+    !!(!isOtherDesignation ? String(formData.designation || '').trim() : customDesignation.trim()) &&
     hasServiceRules;
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Block submit on Number of Posts validation
+    // Block submit on No. of Posts Requisitioned validation
     if (formData.num_posts === '' || formData.num_posts === null || formData.num_posts === undefined) {
-      toast.error('Number of Posts is required');
+      toast.error('No. of Posts Requisitioned is required');
       return;
     }
     if (numPostsError) {
@@ -297,7 +326,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
             6. Promotion Qouta
             7. Approved Syllabus
             8. Service Rule
-            9. Date of Occurrence of Vacancy */}
+            9. Date of Availability of Vacancy */}
 
         {/* 1. Department */}
         <div className="col-md-6 form-group">
@@ -332,7 +361,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
             fullWidth
             required
             type="number"
-            label="Number of Posts"
+            label="No. of Posts Requisitioned"
             name="num_posts"
             value={formData.num_posts}
             onChange={handleChange}
@@ -364,16 +393,86 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
           </TextField>
         </div>
 
-        {/* 4. Designation of post */}
+        {/* 4. Designation of post — sourced dynamically from /settings/designations */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
             required
+            select
             label="Designation or Nomenclature of the Post(s)"
             name="designation"
-            value={formData.designation}
-            onChange={handleChange}
-          />
+            value={isOtherDesignation ? OTHER_DESIGNATION : (formData.designation ?? '')}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === OTHER_DESIGNATION) {
+                setIsOtherDesignation(true);
+              } else {
+                setIsOtherDesignation(false);
+                setCustomDesignation('');
+                setFormData((prev) => ({ ...prev, designation: val }));
+              }
+            }}
+            helperText={designationOptions.length === 0 ? 'No designations configured in Settings yet' : ' '}
+          >
+            <MenuItem value="">Select Designation</MenuItem>
+            {designationOptions.map((d) => (
+              <MenuItem key={d.id} value={d.name}>{d.name}</MenuItem>
+            ))}
+            {!isOtherDesignation && formData.designation && !designationOptions.some((d) => d.name === formData.designation) && (
+              <MenuItem value={formData.designation}>{formData.designation}</MenuItem>
+            )}
+            <MenuItem value={OTHER_DESIGNATION} sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+              Other (specify)
+            </MenuItem>
+          </TextField>
+          {isOtherDesignation && (
+            <div className="mt-2 flex gap-2 items-center animate-in fade-in duration-200">
+              <TextField
+                fullWidth
+                size="small"
+                label="Custom Designation"
+                value={customDesignation}
+                onChange={(e) => setCustomDesignation(e.target.value)}
+                placeholder="e.g. Assistant Director"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const trimmed = customDesignation.trim();
+                    if (trimmed) {
+                      setFormData((prev) => ({ ...prev, designation: trimmed }));
+                      setIsOtherDesignation(false);
+                      setCustomDesignation('');
+                    }
+                  }
+                }}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const trimmed = customDesignation.trim();
+                  if (trimmed) {
+                    setFormData((prev) => ({ ...prev, designation: trimmed }));
+                    setIsOtherDesignation(false);
+                    setCustomDesignation('');
+                  }
+                }}
+                className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded-lg whitespace-nowrap"
+              >
+                Add &amp; Set
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOtherDesignation(false);
+                  setCustomDesignation('');
+                }}
+                className="px-3 py-2 border border-slate-300 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 5. Direct Quota (live API: quota_promotion) */}
@@ -385,7 +484,6 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
-            required
             label="Direct Quota"
             name="quota_promotion"
             value={formData.quota_promotion ?? ''}
@@ -398,7 +496,6 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
-            required
             label="Promotion Qouta"
             name="quota_percentage"
             value={formData.quota_percentage ?? ''}
@@ -498,13 +595,34 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
           />
         </div>
 
-        {/* 9. Date of Occurrence of Vacancy */}
+        {/* 9. Service Rule Text Area */}
+        <div className="col-md-12 form-group">
+          <TextField
+            fullWidth
+            multiline
+            label="Service Rule (Text)"
+            name="service_rules_text"
+            value={formData.service_rules_text}
+            onChange={handleChange}
+            minRows={4}
+            variant="outlined"
+            helperText="Enter service rule details here"
+          />
+          {/* Footnote */}
+          <div className="footnote-container" style={{ marginTop: '12px', marginBottom: '8px' }}>
+            <span className="footnote-label">Note:</span>
+            <p className="footnote-text">
+              The service rules/qualification, and other eligibility criteria for the requisitioned posts shall be incorporated strictly in accordance with the relevant govt. notification.
+            </p>
+          </div>
+        </div>
+
+        {/* 10. Date of Availability of Vacancy */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth
-            required
             type="date"
-            label="Date of Occurrence of Vacancy"
+            label="Date of Availability of Vacancy"
             name="vacancy_date"
             value={formData.vacancy_date}
             onChange={handleChange}
@@ -518,12 +636,16 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
             `getCleanedFormData()` below. Do not render a TextField here. */}
       </div>
 
+
+
       <div className="navigation-buttons">
         <div></div>
         <div className="flex gap-2">
-          <button type="button" onClick={handleSaveDraftClick} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
-            Save Draft
-          </button>
+          {!isEdit && (
+            <button type="button" onClick={handleSaveDraftClick} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">
+              Save Draft
+            </button>
+          )}
           <button
             type="submit"
             disabled={!isStep1Valid}

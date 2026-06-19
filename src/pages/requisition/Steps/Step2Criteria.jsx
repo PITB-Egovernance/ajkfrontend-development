@@ -13,14 +13,15 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   const { activeQualifications, activeDegrees } = useLocalSettings();
 
   const [formData, setFormData] = useState({
-    academic_qualification:   '',
+    academic_qualification:   [],
     equivalent_qualification: '',
     authority_certificate:    '',
     degree_equivalence:       '',
     any_other_qualification:  '',
     training_institute:       '',
     experience_type:          '',
-    experience_length:        0,
+    experience_length:        '',
+    qualification_experience: {},
     min_qualification:        '',
     eligible_degrees:         '', // Stores comma-separated degree names
   });
@@ -114,7 +115,14 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     });
 
     setSelectedGroups(newGroups);
-    setFormData(prev => ({ ...prev, eligible_degrees: updatedDegrees.join(',') }));
+    setFormData(prev => {
+      const nextStr = updatedDegrees.join(',');
+      return {
+        ...prev,
+        eligible_degrees: nextStr,
+        degree_equivalence: nextStr
+      };
+    });
   };
 
   // Handle individual degree checkbox toggle
@@ -135,7 +143,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       }
 
       const newEligibleDegrees = updated.join(',');
-      return { ...prev, eligible_degrees: newEligibleDegrees };
+      return { ...prev, eligible_degrees: newEligibleDegrees, degree_equivalence: newEligibleDegrees };
     });
   };
 
@@ -160,9 +168,11 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   const someSelected    = selectedDegreeList.length > 0 && !allSelected;
 
   const handleToggleAll = () => {
+    const nextStr = allSelected ? '' : allDegreeNames.join(',');
     setFormData((prev) => ({
       ...prev,
-      eligible_degrees: allSelected ? '' : allDegreeNames.join(','),
+      eligible_degrees: nextStr,
+      degree_equivalence: nextStr,
     }));
   };
 
@@ -176,7 +186,8 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       const next = fullySelected
         ? current.filter((n) => !groupDegreeNames.includes(n))           // unselect all in group
         : Array.from(new Set([...current, ...groupDegreeNames]));        // select all in group
-      return { ...prev, eligible_degrees: next.join(',') };
+      const nextStr = next.join(',');
+      return { ...prev, eligible_degrees: nextStr, degree_equivalence: nextStr };
     });
   };
 
@@ -202,15 +213,39 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       const raw = data.degree_equivalence || '';
       const degreeNames = raw.split(',').map(d => d ? String(d).trim() : '').filter(d => d);
 
+      // Parse the stored experience_length string back into the
+      // qualification_experience object so the checkboxes and year
+      // inputs are restored when navigating back to Step 2.
+      // Format: "Master: 9 years, MS English: 16 years, MA Islamiat: 3 years"
+      let restoredQualExp = data.qualification_experience || {};
+      if (Object.keys(restoredQualExp).length === 0 && data.experience_length) {
+        const parsed = {};
+        const entries = String(data.experience_length).split(',').map(s => s.trim()).filter(Boolean);
+        entries.forEach(entry => {
+          const match = entry.match(/^(.+?):\s*(\d+)\s*years?$/i);
+          if (match) {
+            parsed[match[1].trim()] = parseInt(match[2], 10) || 0;
+          }
+        });
+        if (Object.keys(parsed).length > 0) {
+          restoredQualExp = parsed;
+        }
+      }
+
       setFormData({
-        academic_qualification:   data.academic_qualification   || '',
+        academic_qualification:   data.academic_qualification
+          ? (Array.isArray(data.academic_qualification)
+              ? data.academic_qualification
+              : String(data.academic_qualification).split(',').map((s) => s.trim()).filter(Boolean))
+          : [],
         equivalent_qualification: data.equivalent_qualification || '',
         authority_certificate:    data.authority_certificate    || '',
         degree_equivalence:       degreeNames.length > 0 ? degreeNames.join(',') : (data.degree_equivalence || ''),
         any_other_qualification:  data.any_other_qualification  || '',
         training_institute:       data.training_institute       || '',
         experience_type:          data.experience_type          || '',
-        experience_length:        data.experience_length        || 0,
+        experience_length:        data.experience_length        || '',
+        qualification_experience: restoredQualExp,
         min_qualification:        data.min_qualification        || '',
         eligible_degrees:         degreeNames.length > 0 ? degreeNames.join(',') : (data.eligible_degrees || ''),
       });
@@ -240,17 +275,37 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
 
   // Degrees filtered to match the selected academic qualification.
   const filteredDegrees = activeDegrees.filter((d) => {
-    if (!formData.academic_qualification) return true;
-    const matchingQual = activeQualifications.find(
-      (q) => q.name === formData.academic_qualification
-    );
-    return matchingQual ? d.qualification_id === matchingQual.id : true;
+    const qualArr = Array.isArray(formData.academic_qualification) ? formData.academic_qualification : [];
+    if (qualArr.length === 0) return true;
+    const matchingQualIds = activeQualifications
+      .filter((q) => qualArr.includes(q.name))
+      .map((q) => q.id);
+    return matchingQualIds.length === 0 || matchingQualIds.includes(d.qualification_id);
   });
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
+  const handleAcademicQualToggle = (qualName) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.academic_qualification) ? prev.academic_qualification : [];
+      const adding = !current.includes(qualName);
+      const next = adding
+        ? [...current, qualName]
+        : current.filter((q) => q !== qualName);
+      const nextExp = { ...prev.qualification_experience };
+      if (adding) {
+        nextExp[qualName] = nextExp[qualName] ?? 0;
+      } else {
+        delete nextExp[qualName];
+      }
+      return { ...prev, academic_qualification: next, qualification_experience: nextExp, degree_equivalence: '', eligible_degrees: '' };
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'academic_qualification') return;
 
     if (value === OTHER) {
       setShowOther((prev) => ({ ...prev, [name]: true }));
@@ -259,12 +314,8 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
 
     setShowOther((prev) => ({ ...prev, [name]: false }));
 
-    // Handle side effects outside of setFormData callback
     if (name === 'equivalent_qualification') {
       setShowAuthority(value === 'Yes');
-    }
-    if (name === 'academic_qualification') {
-      setCustomDegree('');
     }
 
     setFormData((prev) => {
@@ -281,19 +332,15 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         }
       }
 
-      // Reset degree filter when qualification changes.
-      if (name === 'academic_qualification') {
-        newData.degree_equivalence = '';
-        newData.eligible_degrees = '';
-      }
-
-      // Auto-select all degrees in group when group is selected in Equivalence dropdown
       if (name === 'degree_equivalence') {
         if (value !== OTHER && value !== '') {
           const groupDegrees = groupedDegrees[value] || [];
-          newData.eligible_degrees = groupDegrees.map(d => d.name).join(',');
+          const nextStr = groupDegrees.map(d => d.name).join(',');
+          newData.eligible_degrees = nextStr;
+          newData.degree_equivalence = nextStr;
         } else {
           newData.eligible_degrees = '';
+          newData.degree_equivalence = '';
         }
       }
 
@@ -320,8 +367,9 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       );
       if (!alreadyExists) {
         // Link to selected qualification if available.
+        const qualArr = Array.isArray(formData.academic_qualification) ? formData.academic_qualification : [];
         const matchingQual = activeQualifications.find(
-          (q) => q.name === formData.academic_qualification
+          (q) => qualArr.includes(q.name)
         );
         localSettingsApi.add('degrees', {
           name:             trimmed,
@@ -331,7 +379,27 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       }
     }
 
-    setFormData((prev) => ({ ...prev, [fieldName]: trimmed }));
+    if (fieldName === 'academic_qualification') {
+      setFormData((prev) => {
+        const current = Array.isArray(prev.academic_qualification) ? prev.academic_qualification : [];
+        return { ...prev, academic_qualification: current.includes(trimmed) ? current : [...current, trimmed] };
+      });
+    } else if (fieldName === 'degree_equivalence') {
+      setFormData((prev) => {
+        const current = prev.eligible_degrees
+          ? prev.eligible_degrees.split(',').map(d => d ? String(d).trim() : '').filter(d => d)
+          : [];
+        const next = current.includes(trimmed) ? current : [...current, trimmed];
+        const nextStr = next.join(',');
+        return {
+          ...prev,
+          degree_equivalence: nextStr,
+          eligible_degrees: nextStr
+        };
+      });
+    } else {
+      setFormData((prev) => ({ ...prev, [fieldName]: trimmed }));
+    }
     setShowOther((prev) => ({ ...prev, [fieldName]: false }));
     setCustom('');
   };
@@ -342,8 +410,16 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
 
   const buildSubmitData = () => {
     const submitData = { ...formData };
+    if (Array.isArray(submitData.academic_qualification)) {
+      submitData.academic_qualification = submitData.academic_qualification.join(', ');
+    }
     if (selectedDegreeList.length > 0) {
       submitData.degree_equivalence = selectedDegreeList.join(',');
+    }
+    const qe = submitData.qualification_experience || {};
+    const expEntries = Object.entries(qe).filter(([, yrs]) => yrs !== null && yrs !== undefined);
+    if (expEntries.length > 0) {
+      submitData.experience_length = expEntries.map(([qual, yrs]) => `${qual}: ${yrs} years`).join(', ');
     }
     return submitData;
   };
@@ -355,14 +431,14 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   // Authority Certificate and Degree of Equivalence are only required when
   // Equivalent Qualification is "Yes".
   const isStep2Valid =
-    !!formData.academic_qualification &&
+    (Array.isArray(formData.academic_qualification) ? formData.academic_qualification.length > 0 : !!formData.academic_qualification) &&
     (formData.equivalent_qualification !== 'Yes' ||
       (!!formData.authority_certificate && !!formData.degree_equivalence));
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!formData.academic_qualification) {
+    if (!formData.academic_qualification || (Array.isArray(formData.academic_qualification) && formData.academic_qualification.length === 0)) {
       alert('Academic Qualification is required');
       return;
     }
@@ -425,21 +501,60 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
 
       <div className="row">
 
-        {/* Academic Qualification */}
+        {/* Academic Qualification (multi-select with checkboxes) */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth required select
             label="Academic Qualification"
             name="academic_qualification"
-            value={showOther.academic_qualification ? OTHER : formData.academic_qualification}
-            onChange={handleChange}
+            value={Array.isArray(formData.academic_qualification) ? formData.academic_qualification : []}
+            SelectProps={{
+              multiple: true,
+              onChange: () => {},
+              renderValue: (selected) => {
+                if (!selected || selected.length === 0) return '';
+                return (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                    {selected.map((v) => <Chip key={v} label={v} size="small" />)}
+                  </Box>
+                );
+              },
+              MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+            }}
           >
-            <MenuItem value="">Select</MenuItem>
+            <MenuItem dense onClick={(e) => {
+              e.preventDefault();
+              const allNames = activeQualifications.map((q) => q.name);
+              const current = Array.isArray(formData.academic_qualification) ? formData.academic_qualification : [];
+              const allSelected = allNames.every((n) => current.includes(n));
+              const nextExp = allSelected ? {} : Object.fromEntries(allNames.map((n) => [n, (formData.qualification_experience || {})[n] ?? 0]));
+              setFormData((prev) => ({
+                ...prev,
+                academic_qualification: allSelected ? [] : allNames,
+                qualification_experience: nextExp,
+                degree_equivalence: '', eligible_degrees: '',
+              }));
+            }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+              <Checkbox size="small"
+                checked={activeQualifications.length > 0 && activeQualifications.every((q) => (formData.academic_qualification || []).includes(q.name))}
+                indeterminate={activeQualifications.some((q) => (formData.academic_qualification || []).includes(q.name)) && !activeQualifications.every((q) => (formData.academic_qualification || []).includes(q.name))}
+                sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+              />
+              <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+            </MenuItem>
             {activeQualifications.map((q) => (
-              <MenuItem key={q.id} value={q.name}>{q.name}</MenuItem>
+              <MenuItem key={q.id} dense onClick={(e) => { e.preventDefault(); handleAcademicQualToggle(q.name); }}>
+                <Checkbox
+                  size="small"
+                  checked={(formData.academic_qualification || []).includes(q.name)}
+                  sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                />
+                <ListItemText primary={q.name} />
+              </MenuItem>
             ))}
-            <MenuItem value={OTHER} sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-              Other (specify)
+            <MenuItem dense onClick={(e) => { e.preventDefault(); setShowOther((prev) => ({ ...prev, academic_qualification: true })); }}
+              sx={{ color: 'text.secondary', fontStyle: 'italic', borderTop: '1px solid #e2e8f0' }}>
+              <ListItemText primary="Other (specify)" />
             </MenuItem>
           </TextField>
           {showOther.academic_qualification && (
@@ -611,14 +726,57 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         </div>
 
         <div className="col-md-6 form-group">
-          <TextField
-            fullWidth type="number"
-            label="Length of Experience (in years)"
-            name="experience_length"
-            value={formData.experience_length}
-            onChange={handleChange}
-            inputProps={{ min: 0 }}
-          />
+          <label className="text-sm font-semibold text-slate-700 mb-2 block">
+            Experience per Qualification (years)
+          </label>
+          {(Array.isArray(formData.academic_qualification) && formData.academic_qualification.length > 0) ? (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              {formData.academic_qualification.map((qual) => {
+                const qe = formData.qualification_experience || {};
+                const isEnabled = qe[qual] !== undefined && qe[qual] !== null;
+                return (
+                  <div key={qual} className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 last:border-b-0 hover:bg-slate-50">
+                    <Checkbox
+                      size="small"
+                      checked={isEnabled}
+                      onChange={() => {
+                        setFormData((prev) => {
+                          const next = { ...prev.qualification_experience };
+                          if (isEnabled) {
+                            delete next[qual];
+                          } else {
+                            next[qual] = 0;
+                          }
+                          return { ...prev, qualification_experience: next };
+                        });
+                      }}
+                      sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                    />
+                    <span className="text-sm text-slate-700 font-medium flex-1">{qual}</span>
+                    {isEnabled && (
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={qe[qual] ?? 0}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          setFormData((prev) => ({
+                            ...prev,
+                            qualification_experience: { ...prev.qualification_experience, [qual]: val },
+                          }));
+                        }}
+                        inputProps={{ min: 0, max: 50, style: { width: 60, textAlign: 'center' } }}
+                        sx={{ width: 100 }}
+                        label="Years"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400">Select academic qualifications first to set experience per qualification.</p>
+          )}
         </div>
 
         {/* Minimum Qualification */}
@@ -649,6 +807,8 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         </div>
       </div>
 
+
+
       <div className="navigation-buttons">
         <button
           type="button"
@@ -658,13 +818,15 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           Previous
         </button>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onSaveDraft?.(buildSubmitData())}
-            className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200"
-          >
-            Save Draft
-          </button>
+          {onSaveDraft && (
+            <button
+              type="button"
+              onClick={() => onSaveDraft?.(buildSubmitData())}
+              className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200"
+            >
+              Save Draft
+            </button>
+          )}
           <button
             type="submit"
             disabled={!isStep2Valid}

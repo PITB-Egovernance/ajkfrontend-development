@@ -136,6 +136,18 @@ const AdvertisementApi = {
       body: JSON.stringify(data),
     });
     return handleResponse(response);
+  },
+
+  /**
+   * Publish an advertisement
+   */
+  publish: async (id, data) => {
+    const response = await fetch(`${API_BASE}/advertisements/${id}/publish`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
   }
 };
 
