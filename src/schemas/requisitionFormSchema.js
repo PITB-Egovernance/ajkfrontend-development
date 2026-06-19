@@ -99,10 +99,10 @@ export const requisitionFormSchema = {
       type: 'required',
       message: 'Nationality is required'
     },
-    domicile: {
-      type: 'required',
-      message: 'Domicile is required'
-    },
+    // domicile: {
+    //   type: 'required',
+    //   message: 'Domicile is required'
+    // },
     // gender_basis: {
     //   type: 'required',
     //   message: 'Gender is required'
