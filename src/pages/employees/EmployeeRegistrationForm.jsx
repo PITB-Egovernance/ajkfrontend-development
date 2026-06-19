@@ -118,6 +118,7 @@ const EmployeeRegistrationForm = () => {
     const errors = {};
     if (!username.trim()) errors.username = ['Username is required'];
     if (!cnic.trim()) errors.cnic = ['CNIC is required'];
+    else if (cnic.length !== 13) errors.cnic = ['CNIC must be exactly 13 digits'];
     if (!email.trim()) errors.email = ['Email address is required'];
     if (!password) errors.password = ['Password is required'];
     else if (password.length < 8) errors.password = ['Password must be at least 8 characters'];
@@ -127,6 +128,7 @@ const EmployeeRegistrationForm = () => {
     if (!dob) errors.dob = ['Date of birth is required'];
     if (!gender) errors.gender = ['Gender is required'];
     if (!mobile.trim()) errors.mobile = ['Mobile number is required'];
+    else if (mobile.length !== 11) errors.mobile = ['Mobile number must be exactly 11 digits'];
     if (!district) errors.domicile_district = ['Domicile district is required'];
     if (!designation) errors.designation = ['Designation is required'];
     if (!grade) errors.grade = ['Grade is required'];
@@ -206,13 +208,14 @@ const EmployeeRegistrationForm = () => {
                   <TextField
                     fullWidth
                     label="CNIC"
-                    placeholder="xxxxx-xxxxxxx-x"
+                    placeholder="13 digits e.g. 3740512345671"
                     value={cnic}
-                    onChange={(e) => setCnic(e.target.value)}
+                    onChange={(e) => setCnic(e.target.value.replace(/\D/g, '').slice(0, 13))}
                     required
+                    inputProps={{ maxLength: 13, inputMode: 'numeric' }}
                     sx={fieldSx}
                     error={!!fieldErrors?.cnic}
-                    helperText={fieldErrors?.cnic?.join(', ')}
+                    helperText={fieldErrors?.cnic?.join(', ') || `${cnic.length}/13 digits`}
                   />
                 </div>
               </div>
@@ -315,13 +318,14 @@ const EmployeeRegistrationForm = () => {
                   <TextField
                     fullWidth
                     label="Mobile Number"
-                    placeholder="+923XXXXXXXXX"
+                    placeholder="11 digits e.g. 03001234567"
                     value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
+                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
                     required
+                    inputProps={{ maxLength: 11, inputMode: 'numeric' }}
                     sx={fieldSx}
                     error={!!fieldErrors?.mobile}
-                    helperText={fieldErrors?.mobile?.join(', ')}
+                    helperText={fieldErrors?.mobile?.join(', ') || `${mobile.length}/11 digits`}
                   />
                 </div>
                 <div className="col-md-6 form-group">
