@@ -26,6 +26,7 @@ import toast from 'react-hot-toast';
 import { getJobRouteId } from 'utils/jobMapper';
 import OfficialPublicationModal from 'components/results/OfficialPublicationModal';
 import MarkApprovalConsole from 'components/results/MarkApprovalConsole';
+import { formatDate } from 'utils/dateUtils';
 
 /**
  * ResultsDashboard
@@ -74,7 +75,6 @@ const ResultsDashboard = () => {
       const res = await ResultsApi.getImportHistory({ limit: 5 });
       setImportHistory(res.data || res || []);
     } catch (err) {
-      console.error('History fetch failed', err);
       setImportHistory([]);
     } finally {
       setHistoryLoading(false);
@@ -86,7 +86,6 @@ const ResultsDashboard = () => {
       const res = await ResultsApi.getPendingMarkEdits();
       setPendingCount(res.data?.length || 0);
     } catch (err) {
-      console.error('Failed to fetch pending approvals');
     }
   };
 
@@ -102,7 +101,6 @@ const ResultsDashboard = () => {
         }));
       }
     } catch (err) {
-      console.error('Failed to fetch stats', err);
     }
   };
 
@@ -596,7 +594,7 @@ const ResultsDashboard = () => {
                         <div>
                           <p className="text-sm font-black text-slate-800">{item.job_detail?.designation || 'System Import'}</p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase">
-                            {item.total_rows || 0} Candidates processed • {new Date(item.created_at).toLocaleDateString()}
+                            {item.total_rows || 0} Candidates processed • {formatDate(item.created_at)}
                           </p>
                         </div>
                       </div>

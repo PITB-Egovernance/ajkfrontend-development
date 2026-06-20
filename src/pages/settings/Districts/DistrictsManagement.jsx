@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { DataGrid } from "@mui/x-data-grid";
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
   IconButton,
@@ -456,7 +456,7 @@ const DistrictsManagement = () => {
       />
 
       {/* DATAGRID */}
-      <DataGrid
+      <TooltipDataGrid
         rows={filteredRows}
         columns={columns}
         getRowId={(row) => row.id}

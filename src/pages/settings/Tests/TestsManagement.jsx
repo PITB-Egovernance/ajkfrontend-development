@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField, IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, Menu, MenuItem, Switch,
@@ -12,6 +12,7 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import { GRID_SX } from 'utils/gridStyles';
 
 const API_BASE = Config.apiUrl;
 
@@ -23,20 +24,6 @@ const getHeaders = (json = true) => {
   };
   if (json) h['Content-Type'] = 'application/json';
   return h;
-};
-
-const gridSx = {
-  border: 'none',
-  '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc' },
-  '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
-  '& .MuiDataGrid-row':              { minHeight: '52px !important' },
-  '& .MuiDataGrid-checkboxInput svg':             { color: '#064e3b' },
-  '& .MuiDataGrid-checkboxInput:hover svg':        { color: '#065f46' },
-  '& .MuiDataGrid-checkboxInput.Mui-checked svg':  { color: '#064e3b' },
-  '& .MuiCheckbox-root .MuiSvgIcon-root':           { color: '#064e3b' },
-  '& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root': { color: '#064e3b' },
-  '& .MuiDataGrid-row.Mui-selected':       { backgroundColor: '#ecfdf5' },
-  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: '#d1fae5' },
 };
 
 const emptyForm = { test_name: '', test_fees: '' };
@@ -223,9 +210,8 @@ const TestsManagement = () => {
         // Show backend validation messages if present (Laravel returns { errors: { field: [..] } })
         const fieldErrors = r.errors ? Object.values(r.errors).flat().join(', ') : '';
         toast.error(fieldErrors || r.message || 'Status update failed');
-        console.error('Toggle status failed', r);
       }
-    } catch (e) { toast.error('Status update failed'); console.error(e); }
+    } catch (e) { toast.error('Status update failed'); }
   };
 
   const columns = [
@@ -324,7 +310,7 @@ const TestsManagement = () => {
           )}
         </div>
 
-        <DataGrid
+        <TooltipDataGrid
           rows={filtered}
           columns={columns}
           getRowId={(r) => r.id}
@@ -338,7 +324,7 @@ const TestsManagement = () => {
           disableRowSelectionOnClick
           rowSelectionModel={selectionModel}
           onRowSelectionModelChange={(s) => setSelectionModel(s)}
-          sx={gridSx}
+          sx={GRID_SX}
         />
 
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>

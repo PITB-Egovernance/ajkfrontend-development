@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { DataGrid } from "@mui/x-data-grid";
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { TextField, MenuItem } from "@mui/material";
 import {
   ArrowLeft,
@@ -264,7 +264,7 @@ const RollSlipGeneration = () => {
             </button>
           </div>
         ) : (
-          <DataGrid
+          <TooltipDataGrid
             rows={filteredRows} columns={columns} getRowId={(r) => r.id}
             paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[25, 50, 100]} autoHeight disableRowSelectionOnClick sx={gridSx}

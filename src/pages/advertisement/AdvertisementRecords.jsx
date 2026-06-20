@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import {
@@ -30,8 +30,10 @@ import AdvertisementApi from '../../api/advertisementApi';
 import { Menu, MenuItem, IconButton, TextField } from '@mui/material';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { Link } from 'react-router-dom';
+import { formatDate } from 'utils/dateUtils';
 
 const STATUS_BADGES = {
+  pending:             { label: 'Pending',            className: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
   active:              { label: 'Active',             className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
   temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-200 text-amber-700' },
   permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-200 text-red-700' },
@@ -344,7 +346,7 @@ const AdvertisementRecords = () => {
     }
 
     if (filters.status) {
-      const adStatus = ad.status || 'active';
+      const adStatus = ad.publish_date ? (ad.status || 'published') : 'pending';
       if (adStatus !== filters.status) return false;
     }
 
@@ -382,7 +384,7 @@ const AdvertisementRecords = () => {
       valueGetter: (params) => new Date(params.value),
       valueFormatter: (params) =>
         params.value instanceof Date
-          ? params.value.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+          ? formatDate(params.value)
           : params.value
     },
     {
@@ -392,7 +394,7 @@ const AdvertisementRecords = () => {
       valueGetter: (params) => new Date(params.value),
       valueFormatter: (params) =>
         params.value instanceof Date
-          ? params.value.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+          ? formatDate(params.value)
           : params.value
     },
     {
@@ -401,8 +403,7 @@ const AdvertisementRecords = () => {
       width: 160,
       renderCell: (params) => {
         if (!params.value) return <span className="text-slate-400 text-xs">Not Published</span>;
-        const d = new Date(params.value);
-        return <span className="text-sm font-medium text-slate-700">{d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>;
+        return <span className="text-sm font-medium text-slate-700">{formatDate(params.value)}</span>;
       }
     },
     {
@@ -420,8 +421,8 @@ const AdvertisementRecords = () => {
       width: 150,
       renderCell: (params) => {
         const isPublished = !!params.row.publish_date;
-        const statusKey = isPublished ? 'published' : (params.row.status || 'active');
-        const badge = STATUS_BADGES[statusKey] || STATUS_BADGES.active;
+        const statusKey = isPublished ? (params.row.status || 'published') : 'pending';
+        const badge = STATUS_BADGES[statusKey] || STATUS_BADGES.pending;
         return (
           <div className="flex items-center h-full">
             <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${badge.className}`}>
@@ -556,7 +557,7 @@ const AdvertisementRecords = () => {
                     </button>
                     {isOpen && (
                       <div className="p-3">
-                        <DataGrid
+                        <TooltipDataGrid
                           rows={group.ads.map(toRow)}
                           columns={columns}
                           autoHeight
@@ -575,7 +576,7 @@ const AdvertisementRecords = () => {
               })}
             </div>
           ) : (
-            <DataGrid
+            <TooltipDataGrid
               rows={filteredAdvertisements.map(toRow)}
               columns={columns}
               autoHeight

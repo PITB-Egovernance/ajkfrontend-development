@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField, IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, Switch, Menu, MenuItem,
@@ -12,6 +12,7 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import { GRID_SX } from 'utils/gridStyles';
 
 const API_BASE = Config.apiUrl;
 
@@ -21,15 +22,6 @@ const getHeaders = () => ({
   'Content-Type': 'application/json',
   'X-API-KEY': Config.apiKey,
 });
-
-const gridSx = {
-  border: 'none',
-  '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc' },
-  '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
-  '& .MuiDataGrid-row':              { minHeight: '52px !important' },
-  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: '#ecfdf5' },
-  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: '#d1fae5' },
-};
 
 const QualificationsManagement = () => {
   const navigate = useNavigate();
@@ -191,9 +183,9 @@ const QualificationsManagement = () => {
             value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 320 }} />
         </div>
 
-        <DataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
+        <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={gridSx} />
+          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX} />
 
         {/* 3-dot action menu */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>

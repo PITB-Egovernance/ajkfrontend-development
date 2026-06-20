@@ -59,7 +59,6 @@ const EmployeeRegistrationForm = () => {
           );
         }
       } catch (error) {
-        console.error('Error fetching districts:', error);
         toast.error('Failed to load districts');
       }
     };
@@ -77,7 +76,6 @@ const EmployeeRegistrationForm = () => {
           );
         }
       } catch (error) {
-        console.error('Error fetching designations:', error);
         toast.error('Failed to load designations');
       }
     };
@@ -95,7 +93,6 @@ const EmployeeRegistrationForm = () => {
           );
         }
       } catch (error) {
-        console.error('Error fetching grades:', error);
         toast.error('Failed to load grades');
       }
     };

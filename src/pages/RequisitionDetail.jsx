@@ -51,7 +51,6 @@ const RequisitionDetail = () => {
       );
     }
   } catch (error) {
-    console.error("Error fetching districts:", error);
   }
 };
 
@@ -74,7 +73,6 @@ const RequisitionDetail = () => {
         );
       }
     } catch (error) {
-      console.error("Error fetching grades:", error);
     }
   };
 
@@ -150,7 +148,6 @@ const RequisitionDetail = () => {
 
       // Handle API response format
       const responseData = result.data || result;
-      console.log('Response requisition detail', responseData)
       const data = responseData.requisition || responseData;
 
       if (result.success || result.status === 200 || data) {
@@ -305,7 +302,6 @@ const RequisitionDetail = () => {
         throw new Error(result.message || 'Invalid response');
       }
     } catch (err) {
-      console.error('Error fetching requisition:', err);
       toast.error(err.message || 'Error loading requisition details');
       navigate('/dashboard/requisitions');
     } finally {
@@ -334,7 +330,6 @@ const RequisitionDetail = () => {
   };
 
   const exportToPDF = () => {
-    console.log('Requisitions data export', requisition.hash_id)
     if (!requisition) {
       toast.error('No requisition data to export');
       return;
@@ -382,6 +377,12 @@ const RequisitionDetail = () => {
 
       yPosition += 3;
 
+      // Build full URLs for service rules & syllabus so we can embed
+      // proper clickable links in the PDF instead of raw text URLs.
+      const baseUrl = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
+      const serviceRulesUrl = requisition.service_rules ? `${baseUrl}/${requisition.service_rules}` : null;
+      const syllabusUrl = requisition.syllabus ? `${baseUrl}/${requisition.syllabus}` : null;
+
       // Main Table Data
       const tableData = [
         [
@@ -389,21 +390,21 @@ const RequisitionDetail = () => {
           '(i) Designation or nomenclature of the Post(s)\n(ii) Scale of the Post\n(iii) Department & Class of Service\n(iv) Percentage of quota fixed\n(v) Number of posts to be filled\n(vi) Date(s) of availability of vacancy(s)',
           `(i) ${requisition.designation || 'N/A'}\n(ii) ${getScaleName(requisition.scale)}\n(iii) ${(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}\n(iv) Direct: ${getQuotaDisplay(requisition.quota_percentage)} | Promotion: ${getQuotaDisplay(requisition.quota_promotion)}\n(v) ${requisition.num_posts || 'N/A'}\n(vi) Details in Annex "A"`
         ],
-        ['2', 'Service Rules for the Post(s) to be filled', (requisition.service_rules
-          ? `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}`
+        ['2', 'Service Rules for the Post(s) to be filled', (serviceRulesUrl
+          ? serviceRulesUrl
           : 'No service rule file uploaded yet')
           + (requisition.service_rules_text ? `\n\n${requisition.service_rules_text}` : '')],
-        ['3', 'Approved syllabus for the Post(s) to be filled', requisition.syllabus
-          ? `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`
+        ['3', 'Approved syllabus for the Post(s) to be filled', syllabusUrl
+          ? syllabusUrl
           : 'No syllabus file uploaded yet'],
         [
           '4',
-          'Qualification Required:\n(i) Academic\n(ii) Equivalent qualification authority\n(iii) Name degree of equivalence\n(iv) Any other Qualification\n(v) Training with institute name',
+          'Qualification Required:\n(i) Required Qualification\n(ii) Equivalent qualification authority\n(iii) Name degree of equivalence\n(iv) Any other Qualification\n(v) Training with institute name',
           `(i) ${requisition.qualification?.academic_qualification || 'N/A'}\n(ii) ${requisition.qualification?.equivalent_qualification || 'N/A'}\n(iii) ${requisition.qualification?.degree_equivalence || 'N/A'}\n(iv) ${requisition.qualification?.any_other_qualification || 'N/A'}\n(v) ${requisition.qualification?.training_institute || 'N/A'}`
         ],
         [
           '5',
-          'Experience:\n(i) Type of experience required\n(ii) Length of experience\n(iii) Minimum academic qualification',
+          'Experience:\n(i) Type of experience required\n(ii) Length of experience\n(iii) Minimum required qualification',
           `(i) ${requisition.qualification?.experience_type || 'N/A'}\n(ii) ${requisition.qualification?.experience_length || 'N/A'}\n(iii) ${requisition.qualification?.min_qualification || 'N/A'}`
         ],
         [
@@ -427,8 +428,8 @@ const RequisitionDetail = () => {
         head: [],
         body: tableData,
         theme: 'grid',
-        styles: { 
-          fontSize: 8, 
+        styles: {
+          fontSize: 8,
           cellPadding: 2,
           lineColor: [0, 0, 0],
           lineWidth: 0.1
@@ -438,7 +439,15 @@ const RequisitionDetail = () => {
           1: { cellWidth: 75, valign: 'top' },
           2: { cellWidth: 97, valign: 'top' }
         },
-        margin: { left: marginLeft, right: marginRight }
+        margin: { left: marginLeft, right: marginRight },
+        didDrawCell: (data) => {
+          if (data.column.index !== 2) return;
+          const rowIndex = data.row.index;
+          const url = rowIndex === 1 ? serviceRulesUrl : rowIndex === 2 ? syllabusUrl : null;
+          if (url) {
+            doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url });
+          }
+        },
       });
 
       yPosition = doc.lastAutoTable.finalY + 5;
@@ -537,7 +546,6 @@ const RequisitionDetail = () => {
       toast.success('PDF exported successfully!');
     } catch (error) {
       toast.error('Failed to export PDF: ' + error.message);
-      console.error('PDF Export Error:', error);
     }
   };
 
@@ -656,7 +664,7 @@ const RequisitionDetail = () => {
               <th style={styles.number}>4</th>
               <td style={styles.tableCell}>
                 <b>Qualification Required:</b><br />
-                (i) Academic<span style={styles.fieldLine}></span>
+                (i) Required Qualification<span style={styles.fieldLine}></span>
                 (ii) In case of equivalent qualification is accepted, name the authority for issuing the equivalent certificate.<span style={styles.fieldLine}></span>
                 (iii) Name degree of equivalence.<span style={styles.fieldLine}></span>
                 (iv) Any other Qualification under Rules.<span style={styles.fieldLine}></span>
@@ -679,7 +687,7 @@ const RequisitionDetail = () => {
                 <b>Experience:</b><br />
                 (i) What type of experience required<span style={styles.fieldLine}></span>
                 (ii) Length of experience<span style={styles.fieldLine}></span>
-                (iii) Minimum academic qualification after acquisition of which the prescribed experience shall be counted<span style={styles.fieldLine}></span>
+                (iii) Minimum required qualification after acquisition of which the prescribed experience shall be counted<span style={styles.fieldLine}></span>
                 <br /><b>Note:</b> Only those experience certificates shall be accepted, which shall be in accordance with Rule Notification # AJKPSC/1-2017/1077-10782 approved by AJK PSC. (Rules Attached)
               </td>
               <td style={styles.tableCellValue}>

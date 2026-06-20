@@ -155,7 +155,6 @@ const DispatchSentAddNew = () => {
         setError(result.message || 'Please check the form and try again.');
       }
     } catch (err) {
-      console.error(err);
       toast.dismiss();
       toast.error('Network error. Please check your connection and try again.');
       setError('Network error. Please check your connection and try again.');

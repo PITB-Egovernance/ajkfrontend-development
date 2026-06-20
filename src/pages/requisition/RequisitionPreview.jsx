@@ -76,7 +76,6 @@ const RequisitionPreview = () => {
         );
       }
     } catch (err) {
-      console.error('Failed to load districts for preview');
     }
   };
 
@@ -101,7 +100,6 @@ const RequisitionPreview = () => {
         );
       }
     } catch (err) {
-      console.error('Failed to load grades for preview');
     }
   };
 
@@ -129,7 +127,6 @@ const RequisitionPreview = () => {
         );
       }
     } catch (err) {
-      console.error('Failed to load departments for preview');
     }
   };
 
@@ -214,13 +211,10 @@ const RequisitionPreview = () => {
         });
       } else {
         const errorMsg = result?.error || result?.message || 'Failed to load preview data';
-        console.error('❌ Preview load failed:', errorMsg);
         toast.error(errorMsg);
         setLoadError(errorMsg);
       }
     } catch (error) {
-      console.error('❌ Error loading preview:', error);
-
       // Laravel's default rate-limit response is HTTP 429 with the message
       // "Too Many Attempts." — surface a friendly, actionable message and a
       // Retry button instead of letting it bubble up as an uncaught error.
@@ -240,13 +234,8 @@ const RequisitionPreview = () => {
     setConfirming(true);
     setShowConfirmDialog(false); // Close dialog
 
-    console.log('🚀 Starting confirmation process...');
-    console.log('📋 Temp ID:', tempId);
-
     try {
       const result = await RequisitionApi.confirm(tempId);
-
-      console.log('✅ API Response:', result);
 
       // Check for success
       if (result.success || result.status === 200) {
@@ -280,17 +269,13 @@ const RequisitionPreview = () => {
         } catch { /* ignore */ }
 
         setTimeout(() => {
-          console.log('🔄 Redirecting to requisitions list...');
           navigate('/dashboard/requisitions');
         }, 1500);
       } else {
         const errorMsg = result.error || result.message || 'Failed to confirm requisition';
-        console.error('❌ Confirmation failed:', errorMsg);
         toast.error(errorMsg);
       }
     } catch (error) {
-      console.error('❌ Exception during confirmation:', error);
-
       // Provide more specific error messages
       let errorMessage = 'Error confirming requisition';
       if (error.message) {
@@ -306,7 +291,6 @@ const RequisitionPreview = () => {
       toast.error(errorMessage);
     } finally {
       setConfirming(false);
-      console.log('🏁 Confirmation process ended');
     }
   };
 
@@ -435,7 +419,7 @@ const RequisitionPreview = () => {
             <Table size="small">
               <TableBody>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold', width: '250px' }}>Academic Qualification</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '250px' }}>Required Qualification</TableCell>
                   <TableCell>
                     {(() => {
                       const raw = step2.academic_qualification || '';
@@ -531,7 +515,26 @@ const RequisitionPreview = () => {
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Minimum Qualification</TableCell>
-                  <TableCell>{step2.min_qualification || 'N/A'}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const raw = step2.min_qualification || '';
+                      const qualNames = Array.isArray(raw)
+                        ? raw
+                        : raw.split(',').map(q => q.trim()).filter(Boolean);
+                      if (qualNames.length > 0) {
+                        return (
+                          <div className="flex flex-wrap gap-1.5">
+                            {qualNames.map((name, idx) => (
+                              <span key={idx} className="inline-block bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-sm font-medium">
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return 'N/A';
+                    })()}
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>

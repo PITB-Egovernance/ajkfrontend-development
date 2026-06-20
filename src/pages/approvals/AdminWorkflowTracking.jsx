@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import StatusBadge from 'components/workflow/StatusBadge';
@@ -274,7 +274,7 @@ const AdminWorkflowTracking = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <DataGrid
+          <TooltipDataGrid
             rows={filteredRows}
             columns={columns}
             loading={loading}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TextField, MenuItem, InputAdornment } from '@mui/material';
 import toast from 'react-hot-toast';
 
@@ -180,7 +181,6 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
     
     // CRITICAL: Ensure we only get ONE file, never an array
     if (files && files.length > 1) {
-      console.error('❌ Multiple files selected! Only one file allowed for', name);
       toast.error('Please select only one file');
       e.target.value = '';
       return;
@@ -200,15 +200,12 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
         return;
       }
       
-      console.log(`📎 File selected for ${name}:`, file.name, 'Size:', file.size, 'Type:', file.type);
-      
       setFormData(prev => ({
         ...prev,
         [name]: file  // This is a single File object, NEVER an array
       }));
     } else {
       // File input cleared
-      console.log(`🗑️ File input cleared for ${name}`);
     }
   };
 
@@ -220,12 +217,10 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
     }
 
     if (Array.isArray(cleanedFormData.service_rules)) {
-      console.warn('⚠️ Step1: service_rules is an array, converting:', cleanedFormData.service_rules);
       cleanedFormData.service_rules = cleanedFormData.service_rules.length > 0 ? cleanedFormData.service_rules[0] : null;
     }
 
     if (Array.isArray(cleanedFormData.syllabus)) {
-      console.warn('⚠️ Step1: syllabus is an array, converting:', cleanedFormData.syllabus);
       cleanedFormData.syllabus = cleanedFormData.syllabus.length > 0 ? cleanedFormData.syllabus[0] : null;
     }
 
@@ -273,12 +268,15 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
 
   // Gate the Next button on every required field in this step so the admin
   // can't advance with a half-filled form.
+  const navigate = useNavigate();
+
   const isStep1Valid =
     !!formData.department &&
     formData.num_posts !== '' && formData.num_posts !== null && formData.num_posts !== undefined && !numPostsError &&
     !!formData.scale &&
     !!(!isOtherDesignation ? String(formData.designation || '').trim() : customDesignation.trim()) &&
-    hasServiceRules;
+    hasServiceRules &&
+    !!formData.service_rules_text?.trim();
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -298,13 +296,12 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
       return;
     }
 
-    const cleanedFormData = getCleanedFormData();
+    if (!formData.service_rules_text?.trim()) {
+      toast.error('Service Rule (Text) is required');
+      return;
+    }
 
-    console.log('📋 Step1 Form Data being submitted:', {
-      ...cleanedFormData,
-      service_rules: cleanedFormData.service_rules instanceof File ? `[File: ${cleanedFormData.service_rules.name}]` : cleanedFormData.service_rules,
-      syllabus: cleanedFormData.syllabus instanceof File ? `[File: ${cleanedFormData.syllabus.name}]` : cleanedFormData.syllabus,
-    });
+    const cleanedFormData = getCleanedFormData();
 
     onNext(cleanedFormData);
   };
@@ -488,6 +485,11 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
             name="quota_promotion"
             value={formData.quota_promotion ?? ''}
             onChange={handleChange}
+            type="number"
+            inputProps={{ min: 0, max: 100, step: 1 }}
+            InputProps={{
+              endAdornment: <InputAdornment position="end">%</InputAdornment>
+            }}
             helperText="Enter a percentage (0-100)."
           />
         </div>
@@ -600,13 +602,19 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
           <TextField
             fullWidth
             multiline
+            required
             label="Service Rule (Text)"
             name="service_rules_text"
             value={formData.service_rules_text}
             onChange={handleChange}
             minRows={4}
             variant="outlined"
-            helperText="Enter service rule details here"
+            error={!formData.service_rules_text?.trim()}
+            helperText={
+              !formData.service_rules_text?.trim()
+                ? 'Service Rule (Text) is required'
+                : 'Enter service rule details here'
+            }
           />
           {/* Footnote */}
           <div className="footnote-container" style={{ marginTop: '12px', marginBottom: '8px' }}>
@@ -639,7 +647,15 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
 
 
       <div className="navigation-buttons">
-        <div></div>
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/requisitions')}
+            className="px-6 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-all duration-200"
+          >
+            Cancel
+          </button>
+        </div>
         <div className="flex gap-2">
           {!isEdit && (
             <button type="button" onClick={handleSaveDraftClick} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-all duration-200">

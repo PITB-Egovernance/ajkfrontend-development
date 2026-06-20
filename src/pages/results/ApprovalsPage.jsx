@@ -31,7 +31,6 @@ const ApprovalsPage = () => {
       setPendingEdits(res.data || []);
     } catch (err) {
       toast.error('Failed to fetch pending approvals');
-      console.error(err);
     } finally {
       setLoading(false);
     }

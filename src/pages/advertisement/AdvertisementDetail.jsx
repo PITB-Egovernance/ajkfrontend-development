@@ -10,9 +10,11 @@ import AdvertisementApi from '../../api/advertisementApi';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { formatDate } from 'utils/dateUtils';
 
 const STATUS_BADGES = {
   active:              { label: 'Active',             className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
+  published:           { label: 'Published',          className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
   temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-100 text-amber-700' },
   permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-100 text-red-700' },
   reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-100 text-blue-700' },
@@ -61,7 +63,6 @@ const AdvertisementDetail = () => {
         );
       }
     } catch (error) {
-      console.error("Error fetching grades:", error);
     }
   };
 
@@ -141,15 +142,6 @@ const AdvertisementDetail = () => {
     const str = String(rawScale).trim();
     const matched = gradeOptions.find((g) => g.id === str || g.name === str);
     return matched ? matched.name : str;
-  };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
   };
 
   const getFileUrl = (path) => {
@@ -706,10 +698,22 @@ const AdvertisementDetail = () => {
                   ID: {advertisement.hash_id}
                 </span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                  (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).className
+                  advertisement.publish_date
+                    ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                    : (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).className
                 }`}>
-                  {(STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).label}
+                  {advertisement.publish_date ? 'Published' : (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).label}
                 </span>
+                {advertisement.secretary_name && (
+                  <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                    Secretary: {advertisement.secretary_name}
+                  </span>
+                )}
+                {advertisement.publish_date && (
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                    Published: {formatDate(advertisement.publish_date)}
+                  </span>
+                )}
               </div>
               <h1 className="text-lg font-black text-slate-800">{advertisement.adv_number}</h1>
             </div>
@@ -735,7 +739,7 @@ const AdvertisementDetail = () => {
             />
             <div className="adv-gov">Government of Azad Jammu &amp; Kashmir</div>
             <div className="adv-org">Azad Jammu &amp; Kashmir Public Service Commission</div>
-            <div className="adv-seat">Muzaffarabad</div>
+            <div className="adv-seat">Jalalabad, Muzaffarabad</div>
             <div className="adv-web">https://ajkpsc.punjab.gov.pk/</div>
             <div className="adv-bar">
               <div className="adv-no">{advertisement.adv_number}</div>
@@ -874,9 +878,9 @@ const AdvertisementDetail = () => {
           <div className="adv-signoff">
             <div className="sig">
               <div className="line"></div>
-              <div className="role">Secretary</div>
-              <div className="org2">AJK Public Service Commission, Muzaffarabad</div>
-              <div className="date">Dated: {formatDate(advertisement.adv_date)}</div>
+              <div className="role">{advertisement.secretary_name ? `${advertisement.secretary_name}` : 'Secretary'}</div>
+              <div className="org2">Secretary, AJ&K Public Service Commission</div>
+              <div className="date">Dated: {advertisement.publish_date ? formatDate(advertisement.publish_date) : formatDate(advertisement.adv_date)}</div>
             </div>
           </div>
 

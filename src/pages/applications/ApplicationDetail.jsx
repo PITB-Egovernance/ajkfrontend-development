@@ -7,6 +7,7 @@ import ApplicationApi from 'api/applicationApi';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import { formatApplicationDocumentType } from 'utils/applicationOcrUtils';
+import { formatDate } from 'utils/dateUtils';
 
 const ApplicationDetail = () => {
   const { id } = useParams();
@@ -80,8 +81,8 @@ const ApplicationDetail = () => {
           
           // Use issue_date or fall back to any available date if it's actually a cert
           const rawDate = cert.issue_date || cert.created_at;
-          const formattedDate = rawDate && !rawDate.includes('0000-00-00') 
-            ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) 
+          const formattedDate = rawDate && !rawDate.includes('0000-00-00')
+            ? formatDate(rawDate)
             : 'N/A';
 
           return {
@@ -89,7 +90,7 @@ const ApplicationDetail = () => {
             title: title || 'Unnamed Certification',
             issuing_organization: org || 'N/A',
             issue_date: formattedDate,
-            expiry_date: cert.expiry_date ? new Date(cert.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
+            expiry_date: cert.expiry_date ? formatDate(cert.expiry_date) : null,
           };
         }),
         skills: snapshot.skills || rawData.candidate?.skills || [],
@@ -214,7 +215,7 @@ const ApplicationDetail = () => {
               <div><p className="text-sm text-slate-500">Full Name</p><p className="font-medium text-slate-800">{profile?.full_name || 'N/A'}</p></div>
               <div><p className="text-sm text-slate-500">Father's Name</p><p className="font-medium text-slate-800">{profile?.father_name || 'N/A'}</p></div>
               <div><p className="text-sm text-slate-500">CNIC</p><p className="font-medium text-slate-800">{profile?.cnic || 'N/A'}</p></div>
-              <div><p className="text-sm text-slate-500">Date of Birth</p><p className="font-medium text-slate-800">{profile?.dob ? new Date(profile.dob).toLocaleDateString() : 'N/A'}</p></div>
+              <div><p className="text-sm text-slate-500">Date of Birth</p><p className="font-medium text-slate-800">{profile?.dob ? formatDate(profile.dob) : 'N/A'}</p></div>
               <div><p className="text-sm text-slate-500">Gender</p><p className="font-medium text-slate-800 capitalize">{profile?.gender || 'N/A'}</p></div>
               <div><p className="text-sm text-slate-500">Religion</p><p className="font-medium text-slate-800 capitalize">{profile?.religion || 'N/A'}</p></div>
               <div><p className="text-sm text-slate-500">Domicile District</p><p className="font-medium text-slate-800">{profile?.domicile || 'N/A'}</p></div>
@@ -371,9 +372,9 @@ const ApplicationDetail = () => {
                         
                         <div className="flex items-center gap-1.5 mt-3 bg-white w-fit px-3 py-1.5 rounded-md border border-slate-200 shadow-sm">
                           <Clock size={14} className="text-slate-400" /> 
-                          <span className="text-xs font-semibold text-slate-700">{exp.start_date ? new Date(exp.start_date).toLocaleDateString() : 'N/A'}</span> 
-                          <span className="text-xs text-slate-400 font-medium px-1">TO</span> 
-                          <span className="text-xs font-semibold text-slate-700">{exp.end_date ? new Date(exp.end_date).toLocaleDateString() : 'Present'}</span>
+                          <span className="text-xs font-semibold text-slate-700">{exp.start_date ? formatDate(exp.start_date) : 'N/A'}</span>
+                          <span className="text-xs text-slate-400 font-medium px-1">TO</span>
+                          <span className="text-xs font-semibold text-slate-700">{exp.end_date ? formatDate(exp.end_date) : 'Present'}</span>
                         </div>
                       </div>
                     </div>

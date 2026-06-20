@@ -15,7 +15,6 @@ export const setStorageItem = (key, value) => {
     localStorage.setItem(key, serialized);
     return true;
   } catch (error) {
-    console.error(`Error setting localStorage item "${key}":`, error);
     return false;
   }
 };
@@ -37,7 +36,6 @@ export const getStorageItem = (key, defaultValue = null) => {
       return item; // Return as string if not JSON
     }
   } catch (error) {
-    console.error(`Error getting localStorage item "${key}":`, error);
     return defaultValue;
   }
 };
@@ -52,7 +50,6 @@ export const removeStorageItem = (key) => {
     localStorage.removeItem(key);
     return true;
   } catch (error) {
-    console.error(`Error removing localStorage item "${key}":`, error);
     return false;
   }
 };
@@ -66,7 +63,6 @@ export const hasStorageItem = (key) => {
   try {
     return localStorage.getItem(key) !== null;
   } catch (error) {
-    console.error(`Error checking localStorage item "${key}":`, error);
     return false;
   }
 };
@@ -80,7 +76,6 @@ export const clearStorage = () => {
     localStorage.clear();
     return true;
   } catch (error) {
-    console.error('Error clearing localStorage:', error);
     return false;
   }
 };
@@ -93,7 +88,6 @@ export const getStorageKeys = () => {
   try {
     return Object.keys(localStorage);
   } catch (error) {
-    console.error('Error getting localStorage keys:', error);
     return [];
   }
 };
@@ -111,7 +105,6 @@ export const getStorageSize = () => {
       }
     }
   } catch (error) {
-    console.error('Error calculating storage size:', error);
   }
   return size;
 };
@@ -128,7 +121,6 @@ export const setStorageItems = (items) => {
     });
     return true;
   } catch (error) {
-    console.error('Error setting multiple storage items:', error);
     return false;
   }
 };
@@ -143,7 +135,6 @@ export const removeStorageItems = (keys) => {
     keys.forEach(key => removeStorageItem(key));
     return true;
   } catch (error) {
-    console.error('Error removing multiple storage items:', error);
     return false;
   }
 };

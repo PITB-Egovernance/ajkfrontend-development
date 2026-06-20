@@ -116,11 +116,8 @@ const AdvertisementCreateForm = () => {
             ? notes.terms_conditions
             : [""];
         setTermsConditions(tc);
-      } else {
-        console.warn("Advertisement notes not available — using empty defaults.");
       }
     } catch (err) {
-      console.warn("Error fetching advertisement notes (non-fatal):", err);
     }
   };
 
@@ -198,7 +195,6 @@ const AdvertisementCreateForm = () => {
 
         setJobTitles((prev) => ({ ...prev, ...titlesMap }));
       } catch (err) {
-        console.error("Error fetching job titles:", err);
       }
     };
     fetchTitles();

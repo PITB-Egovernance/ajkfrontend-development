@@ -136,7 +136,6 @@ const ImportResultsPage = () => {
         toast.error('Dry-run found validation errors. Please review the report.', { id: 'csv-dryrun' });
       }
     } catch (err) {
-      console.error('Dry-run failure:', err);
       setLastError(err);
       toast.error(err.message || 'Dry-run validation analysis failed.', { id: 'csv-dryrun' });
     } finally {
@@ -173,7 +172,6 @@ const ImportResultsPage = () => {
         navigate('/dashboard/results');
       }, 1500);
     } catch (err) {
-      console.error('CSV Final Ingestion Error:', err);
       setLastError(err);
       toast.error(err.message || 'Final Ingestion Failed', { id: 'csv-finalize' });
     } finally {

@@ -276,6 +276,11 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           path: "/dashboard/settings/terms-conditions",
           icon: BookOpenText,
         },
+        {
+          label: "Requisition Approval Flow",
+          path: "/dashboard/settings/approval-flow",
+          icon: CheckCircle,
+        },
       ],
     },
   ];

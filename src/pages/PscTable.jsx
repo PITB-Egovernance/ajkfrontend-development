@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
-import { Link, Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
+import { Link, Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from '@mui/material';
 import { MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
@@ -87,8 +87,6 @@ const PscTable = () => {
     hash_id: item.hash_id,
     designation: item.designation,
     requisition_form: item.requisition_form,
-    annex_a_form: item.annex_a_form,
-    other_attachment: item.other_attachment,
     remarks: item.remarks || '-',
     status: item.status || 'Pending',
   });
@@ -248,9 +246,11 @@ const PscTable = () => {
     const shortName = fileName.length > 35 ? fileName.substring(0, 35) + '...' : fileName;
 
     return (
-      <Link href={fullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-        {shortName}
-      </Link>
+      <Tooltip title={fileName} arrow placement="top">
+        <Link href={fullUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+          {shortName}
+        </Link>
+      </Tooltip>
     );
   };
 
@@ -263,15 +263,13 @@ const PscTable = () => {
   };
 
   const columns = [
-    { field: 'hash_id', headerName: 'Ref', width: 120 },
-    { field: 'requisition_form', headerName: 'Requisition Form', width: 180, renderCell: (params) => renderFileLink(params.value) },
-    { field: 'annex_a_form', headerName: 'Annex-A Form', width: 180, renderCell: (params) => renderFileLink(params.value) },
-    { field: 'other_attachment', headerName: 'Other Attachment', width: 180, renderCell: (params) => renderFileLink(params.value) },
-    { field: 'remarks', headerName: 'Remarks', width: 200 },
+    { field: 'hash_id', headerName: 'Ref', flex: 1, minWidth: 120 },
+    { field: 'requisition_form', headerName: 'Requisition Form', flex: 2, minWidth: 180, renderCell: (params) => renderFileLink(params.value) },
+    { field: 'remarks', headerName: 'Remarks', flex: 2, minWidth: 200 },
     {
       field: 'status',
       headerName: 'Status',
-      width: 130,
+      flex: 1, minWidth: 130,
       renderCell: (params) => {
         const status = params.value || 'pending';
 
@@ -285,7 +283,7 @@ const PscTable = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 80,
+      width: 80, minWidth: 80,
       sortable: false,
       renderCell: (params) => (
         <IconButton
@@ -347,7 +345,7 @@ const PscTable = () => {
             <small>Check console for details. Make sure token is valid and backend is running.</small>
           </div>
         ) : (
-          <DataGrid
+          <TooltipDataGrid
             rows={filteredRows}
             columns={columns}
             pagination

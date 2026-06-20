@@ -91,7 +91,6 @@ const RequisitionApi = {
    * Get requisition preview by temp ID
    */
   getPreview: async (tempId) => {
-    console.log('temp ID', tempId)
     const response = await fetch(
       `${API_BASE}/requisitions/preview/${tempId}`,
       {

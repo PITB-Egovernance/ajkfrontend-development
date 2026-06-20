@@ -5,7 +5,7 @@ import {
   DialogContent, DialogTitle, Divider, Grid, IconButton, MenuItem,
   Paper, Tab, Tabs, TextField, Tooltip, Typography, Alert,
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   ArrowLeft, RefreshCw, Upload, Calculator, Download,
   Edit, CheckCircle, History, Send,
@@ -13,6 +13,7 @@ import {
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import confirmDelete from 'components/ui/ConfirmDelete';
+import { formatDate } from 'utils/dateUtils';
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
@@ -78,7 +79,6 @@ export default function AwardListDetail() {
       setEntries(payload?.entries ?? []);
       setAuditLogs(payload?.audit_logs ?? []);
     } catch (err) {
-      console.error('Failed to fetch award list', err);
     } finally {
       setLoading(false);
     }
@@ -113,7 +113,6 @@ export default function AwardListDetail() {
       setMarksOpen(false);
       fetchDetail();
     } catch (err) {
-      console.error('Failed to save marks', err);
     } finally {
       setMarksSaving(false);
     }
@@ -137,7 +136,6 @@ export default function AwardListDetail() {
       setStatusOpen(false);
       fetchDetail();
     } catch (err) {
-      console.error('Failed to save status', err);
     } finally {
       setStatusSaving(false);
     }
@@ -246,7 +244,7 @@ export default function AwardListDetail() {
       field: 'changed_at',
       headerName: 'Time',
       width: 160,
-      renderCell: ({ value }) => value ? new Date(value).toLocaleString('en-GB') : '—',
+      renderCell: ({ value }) => value ? formatDate(value) : '—',
     },
     { field: 'action', headerName: 'Action', width: 180 },
     { field: 'changed_by', headerName: 'By', width: 100 },
@@ -295,7 +293,7 @@ export default function AwardListDetail() {
             {list.district && `${list.district} · `}
             {list.case_number && `Case: ${list.case_number} · `}
             {list.interview_date &&
-              `Interview: ${new Date(list.interview_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+              `Interview: ${formatDate(list.interview_date)}`}
           </Typography>
         </Box>
         <Chip
@@ -386,7 +384,7 @@ export default function AwardListDetail() {
 
       {tab === 0 && (
         <Box sx={{ height: 520 }}>
-          <DataGrid
+          <TooltipDataGrid
             rows={entries}
             columns={entryColumns}
             pageSizeOptions={[15, 25, 50, 100]}
@@ -400,7 +398,7 @@ export default function AwardListDetail() {
 
       {tab === 1 && (
         <Box sx={{ height: 400 }}>
-          <DataGrid
+          <TooltipDataGrid
             rows={auditLogs}
             columns={auditColumns}
             pageSizeOptions={[15, 25, 50]}

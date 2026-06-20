@@ -24,6 +24,18 @@ import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
+const API_BASE = Config.apiUrl;
+
+const getHeaders = (json = true) => {
+  const h = {
+    Authorization: `Bearer ${AuthService.getToken()}`,
+    Accept: 'application/json',
+    'X-API-KEY': Config.apiKey,
+  };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 const OrganizationInformation = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -51,10 +63,6 @@ const OrganizationInformation = () => {
     org_chart_image: null
   });
 
-  const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
-
   const fetchEmployees = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/employees/list`, {
@@ -69,7 +77,6 @@ const OrganizationInformation = () => {
         setEmployees(result.data || []);
       }
     } catch (error) {
-      console.error('Error fetching employees:', error);
       toast.error('Failed to load employees list');
     }
   }, [API_BASE, TOKEN, API_KEY]);
@@ -89,7 +96,6 @@ const OrganizationInformation = () => {
         setOrganizationData(result.data);
       }
     } catch (error) {
-      console.error('Error fetching organization data:', error);
     } finally {
       setLoading(false);
     }
@@ -227,7 +233,6 @@ const OrganizationInformation = () => {
         toast.error(result.message || 'Failed to update organization information');
       }
     } catch (error) {
-      console.error('Error updating organization:', error);
       toast.error('An error occurred while updating organization information');
     } finally {
       setLoading(false);

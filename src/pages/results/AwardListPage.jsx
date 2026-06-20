@@ -21,6 +21,7 @@ import Input from 'components/ui/Input';
 import { toast } from 'react-hot-toast';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
+import { formatDate } from 'utils/dateUtils';
 
 /**
  * AwardListPage (v2.3) - Interview Secretary Merit List Builder
@@ -237,7 +238,6 @@ const AwardListPage = () => {
         if (err.status === 409) {
           toast.error(`Conflict for ${award.application?.candidate_name}. Please refresh.`);
         } else {
-          console.error('Auto-save error:', err);
         }
       } finally {
         setSavingRows(prev => ({ ...prev, [id]: false }));
@@ -279,8 +279,7 @@ const AwardListPage = () => {
       if (res.success) {
         toast.success(res.message, { id: 'csv-import' });
         if (res.errors && res.errors.length > 0) {
-          console.warn('Import skipped rows:', res.errors);
-          toast.error(`${res.errors.length} rows failed to import. Check console/details.`, { duration: 6000 });
+          toast.error(`${res.errors.length} rows failed to import. Check details.`, { duration: 6000 });
         }
         handleLoadList();
       } else {
@@ -397,7 +396,7 @@ const AwardListPage = () => {
     doc.setFont('helvetica', 'bold');
     doc.text('Printed On:', 120, 42);
     doc.setFont('helvetica', 'normal');
-    doc.text(new Date().toLocaleDateString(), 145, 42);
+    doc.text(formatDate(new Date()), 145, 42);
 
     const tableData = awards.map(row => [
       row.merit_rank || '-',

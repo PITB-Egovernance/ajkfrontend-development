@@ -93,7 +93,6 @@ const DegreeGroupSelector = ({ value = '', onChange, required = false, label = '
         toast.error(result.message || 'Failed to load degrees');
       }
     } catch (error) {
-      console.error('Error fetching degrees:', error);
       toast.error('Failed to load degrees');
     } finally {
       setLoading(false);

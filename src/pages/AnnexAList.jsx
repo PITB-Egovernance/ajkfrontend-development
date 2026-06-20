@@ -22,6 +22,7 @@ import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { formatDate } from 'utils/dateUtils';
 
 const AnnexAList = () => {
   const navigate = useNavigate();
@@ -293,11 +294,11 @@ const AnnexAList = () => {
                       <div className="text-sm space-y-1">
                         <div className="flex items-center gap-2 text-slate-600">
                           <Calendar className="w-3 h-3" />
-                          <span>Initial: {new Date(annex.date_initial_appointment).toLocaleDateString()}</span>
+                          <span>Initial: {formatDate(annex.date_initial_appointment)}</span>
                         </div>
                         <div className="flex items-center gap-2 text-slate-600">
                           <Calendar className="w-3 h-3" />
-                          <span>Extension: {new Date(annex.date_last_extension).toLocaleDateString()}</span>
+                          <span>Extension: {formatDate(annex.date_last_extension)}</span>
                         </div>
                       </div>
                     </td>

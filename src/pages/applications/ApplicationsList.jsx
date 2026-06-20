@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DataGrid, useGridApiRef } from '@mui/x-data-grid';
+import { useGridApiRef } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { IconButton, Menu, MenuItem, TextField, MenuItem as SelectItem } from '@mui/material';
 import { Eye, CheckCircle, XCircle, MoreVertical, RefreshCw, FilterX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +15,7 @@ import {
   getApplicationOcrBatchLabel,
   getApplicationOcrBatchPillClass,
 } from 'utils/applicationOcrUtils';
+import { formatDate } from 'utils/dateUtils';
 
 // ── Module-level constants ────────────────────────────────────────────────────
 
@@ -119,8 +121,7 @@ const ApplicationsList = () => {
       // UNREVIEWED_SENTINEL is a frontend-only token (no admin row with that status exists);
       // skip sending it to the server so the local filter can pick up rows whose status is empty.
       const params = {
-        page: paginationModel.page + 1,
-        per_page: paginationModel.pageSize,
+        per_page: 1000,
         search: filters.search,
         job_id: filters.job_id,
         status: filters.status === UNREVIEWED_SENTINEL ? '' : filters.status,
@@ -191,7 +192,7 @@ const ApplicationsList = () => {
           status:          effectiveStatus,
           applied_at_raw:  item.submitted_at || item.created_at || null,
           applied_at: (item.submitted_at || item.created_at)
-            ? new Date(item.submitted_at || item.created_at).toLocaleDateString()
+            ? formatDate(item.submitted_at || item.created_at)
             : 'N/A',
           ocr_batch:       getApplicationOcrBatch(item.candidate?.documents || item.documents || []),
           eligibility_age_passed:       item.eligibility_summary?.checks?.age_passed,
@@ -251,7 +252,7 @@ const ApplicationsList = () => {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel, filters, advertisementMap]);
+  }, [filters, advertisementMap]);
 
   useEffect(() => {
     const timer = setTimeout(fetchApplications, 500);
@@ -595,12 +596,10 @@ const ApplicationsList = () => {
               </p>
             </div>
           ) : (
-            <DataGrid
+            <TooltipDataGrid
               apiRef={apiRef}
               rows={rows}
               columns={columns}
-              paginationMode="server"
-              rowCount={total}
               paginationModel={paginationModel}
               onPaginationModelChange={setPaginationModel}
               pageSizeOptions={[10, 25, 50]}

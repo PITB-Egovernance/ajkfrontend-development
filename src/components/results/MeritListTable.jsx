@@ -1,9 +1,10 @@
 import React from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import StatusBadge from './StatusBadge';
 import { RotateCw, UserX, AlertCircle, ShieldCheck } from 'lucide-react';
 import Button from 'components/ui/Button';
 import { DataGridLoader } from 'components/ui/Loader';
+import { formatDate } from 'utils/dateUtils';
 
 const MeritListTable = ({ rows, loading, onRotate, onStatusChange, isAdmin }) => {
   const columns = [
@@ -97,7 +98,7 @@ const MeritListTable = ({ rows, loading, onRotate, onStatusChange, isAdmin }) =>
             )}
 
             {hasBeenReplaced && (
-              <div title={`Replaced on ${new Date(params.row.replaced_on).toLocaleDateString()}`} className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-lg border border-slate-200">
+              <div title={`Replaced on ${formatDate(params.row.replaced_on)}`} className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-lg border border-slate-200">
                 <ShieldCheck size={14} className="text-slate-400" />
                 <span className="text-[10px] font-black text-slate-400 uppercase">Archived</span>
               </div>
@@ -110,7 +111,7 @@ const MeritListTable = ({ rows, loading, onRotate, onStatusChange, isAdmin }) =>
 
   return (
     <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
-      <DataGrid
+      <TooltipDataGrid
         rows={rows}
         columns={columns}
         loading={loading}

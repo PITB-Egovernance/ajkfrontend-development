@@ -81,7 +81,6 @@ const ContractorsManagement = () => {
         setContractors(result.data || []);
       }
     } catch (error) {
-      console.error('Error fetching contractors:', error);
       toast.error('Failed to load contractors');
     } finally {
       setLoading(false);
@@ -163,7 +162,6 @@ const ContractorsManagement = () => {
         toast.error(result.message || 'Operation failed');
       }
     } catch (error) {
-      console.error('Error saving contractor:', error);
       toast.error('An error occurred while saving');
     } finally {
       setLoading(false);
@@ -194,7 +192,6 @@ const ContractorsManagement = () => {
         toast.error(result.message || 'Failed to delete contractor');
       }
     } catch (error) {
-      console.error('Error deleting contractor:', error);
       toast.error('An error occurred while deleting');
     } finally {
       setLoading(false);

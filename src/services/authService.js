@@ -136,7 +136,6 @@ class AuthService {
     try {
       await this.request(`${API_URL}/logout`, { method: "POST" });
     } catch (e) {
-      console.warn("Server logout failed (OK for demo)", e.message);
     } finally {
       localStorage.removeItem("authToken");
       localStorage.removeItem("user");

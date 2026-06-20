@@ -24,6 +24,18 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
+const API_BASE = Config.apiUrl;
+
+const getHeaders = (json = true) => {
+  const h = {
+    Authorization: `Bearer ${AuthService.getToken()}`,
+    Accept: 'application/json',
+    'X-API-KEY': Config.apiKey,
+  };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 const TehsilsManagement = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -40,10 +52,6 @@ const TehsilsManagement = () => {
     status: 'active'
   });
 
-  const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
-
   useEffect(() => {
     fetchTehsils();
     fetchDistricts();
@@ -54,18 +62,13 @@ const TehsilsManagement = () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/settings/tehsils`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: getHeaders(false),
       });
       const result = await response.json();
       if (result.status === 200) {
         setTehsils(result.data || []);
       }
     } catch (error) {
-      console.error('Error fetching tehsils:', error);
       toast.error('Failed to load tehsils');
     } finally {
       setLoading(false);
@@ -75,18 +78,13 @@ const TehsilsManagement = () => {
   const fetchDistricts = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/districts`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: getHeaders(false),
       });
       const result = await response.json();
       if (result.status === 200) {
         setDistricts(result.data || []);
       }
     } catch (error) {
-      console.error('Error fetching districts:', error);
     }
   };
 
@@ -141,11 +139,7 @@ const TehsilsManagement = () => {
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: getHeaders(),
         body: JSON.stringify(formData),
       });
 
@@ -159,7 +153,6 @@ const TehsilsManagement = () => {
         toast.error(result.message || 'Operation failed');
       }
     } catch (error) {
-      console.error('Error saving tehsil:', error);
       toast.error('An error occurred while saving');
     } finally {
       setLoading(false);
@@ -175,10 +168,7 @@ const TehsilsManagement = () => {
     try {
       const response = await fetch(`${API_BASE}/settings/tehsils/${tehsilId}/delete`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'X-API-KEY': API_KEY,
-        },
+        headers: getHeaders(false),
       });
 
       const result = await response.json();
@@ -190,7 +180,6 @@ const TehsilsManagement = () => {
         toast.error(result.message || 'Failed to delete tehsil');
       }
     } catch (error) {
-      console.error('Error deleting tehsil:', error);
       toast.error('An error occurred while deleting');
     } finally {
       setLoading(false);

@@ -88,7 +88,6 @@ const RequisitionForm = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching districts:', error);
       toast.error('Failed to load districts');
     }
   };
@@ -115,7 +114,6 @@ const RequisitionForm = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
     }
   };
 
@@ -138,7 +136,6 @@ const RequisitionForm = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching grades:', error);
     }
   };
 
@@ -161,7 +158,6 @@ const RequisitionForm = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching designations:', error);
     }
   };
 

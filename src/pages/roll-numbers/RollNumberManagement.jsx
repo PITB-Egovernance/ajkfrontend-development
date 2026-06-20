@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
   IconButton,
@@ -31,6 +31,7 @@ import {
   getApplicationOcrBatchLabel,
   getApplicationOcrBatchPillClass,
 } from 'utils/applicationOcrUtils';
+import { formatDate } from 'utils/dateUtils';
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -121,7 +122,6 @@ const RollNumberManagement = () => {
       });
       setAdvertisementMap(map);
     } catch (err) {
-      console.error('Failed to load advertisements for resolving advertisement numbers');
     }
   }, []);
 
@@ -142,7 +142,6 @@ const RollNumberManagement = () => {
       });
       setCandidateAdvMap(map);
     } catch (err) {
-      console.error('Failed to load candidate applications for advertisement resolution');
     }
   }, []);
 
@@ -202,7 +201,7 @@ const RollNumberManagement = () => {
             job_title:         item.job_title || candidateAdvMap[item.application_number]?.job_title || 'N/A',
             advertisement_no:  resolveAdvertisementNo(item),
             advertisement_id:  item.advertisement_id,
-            applied_at:        item.applied_at ? new Date(item.applied_at).toLocaleDateString() : 'N/A',
+            applied_at:        item.applied_at ? formatDate(item.applied_at) : 'N/A',
             payment_status:    item.payment_status || 'N/A',
             ocr_batch:         getApplicationOcrBatch(item.documents || []),
             has_disability:    !!item.disability,
@@ -581,7 +580,7 @@ const RollNumberManagement = () => {
               </p>
             </div>
           ) : (
-            <DataGrid
+            <TooltipDataGrid
               rows={rows}
               columns={columns}
               getRowId={(r) => r.id}

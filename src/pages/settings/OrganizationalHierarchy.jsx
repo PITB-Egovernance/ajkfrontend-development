@@ -66,7 +66,6 @@ const OrganizationalHierarchy = () => {
         setBranches(result.data || []);
       }
     } catch (error) {
-      console.error('Error fetching branches:', error);
       toast.error('Failed to load branches');
     } finally {
       setLoading(false);
@@ -87,7 +86,6 @@ const OrganizationalHierarchy = () => {
         setEmployees(result.data || []);
       }
     } catch (error) {
-      console.error('Error fetching employees:', error);
     }
   };
 
@@ -157,7 +155,6 @@ const OrganizationalHierarchy = () => {
         toast.error(result.message || 'Operation failed');
       }
     } catch (error) {
-      console.error('Error saving branch:', error);
       toast.error('An error occurred while saving');
     } finally {
       setLoading(false);
@@ -188,7 +185,6 @@ const OrganizationalHierarchy = () => {
         toast.error(result.message || 'Failed to delete branch');
       }
     } catch (error) {
-      console.error('Error deleting branch:', error);
       toast.error('An error occurred while deleting');
     } finally {
       setLoading(false);

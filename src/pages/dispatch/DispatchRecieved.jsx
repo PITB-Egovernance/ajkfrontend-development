@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Button } from 'components/ui';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Box } from '@mui/material';
 import { InlineLoader } from 'components/ui/Loader';
 import { jsPDF } from 'jspdf';
@@ -131,7 +131,6 @@ export default function DispatchReceived() {
         setRowCount(apiData.total);
       }
     } catch (error) {
-      console.error(error);
       toast.error('Failed to load received forms');
     } finally {
       setLoading(false);
@@ -162,7 +161,6 @@ export default function DispatchReceived() {
         setOpenModal(false);
       }
     } catch (error) {
-      console.error('Fetch error:', error);
       toast.error('Failed to load details.');
       setOpenModal(false);
     } finally {
@@ -272,7 +270,7 @@ export default function DispatchReceived() {
       />
 
       <Box sx={{ width: '100%', height: 'auto' }}>
-        <DataGrid
+        <TooltipDataGrid
           rows={filteredRows}
           columns={columns}
           getRowId={(row) => row.id}

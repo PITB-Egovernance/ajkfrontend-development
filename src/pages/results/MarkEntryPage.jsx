@@ -102,7 +102,6 @@ const MarkEntryPage = () => {
           setPassingMarks(Math.ceil(calculatedTotal * 0.4));
         }
       } catch (err) {
-        console.error('Failed to load subjects', err);
       }
     };
     fetchTemplates();

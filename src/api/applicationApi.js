@@ -236,8 +236,6 @@ const ApplicationApi = {
     application: applicationMeta,
   };
 
-  console.log('Update Status API Body:', body);
-
   const response = await fetch(`${ADMIN_API_BASE}/applications/${applicationNumber}/status`, {
     method: 'PUT',
     headers: getAdminHeaders(),
@@ -285,8 +283,6 @@ const ApplicationApi = {
     status,
     applications: applications.map(buildApplicationMeta),
   };
-
-  console.log('Bulk Status API Body:', body);
 
   const response = await fetch(`${ADMIN_API_BASE}/applications/bulk-status`, {
     method: 'PUT',

@@ -849,11 +849,14 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
                     type="number"
                     size="small"
                     value={formData.post[index] ?? ''}
-                    onChange={(e) => handleArrayChange(index, 'post', e.target.value)}
-                    placeholder="Optional"
-                    inputProps={{ min: 0 }}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      handleArrayChange(index, 'post', val);
+                    }}
+                    onKeyDown={(e) => { if (e.key === '.' || e.key === 'e' || e.key === '-' || e.key === '+') e.preventDefault(); }}
+                    inputProps={{ min: 0, step: 1 }}
                     error={!!rowErrors[index]?.post}
-                    helperText={rowErrors[index]?.post || 'Decide later'}
+                    helperText={rowErrors[index]?.post || ''}
                   />
                 </td>
                 {/* Promotional Quota Posts input — disabled (not currently

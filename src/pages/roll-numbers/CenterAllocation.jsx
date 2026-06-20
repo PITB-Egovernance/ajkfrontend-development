@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { DataGrid } from "@mui/x-data-grid";
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
   MenuItem,
@@ -22,6 +22,7 @@ import toast from "react-hot-toast";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
+import { GRID_SX } from 'utils/gridStyles';
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 const API_KEY  = Config.apiKey;
@@ -32,19 +33,6 @@ const getHeaders = () => ({
   "Content-Type": "application/json",
   "X-API-KEY": API_KEY,
 });
-
-const gridSx = {
-  border: "none",
-  "& .MuiDataGrid-columnHeaders":    { backgroundColor: "#f8fafc" },
-  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
-  "& .MuiDataGrid-row": { minHeight: "52px !important" },
-  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
-  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
-  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
-  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
-  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
-  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
-};
 
 const CenterAllocation = () => {
   const navigate = useNavigate();
@@ -260,10 +248,10 @@ const CenterAllocation = () => {
         </div>
 
         {/* GRID */}
-        <DataGrid
+        <TooltipDataGrid
           rows={filteredRows} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[25, 50, 100]} autoHeight disableRowSelectionOnClick sx={gridSx}
+          pageSizeOptions={[25, 50, 100]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
         />
 
         {/* AUTO-ALLOCATE MODAL */}

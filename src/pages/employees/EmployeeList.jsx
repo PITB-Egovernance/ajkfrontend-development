@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Menu, MenuItem, IconButton, Switch } from '@mui/material';
 import toast from 'react-hot-toast';
 import {
@@ -16,6 +16,7 @@ import Button from 'components/ui/Button';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import EmployeeDetailsModal from 'components/employees/EmployeeDetailsModal';
 import EmployeeService from 'services/EmployeeService';
+import { GRID_SX } from 'utils/gridStyles';
 
 const FILTER_CONFIG = [
   { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by full name' },
@@ -35,13 +36,6 @@ const FILTER_CONFIG = [
 ];
 
 const EMPTY_FILTERS = { full_name: '', cnic: '', email: '', mobile: '', designation: '', status: '' };
-
-const gridSx = {
-  border: 'none',
-  '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f8fafc' },
-  '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
-  '& .MuiDataGrid-row': { minHeight: '56px !important' },
-};
 
 const mapUser = (user, idx) => ({
   id: user?.hash_id || user?.id || `user-${idx}`,
@@ -315,7 +309,7 @@ const EmployeeList = () => {
 
         {/* Table */}
         <div className="bg-white rounded-lg shadow-sm p-4">
-          <DataGrid
+          <TooltipDataGrid
             rows={filteredEmployees}
             columns={columns}
             loading={loading}
@@ -323,7 +317,7 @@ const EmployeeList = () => {
             pageSizeOptions={[10, 25, 50]}
             initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
             disableRowSelectionOnClick
-            sx={gridSx}
+            sx={GRID_SX}
           />
         </div>
       </div>

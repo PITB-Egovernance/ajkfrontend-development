@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField, IconButton, Menu, MenuItem,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -13,6 +13,7 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import { GRID_SX } from 'utils/gridStyles';
 
 const API_BASE = Config.apiUrl;
 
@@ -22,15 +23,6 @@ const getHeaders = () => ({
   'Content-Type': 'application/json',
   'X-API-KEY': Config.apiKey,
 });
-
-const gridSx = {
-  border: 'none',
-  '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc' },
-  '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
-  '& .MuiDataGrid-row':              { minHeight: '52px !important' },
-  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: '#ecfdf5' },
-  '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: '#d1fae5' },
-};
 
 const TermsConditions = () => {
   const navigate = useNavigate();
@@ -307,7 +299,7 @@ const TermsConditions = () => {
         />
 
         {/* Unified Table */}
-        <DataGrid
+        <TooltipDataGrid
           rows={filteredRows}
           columns={columns}
           getRowId={(r) => r.id}
@@ -317,7 +309,7 @@ const TermsConditions = () => {
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           autoHeight
           disableRowSelectionOnClick
-          sx={gridSx}
+          sx={GRID_SX}
         />
 
         {/* Context Menu */}

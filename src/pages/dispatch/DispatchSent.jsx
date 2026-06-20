@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   Button,
   Box,
@@ -118,7 +118,6 @@ const DispatchSent = () => {
       setFilteredForms(rows);
       setTotalRows(result.data.total);
     } catch (error) {
-      console.error('Error:', error);
       alert('Failed to load dispatched forms');
     } finally {
       setLoading(false);
@@ -135,7 +134,6 @@ const DispatchSent = () => {
       setSelectedForm(result.data);
       setModalOpen(true);
     } catch (error) {
-      console.error(error);
       alert('Failed to load details');
     }
   };
@@ -220,7 +218,7 @@ const DispatchSent = () => {
       />
         
       <Box sx={{ width: '100%', height: 'auto' }}>
-        <DataGrid
+        <TooltipDataGrid
           rows={filteredForms}
           columns={columns}
           getRowId={(row) => row.id}

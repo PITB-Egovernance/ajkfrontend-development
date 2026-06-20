@@ -7,6 +7,7 @@ import { ArrowLeft, Send, Download, AlertTriangle, CheckCircle2, History, Trash2
 import ResultsApi from 'api/resultsApi';
 import PublicationChecklist from 'components/results/PublicationChecklist';
 import toast from 'react-hot-toast';
+import { formatDate } from 'utils/dateUtils';
 
 /**
  * PublicationPage
@@ -42,7 +43,7 @@ const PublicationPage = () => {
 
       // Audit History (Simplified for now)
       setHistory([
-        { id: 1, action: 'Award List Finalized', user: 'Secretary PSC', date: new Date().toLocaleDateString() },
+        { id: 1, action: 'Award List Finalized', user: 'Secretary PSC', date: formatDate(new Date()) },
       ]);
 
       // Check current status

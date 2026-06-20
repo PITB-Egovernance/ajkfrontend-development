@@ -22,7 +22,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     experience_type:          '',
     experience_length:        '',
     qualification_experience: {},
-    min_qualification:        '',
+    min_qualification:        [],
     eligible_degrees:         '', // Stores comma-separated degree names
   });
 
@@ -55,7 +55,6 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           setAllDegrees(degrees);
         }
       } catch (error) {
-        console.error('Error fetching degrees:', error);
       } finally {
         setLoadingDegrees(false);
       }
@@ -246,7 +245,11 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         experience_type:          data.experience_type          || '',
         experience_length:        data.experience_length        || '',
         qualification_experience: restoredQualExp,
-        min_qualification:        data.min_qualification        || '',
+        min_qualification:        data.min_qualification
+          ? (Array.isArray(data.min_qualification)
+              ? data.min_qualification
+              : String(data.min_qualification).split(',').map((s) => s.trim()).filter(Boolean))
+          : [],
         eligible_degrees:         degreeNames.length > 0 ? degreeNames.join(',') : (data.eligible_degrees || ''),
       });
       setShowAuthority(data.equivalent_qualification === 'Yes');
@@ -302,10 +305,20 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     });
   };
 
+  const handleMinQualToggle = (qualName) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.min_qualification) ? prev.min_qualification : [];
+      const next = current.includes(qualName)
+        ? current.filter((q) => q !== qualName)
+        : [...current, qualName];
+      return { ...prev, min_qualification: next };
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === 'academic_qualification') return;
+    if (name === 'academic_qualification' || name === 'min_qualification') return;
 
     if (value === OTHER) {
       setShowOther((prev) => ({ ...prev, [name]: true }));
@@ -384,6 +397,11 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         const current = Array.isArray(prev.academic_qualification) ? prev.academic_qualification : [];
         return { ...prev, academic_qualification: current.includes(trimmed) ? current : [...current, trimmed] };
       });
+    } else if (fieldName === 'min_qualification') {
+      setFormData((prev) => {
+        const current = Array.isArray(prev.min_qualification) ? prev.min_qualification : [];
+        return { ...prev, min_qualification: current.includes(trimmed) ? current : [...current, trimmed] };
+      });
     } else if (fieldName === 'degree_equivalence') {
       setFormData((prev) => {
         const current = prev.eligible_degrees
@@ -413,6 +431,9 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     if (Array.isArray(submitData.academic_qualification)) {
       submitData.academic_qualification = submitData.academic_qualification.join(', ');
     }
+    if (Array.isArray(submitData.min_qualification)) {
+      submitData.min_qualification = submitData.min_qualification.join(', ');
+    }
     if (selectedDegreeList.length > 0) {
       submitData.degree_equivalence = selectedDegreeList.join(',');
     }
@@ -439,7 +460,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     e.preventDefault();
 
     if (!formData.academic_qualification || (Array.isArray(formData.academic_qualification) && formData.academic_qualification.length === 0)) {
-      alert('Academic Qualification is required');
+      alert('Required Qualification is required');
       return;
     }
     if (formData.equivalent_qualification === 'Yes') {
@@ -505,7 +526,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         <div className="col-md-6 form-group">
           <TextField
             fullWidth required select
-            label="Academic Qualification"
+            label="Required Qualification"
             name="academic_qualification"
             value={Array.isArray(formData.academic_qualification) ? formData.academic_qualification : []}
             SelectProps={{
@@ -779,21 +800,57 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           )}
         </div>
 
-        {/* Minimum Qualification */}
+        {/* Minimum Qualification (multi-select with checkboxes) */}
         <div className="col-md-6 form-group">
           <TextField
             fullWidth select
             label="Minimum Qualification"
             name="min_qualification"
-            value={showOther.min_qualification ? OTHER : formData.min_qualification}
-            onChange={handleChange}
+            value={Array.isArray(formData.min_qualification) ? formData.min_qualification : []}
+            SelectProps={{
+              multiple: true,
+              onChange: () => {},
+              renderValue: (selected) => {
+                if (!selected || selected.length === 0) return '';
+                return (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                    {selected.map((v) => <Chip key={v} label={v} size="small" />)}
+                  </Box>
+                );
+              },
+              MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+            }}
           >
-            <MenuItem value="">Select</MenuItem>
+            <MenuItem dense onClick={(e) => {
+              e.preventDefault();
+              const allNames = activeQualifications.map((q) => q.name);
+              const current = Array.isArray(formData.min_qualification) ? formData.min_qualification : [];
+              const allSelected = allNames.every((n) => current.includes(n));
+              setFormData((prev) => ({
+                ...prev,
+                min_qualification: allSelected ? [] : allNames,
+              }));
+            }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+              <Checkbox size="small"
+                checked={activeQualifications.length > 0 && activeQualifications.every((q) => (formData.min_qualification || []).includes(q.name))}
+                indeterminate={activeQualifications.some((q) => (formData.min_qualification || []).includes(q.name)) && !activeQualifications.every((q) => (formData.min_qualification || []).includes(q.name))}
+                sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+              />
+              <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+            </MenuItem>
             {activeQualifications.map((q) => (
-              <MenuItem key={q.id} value={q.name}>{q.name}</MenuItem>
+              <MenuItem key={q.id} dense onClick={(e) => { e.preventDefault(); handleMinQualToggle(q.name); }}>
+                <Checkbox
+                  size="small"
+                  checked={(formData.min_qualification || []).includes(q.name)}
+                  sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                />
+                <ListItemText primary={q.name} />
+              </MenuItem>
             ))}
-            <MenuItem value={OTHER} sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-              Other (specify)
+            <MenuItem dense onClick={(e) => { e.preventDefault(); setShowOther((prev) => ({ ...prev, min_qualification: true })); }}
+              sx={{ color: 'text.secondary', fontStyle: 'italic', borderTop: '1px solid #e2e8f0' }}>
+              <ListItemText primary="Other (specify)" />
             </MenuItem>
           </TextField>
           {showOther.min_qualification && (

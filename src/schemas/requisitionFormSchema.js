@@ -40,12 +40,16 @@ export const requisitionFormSchema = {
       type: 'required',
       message: 'Department is required'
     },
+    service_rules_text: {
+      type: 'required',
+      message: 'Service Rule (Text) is required'
+    },
   },
   
   step2: {
     academic_qualification: {
       type: 'required',
-      message: 'Academic qualification is required'
+      message: 'Required qualification is required'
     },
 
     degree_equivalence: {

@@ -24,6 +24,7 @@ import Input from 'components/ui/Input';
 import { toast } from 'react-hot-toast';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
+import { formatDate } from 'utils/dateUtils';
 
 const InterviewAwardManagement = () => {
   const navigate = useNavigate();
@@ -393,7 +394,7 @@ const InterviewAwardManagement = () => {
                                 Roll: <span className="text-slate-900">{row.application?.roll_no || 'TBD'}</span> • Dist: {row.district}
                               </span>
                               <span className="text-[9px] text-slate-400 font-medium mt-1">
-                                DOB: {new Date(row.application?.candidate_dob).toLocaleDateString()}
+                                DOB: {formatDate(row.application?.candidate_dob)}
                               </span>
                             </div>
                           </td>

@@ -230,8 +230,6 @@ export default function JobCreation() {
         notes_internal: data.notes_internal,
       };
 
-      console.log('Submitting data:', submissionData);
-
       const response = await fetch(`${API}/jobs`, {
         method: 'POST',
         headers: {
@@ -260,8 +258,7 @@ export default function JobCreation() {
       }, 1500);
 
     } catch (error) {
-      console.error('Submission error:', error);
-      setMessage({ 
+      setMessage({
         type: 'error', 
         text: error.message || 'Failed to create job. Please try again.' 
       });

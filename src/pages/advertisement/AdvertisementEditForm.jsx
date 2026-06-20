@@ -37,6 +37,7 @@ const AdvertisementEditForm = () => {
   const [examFees, setExamFees] = useState(FALLBACK_EXAM_FEES);
   const [status, setStatus] = useState("active");
   const [extendDate, setExtendDate] = useState("");
+  const [isPublished, setIsPublished] = useState(false);
 
   useEffect(() => {
     let aborted = false;
@@ -86,6 +87,7 @@ const AdvertisementEditForm = () => {
           setImportantNotes(data.important_notes || "");
           setStatus(data.status || "active");
           setExtendDate(data.extend_date?.split("T")[0] || "");
+          setIsPublished(!!data.publish_date);
 
           let terms = [""];
           if (data.terms_conditions) {
@@ -171,7 +173,7 @@ const AdvertisementEditForm = () => {
         note: note || "",
         important_notes: importantNotes || "",
         terms_conditions: filteredTerms,
-        status,
+        status: isPublished ? status : "active",
         extend_date: status === "extend_date" ? (extendDate || null) : null,
         job_fees: JSON.stringify(feesPayload),
         job_test_types: JSON.stringify(testTypesPayload)
@@ -323,6 +325,7 @@ const AdvertisementEditForm = () => {
                 </div>
               </div>
 
+              {isPublished && (
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField
@@ -373,6 +376,7 @@ const AdvertisementEditForm = () => {
                   </div>
                 )}
               </div>
+              )}
             </div>
 
             {selectedIds.length > 0 && (

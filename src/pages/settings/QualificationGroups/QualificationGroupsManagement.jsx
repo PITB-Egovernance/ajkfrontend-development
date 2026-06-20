@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField, IconButton, MenuItem, Dialog, DialogTitle,
   DialogContent, DialogActions, Switch, Checkbox,
@@ -14,6 +14,7 @@ import { localSettingsApi } from 'hooks/useLocalSettings';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { GRID_SX } from 'utils/gridStyles';
 
 const API_BASE = Config.apiUrl;
 const getApiHeaders = () => ({
@@ -25,14 +26,6 @@ const getApiHeaders = () => ({
 const KEY  = 'groups';
 const QKEY = 'qualifications';
 const DKEY = 'degrees';
-
-const gridSx = {
-  border: 'none',
-  '& .MuiDataGrid-columnHeaders':    { backgroundColor: '#f8fafc' },
-  '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
-  '& .MuiDataGrid-row':              { minHeight: '56px !important' },
-  '& .MuiDataGrid-row.Mui-selected': { backgroundColor: '#ecfdf5' },
-};
 
 const emptyForm = { name: '', qualification_id: '', degree_ids: [] };
 
@@ -284,10 +277,10 @@ const QualificationGroupsManagement = () => {
         </div>
 
         {/* GRID */}
-        <DataGrid
+        <TooltipDataGrid
           rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={gridSx}
+          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
           getRowHeight={() => 'auto'}
         />
 

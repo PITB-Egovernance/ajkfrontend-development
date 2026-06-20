@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { DataGrid } from "@mui/x-data-grid";
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
   IconButton,
@@ -21,27 +21,22 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 
-const gridSx = {
-  border: "none",
-  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
-  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
-  "& .MuiDataGrid-row": { minHeight: "52px !important" },
-  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
-  "& .MuiDataGrid-checkboxInput:hover svg":        { color: "#065f46" },
-  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
-  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
-  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
-  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
-  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
+const API_BASE = Config.apiUrl;
+
+const getHeaders = (json = true) => {
+  const h = {
+    Authorization: `Bearer ${AuthService.getToken()}`,
+    Accept: 'application/json',
+    'X-API-KEY': Config.apiKey,
+  };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
 };
 
 const DesignationsManagement = () => {
   const navigate = useNavigate();
-
-  const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,11 +119,7 @@ const DesignationsManagement = () => {
       const response = await fetch(
         `${API_BASE}/settings/designations?page=${page + 1}&per_page=${pageSize}`,
         {
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            Accept: "application/json",
-            "X-API-KEY": API_KEY,
-          },
+          headers: getHeaders(false),
         }
       );
 
@@ -154,7 +145,6 @@ const DesignationsManagement = () => {
         toast.error(result.message || "Failed to load designations");
       }
     } catch (error) {
-      console.error(error);
       toast.error("Failed to load designations");
     } finally {
       setLoading(false);
@@ -164,15 +154,10 @@ const DesignationsManagement = () => {
  const fetchGrades = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/grades`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
+        headers: getHeaders(false),
       });
 
       const result = await response.json();
-      console.log("Grades API:", result);
 
       // ✅ Handle all possible API structures safely
       let gradeArray = [];
@@ -190,7 +175,6 @@ const DesignationsManagement = () => {
       setGrades(gradeArray);
 
     } catch (error) {
-      console.error("Grade fetch error:", error);
       setGrades([]); // prevent crash
     }
   };
@@ -268,12 +252,7 @@ const DesignationsManagement = () => {
 
     const response = await fetch(url, {
       method: "POST", // ✅ FORCE POST (Laravel standard)
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-API-KEY": API_KEY,
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         name: formData.name,
         grade_id: formData.grade_id,
@@ -283,7 +262,6 @@ const DesignationsManagement = () => {
     });
 
     const result = await response.json();
-    console.log("Designation Submit:", result);
 
     if (result.success === true || result.status === 200) {
       toast.success(
@@ -300,7 +278,6 @@ const DesignationsManagement = () => {
     }
 
   } catch (error) {
-    console.error("Submit Error:", error);
     toast.error("Server error while saving designation");
   } finally {
     setLoading(false);
@@ -319,11 +296,7 @@ const DesignationsManagement = () => {
         `${API_BASE}/settings/designations/${selectedRow.hash_id}/delete`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            Accept: "application/json",
-            "X-API-KEY": API_KEY,
-          },
+          headers: getHeaders(false),
         }
       );
 
@@ -336,7 +309,6 @@ const DesignationsManagement = () => {
         toast.error(result.message || "Failed to delete designation");
       }
     } catch (error) {
-      console.error(error);
       toast.error("Server error while deleting designation");
     }
   };
@@ -346,7 +318,7 @@ const DesignationsManagement = () => {
     try {
       const res    = await fetch(`${API_BASE}/settings/designations/${row.hash_id || row.id}/update`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json", Accept: "application/json", "X-API-KEY": API_KEY },
+        headers: getHeaders(),
         body: JSON.stringify({ name: row.name, grade_id: row.grade_id, type: "Internal", status: newStatus }),
       });
       const result = await res.json();
@@ -501,17 +473,18 @@ const DesignationsManagement = () => {
         />
 
         {/* TABLE */}
-        <DataGrid
+        <TooltipDataGrid
           rows={filteredRows}
           columns={columns}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50]}
+          pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
+          initialState={GRID_INITIAL_STATE}
           paginationMode="server"
           rowCount={total}
           loading={loading}
           autoHeight
-          sx={gridSx}
+          sx={GRID_SX}
         />
 
         {/* MENU */}

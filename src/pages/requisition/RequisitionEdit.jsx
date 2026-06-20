@@ -64,7 +64,6 @@ const RequisitionEdit = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching districts:', error);
       toast.error('Failed to load districts');
     }
   };
@@ -91,7 +90,6 @@ const RequisitionEdit = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
     }
   };
 
@@ -114,7 +112,6 @@ const RequisitionEdit = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching grades:', error);
     }
   };
 
@@ -137,21 +134,17 @@ const RequisitionEdit = () => {
         );
       }
     } catch (error) {
-      console.error('Error fetching designations:', error);
     }
   };
 
   const loadRequisitionData = async () => {
     setLoading(true);
-    console.log('📝 Loading requisition data for edit, ID:', id);
 
     try {
       const result = await RequisitionApi.getForEdit(id);
-      console.log('📥 Edit API Response:', result);
 
       if (result.success && result.data && result.data.requisition) {
         const req = result.data.requisition;
-        console.log('✅ Requisition data loaded:', req);
 
         // Normalize whatever shape the API returns (string path, array,
         // `{}` placeholder, or relation-style object) to a usable path or
@@ -212,7 +205,6 @@ const RequisitionEdit = () => {
           }
         });
 
-        console.log('✅ Form data set successfully');
       } else {
         const errorMsg = result.message || result.error || 'Failed to load requisition data';
         console.error('❌ Edit load failed:', errorMsg);
@@ -243,7 +235,7 @@ const RequisitionEdit = () => {
       // positive that blocked the live edit form from saving.
       if (!data.num_posts || data.num_posts < 1) errors.num_posts = 'No. of Posts Requisitioned is required';
     } else if (step === 1) {
-      if (!data.academic_qualification) errors.academic_qualification = 'Academic qualification is required';
+      if (!data.academic_qualification) errors.academic_qualification = 'Required qualification is required';
       if (!data.degree_equivalence) errors.degree_equivalence = 'Degree equivalence is required';
     } else if (step === 2) {
       if (!data.min_age || data.min_age < 18) errors.min_age = 'Minimum age must be at least 18';

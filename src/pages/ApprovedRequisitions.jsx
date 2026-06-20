@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
+import { Tooltip } from '@mui/material';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { formatDate } from 'utils/dateUtils';
 
 const ApprovedRequisitions = () => {
   const navigate = useNavigate();
@@ -208,7 +210,6 @@ const ApprovedRequisitions = () => {
         );
       }
     } catch (err) {
-      console.error('Failed to load grades');
     }
   };
 
@@ -268,22 +269,50 @@ const ApprovedRequisitions = () => {
     return 'bg-gray-100 text-gray-700';
   };
 
+  const tooltipCell = (params) => (
+    <Tooltip title={params.value ?? ''} arrow placement="top">
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {params.value ?? ''}
+      </span>
+    </Tooltip>
+  );
+
+  const tooltipHeader = (short, full) => () => (
+    <Tooltip title={full} arrow placement="top">
+      <span style={{ fontWeight: 'bold', cursor: 'default' }}>{short}</span>
+    </Tooltip>
+  );
+
   const columns = [
-    { field: 'id', headerName: 'Ref', width: 90 },
-    { field: 'designation', headerName: 'Designation', flex: 1, minWidth: 150 },
-    { field: 'department', headerName: 'Department', flex: 1, minWidth: 150 },
+    { field: 'id', headerName: 'Ref', width: 90, renderCell: tooltipCell },
+    { field: 'designation', headerName: 'Designation', flex: 1, minWidth: 150, renderCell: tooltipCell },
+    { field: 'department', headerName: 'Department', flex: 1, minWidth: 150, renderCell: tooltipCell },
     {
       field: 'scale',
       headerName: 'Scale',
       width: 120,
-      renderCell: (params) => getScaleName(params.value),
+      renderCell: (params) => {
+        const val = getScaleName(params.value);
+        return (
+          <Tooltip title={val} arrow placement="top">
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+          </Tooltip>
+        );
+      },
     },
-    { field: 'quota_percentage', headerName: 'Quota %', width: 110 },
-    { field: 'num_posts', headerName: 'Requisitioned Posts', width: 150 },
-    { field: 'vacancy_date', headerName: 'Vacancy Date', width: 140 },
+    { field: 'quota_percentage', headerName: 'Quota %', width: 110, renderCell: tooltipCell },
+    { field: 'num_posts', headerName: 'Requisitioned Posts', width: 150, renderCell: tooltipCell },
+    { field: 'vacancy_date', renderHeader: tooltipHeader('Req.Date', 'Requisition Date'), width: 140, renderCell: tooltipCell },
     {
-      field: 'created_at', headerName: 'Created At', width: 140,
-      renderCell: (params) => params.value ? new Date(params.value).toLocaleDateString() : '—',
+      field: 'created_at', renderHeader: tooltipHeader('Appr.Date', 'Approved Date'), width: 140,
+      renderCell: (params) => {
+        const val = params.value ? formatDate(params.value) : '—';
+        return (
+          <Tooltip title={val} arrow placement="top">
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+          </Tooltip>
+        );
+      },
     },
     {
       field: 'status',
@@ -292,9 +321,11 @@ const ApprovedRequisitions = () => {
       renderCell: (params) => {
         const status = params.value || 'Approved';
         return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusClass(status)}`}>
-            {status.toUpperCase()}
-          </span>
+          <Tooltip title={status} arrow placement="top">
+            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusClass(status)}`}>
+              {status.toUpperCase()}
+            </span>
+          </Tooltip>
         );
       },
     },
@@ -334,7 +365,7 @@ const ApprovedRequisitions = () => {
         ) : error ? (
           <div className="text-red-600 text-center py-8">Error: {error}</div>
         ) : (
-          <DataGrid
+          <TooltipDataGrid
             rows={filteredRows}
             columns={columns}
             paginationModel={paginationModel}

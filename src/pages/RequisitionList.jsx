@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Typography, IconButton, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Checkbox, FormControlLabel } from '@mui/material';
 import { MoreVertical, Eye, Upload, Pencil, Trash2, X, ArrowRight } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
@@ -107,7 +107,6 @@ const RequisitionList = () => {
         setLocalDraftMeta(parsedDraftMeta);
       }
     } catch (error) {
-      console.warn('Unable to load local draft meta:', error);
     }
   }, []);
 
@@ -155,10 +154,6 @@ const RequisitionList = () => {
     setError(null);
     try {
       const url = `${API_BASE}/requisitions?page=${pageNum + 1}&per_page=${pageSize}`;
-      console.log('🔍 Fetching requisitions from:', url);
-      console.log('📡 API_BASE:', API_BASE);
-      console.log('🌐 Environment:', process.env.NODE_ENV);
-      
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${TOKEN}`,
@@ -166,8 +161,6 @@ const RequisitionList = () => {
           'X-API-KEY': API_KEY,
         },
       });
-      
-      console.log('📥 Response status:', response.status, response.statusText);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch requisitions: ${response.status} ${response.statusText}`);
@@ -178,8 +171,7 @@ const RequisitionList = () => {
       // Handle different response structures from the API
       const data = result.data || result;
       const dataArray = Array.isArray(data) ? data : (data.data || []);
-      const total = result.meta?.total || result.total || (Array.isArray(dataArray) ? dataArray.length : 0);
-      console.log('Data Array', dataArray)
+      const total = result.meta?.total || result.total || data.total || data.meta?.total || data.last_page * pageSize || (Array.isArray(dataArray) ? dataArray.length : 0);
       if (Array.isArray(dataArray) && dataArray.length > 0) {
         const requisitions = dataArray.map((item, index) => ({
           id: item.hash_id || item.id || item.temp_id || item.tempId || `temp-${index}-${Date.now()}`,
@@ -200,11 +192,6 @@ const RequisitionList = () => {
       }
     } catch (err) {
       const errorMsg = err.message || 'Failed to fetch requisitions';
-      console.error('❌ Error fetching requisitions:', {
-        message: errorMsg,
-        error: err,
-        timestamp: new Date().toISOString()
-      });
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -402,8 +389,6 @@ const RequisitionList = () => {
       formData.append("remarks", uploadForm.remarks);
     }
 
-    console.log("Uploading files for job_id:", uploadingJobId);
-
     const response = await fetch(`${API_BASE}/requisitions/upload`, {
       method: "POST",
       headers: {
@@ -440,8 +425,6 @@ const RequisitionList = () => {
     }
 
   } catch (error) {
-    console.error("Upload error:", error);
-
     // 🔹 Network error
     if (error.name === "TypeError") {
       toast.error("Network error. Please check internet connection.");
@@ -458,7 +441,6 @@ const RequisitionList = () => {
     if (selectedRow) {
       // Use hash_id for editing to match API endpoint
       const editId = selectedRow.hash_id || selectedRow.id;
-      console.log('📝 Editing requisition:', editId);
       navigate(`/dashboard/requisitions/edit/${editId}`);
     }
     handleMenuClose();
@@ -473,10 +455,7 @@ const RequisitionList = () => {
     setLoading(true);
     try {
       const deleteId = selectedRow.hash_id || selectedRow.id;
-      console.log('🗑️ Deleting requisition:', deleteId);
-      
       const result = await RequisitionApi.delete(deleteId);
-      console.log('🗑️ Delete response:', result);
       
       if (result.success) {
         toast.success(result.message || 'Requisition deleted successfully');
@@ -486,7 +465,6 @@ const RequisitionList = () => {
       }
     } catch (error) {
       toast.error(error.message || 'Error deleting requisition');
-      console.error('Delete error:', error);
     } finally {
       setLoading(false);
     }
@@ -589,7 +567,7 @@ const RequisitionList = () => {
                 Error: {error}
               </div>
             ) : (
-              <DataGrid
+              <TooltipDataGrid
                 rows={filteredRows}
                 columns={columns}
                 getRowId={(row) => row.id}
@@ -696,42 +674,6 @@ const RequisitionList = () => {
               {uploadForm.requisition_form && (
                 <Typography variant="caption" className="text-green-600 mt-1 block">
                   Selected: {uploadForm.requisition_form.name}
-                </Typography>
-              )}
-            </div>
-
-            {/* Annex A Form - Optional */}
-            <div>
-              <Typography variant="body2" className="mb-2 font-medium">
-                Annex A Form
-              </Typography>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => handleFileChange(e, 'annex_a_form')}
-                className="w-full p-2 border border-gray-300 rounded"
-              />
-              {uploadForm.annex_a_form && (
-                <Typography variant="caption" className="text-green-600 mt-1 block">
-                  Selected: {uploadForm.annex_a_form.name}
-                </Typography>
-              )}
-            </div>
-
-            {/* Other Attachment - Optional */}
-            <div>
-              <Typography variant="body2" className="mb-2 font-medium">
-                Other Attachment
-              </Typography>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => handleFileChange(e, 'other_attachment')}
-                className="w-full p-2 border border-gray-300 rounded"
-              />
-              {uploadForm.other_attachment && (
-                <Typography variant="caption" className="text-green-600 mt-1 block">
-                  Selected: {uploadForm.other_attachment.name}
                 </Typography>
               )}
             </div>

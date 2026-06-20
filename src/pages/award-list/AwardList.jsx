@@ -5,10 +5,11 @@ import {
   DialogTitle, TextField, MenuItem, Typography, CircularProgress,
   InputAdornment, IconButton, Tooltip,
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Plus, Search, X, RefreshCw, ExternalLink, Download } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { formatDate } from 'utils/dateUtils';
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
@@ -64,7 +65,6 @@ export default function AwardList() {
       setRows(payload?.data ?? []);
       setTotal(payload?.total ?? 0);
     } catch (err) {
-      console.error('Failed to fetch award lists', err);
     } finally {
       setLoading(false);
     }
@@ -127,7 +127,7 @@ export default function AwardList() {
       width: 130,
       renderCell: ({ value }) =>
         value
-          ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          ? formatDate(value)
           : '—',
     },
     {
@@ -231,7 +231,7 @@ export default function AwardList() {
 
       {/* Grid */}
       <Box sx={{ height: 520 }}>
-        <DataGrid
+        <TooltipDataGrid
           rows={rows}
           columns={columns}
           rowCount={total}

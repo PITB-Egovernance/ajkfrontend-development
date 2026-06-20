@@ -1,15 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from 'components/ui/Card';
-import { 
-  Building2, 
-  Network, 
-  MapPin, 
+import {
+  Building2,
+  Network,
+  MapPin,
   Map,
   Briefcase,
   Award,
   Building,
-  Users
+  Users,
+  GitBranch,
 } from 'lucide-react';
 
 const Settings = () => {
@@ -72,6 +73,13 @@ const Settings = () => {
     //   iconBg: 'bg-violet-500',
     //   link: '/dashboard/settings/contractors'
     // }
+    {
+      icon: GitBranch,
+      title: 'Requisition Approval Flow',
+      description: 'Configure department approval hierarchy',
+      iconBg: 'bg-indigo-500',
+      link: '/dashboard/settings/approval-flow'
+    },
   ];
 
   return (

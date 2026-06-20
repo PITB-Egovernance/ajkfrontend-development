@@ -13,6 +13,7 @@ import Button from 'components/ui/Button';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatDate } from 'utils/dateUtils';
 
 /**
  * MarkApprovalConsole
@@ -126,7 +127,7 @@ const MarkApprovalConsole = () => {
                   </div>
                   <div className="flex items-center gap-2 mt-2 text-[9px] font-bold text-slate-400 uppercase">
                     <History size={10} />
-                    Requested by {edit.creator?.username} • {new Date(edit.created_at).toLocaleDateString()}
+                    Requested by {edit.creator?.username} • {formatDate(edit.created_at)}
                   </div>
                 </div>
 

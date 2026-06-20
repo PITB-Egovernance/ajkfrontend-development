@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { DataGrid } from "@mui/x-data-grid";
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
   IconButton,
@@ -21,21 +21,7 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
-
-/* ── shared DataGrid sx matching ApprovedRequisitions ── */
-const gridSx = {
-  border: "none",
-  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
-  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
-  "& .MuiDataGrid-row": { minHeight: "52px !important" },
-  "& .MuiDataGrid-checkboxInput svg":             { color: "#064e3b" },
-  "& .MuiDataGrid-checkboxInput:hover svg":        { color: "#065f46" },
-  "& .MuiDataGrid-checkboxInput.Mui-checked svg":  { color: "#064e3b" },
-  "& .MuiCheckbox-root .MuiSvgIcon-root":          { color: "#064e3b" },
-  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
-  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
-  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
-};
+import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 
 const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   <button
@@ -47,18 +33,21 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
+const API_BASE = Config.apiUrl;
+
+const getHeaders = (json = true) => {
+  const h = {
+    Authorization: `Bearer ${AuthService.getToken()}`,
+    Accept: 'application/json',
+    'X-API-KEY': Config.apiKey,
+  };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 const ExamCentersManagement = () => {
   const navigate  = useNavigate();
   const importRef = useRef(null);
-
-  const API_BASE = Config.apiUrl;
-  const API_KEY  = Config.apiKey;
-
-  const getHeaders = (json = true) => {
-    const h = { Authorization: `Bearer ${AuthService.getToken()}`, Accept: "application/json", "X-API-KEY": API_KEY };
-    if (json) h["Content-Type"] = "application/json";
-    return h;
-  };
 
   const [allRows,   setAllRows]   = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -303,7 +292,7 @@ const ExamCentersManagement = () => {
     setImporting(true);
     try {
       const body = new FormData(); body.append("file", file);
-      const res = await fetch(`${API_BASE}/settings/exam-centers/import`, { method: "POST", headers: { Authorization: `Bearer ${AuthService.getToken()}`, Accept: "application/json", "X-API-KEY": API_KEY }, body });
+      const res = await fetch(`${API_BASE}/settings/exam-centers/import`, { method: "POST", headers: getHeaders(false), body });
       const r   = await res.json();
       if (r.status === 200 || r.success) { toast.success(r.message || "Import successful"); fetchCenters(); }
       else toast.error(r.message || "Import failed");
@@ -429,7 +418,7 @@ const ExamCentersManagement = () => {
         />
 
         {/* GRID — client-side pagination + search */}
-        <DataGrid
+        <TooltipDataGrid
           rows={filteredRows}
           columns={columns}
           getRowId={(r) => r.id}
@@ -442,7 +431,7 @@ const ExamCentersManagement = () => {
           disableRowSelectionOnClick
           rowSelectionModel={selectionModel}
           onRowSelectionModelChange={(s) => setSelectionModel(s)}
-          sx={gridSx}
+          sx={GRID_SX}
         />
 
         {/* MENU */}

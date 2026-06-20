@@ -17,6 +17,7 @@ import {
   XCircle,
   MessageSquareText,
 } from 'lucide-react';
+import { formatDate } from 'utils/dateUtils';
 
 const FLOW_STAGES = [
   { key: 'submitted', label: 'Submitted', shortLabel: 'S', eventIcon: FileCheck2 },
@@ -44,7 +45,7 @@ const formatDateTime = (value) => {
   if (!value) return 'Not available';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Not available';
-  return date.toLocaleString();
+  return formatDate(date);
 };
 
 const normalizeStep = (step = {}) => ({

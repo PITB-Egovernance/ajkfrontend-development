@@ -19,8 +19,6 @@ import { TextField } from '@mui/material';
 const ValidatedTextField = ({ form, name, helperText = ' ', ...rest }) => {
   if (!form || typeof form.getMuiFieldProps !== 'function') {
     // Helpful guard: makes a developer-time mistake obvious instead of silent.
-    // eslint-disable-next-line no-console
-    console.error('<ValidatedTextField> requires a `form` prop from useFormValidation().');
     return <TextField name={name} helperText={helperText} {...rest} />;
   }
 

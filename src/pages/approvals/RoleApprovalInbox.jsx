@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import toast from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/Card';
 import Button from 'components/ui/Button';
@@ -7,6 +7,7 @@ import ApprovalWorkflowService from 'services/ApprovalWorkflowService';
 import { useAuth } from 'context/AuthContext';
 import StatusBadge from 'components/workflow/StatusBadge';
 import ApprovalActionDialog from 'components/workflow/ApprovalActionDialog';
+import { formatDate } from 'utils/dateUtils';
 
 const TABS = {
   CURRENT: 'current',
@@ -101,7 +102,7 @@ const RoleApprovalInbox = ({ stage, title }) => {
         field: 'submittedAt',
         headerName: 'Submitted',
         minWidth: 140,
-        valueFormatter: (params) => (params?.value ? new Date(params.value).toLocaleDateString() : 'N/A'),
+        valueFormatter: (params) => (params?.value ? formatDate(params.value) : 'N/A'),
       },
       {
         field: 'currentStage',
@@ -170,7 +171,7 @@ const RoleApprovalInbox = ({ stage, title }) => {
         minWidth: 180,
         valueFormatter: (params) =>
           params?.value && params.value !== 'N/A'
-            ? new Date(params.value).toLocaleString()
+            ? formatDate(params.value)
             : 'N/A',
       },
     ],
@@ -223,7 +224,7 @@ const RoleApprovalInbox = ({ stage, title }) => {
           </div>
         </CardHeader>
         <CardContent>
-          <DataGrid
+          <TooltipDataGrid
             rows={rows}
             columns={columns}
             autoHeight

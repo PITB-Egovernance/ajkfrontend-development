@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { DataGrid } from "@mui/x-data-grid";
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
   IconButton,
@@ -20,20 +20,7 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
-
-const gridSx = {
-  border: "none",
-  "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
-  "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
-  "& .MuiDataGrid-row": { minHeight: "52px !important" },
-  "& .MuiDataGrid-checkboxInput svg":              { color: "#064e3b" },
-  "& .MuiDataGrid-checkboxInput:hover svg":         { color: "#065f46" },
-  "& .MuiDataGrid-checkboxInput.Mui-checked svg":   { color: "#064e3b" },
-  "& .MuiCheckbox-root .MuiSvgIcon-root":           { color: "#064e3b" },
-  "& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root": { color: "#064e3b" },
-  "& .MuiDataGrid-row.Mui-selected":       { backgroundColor: "#ecfdf5" },
-  "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#d1fae5" },
-};
+import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 
 const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   <button type="button" onClick={onClick}
@@ -51,22 +38,25 @@ const EXCLUDED_DISTRICTS = [
   "refugees settle in pakistan (1947)",
 ];
 
+const API_BASE = Config.apiUrl;
+
+const getHeaders = (json = true) => {
+  const h = {
+    Authorization: `Bearer ${AuthService.getToken()}`,
+    Accept: 'application/json',
+    'X-API-KEY': Config.apiKey,
+  };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+};
+
 const CitiesManagement = () => {
   const navigate = useNavigate();
-
-  const API_BASE = Config.apiUrl;
-  const API_KEY  = Config.apiKey;
 
   // City→district mapping cache (backend doesn't return district_id yet)
   const DISTRICT_MAP_KEY = 'ajk_city_district_map';
   const loadDistrictMap  = () => { try { return JSON.parse(localStorage.getItem(DISTRICT_MAP_KEY) || '{}'); } catch { return {}; } };
   const saveDistrictMap  = (map) => { try { localStorage.setItem(DISTRICT_MAP_KEY, JSON.stringify(map)); } catch {} };
-
-  const getHeaders = (json = true) => {
-    const h = { Authorization: `Bearer ${AuthService.getToken()}`, Accept: "application/json", "X-API-KEY": API_KEY };
-    if (json) h["Content-Type"] = "application/json";
-    return h;
-  };
 
   const [allRows,    setAllRows]    = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -373,20 +363,21 @@ const CitiesManagement = () => {
         />
 
         {/* GRID */}
-        <DataGrid
+        <TooltipDataGrid
           rows={filteredRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50]}
+          initialState={GRID_INITIAL_STATE}
+          pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
           loading={loading}
           autoHeight
           checkboxSelection
           disableRowSelectionOnClick
           rowSelectionModel={selectionModel}
           onRowSelectionModelChange={(s) => setSelectionModel(s)}
-          sx={gridSx}
+          sx={GRID_SX}
         />
 
         {/* MENU */}
