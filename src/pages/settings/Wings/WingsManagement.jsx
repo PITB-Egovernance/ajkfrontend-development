@@ -50,9 +50,9 @@ const WingsManagement = () => {
     ...(json ? { "Content-Type": "application/json" } : {}),
   });
 
-  const [rows, setRows]               = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [total, setTotal]             = useState(0);
+  const [rows, setRows]                       = useState([]);
+  const [loading, setLoading]                 = useState(true);
+  const [total, setTotal]                     = useState(0);
   const [secretaryId, setSecretaryId] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -120,13 +120,18 @@ const WingsManagement = () => {
     try {
       const res    = await fetch(`${API_BASE}/settings/designations?per_page=100`, { headers: headers(false) });
       const result = await res.json();
-      const data   = result.data?.data ?? result.data ?? [];
-      const secretary = (Array.isArray(data) ? data : []).find(
-        (d) => d.name?.toLowerCase().includes('secretary')
-      );
-      if (secretary) setSecretaryId(secretary.id ?? secretary.hash_id);
+      console.log("Secretary fetch result:", result);
+      const raw    = result.data?.data ?? result.data ?? result ?? [];
+      const data   = Array.isArray(raw) ? raw : [];
+      const secretary = data.find((d) => d.name?.toLowerCase().includes('secretary'));
+      if (secretary) {
+        const id = secretary.id !== undefined && secretary.id !== null
+          ? Number(secretary.id)
+          : secretary.hash_id;
+        setSecretaryId(id);
+      }
     } catch {
-      // silent — parent_id will fall back to 0
+      // silent
     }
   };
 
