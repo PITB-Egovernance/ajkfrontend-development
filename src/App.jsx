@@ -52,6 +52,11 @@ import DepartmentsManagement from 'pages/settings/Departments/DepartmentsManagem
 import NationalitiesManagement from 'pages/settings/Nationality/NationalitiesManagement';
 import TestsManagement from 'pages/settings/Tests/TestsManagement';
 import ExamFeesManagement from 'pages/settings/ExamFees/ExamFeesManagement';
+import SubjectManagement from 'pages/settings/Subject/SubjectManagement';
+import CertificatesManagement from 'pages/settings/Certificates/CertificatesManagement';
+import DigitalSignatureManagement from 'pages/settings/DigitalSignature/DigitalSignatureManagement';
+import SystemSettings from 'pages/settings/SystemSettings/SystemSettings';
+import WingsManagement from 'pages/settings/Wings/WingsManagement';
 import ApplicationsList from 'pages/applications/ApplicationsList';
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
@@ -108,7 +113,6 @@ function App() {
           <Route path="requisitions/:id/edit" element={<RequisitionEdit />} />
           <Route path="requisitions/:id" element={<RequisitionDetail />} />
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
-          <Route path="settings/terms-conditions" element={<AddNotes />} />
           <Route path="add-notes" element={<AddNotes />} />
           <Route path="advertisement-records" element={<AdvertisementRecords />} />
           <Route path="advertisements/view/:id" element={<AdvertisementDetail />} />
@@ -184,6 +188,11 @@ function App() {
           <Route path="settings/nationalities" element={<NationalitiesManagement />} />
           <Route path="settings/tests" element={<TestsManagement />} />
           <Route path="settings/exam-fees" element={<ExamFeesManagement />} />
+          <Route path="settings/subjects" element={<SubjectManagement />} />
+          <Route path="settings/certificates" element={<CertificatesManagement />} />
+          <Route path="settings/digital-signatures" element={<DigitalSignatureManagement />} />
+          <Route path="settings/system-settings" element={<SystemSettings />} />
+          <Route path="settings/wings" element={<WingsManagement />} />
 
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />
