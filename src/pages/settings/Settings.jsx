@@ -11,6 +11,11 @@ import {
   Building,
   Users,
   GitBranch,
+  BookOpen,
+  ScrollText,
+  PenTool,
+  UserCog,
+  LayoutList
 } from 'lucide-react';
 
 const Settings = () => {
@@ -72,7 +77,7 @@ const Settings = () => {
     //   description: 'Manage freelance contractors',
     //   iconBg: 'bg-violet-500',
     //   link: '/dashboard/settings/contractors'
-    // }
+    // },
     {
       icon: GitBranch,
       title: 'Requisition Approval Flow',
@@ -80,6 +85,48 @@ const Settings = () => {
       iconBg: 'bg-indigo-500',
       link: '/dashboard/settings/approval-flow'
     },
+    {
+      icon: BookOpen,
+      title: 'Subject Management',
+      description: 'Manage subject groups and marks',
+      iconBg: 'bg-rose-500',
+      link: '/dashboard/settings/subjects'
+    },
+    {
+      icon: Award,
+      title: 'Certificates',
+      description: 'Manage certificate entries',
+      iconBg: 'bg-sky-500',
+      link: '/dashboard/settings/certificates'
+    },
+    {
+      icon: ScrollText,
+      title: 'Terms & Conditions',
+      description: 'Manage terms and conditions entries',
+      iconBg: 'bg-violet-500',
+      link: '/dashboard/settings/terms-and-conditions'
+    },
+    {
+      icon: PenTool,
+      title: 'Digital Signatures',
+      description: 'Manage employee digital signature images',
+      iconBg: 'bg-emerald-600',
+      link: '/dashboard/settings/digital-signatures'
+    },
+    {
+      icon: UserCog,
+      title: 'System Settings',
+      description: 'View Chairman, Secretary and Super Admin users',
+      iconBg: 'bg-slate-700',
+      link: '/dashboard/settings/system-settings'
+    },
+    {
+      icon: LayoutList,
+      title: 'Wings / Sections',
+      description: 'Manage wings and sections hierarchy',
+      iconBg: 'bg-indigo-600',
+      link: '/dashboard/settings/wings'
+    }
   ];
 
   return (
