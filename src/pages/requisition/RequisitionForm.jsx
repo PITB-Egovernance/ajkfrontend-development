@@ -153,7 +153,7 @@ const RequisitionForm = () => {
         const list = result.data?.data ?? result.data ?? [];
         setDesignationOptions(
           list
-            .filter((d) => (d.status ?? 'active') === 'active')
+            .filter((d) => (d.status ?? 'active') === 'active' && !d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
             .map((d) => ({ id: d.hash_id || d.id, name: d.name }))
         );
       }

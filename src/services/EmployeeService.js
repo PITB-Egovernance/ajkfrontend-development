@@ -53,7 +53,7 @@ class EmployeeService {
   // ──────────────────────────────────────────────────────
   static async getUsers(params = {}) {
     const query = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE}/users${query ? `?${query}` : ''}`, {
+    const response = await fetch(`${API_BASE}/settings/employee/list${query ? `?${query}` : ''}`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -61,7 +61,7 @@ class EmployeeService {
     const result = await safeJson(response);
 
     if (!response.ok) {
-      throw new Error(result?.message || 'Failed to load users');
+      throw new Error(result?.message || 'Failed to load employees');
     }
 
     return {

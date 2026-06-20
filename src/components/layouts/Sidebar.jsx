@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   FileText,
   ClipboardList,
@@ -42,6 +42,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
 
   const [localOpenMenu, setLocalOpenMenu] = useState("");
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Use context menu state if available
   const currentOpenMenu = openMenu !== undefined ? openMenu : localOpenMenu;
@@ -321,7 +322,10 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           onMouseLeave={() => !isOpen && setShowHoverMenu(false)}
         >
           <button
-            onClick={() => toggleMenu(item.id)}
+            onClick={() => {
+              toggleMenu(item.id);
+              if (item.path) navigate(item.path);
+            }}
             className={cn(
               "w-full flex items-center justify-between py-3 rounded-xl transition-all duration-200 border-b border-emerald-700/20",
               "text-sm font-medium group",

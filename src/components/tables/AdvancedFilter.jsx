@@ -9,12 +9,13 @@ import {
   X
 } from 'lucide-react';
 
-const AdvancedFilter = ({ 
-  filters, 
-  onFilterChange, 
-  onClearFilters, 
+const AdvancedFilter = ({
+  filters,
+  onFilterChange,
+  onClearFilters,
   filterConfig,
-  title = "Advanced Filters"
+  title = "Advanced Filters",
+  extraFilters
 }) => {
   const handleFilterChange = (name, value) => {
     onFilterChange({ target: { name, value } });
@@ -44,6 +45,7 @@ const AdvancedFilter = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {extraFilters && extraFilters}
         {filterConfig.map((config) => {
           switch (config.type) {
             case 'text':

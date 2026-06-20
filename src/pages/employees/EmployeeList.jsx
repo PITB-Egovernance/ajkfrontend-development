@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
-import { Menu, MenuItem, IconButton, Switch } from '@mui/material';
+import { Menu, MenuItem, IconButton, Switch, TextField, Checkbox, ListItemText, Chip, Box } from '@mui/material';
 import toast from 'react-hot-toast';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import {
   Users,
   Search,
@@ -18,12 +20,11 @@ import EmployeeDetailsModal from 'components/employees/EmployeeDetailsModal';
 import EmployeeService from 'services/EmployeeService';
 import { GRID_SX } from 'utils/gridStyles';
 
-const FILTER_CONFIG = [
+const BASE_FILTER_CONFIG = [
   { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by full name' },
   { name: 'cnic', label: 'CNIC', type: 'text', placeholder: 'Filter by CNIC' },
   { name: 'email', label: 'Email', type: 'text', placeholder: 'Filter by email' },
   { name: 'mobile', label: 'Mobile Number', type: 'text', placeholder: 'Filter by mobile' },
-  { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
   {
     name: 'status',
     label: 'Status',
@@ -35,7 +36,7 @@ const FILTER_CONFIG = [
   },
 ];
 
-const EMPTY_FILTERS = { full_name: '', cnic: '', email: '', mobile: '', designation: '', status: '' };
+const EMPTY_FILTERS = { full_name: '', cnic: '', email: '', mobile: '', status: '' };
 
 const mapUser = (user, idx) => ({
   id: user?.hash_id || user?.id || `user-${idx}`,
@@ -111,6 +112,8 @@ const EmployeeList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedHashId, setSelectedHashId] = useState(null);
+  const [designationOptions, setDesignationOptions] = useState([]);
+  const [selectedDesignations, setSelectedDesignations] = useState([]);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -126,6 +129,41 @@ const EmployeeList = () => {
 
   useEffect(() => {
     fetchEmployees();
+
+    const headers = {
+      Authorization: `Bearer ${AuthService.getToken()}`,
+      Accept: 'application/json',
+      'X-API-KEY': Config.apiKey,
+    };
+    const loadDesignations = async () => {
+      try {
+        const [desigRes, wingsRes] = await Promise.all([
+          fetch(`${Config.apiUrl}/settings/designations?per_page=200`, { headers }),
+          fetch(`${Config.apiUrl}/settings/wings?per_page=200`, { headers }),
+        ]);
+        const desigResult = await desigRes.json();
+        const wingsResult = await wingsRes.json();
+        const wingsList = wingsResult.success ? (wingsResult.data?.data ?? wingsResult.data ?? []) : [];
+
+        if (desigResult.success === true || desigResult.status === 200) {
+          setDesignationOptions(
+            (desigResult.data?.data ?? desigResult.data ?? [])
+              .filter((d) => !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
+              .map((d) => {
+                let wingName = '';
+                if (d.wings) {
+                  const wing = wingsList.find((w) => w.hash_id === d.wings || String(w.id) === String(d.wings));
+                  wingName = wing?.name || '';
+                }
+                return { id: d.hash_id, name: d.name, wingName };
+              })
+          );
+        }
+      } catch {
+        setDesignationOptions([]);
+      }
+    };
+    loadDesignations();
   }, []);
 
   const handleToggleStatus = async (employee) => {
@@ -171,6 +209,7 @@ const EmployeeList = () => {
 
   const handleClearFilters = () => {
     setFilters(EMPTY_FILTERS);
+    setSelectedDesignations([]);
   };
 
   const filteredEmployees = employees.filter((emp) => {
@@ -188,7 +227,13 @@ const EmployeeList = () => {
     if (filters.cnic && !emp.cnic?.toLowerCase().includes(filters.cnic.toLowerCase())) return false;
     if (filters.email && !emp.email?.toLowerCase().includes(filters.email.toLowerCase())) return false;
     if (filters.mobile && !emp.mobile?.toLowerCase().includes(filters.mobile.toLowerCase())) return false;
-    if (filters.designation && !emp.designation?.toLowerCase().includes(filters.designation.toLowerCase())) return false;
+    if (selectedDesignations.length > 0) {
+      const selectedNames = selectedDesignations.map((id) => {
+        const opt = designationOptions.find((d) => d.id === id);
+        return opt?.name?.toLowerCase() || '';
+      });
+      if (!selectedNames.some((n) => n && emp.designation?.toLowerCase().includes(n))) return false;
+    }
     if (filters.status && emp.status !== filters.status) return false;
 
     return true;
@@ -303,8 +348,68 @@ const EmployeeList = () => {
           filters={filters}
           onFilterChange={handleFilterChange}
           onClearFilters={handleClearFilters}
-          filterConfig={FILTER_CONFIG}
+          filterConfig={BASE_FILTER_CONFIG}
           title="Filter Employees"
+          extraFilters={
+            designationOptions.length > 0 && (
+              <TextField
+                fullWidth
+                select
+                label="Designation"
+                value={selectedDesignations}
+                size="small"
+                SelectProps={{
+                  multiple: true,
+                  onChange: () => {},
+                  renderValue: (selected) => {
+                    if (!selected || selected.length === 0) return '';
+                    return (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                        {selected.map((id) => {
+                          const opt = designationOptions.find((d) => d.id === id);
+                          const label = opt ? (opt.wingName ? `${opt.name} — ${opt.wingName}` : opt.name) : id;
+                          return <Chip key={id} label={label} size="small" />;
+                        })}
+                      </Box>
+                    );
+                  },
+                  MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+                }}
+                sx={{ '& .MuiOutlinedInput-root': { minHeight: 40, height: 'auto' } }}
+              >
+                <MenuItem dense onClick={(e) => {
+                  e.preventDefault();
+                  const allIds = designationOptions.map((d) => d.id);
+                  const allSelected = allIds.length > 0 && allIds.every((id) => selectedDesignations.includes(id));
+                  setSelectedDesignations(allSelected ? [] : allIds);
+                }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <Checkbox size="small"
+                    checked={designationOptions.length > 0 && designationOptions.every((d) => selectedDesignations.includes(d.id))}
+                    indeterminate={designationOptions.some((d) => selectedDesignations.includes(d.id)) && !designationOptions.every((d) => selectedDesignations.includes(d.id))}
+                    sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+                  />
+                  <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+                </MenuItem>
+                {designationOptions.map((d) => (
+                  <MenuItem key={d.id} dense onClick={(e) => {
+                    e.preventDefault();
+                    setSelectedDesignations((prev) =>
+                      prev.includes(d.id) ? prev.filter((id) => id !== d.id) : [...prev, d.id]
+                    );
+                  }}>
+                    <Checkbox size="small"
+                      checked={selectedDesignations.includes(d.id)}
+                      sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                    />
+                    <ListItemText
+                      primary={d.wingName ? `${d.name} — ${d.wingName}` : d.name}
+                      primaryTypographyProps={{ fontSize: 13 }}
+                    />
+                  </MenuItem>
+                ))}
+              </TextField>
+            )
+          }
         />
 
         {/* Table */}

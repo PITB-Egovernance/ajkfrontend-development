@@ -1,0 +1,29 @@
+{
+  "process_type": "requisition",
+  "assignments": [
+    {
+      "step": 1,
+      "wing": "Exam Wing",
+      "designation": "Assistant Director",
+      "employee": "Muhammad Imran Khan"
+    },
+    {
+      "step": 2,
+      "wing": "Recruitment Wing I",
+      "designation": "Deputy Director",
+      "employee": "Khalid Mehmood"
+    },
+    {
+      "step": 3,
+      "wing": "Recruitment Wing II",
+      "designation": "Director",
+      "employee": "Dr. Farooq Ahmed"
+    },
+    {
+      "step": 4,
+      "wing": "Final Approval",
+      "designation": "Secretary",
+      "employee": "Raja Muhammad Arif"
+    }
+  ]
+}

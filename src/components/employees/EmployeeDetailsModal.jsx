@@ -8,6 +8,10 @@ import {
   MenuItem,
   Autocomplete,
   CircularProgress,
+  Checkbox,
+  ListItemText,
+  Chip,
+  Box,
 } from '@mui/material';
 import { Pencil, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -62,11 +66,13 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
   const [districtOptions,    setDistrictOptions]    = useState([]);
   const [designationOptions, setDesignationOptions] = useState([]);
   const [gradeOptions,       setGradeOptions]       = useState([]);
+  const [roleOptions,        setRoleOptions]        = useState([]);
 
   // Selected Autocomplete objects
   const [selectedDistrict,    setSelectedDistrict]    = useState(null);
   const [selectedDesignation, setSelectedDesignation] = useState(null);
   const [selectedGrade,       setSelectedGrade]       = useState(null);
+  const [selectedRoles,       setSelectedRoles]       = useState([]);
 
   /* ── Load user details when modal opens ── */
   useEffect(() => {
@@ -114,23 +120,31 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
     };
 
     try {
-      const [dRes, desRes, gRes] = await Promise.all([
+      const [dRes, desRes, gRes, rRes] = await Promise.all([
         fetch(`${Config.apiUrl}/settings/districts`,                     { headers }),
         fetch(`${Config.apiUrl}/settings/designations?per_page=100`,    { headers }),
         fetch(`${Config.apiUrl}/settings/grades?per_page=100`,          { headers }),
+        fetch(`${Config.apiUrl}/settings/roles`,                         { headers }),
       ]);
-      const [dData, desData, gData] = await Promise.all([
-        dRes.json(), desRes.json(), gRes.json(),
+      const [dData, desData, gData, rData] = await Promise.all([
+        dRes.json(), desRes.json(), gRes.json(), rRes.json(),
       ]);
 
       setDistrictOptions(
         (dData.data?.data ?? dData.data ?? []).map((d) => ({ id: d.hash_id, name: d.name }))
       );
       setDesignationOptions(
-        (desData.data?.data ?? desData.data ?? []).map((d) => ({ id: d.hash_id, name: d.name }))
+        (desData.data?.data ?? desData.data ?? [])
+          .filter((d) => !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
+          .map((d) => ({ id: d.hash_id, name: d.name }))
       );
       setGradeOptions(
         (gData.data?.data ?? gData.data ?? []).map((g) => ({ id: g.hash_id, name: g.name }))
+      );
+      setRoleOptions(
+        (rData.data?.data ?? rData.data ?? [])
+          .filter((r) => !r.deleted_at)
+          .map((r) => ({ id: r.hash_id, name: r.role_name }))
       );
     } catch {
       toast.error('Failed to load dropdown options');
@@ -161,7 +175,11 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
       );
       setSelectedGrade(found || null);
     }
-  }, [editing, districtOptions, designationOptions, gradeOptions]); // eslint-disable-line
+    if (form.role && roleOptions.length) {
+      const userRoles = form.role.split(',').map((r) => r.trim()).filter(Boolean);
+      setSelectedRoles(userRoles);
+    }
+  }, [editing, districtOptions, designationOptions, gradeOptions, roleOptions]); // eslint-disable-line
 
   const startEditing = async () => {
     await loadOptions();
@@ -177,6 +195,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
     const resolvedGrade       = selectedGrade?.name       || form.scale       || '';
     const resolvedDesignation = selectedDesignation?.name || form.designation || '';
     const resolvedDomicile    = selectedDistrict?.name    || form.domicile    || '';
+    const resolvedRole        = selectedRoles.length > 0  ? selectedRoles.join(', ') : (form.role || '');
     const resolvedGender      = form.gender ? form.gender.toLowerCase() : '';
 
     // Snapshot of original values using the same resolved keys
@@ -191,6 +210,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
       domicile:            user?.domicile             || '',
       designation:         user?.designation          || '',
       grade:               user?.scale                || '',
+      role:                user?.role                 || '',
       status:              user?.status               || '',
     };
 
@@ -205,6 +225,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
       domicile:            resolvedDomicile,
       designation:         resolvedDesignation,
       grade:               resolvedGrade,
+      role:                resolvedRole,
       status:              form.status,
     };
 
@@ -426,6 +447,63 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
                   </MenuItem>
                 ))}
               </TextField>
+
+              {/* Role */}
+              {roleOptions.length > 0 && (
+                <TextField
+                  fullWidth
+                  select
+                  label="Role"
+                  value={selectedRoles}
+                  SelectProps={{
+                    multiple: true,
+                    onChange: () => {},
+                    renderValue: (selected) => {
+                      if (!selected || selected.length === 0) return '';
+                      return (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                          {selected.map((v) => <Chip key={v} label={v} size="small" />)}
+                        </Box>
+                      );
+                    },
+                    MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+                  }}
+                  sx={{
+                    ...fieldSx,
+                    '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' },
+                  }}
+                >
+                  <MenuItem dense onClick={(e) => {
+                    e.preventDefault();
+                    const allNames = roleOptions.map((r) => r.name);
+                    const allSelected = allNames.length > 0 && allNames.every((n) => selectedRoles.includes(n));
+                    setSelectedRoles(allSelected ? [] : allNames);
+                  }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <Checkbox size="small"
+                      checked={roleOptions.length > 0 && roleOptions.every((r) => selectedRoles.includes(r.name))}
+                      indeterminate={roleOptions.some((r) => selectedRoles.includes(r.name)) && !roleOptions.every((r) => selectedRoles.includes(r.name))}
+                      sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+                    />
+                    <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+                  </MenuItem>
+
+                  {roleOptions.map((r) => (
+                    <MenuItem key={r.id} dense onClick={(e) => {
+                      e.preventDefault();
+                      setSelectedRoles((prev) =>
+                        prev.includes(r.name) ? prev.filter((n) => n !== r.name) : [...prev, r.name]
+                      );
+                    }}>
+                      <Checkbox
+                        size="small"
+                        checked={selectedRoles.includes(r.name)}
+                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                      />
+                      <ListItemText primary={r.name} primaryTypographyProps={{ fontSize: 13 }} />
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
 
             </div>
           </div>

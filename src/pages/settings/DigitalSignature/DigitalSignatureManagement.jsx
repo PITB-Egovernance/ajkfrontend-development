@@ -119,7 +119,7 @@ const DigitalSignatureManagement = () => {
       const res    = await fetch(`${API_BASE}/settings/designations?per_page=100`, { headers: authHeaders() });
       const result = await res.json();
       const data   = result.data?.data ?? result.data ?? [];
-      setDesignations(Array.isArray(data) ? data : []);
+      setDesignations(Array.isArray(data) ? data.filter((d) => !d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase())) : []);
     } catch {
       setDesignations([]);
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+  import React, { useState, useEffect } from "react";
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
@@ -44,10 +44,12 @@ const DesignationsManagement = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [grades, setGrades] = useState([]);
+  const [wings, setWings] = useState([]);
 
   const [filters, setFilters] = useState({
     name: '',
     grade_id: '',
+    wings: '',
     status: ''
   });
 
@@ -63,6 +65,12 @@ const DesignationsManagement = () => {
       label: 'Grade',
       type: 'select',
       options: grades.map(g => ({ value: g.id || g.hash_id, label: g.name }))
+    },
+    {
+      name: 'wings',
+      label: 'Wing',
+      type: 'select',
+      options: wings.map(w => ({ value: w.hash_id, label: w.name }))
     },
     {
       name: 'status',
@@ -87,6 +95,7 @@ const DesignationsManagement = () => {
     setFilters({
       name: '',
       grade_id: '',
+      wings: '',
       status: ''
     });
   };
@@ -105,6 +114,7 @@ const DesignationsManagement = () => {
   const [formData, setFormData] = useState({
     name: "",
     grade_id: "",
+    wings: "",
     type: "",
     status: "active",
   });
@@ -112,7 +122,7 @@ const DesignationsManagement = () => {
   /* ===============================
      FETCH DESIGNATIONS
   =============================== */
-  const fetchDesignations = async (page = 0, pageSize = 15) => {
+  const fetchDesignations = async (page = 0, pageSize = 15, wingsList = []) => {
     setLoading(true);
 
     try {
@@ -128,16 +138,27 @@ const DesignationsManagement = () => {
       if (result.success === true || result.status === 200) {
         const dataArray = result.data?.data || result.data || [];
 
-        const formatted = dataArray.map((item) => ({
-          id: item.hash_id,
-          hash_id: item.hash_id,
-          name: item.name,
-          grade_id: item.grade_id,
-          grade_name: item.grade?.name || item.grade_name || "",
-          type: item.type,
-          status: item.status ?? "active",
-
-        }));
+          const formatted = dataArray.map((item) => {
+          // Try to resolve wing name from the API relation, or fallback to wingsList
+          let wingName = item.wing?.name || item.wing_name || "";
+          if (!wingName && item.wings && wingsList.length > 0) {
+            const matchedWing = wingsList.find(
+              (w) => w.hash_id === item.wings || String(w.id) === String(item.wings)
+            );
+            wingName = matchedWing?.name || "";
+          }
+          return {
+            id: item.hash_id,
+            hash_id: item.hash_id,
+            name: item.name,
+            grade_id: item.grade_id,
+            grade_name: item.grade?.name || item.grade_name || "",
+            wings: item.wings || "",
+            wing_name: wingName,
+            type: item.type,
+            status: item.status ?? "active",
+          };
+        });
 
         setRows(formatted);
         setTotal(result.data?.total || formatted.length);
@@ -179,9 +200,42 @@ const DesignationsManagement = () => {
     }
   };
 
+  const fetchWings = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/wings?per_page=200`, {
+        headers: getHeaders(false),
+      });
+      const result = await response.json();
+      let wingArray = [];
+      if (Array.isArray(result)) {
+        wingArray = result;
+      } else if (Array.isArray(result.data)) {
+        wingArray = result.data;
+      } else if (Array.isArray(result.data?.data)) {
+        wingArray = result.data.data;
+      }
+      const formatted = wingArray
+        .filter((w) => w.status === 'active' || !w.status)
+        .map((w) => ({
+          id: w.id,
+          hash_id: w.hash_id || String(w.id),
+          name: w.name,
+        }));
+      setWings(formatted);
+      return formatted;
+    } catch (error) {
+      setWings([]);
+      return [];
+    }
+  };
+
   useEffect(() => {
-    fetchGrades();
-    fetchDesignations(paginationModel.page, paginationModel.pageSize);
+    const init = async () => {
+      await fetchGrades();
+      const wingsList = await fetchWings();
+      await fetchDesignations(paginationModel.page, paginationModel.pageSize, wingsList);
+    };
+    init();
     // eslint-disable-next-line
   }, [paginationModel.page, paginationModel.pageSize]);
 
@@ -215,6 +269,10 @@ const DesignationsManagement = () => {
       return false;
     }
 
+    if (filters.wings && row.wings !== filters.wings) {
+      return false;
+    }
+
     if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
       return false;
     }
@@ -236,10 +294,10 @@ const DesignationsManagement = () => {
     return;
   }
 
-  // if (!formData.type) {
-  //   toast.error("Type is required");
-  //   return;
-  // }
+  if (formData.name.trim().toLowerCase() === "secretary" && formData.wings) {
+    toast.error("Secretary designation cannot have a wing assigned");
+    return;
+  }
 
   setLoading(true);
 
@@ -256,6 +314,7 @@ const DesignationsManagement = () => {
       body: JSON.stringify({
         name: formData.name,
         grade_id: formData.grade_id,
+        wings: formData.name.trim().toLowerCase() === "secretary" ? null : (formData.wings || null),
         type: "Internal",
         status: formData.status,
       }),
@@ -272,7 +331,7 @@ const DesignationsManagement = () => {
 
       setOpenModal(false);
       setEditingDesignation(null);
-      fetchDesignations(paginationModel.page, paginationModel.pageSize);
+      fetchDesignations(paginationModel.page, paginationModel.pageSize, wings);
     } else {
       toast.error(result.message || (isUpdate ? "Failed to update designation" : "Failed to create designation"));
     }
@@ -304,7 +363,7 @@ const DesignationsManagement = () => {
 
       if (result.success === true || result.status === 200) {
         toast.success("Designation deleted successfully");
-        fetchDesignations(paginationModel.page, paginationModel.pageSize);
+        fetchDesignations(paginationModel.page, paginationModel.pageSize, wings);
       } else {
         toast.error(result.message || "Failed to delete designation");
       }
@@ -319,12 +378,12 @@ const DesignationsManagement = () => {
       const res    = await fetch(`${API_BASE}/settings/designations/${row.hash_id || row.id}/update`, {
         method: "POST",
         headers: getHeaders(),
-        body: JSON.stringify({ name: row.name, grade_id: row.grade_id, type: "Internal", status: newStatus }),
+        body: JSON.stringify({ name: row.name, grade_id: row.grade_id, wings: row.wings || null, type: "Internal", status: newStatus }),
       });
       const result = await res.json();
       if (res.ok || result.status === 200 || result.success) {
         toast.success(`Designation marked as ${newStatus}`);
-        fetchDesignations(paginationModel.page, paginationModel.pageSize);
+        fetchDesignations(paginationModel.page, paginationModel.pageSize, wings);
       } else {
         toast.error(result.message || "Failed to update designation status");
       }
@@ -343,6 +402,13 @@ const DesignationsManagement = () => {
     field: "grade_name",
     headerName: "Grade",
     width: 150,
+  },
+
+  {
+    field: "wing_name",
+    headerName: "Wing",
+    width: 180,
+    valueGetter: (params) => params.row.wing_name || "—",
   },
 
   {
@@ -415,6 +481,7 @@ const DesignationsManagement = () => {
               setFormData({
                 name: "",
                 grade_id: "",
+                wings: "",
                 type: "",
                 status: "active",
               });
@@ -500,9 +567,11 @@ const DesignationsManagement = () => {
               setFormData({
                 name: selectedRow.name || "",
                 grade_id: selectedRow.grade_id || selectedRow.grade?.hash_id || "",
+                wings: selectedRow.wings || "",
                 type: selectedRow.type || "",
                 status: selectedRow.status || "active",
               });
+
 
               setOpenModal(true);
               setAnchorEl(null);
@@ -535,9 +604,14 @@ const DesignationsManagement = () => {
               label="Designation Name"
               margin="normal"
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
+              onChange={(e) => {
+                const newName = e.target.value;
+                if (newName.trim().toLowerCase() === "secretary") {
+                  setFormData({ ...formData, name: newName, wings: "" });
+                } else {
+                  setFormData({ ...formData, name: newName });
+                }
+              }}
             />
 
             {/* Grade Dropdown */}
@@ -561,6 +635,33 @@ const DesignationsManagement = () => {
                   </MenuItem>
               ))}
             </TextField>
+
+            {/* Wing Dropdown — hidden for Secretary designation */}
+            {formData.name.trim().toLowerCase() !== "secretary" && (
+              <TextField
+                select
+                fullWidth
+                label="Wing"
+                margin="normal"
+                value={formData.wings}
+                onChange={(e) =>
+                  setFormData({ ...formData, wings: e.target.value })
+                }
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {Array.isArray(wings) &&
+                  wings.map((wing) => (
+                    <MenuItem
+                      key={wing.hash_id}
+                      value={wing.hash_id}
+                    >
+                      {wing.name}
+                    </MenuItem>
+                ))}
+              </TextField>
+            )}
 
             {/* Type Field */}
             

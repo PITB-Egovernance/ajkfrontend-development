@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TextField, MenuItem, Autocomplete } from '@mui/material';
+import { TextField, MenuItem, Autocomplete, Checkbox, ListItemText, Chip, Box } from '@mui/material';
 import { UserPlus, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Config from '../../config/baseUrl';
@@ -9,6 +9,7 @@ import EmployeeService from '../../services/EmployeeService';
 import '../job-creation/JobCreationForm.css';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+
 
 const mapApiErrors = (apiErrors = {}) => {
   const mapped = { ...apiErrors };
@@ -32,12 +33,14 @@ const EmployeeRegistrationForm = () => {
   const [gender, setGender] = useState('');
   const [mobile, setMobile] = useState('');
   const [district, setDistrict] = useState(null);
-  const [designation, setDesignation] = useState(null);
+  const [designation, setDesignation] = useState([]);
   const [grade, setGrade] = useState(null);
+  const [selectedRoles, setSelectedRoles] = useState([]);
 
   const [districtOptions, setDistrictOptions] = useState([]);
   const [designationOptions, setDesignationOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
+  const [roleOptions, setRoleOptions] = useState([]);
 
   useEffect(() => {
     const authHeaders = {
@@ -65,14 +68,35 @@ const EmployeeRegistrationForm = () => {
 
     const fetchDesignations = async () => {
       try {
-        const response = await fetch(`${Config.apiUrl}/settings/designations?per_page=100`, { headers: authHeaders });
-        const result = await response.json();
-        if (result.success) {
+        const [desigRes, wingsRes] = await Promise.all([
+          fetch(`${Config.apiUrl}/settings/designations?per_page=100`, { headers: authHeaders }),
+          fetch(`${Config.apiUrl}/settings/wings?per_page=200`, { headers: authHeaders }),
+        ]);
+        const desigResult = await desigRes.json();
+        const wingsResult = await wingsRes.json();
+
+        const wingsList = wingsResult.success
+          ? (wingsResult.data?.data ?? wingsResult.data ?? [])
+          : [];
+
+        if (desigResult.success) {
           setDesignationOptions(
-            (result.data?.data ?? result.data ?? []).map((d) => ({
-              id: d.hash_id,
-              name: d.name,
-            }))
+            (desigResult.data?.data ?? desigResult.data ?? [])
+              .filter((d) => !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
+              .map((d) => {
+                let wingName = '';
+                if (d.wings) {
+                  const wing = wingsList.find((w) => w.hash_id === d.wings || String(w.id) === String(d.wings));
+                  wingName = wing?.name || '';
+                }
+                return {
+                  id: d.hash_id,
+                  name: d.name,
+                  wingName,
+                  gradeName: d.grade?.name || '',
+                  gradeId: d.grade?.hash_id || d.grade_id || '',
+                };
+              })
           );
         }
       } catch (error) {
@@ -97,9 +121,29 @@ const EmployeeRegistrationForm = () => {
       }
     };
 
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch(`${Config.apiUrl}/settings/roles`, { headers: authHeaders });
+        const result = await response.json();
+        if (result.success) {
+          setRoleOptions(
+            (result.data?.data ?? result.data ?? [])
+              .filter((r) => !r.deleted_at)
+              .map((r) => ({
+                id: r.hash_id,
+                name: r.role_name,
+              }))
+          );
+        }
+      } catch {
+        setRoleOptions([]);
+      }
+    };
+
     fetchDistricts();
     fetchDesignations();
     fetchGrades();
+    fetchRoles();
   }, []);
 
   const fieldSx = {
@@ -127,8 +171,12 @@ const EmployeeRegistrationForm = () => {
     if (!mobile.trim()) errors.mobile = ['Mobile number is required'];
     else if (mobile.length !== 11) errors.mobile = ['Mobile number must be exactly 11 digits'];
     if (!district) errors.domicile_district = ['Domicile district is required'];
-    if (!designation) errors.designation = ['Designation is required'];
-    if (!grade) errors.grade = ['Grade is required'];
+    if (!designation || designation.length === 0) errors.designation = ['Designation is required'];
+    const derivedGrades = [...new Set(
+      designation.map((id) => designationOptions.find((d) => d.id === id)?.gradeName).filter(Boolean)
+    )];
+    if (derivedGrades.length === 0) errors.grade = ['Select a designation with a valid grade'];
+    if (!selectedRoles || selectedRoles.length === 0) errors.role = ['Role is required'];
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -150,9 +198,14 @@ const EmployeeRegistrationForm = () => {
         date_of_birth: dob,
         domicile: district.name,
         mobile: mobile.trim(),
-        designation: designation.name,
-        grade: grade.name,
-        role: 'employee',
+        designation: designation.map((id) => {
+          const opt = designationOptions.find((d) => d.id === id);
+          return opt ? opt.name : id;
+        }).join(', '),
+        grade: [...new Set(
+          designation.map((id) => designationOptions.find((d) => d.id === id)?.gradeName).filter(Boolean)
+        )].join(', '),
+        role: selectedRoles.join(', '),
         status: 'inactive',
         status_job: 'active',
       });
@@ -268,8 +321,12 @@ const EmployeeRegistrationForm = () => {
                     onChange={(e) => setPasswordConfirmation(e.target.value)}
                     required
                     sx={fieldSx}
-                    error={!!fieldErrors?.password_confirmation}
-                    helperText={fieldErrors?.password_confirmation?.join(', ')}
+                    error={!!(passwordConfirmation && password && passwordConfirmation !== password) || !!fieldErrors?.password_confirmation}
+                    helperText={
+                      passwordConfirmation && password && passwordConfirmation !== password
+                        ? 'Passwords do not match'
+                        : fieldErrors?.password_confirmation?.join(', ') || ''
+                    }
                   />
                 </div>
               </div>
@@ -348,44 +405,157 @@ const EmployeeRegistrationForm = () => {
 
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <Autocomplete
-                    options={designationOptions}
-                    getOptionLabel={(option) => option.name || ''}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                  <TextField
+                    fullWidth
+                    required
+                    select
+                    label="Designation"
                     value={designation}
-                    onChange={(_, newValue) => setDesignation(newValue)}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Designation"
-                        required
-                        sx={fieldSx}
-                        error={!!fieldErrors?.designation}
-                        helperText={fieldErrors?.designation?.join(', ')}
+                    error={!!fieldErrors?.designation}
+                    helperText={fieldErrors?.designation?.join(', ')}
+                    SelectProps={{
+                      multiple: true,
+                      onChange: () => {},
+                      renderValue: (selected) => {
+                        if (!selected || selected.length === 0) return '';
+                        return (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                            {selected.map((id) => {
+                              const opt = designationOptions.find((d) => d.id === id);
+                              const label = opt ? (opt.wingName ? `${opt.name} — ${opt.wingName}` : opt.name) : id;
+                              return <Chip key={id} label={label} size="small" />;
+                            })}
+                          </Box>
+                        );
+                      },
+                      MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+                    }}
+                    sx={{
+                      ...fieldSx,
+                      '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' },
+                    }}
+                  >
+                    {/* Select All */}
+                    <MenuItem dense onClick={(e) => {
+                      e.preventDefault();
+                      const allIds = designationOptions.map((d) => d.id);
+                      const allSelected = allIds.length > 0 && allIds.every((id) => designation.includes(id));
+                      setDesignation(allSelected ? [] : allIds);
+                    }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <Checkbox size="small"
+                        checked={designationOptions.length > 0 && designationOptions.every((d) => designation.includes(d.id))}
+                        indeterminate={designationOptions.some((d) => designation.includes(d.id)) && !designationOptions.every((d) => designation.includes(d.id))}
+                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
                       />
-                    )}
-                  />
+                      <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+                    </MenuItem>
+
+                    {designationOptions.map((d) => (
+                      <MenuItem key={d.id} dense onClick={(e) => {
+                        e.preventDefault();
+                        setDesignation((prev) =>
+                          prev.includes(d.id) ? prev.filter((id) => id !== d.id) : [...prev, d.id]
+                        );
+                      }}>
+                        <Checkbox
+                          size="small"
+                          checked={designation.includes(d.id)}
+                          sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                        />
+                        <ListItemText
+                          primary={d.wingName ? `${d.name} — ${d.wingName}` : d.name}
+                          primaryTypographyProps={{ fontSize: 13 }}
+                        />
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 </div>
                 <div className="col-md-6 form-group">
-                  <Autocomplete
-                    options={gradeOptions}
-                    getOptionLabel={(option) => option.name || ''}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    value={grade}
-                    onChange={(_, newValue) => setGrade(newValue)}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Grade"
-                        required
-                        sx={fieldSx}
-                        error={!!fieldErrors?.grade}
-                        helperText={fieldErrors?.grade?.join(', ')}
-                      />
-                    )}
+                  <TextField
+                    fullWidth
+                    label="Grade"
+                    required
+                    value={(() => {
+                      const grades = designation
+                        .map((id) => designationOptions.find((d) => d.id === id)?.gradeName)
+                        .filter(Boolean);
+                      return [...new Set(grades)].join(', ');
+                    })()}
+                    InputProps={{ readOnly: true }}
+                    sx={{
+                      ...fieldSx,
+                      '& .MuiOutlinedInput-root': { backgroundColor: '#f8fafc' },
+                    }}
+                    helperText={designation.length === 0 ? 'Select a designation to auto-fill grade' : ''}
                   />
                 </div>
               </div>
+
+              {/* Role */}
+              {roleOptions.length > 0 && (
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField
+                    fullWidth
+                    required
+                    select
+                    label="Role"
+                    value={selectedRoles}
+                    error={!!fieldErrors?.role}
+                    helperText={fieldErrors?.role?.join(', ')}
+                    SelectProps={{
+                      multiple: true,
+                      onChange: () => {},
+                      renderValue: (selected) => {
+                        if (!selected || selected.length === 0) return '';
+                        return (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                            {selected.map((v) => <Chip key={v} label={v} size="small" />)}
+                          </Box>
+                        );
+                      },
+                      MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+                    }}
+                    sx={{
+                      ...fieldSx,
+                      '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' },
+                    }}
+                  >
+                    {/* Select All */}
+                    <MenuItem dense onClick={(e) => {
+                      e.preventDefault();
+                      const allNames = roleOptions.map((r) => r.name);
+                      const allSelected = allNames.length > 0 && allNames.every((n) => selectedRoles.includes(n));
+                      setSelectedRoles(allSelected ? [] : allNames);
+                    }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <Checkbox size="small"
+                        checked={roleOptions.length > 0 && roleOptions.every((r) => selectedRoles.includes(r.name))}
+                        indeterminate={roleOptions.some((r) => selectedRoles.includes(r.name)) && !roleOptions.every((r) => selectedRoles.includes(r.name))}
+                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+                      />
+                      <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+                    </MenuItem>
+
+                    {roleOptions.map((r) => (
+                      <MenuItem key={r.id} dense onClick={(e) => {
+                        e.preventDefault();
+                        setSelectedRoles((prev) =>
+                          prev.includes(r.name) ? prev.filter((n) => n !== r.name) : [...prev, r.name]
+                        );
+                      }}>
+                        <Checkbox
+                          size="small"
+                          checked={selectedRoles.includes(r.name)}
+                          sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                        />
+                        <ListItemText primary={r.name} primaryTypographyProps={{ fontSize: 13 }} />
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </div>
+              </div>
+              )}
+
             </div>
 
             <div className="navigation-buttons">
