@@ -58,6 +58,7 @@ import CertificatesManagement from 'pages/settings/Certificates/CertificatesMana
 import DigitalSignatureManagement from 'pages/settings/DigitalSignature/DigitalSignatureManagement';
 import SystemSettings from 'pages/settings/SystemSettings/SystemSettings';
 import WingsManagement from 'pages/settings/Wings/WingsManagement';
+import RolesManagement from 'pages/settings/Roles/RolesManagement';
 import ApplicationsList from 'pages/applications/ApplicationsList';
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
@@ -195,6 +196,7 @@ function App() {
           <Route path="settings/digital-signatures" element={<DigitalSignatureManagement />} />
           <Route path="settings/system-settings" element={<SystemSettings />} />
           <Route path="settings/wings" element={<WingsManagement />} />
+          <Route path="settings/roles" element={<RolesManagement />} />
 
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />

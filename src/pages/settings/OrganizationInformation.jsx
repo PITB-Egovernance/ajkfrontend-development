@@ -23,8 +23,9 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
-
-const API_BASE = Config.apiUrl;
+  const API_BASE = Config.apiUrl;
+  const TOKEN    = AuthService.getToken();
+  const API_KEY  = Config.apiKey;
 
 const getHeaders = (json = true) => {
   const h = {
