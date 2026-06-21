@@ -20,6 +20,7 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import EmployeeDetailsModal from 'components/employees/EmployeeDetailsModal';
 import EmployeeService from 'services/EmployeeService';
 import { GRID_SX } from 'utils/gridStyles';
+import confirmStatus from 'components/ui/confirmStatus';
 
 const BASE_FILTER_CONFIG = [
   { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by full name' },
@@ -198,6 +199,7 @@ const EmployeeList = () => {
 
   const handleToggleStatus = async (employee) => {
     const newStatus = employee.status === 'active' ? 'inactive' : 'active';
+    if (!await confirmStatus({ newStatus })) return;
     try {
       await EmployeeService.updateUser(employee.hash_id, { status: newStatus });
       setEmployees((prev) =>
