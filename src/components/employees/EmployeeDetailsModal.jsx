@@ -135,7 +135,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
       );
       setDesignationOptions(
         (desData.data?.data ?? desData.data ?? [])
-          .filter((d) => !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
+          .filter((d) => d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
           .map((d) => ({ id: d.hash_id, name: d.name }))
       );
       setGradeOptions(
