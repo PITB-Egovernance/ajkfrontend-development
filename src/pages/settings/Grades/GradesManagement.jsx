@@ -141,7 +141,7 @@ const GradesManagement = () => {
         const dataArray = result.data?.data || result.data || [];
 
         const formatted = dataArray.map((item) => ({
-          id: item.hash_id,
+          id: item.id,
           hash_id: item.hash_id,
           name: item.name,
           status: item.status ?? "active",
