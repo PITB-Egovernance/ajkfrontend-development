@@ -117,22 +117,18 @@ const WingsManagement = () => {
     }
   };
 
+  // The backend validates `parent_id` against the WINGS table, so the parent
+  // must be the Secretary *wing* hash_id (not the Secretary designation).
   const fetchSecretaryId = async () => {
     try {
-      const res    = await fetch(`${API_BASE}/settings/designations?per_page=100`, { headers: headers(false) });
+      const res    = await fetch(`${API_BASE}/settings/wings?per_page=200`, { headers: headers(false) });
       const result = await res.json();
-      console.log("Secretary fetch result:", result);
       const raw    = result.data?.data ?? result.data ?? result ?? [];
       const data   = Array.isArray(raw) ? raw : [];
-      const secretary = data.find((d) => d.name?.toLowerCase().includes('secretary'));
-      if (secretary) {
-        const id = secretary.id !== undefined && secretary.id !== null
-          ? Number(secretary.id)
-          : secretary.hash_id;
-        setSecretaryId(id);
-      }
+      const secretary = data.find((w) => w.name?.toLowerCase().includes('secretary'));
+      if (secretary?.hash_id) setSecretaryId(secretary.hash_id);
     } catch {
-      // silent
+      // silent — wing is created top-level if no Secretary parent is found
     }
   };
 
