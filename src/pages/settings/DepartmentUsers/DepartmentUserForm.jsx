@@ -1,0 +1,307 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { TextField, MenuItem, Autocomplete, Checkbox, ListItemText, Chip, Box } from '@mui/material';
+import { Building2, Save } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
+import DepartmentUserService from 'services/DepartmentUserService';
+import 'pages/job-creation/JobCreationForm.css';
+
+const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+
+const mapApiErrors = (apiErrors = {}) => {
+  const mapped = { ...apiErrors };
+  if (mapped.date_of_birth) mapped.dob = mapped.date_of_birth;
+  if (mapped.domicile) mapped.domicile_district = mapped.domicile;
+  return mapped;
+};
+
+const DepartmentUserForm = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const [username, setUsername] = useState('');
+  const [cnic, setCnic] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fatherHusbandName, setFatherHusbandName] = useState('');
+  const [dob, setDob] = useState('');
+  const [gender, setGender] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [district, setDistrict] = useState(null);
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const [selectedRoles, setSelectedRoles] = useState([]);
+
+  const [districtOptions, setDistrictOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [roleOptions, setRoleOptions] = useState([]);
+
+  useEffect(() => {
+    const authHeaders = {
+      Authorization: `Bearer ${AuthService.getToken()}`,
+      Accept: 'application/json',
+      'X-API-KEY': Config.apiKey,
+    };
+
+    const fetchOptions = async () => {
+      try {
+        const [dRes, depRes, rRes] = await Promise.all([
+          fetch(`${Config.apiUrl}/settings/districts`, { headers: authHeaders }),
+          fetch(`${Config.apiUrl}/settings/departments?per_page=200`, { headers: authHeaders }),
+          fetch(`${Config.apiUrl}/settings/roles`, { headers: authHeaders }),
+        ]);
+        const [dData, depData, rData] = await Promise.all([
+          dRes.json(), depRes.json(), rRes.json(),
+        ]);
+
+        if (dData.success) {
+          setDistrictOptions(
+            (dData.data?.data ?? dData.data ?? []).map((d) => ({ id: d.hash_id, name: d.name }))
+          );
+        }
+        if (depData.success || depData.status === 200) {
+          const list = depData.data?.data ?? depData.data ?? [];
+          setDepartmentOptions(
+            list.filter((d) => (d.status ?? 'active') === 'active')
+              .map((d) => ({ id: d.hash_id || d.id, name: d.department_name || d.name }))
+          );
+        }
+        if (rData.success) {
+          setRoleOptions(
+            (rData.data?.data ?? rData.data ?? [])
+              .filter((r) => !r.deleted_at)
+              .map((r) => ({ id: r.hash_id, name: r.role_name }))
+          );
+        }
+      } catch {
+        toast.error('Failed to load form options');
+      }
+    };
+    fetchOptions();
+  }, []);
+
+  const fieldSx = {
+    '& .MuiOutlinedInput-root': { minHeight: 56 },
+    '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 56 },
+    '& .MuiOutlinedInput-input': { padding: '14px' },
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setFieldErrors({});
+
+    const errors = {};
+    if (!username.trim()) errors.username = ['Username is required'];
+    if (!cnic.trim()) errors.cnic = ['CNIC is required'];
+    else if (cnic.length !== 13) errors.cnic = ['CNIC must be exactly 13 digits'];
+    if (!email.trim()) errors.email = ['Email address is required'];
+    if (!password) errors.password = ['Password is required'];
+    else if (password.length < 8) errors.password = ['Password must be at least 8 characters'];
+    if (!fatherHusbandName.trim()) errors.father_husband_name = ['Father/Husband name is required'];
+    if (!dob) errors.dob = ['Date of birth is required'];
+    if (!gender) errors.gender = ['Gender is required'];
+    if (!mobile.trim()) errors.mobile = ['Mobile number is required'];
+    else if (mobile.length !== 11) errors.mobile = ['Mobile number must be exactly 11 digits'];
+    if (!district) errors.domicile_district = ['Domicile district is required'];
+    if (!selectedDepartment) errors.department = ['Department is required'];
+    if (!selectedRoles || selectedRoles.length === 0) errors.role = ['Role is required'];
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setLoading(true);
+    const loadingToast = toast.loading('Creating department user...');
+    try {
+      const result = await DepartmentUserService.create({
+        username: username.trim(),
+        cnic: cnic.trim().replace(/[^0-9]/g, ''),
+        password,
+        father_husband_name: fatherHusbandName.trim(),
+        email: email.trim(),
+        gender: gender.toLowerCase(),
+        date_of_birth: dob,
+        domicile: district.name,
+        mobile: mobile.trim(),
+        department: selectedDepartment.name,
+        role_permission: selectedRoles,
+      });
+
+      toast.success(result?.message || 'Department user created successfully', { id: loadingToast });
+      navigate('/dashboard/settings/department-users');
+    } catch (error) {
+      if (error.errors && Object.keys(error.errors).length > 0) {
+        setFieldErrors(mapApiErrors(error.errors));
+      }
+      toast.error(error.message || 'Failed to create department user', { id: loadingToast });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="job-creation-container">
+      <div className="container">
+        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white py-4 px-6 rounded-t-xl text-center text-2xl font-bold shadow-lg mb-6">
+          <div className="flex items-center justify-center gap-3">
+            <Building2 className="w-8 h-8" />
+            <span>Create Department User</span>
+          </div>
+        </div>
+
+        <div className="form-container">
+          <form onSubmit={handleSubmit} className="card-body">
+            <div className="row" style={{ margin: 0 }}>
+              <div className="col-md-12">
+                <h6 className="section-title">Personal Information</h6>
+              </div>
+            </div>
+
+            <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Username" value={username}
+                    onChange={(e) => setUsername(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.username} helperText={fieldErrors?.username?.join(', ')} />
+                </div>
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="CNIC" placeholder="13 digits e.g. 3740512345671"
+                    value={cnic} onChange={(e) => setCnic(e.target.value.replace(/\D/g, '').slice(0, 13))}
+                    required inputProps={{ maxLength: 13, inputMode: 'numeric' }} sx={fieldSx}
+                    error={!!fieldErrors?.cnic} helperText={fieldErrors?.cnic?.join(', ') || `${cnic.length}/13 digits`} />
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Email Address" type="email" value={email}
+                    onChange={(e) => setEmail(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.email} helperText={fieldErrors?.email?.join(', ')} />
+                </div>
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Father/Husband Name" value={fatherHusbandName}
+                    onChange={(e) => setFatherHusbandName(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.father_husband_name} helperText={fieldErrors?.father_husband_name?.join(', ')} />
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Password" type="password" value={password}
+                    onChange={(e) => setPassword(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.password} helperText={fieldErrors?.password?.join(', ')} />
+                </div>
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Date of Birth" type="date" value={dob}
+                    onChange={(e) => setDob(e.target.value)} required
+                    InputLabelProps={{ shrink: true }} inputProps={{ style: { height: 28 } }}
+                    sx={fieldSx} error={!!fieldErrors?.dob} helperText={fieldErrors?.dob?.join(', ')} />
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField select fullWidth label="Gender" value={gender}
+                    onChange={(e) => setGender(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.gender} helperText={fieldErrors?.gender?.join(', ')}>
+                    <MenuItem value=""><em>— Select Gender —</em></MenuItem>
+                    {GENDER_OPTIONS.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+                  </TextField>
+                </div>
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Mobile Number" placeholder="11 digits e.g. 03001234567"
+                    value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    required inputProps={{ maxLength: 11, inputMode: 'numeric' }} sx={fieldSx}
+                    error={!!fieldErrors?.mobile} helperText={fieldErrors?.mobile?.join(', ') || `${mobile.length}/11 digits`} />
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <Autocomplete options={districtOptions} getOptionLabel={(o) => o.name || ''}
+                    isOptionEqualToValue={(o, v) => o.id === v.id} value={district}
+                    onChange={(_, v) => setDistrict(v)}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Domicile District" required sx={fieldSx}
+                        error={!!fieldErrors?.domicile_district} helperText={fieldErrors?.domicile_district?.join(', ')} />
+                    )} />
+                </div>
+                <div className="col-md-6 form-group">
+                  <Autocomplete options={departmentOptions} getOptionLabel={(o) => o.name || ''}
+                    isOptionEqualToValue={(o, v) => o.id === v.id} value={selectedDepartment}
+                    onChange={(_, v) => setSelectedDepartment(v)}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Department" required sx={fieldSx}
+                        error={!!fieldErrors?.department} helperText={fieldErrors?.department?.join(', ')} />
+                    )} />
+                </div>
+              </div>
+
+              {/* Role */}
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth required select label="Role" value={selectedRoles}
+                    error={!!fieldErrors?.role} helperText={fieldErrors?.role?.join(', ')}
+                    SelectProps={{
+                      multiple: true, onChange: () => {},
+                      renderValue: (selected) => {
+                        if (!selected || selected.length === 0) return '';
+                        return (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                            {selected.map((id) => {
+                              const opt = roleOptions.find((r) => r.id === id);
+                              return <Chip key={id} label={opt?.name || id} size="small" />;
+                            })}
+                          </Box>
+                        );
+                      },
+                      MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+                    }}
+                    sx={{ ...fieldSx, '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' } }}>
+                    <MenuItem dense onClick={(e) => {
+                      e.preventDefault();
+                      const allIds = roleOptions.map((r) => r.id);
+                      const allSelected = allIds.length > 0 && allIds.every((id) => selectedRoles.includes(id));
+                      setSelectedRoles(allSelected ? [] : allIds);
+                    }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <Checkbox size="small"
+                        checked={roleOptions.length > 0 && roleOptions.every((r) => selectedRoles.includes(r.id))}
+                        indeterminate={roleOptions.some((r) => selectedRoles.includes(r.id)) && !roleOptions.every((r) => selectedRoles.includes(r.id))}
+                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }} />
+                      <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+                    </MenuItem>
+                    {roleOptions.map((r) => (
+                      <MenuItem key={r.id} dense onClick={(e) => {
+                        e.preventDefault();
+                        setSelectedRoles((prev) => prev.includes(r.id) ? prev.filter((id) => id !== r.id) : [...prev, r.id]);
+                      }}>
+                        <Checkbox size="small" checked={selectedRoles.includes(r.id)}
+                          sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }} />
+                        <ListItemText primary={r.name} primaryTypographyProps={{ fontSize: 13 }} />
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </div>
+              </div>
+            </div>
+
+            <div className="navigation-buttons">
+              <button type="button" className="btn btn-prev"
+                onClick={() => navigate('/dashboard/settings/department-users')}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={loading}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                {loading ? 'Saving...' : <><Save size={16} /><span>Create Department User</span></>}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DepartmentUserForm;

@@ -26,6 +26,7 @@ const EmployeeRegistrationForm = () => {
   const [username, setUsername] = useState('');
   const [cnic, setCnic] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [fatherHusbandName, setFatherHusbandName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
@@ -159,6 +160,8 @@ const EmployeeRegistrationForm = () => {
     if (!cnic.trim()) errors.cnic = ['CNIC is required'];
     else if (cnic.length !== 13) errors.cnic = ['CNIC must be exactly 13 digits'];
     if (!email.trim()) errors.email = ['Email address is required'];
+    if (!password) errors.password = ['Password is required'];
+    else if (password.length < 8) errors.password = ['Password must be at least 8 characters'];
     if (!fatherHusbandName.trim()) errors.father_husband_name = ['Father/Husband name is required'];
     if (!dob) errors.dob = ['Date of birth is required'];
     if (!gender) errors.gender = ['Gender is required'];
@@ -184,6 +187,7 @@ const EmployeeRegistrationForm = () => {
       const result = await EmployeeService.register({
         username: username.trim(),
         cnic: cnic.trim().replace(/[^0-9]/g, ''),
+        password,
         father_husband_name: fatherHusbandName.trim(),
         email: email.trim(),
         gender: gender.toLowerCase(),
@@ -193,13 +197,11 @@ const EmployeeRegistrationForm = () => {
         designation: designation.map((id) => {
           const opt = designationOptions.find((d) => d.id === id);
           return opt ? opt.name : id;
-        }).join(', '),
+        }),
         grade: [...new Set(
           designation.map((id) => designationOptions.find((d) => d.id === id)?.gradeName).filter(Boolean)
         )].join(', '),
-        role: selectedRoles.join(', '),
-        status: 'inactive',
-        status_job: 'active',
+        role_permission: selectedRoles,
       });
 
       toast.success(result?.message || 'Employee registered successfully', { id: loadingToast });
@@ -291,6 +293,19 @@ const EmployeeRegistrationForm = () => {
               </div>
 
               <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField
+                    fullWidth
+                    label="Password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    sx={fieldSx}
+                    error={!!fieldErrors?.password}
+                    helperText={fieldErrors?.password?.join(', ')}
+                  />
+                </div>
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
@@ -468,7 +483,10 @@ const EmployeeRegistrationForm = () => {
                         if (!selected || selected.length === 0) return '';
                         return (
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
-                            {selected.map((v) => <Chip key={v} label={v} size="small" />)}
+                            {selected.map((id) => {
+                              const opt = roleOptions.find((r) => r.id === id);
+                              return <Chip key={id} label={opt?.name || id} size="small" />;
+                            })}
                           </Box>
                         );
                       },
@@ -482,13 +500,13 @@ const EmployeeRegistrationForm = () => {
                     {/* Select All */}
                     <MenuItem dense onClick={(e) => {
                       e.preventDefault();
-                      const allNames = roleOptions.map((r) => r.name);
-                      const allSelected = allNames.length > 0 && allNames.every((n) => selectedRoles.includes(n));
-                      setSelectedRoles(allSelected ? [] : allNames);
+                      const allIds = roleOptions.map((r) => r.id);
+                      const allSelected = allIds.length > 0 && allIds.every((id) => selectedRoles.includes(id));
+                      setSelectedRoles(allSelected ? [] : allIds);
                     }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                       <Checkbox size="small"
-                        checked={roleOptions.length > 0 && roleOptions.every((r) => selectedRoles.includes(r.name))}
-                        indeterminate={roleOptions.some((r) => selectedRoles.includes(r.name)) && !roleOptions.every((r) => selectedRoles.includes(r.name))}
+                        checked={roleOptions.length > 0 && roleOptions.every((r) => selectedRoles.includes(r.id))}
+                        indeterminate={roleOptions.some((r) => selectedRoles.includes(r.id)) && !roleOptions.every((r) => selectedRoles.includes(r.id))}
                         sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
                       />
                       <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
@@ -498,12 +516,12 @@ const EmployeeRegistrationForm = () => {
                       <MenuItem key={r.id} dense onClick={(e) => {
                         e.preventDefault();
                         setSelectedRoles((prev) =>
-                          prev.includes(r.name) ? prev.filter((n) => n !== r.name) : [...prev, r.name]
+                          prev.includes(r.id) ? prev.filter((id) => id !== r.id) : [...prev, r.id]
                         );
                       }}>
                         <Checkbox
                           size="small"
-                          checked={selectedRoles.includes(r.name)}
+                          checked={selectedRoles.includes(r.id)}
                           sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
                         />
                         <ListItemText primary={r.name} primaryTypographyProps={{ fontSize: 13 }} />

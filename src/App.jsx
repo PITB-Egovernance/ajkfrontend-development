@@ -59,6 +59,8 @@ import DigitalSignatureManagement from 'pages/settings/DigitalSignature/DigitalS
 import SystemSettings from 'pages/settings/SystemSettings/SystemSettings';
 import WingsManagement from 'pages/settings/Wings/WingsManagement';
 import RolesManagement from 'pages/settings/Roles/RolesManagement';
+import DepartmentUserList from 'pages/settings/DepartmentUsers/DepartmentUserList';
+import DepartmentUserForm from 'pages/settings/DepartmentUsers/DepartmentUserForm';
 import ApplicationsList from 'pages/applications/ApplicationsList';
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
@@ -197,6 +199,8 @@ function App() {
           <Route path="settings/system-settings" element={<SystemSettings />} />
           <Route path="settings/wings" element={<WingsManagement />} />
           <Route path="settings/roles" element={<RolesManagement />} />
+          <Route path="settings/department-users" element={<DepartmentUserList />} />
+          <Route path="settings/department-users/create" element={<DepartmentUserForm />} />
 
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />

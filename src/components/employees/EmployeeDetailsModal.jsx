@@ -175,9 +175,23 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
       );
       setSelectedGrade(found || null);
     }
-    if (form.role && roleOptions.length) {
-      const userRoles = form.role.split(',').map((r) => r.trim()).filter(Boolean);
-      setSelectedRoles(userRoles);
+    if (roleOptions.length) {
+      const roleData = form.role_permission || form.role;
+      if (Array.isArray(roleData)) {
+        const ids = roleData.map((r) => {
+          if (typeof r === 'object') return r.hash_id || r.id;
+          const found = roleOptions.find((opt) => opt.id === r || opt.name.toLowerCase() === String(r).toLowerCase());
+          return found?.id || r;
+        });
+        setSelectedRoles(ids);
+      } else if (roleData) {
+        const names = roleData.split(',').map((r) => r.trim()).filter(Boolean);
+        const ids = names.map((n) => {
+          const found = roleOptions.find((opt) => opt.name.toLowerCase() === n.toLowerCase());
+          return found?.id || n;
+        });
+        setSelectedRoles(ids);
+      }
     }
   }, [editing, districtOptions, designationOptions, gradeOptions, roleOptions]); // eslint-disable-line
 
@@ -191,30 +205,12 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
   };
 
   const handleSave = async () => {
-    // Resolved values (dropdowns may override raw form text)
     const resolvedGrade       = selectedGrade?.name       || form.scale       || '';
     const resolvedDesignation = selectedDesignation?.name || form.designation || '';
     const resolvedDomicile    = selectedDistrict?.name    || form.domicile    || '';
-    const resolvedRole        = selectedRoles.length > 0  ? selectedRoles.join(', ') : (form.role || '');
     const resolvedGender      = form.gender ? form.gender.toLowerCase() : '';
 
-    // Snapshot of original values using the same resolved keys
-    const original = {
-      username:            user?.full_name            || '',
-      full_name:           user?.full_name            || '',
-      email:               user?.email                || '',
-      mobile:              user?.mobile               || '',
-      father_husband_name: user?.father_husband_name  || '',
-      date_of_birth:       user?.date_of_birth        || '',
-      gender:              (user?.gender || '').toLowerCase(),
-      domicile:            user?.domicile             || '',
-      designation:         user?.designation          || '',
-      grade:               user?.scale                || '',
-      role:                user?.role                 || '',
-      status:              user?.status               || '',
-    };
-
-    const next = {
+    const payload = {
       username:            form.full_name,
       full_name:           form.full_name,
       email:               form.email,
@@ -223,23 +219,11 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
       date_of_birth:       form.date_of_birth,
       gender:              resolvedGender,
       domicile:            resolvedDomicile,
-      designation:         resolvedDesignation,
+      designation:         resolvedDesignation ? [resolvedDesignation] : [],
       grade:               resolvedGrade,
-      role:                resolvedRole,
+      role_permission:     selectedRoles,
       status:              form.status,
     };
-
-    // Only include keys whose value actually changed
-    const payload = {};
-    Object.keys(next).forEach((k) => {
-      if (String(next[k]).trim() !== String(original[k]).trim()) payload[k] = next[k];
-    });
-
-    if (Object.keys(payload).length === 0) {
-      toast('No changes detected.', { icon: 'ℹ️' });
-      setEditing(false);
-      return;
-    }
 
     setSaving(true);
     try {
@@ -461,7 +445,10 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
                       if (!selected || selected.length === 0) return '';
                       return (
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
-                          {selected.map((v) => <Chip key={v} label={v} size="small" />)}
+                          {selected.map((id) => {
+                            const opt = roleOptions.find((r) => r.id === id);
+                            return <Chip key={id} label={opt?.name || id} size="small" />;
+                          })}
                         </Box>
                       );
                     },
@@ -474,13 +461,13 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
                 >
                   <MenuItem dense onClick={(e) => {
                     e.preventDefault();
-                    const allNames = roleOptions.map((r) => r.name);
-                    const allSelected = allNames.length > 0 && allNames.every((n) => selectedRoles.includes(n));
-                    setSelectedRoles(allSelected ? [] : allNames);
+                    const allIds = roleOptions.map((r) => r.id);
+                    const allSelected = allIds.length > 0 && allIds.every((id) => selectedRoles.includes(id));
+                    setSelectedRoles(allSelected ? [] : allIds);
                   }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                     <Checkbox size="small"
-                      checked={roleOptions.length > 0 && roleOptions.every((r) => selectedRoles.includes(r.name))}
-                      indeterminate={roleOptions.some((r) => selectedRoles.includes(r.name)) && !roleOptions.every((r) => selectedRoles.includes(r.name))}
+                      checked={roleOptions.length > 0 && roleOptions.every((r) => selectedRoles.includes(r.id))}
+                      indeterminate={roleOptions.some((r) => selectedRoles.includes(r.id)) && !roleOptions.every((r) => selectedRoles.includes(r.id))}
                       sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
                     />
                     <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
@@ -490,12 +477,12 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
                     <MenuItem key={r.id} dense onClick={(e) => {
                       e.preventDefault();
                       setSelectedRoles((prev) =>
-                        prev.includes(r.name) ? prev.filter((n) => n !== r.name) : [...prev, r.name]
+                        prev.includes(r.id) ? prev.filter((id) => id !== r.id) : [...prev, r.id]
                       );
                     }}>
                       <Checkbox
                         size="small"
-                        checked={selectedRoles.includes(r.name)}
+                        checked={selectedRoles.includes(r.id)}
                         sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
                       />
                       <ListItemText primary={r.name} primaryTypographyProps={{ fontSize: 13 }} />

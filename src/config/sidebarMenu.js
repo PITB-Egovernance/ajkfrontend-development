@@ -78,6 +78,7 @@ export const MENU_ITEMS = [
       { label: "Wings / Sections",        path: "/dashboard/settings/wings",        icon: LayoutList },
       { label: "Requisition Approval Flow", path: "/dashboard/settings/approval-flow", icon: CheckCircle },
       { label: "Roles & Permissions", path: "/dashboard/settings/roles",              icon: ShieldCheck },
+      { label: "Department Users",   path: "/dashboard/settings/department-users",  icon: Building2 },
     ],
   },
 ];

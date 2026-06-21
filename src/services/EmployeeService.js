@@ -93,7 +93,7 @@ class EmployeeService {
   // ──────────────────────────────────────────────────────
   static async updateUser(id, data) {
     const response = await fetch(`${API_BASE}/employee/update/${id}`, {
-      method: 'PUT',
+      method: 'POST',
       headers: getHeaders(true),
       body: JSON.stringify(data),
     });

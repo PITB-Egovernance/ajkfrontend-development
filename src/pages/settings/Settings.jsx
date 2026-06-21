@@ -134,6 +134,13 @@ const Settings = () => {
       description: 'Manage roles and module access permissions',
       iconBg: 'bg-violet-700',
       link: '/dashboard/settings/roles'
+    },
+    {
+      icon: Building2,
+      title: 'Department Users',
+      description: 'Manage department login accounts and permissions',
+      iconBg: 'bg-cyan-700',
+      link: '/dashboard/settings/department-users'
     }
   ];
 
