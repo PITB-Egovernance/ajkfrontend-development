@@ -53,7 +53,7 @@ class EmployeeService {
   // ──────────────────────────────────────────────────────
   static async getUsers(params = {}) {
     const query = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE}/settings/employee/list${query ? `?${query}` : ''}`, {
+    const response = await fetch(`${API_BASE}/employee/list${query ? `?${query}` : ''}`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -93,7 +93,7 @@ class EmployeeService {
   // ──────────────────────────────────────────────────────
   static async updateUser(id, data) {
     const response = await fetch(`${API_BASE}/employee/update/${id}`, {
-      method: 'POST',
+      method: 'PUT',
       headers: getHeaders(true),
       body: JSON.stringify(data),
     });
