@@ -218,6 +218,19 @@ const RequisitionApprovalFlow = () => {
     // eslint-disable-next-line
   }, []);
 
+  const usedDesignationNames = useMemo(() => {
+    const map = {};
+    Object.entries(designationMap).forEach(([wingId, desigHashId]) => {
+      const desig = allDesignations.find((d) => d.hash_id === desigHashId);
+      if (desig) {
+        const key = desig.name.toLowerCase();
+        if (!map[key]) map[key] = [];
+        map[key].push(wingId);
+      }
+    });
+    return map;
+  }, [designationMap, allDesignations]);
+
   const assignedCount = Object.keys(designationMap).length;
 
   const completeCount = useMemo(() => {
@@ -517,6 +530,10 @@ const RequisitionApprovalFlow = () => {
                           ) : (
                             wingDesignations.map((desig, desigIdx) => {
                               const isAssigned = designationMap[wing.id] === desig.hash_id;
+                              const nameKey = desig.name.toLowerCase();
+                              const usedInWings = usedDesignationNames[nameKey] || [];
+                              const isUsedElsewhere = usedInWings.length > 0 && !usedInWings.includes(wing.id);
+                              const isDisabled = isUsedElsewhere && !isAssigned;
                               const isLastDesig = desigIdx === wingDesignations.length - 1;
                               const employees = employeesMap[desig.hash_id] || [];
                               const hasEmps = isAssigned && employees.length > 0;
@@ -524,7 +541,7 @@ const RequisitionApprovalFlow = () => {
 
                               return (
                                 <React.Fragment key={desig.hash_id}>
-                                  <div className={`flex items-center gap-0 border-b border-slate-50 transition-colors duration-100 ${isAssigned ? 'bg-emerald-50/40' : 'hover:bg-slate-50'}`}>
+                                  <div className={`flex items-center gap-0 border-b border-slate-50 transition-colors duration-100 ${isAssigned ? 'bg-emerald-50/40' : isDisabled ? 'bg-slate-50/50' : 'hover:bg-slate-50'}`}>
                                     <div className="w-8 flex-shrink-0 flex justify-center relative h-9">
                                       {!isLastWing && <div className="absolute top-0 left-1/2 w-px bg-slate-300 h-full" />}
                                     </div>
@@ -537,13 +554,19 @@ const RequisitionApprovalFlow = () => {
                                         {isAssigned ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                                       </span>
                                     ) : <span className="w-4 flex-shrink-0" />}
-                                    <Checkbox checked={isAssigned} onChange={() => selectDesignation(wing.id, desig.hash_id)}
+                                    <Checkbox checked={isAssigned} onChange={() => !isDisabled && selectDesignation(wing.id, desig.hash_id)}
+                                      disabled={isDisabled}
                                       size="small"
-                                      sx={{ p: '4px', color: '#94a3b8', '&.Mui-checked': { color: '#064e3b' } }} />
-                                    <span className={`text-base py-2 flex-1 cursor-pointer ${isAssigned ? 'font-semibold text-emerald-800' : 'text-slate-600 hover:text-slate-800'}`}
-                                      onClick={() => selectDesignation(wing.id, desig.hash_id)}>
+                                      sx={{ p: '4px', color: isDisabled ? '#cbd5e1' : '#94a3b8', '&.Mui-checked': { color: '#064e3b' }, '&.Mui-disabled': { color: '#e2e8f0' } }} />
+                                    <span className={`text-base py-2 flex-1 ${isAssigned ? 'font-semibold text-emerald-800 cursor-pointer' : isDisabled ? 'text-slate-400 cursor-not-allowed' : 'text-slate-600 hover:text-slate-800 cursor-pointer'}`}
+                                      onClick={() => !isDisabled && selectDesignation(wing.id, desig.hash_id)}>
                                       {desig.name}
                                     </span>
+                                    {isUsedElsewhere && (
+                                      <span className="mr-3 text-xs text-amber-500 flex items-center gap-1">
+                                        <AlertCircle size={11} /> Assigned
+                                      </span>
+                                    )}
                                   </div>
 
                                   {hasEmps && employees.map((emp, empIdx) => {
