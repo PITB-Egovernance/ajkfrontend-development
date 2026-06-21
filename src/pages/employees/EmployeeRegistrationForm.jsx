@@ -26,8 +26,6 @@ const EmployeeRegistrationForm = () => {
   const [username, setUsername] = useState('');
   const [cnic, setCnic] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [fatherHusbandName, setFatherHusbandName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
@@ -161,10 +159,6 @@ const EmployeeRegistrationForm = () => {
     if (!cnic.trim()) errors.cnic = ['CNIC is required'];
     else if (cnic.length !== 13) errors.cnic = ['CNIC must be exactly 13 digits'];
     if (!email.trim()) errors.email = ['Email address is required'];
-    if (!password) errors.password = ['Password is required'];
-    else if (password.length < 8) errors.password = ['Password must be at least 8 characters'];
-    if (!passwordConfirmation) errors.password_confirmation = ['Please confirm the password'];
-    else if (password && passwordConfirmation !== password) errors.password_confirmation = ['Passwords do not match'];
     if (!fatherHusbandName.trim()) errors.father_husband_name = ['Father/Husband name is required'];
     if (!dob) errors.dob = ['Date of birth is required'];
     if (!gender) errors.gender = ['Gender is required'];
@@ -190,8 +184,6 @@ const EmployeeRegistrationForm = () => {
       const result = await EmployeeService.register({
         username: username.trim(),
         cnic: cnic.trim().replace(/[^0-9]/g, ''),
-        password,
-        password_confirmation: passwordConfirmation,
         father_husband_name: fatherHusbandName.trim(),
         email: email.trim(),
         gender: gender.toLowerCase(),
@@ -294,39 +286,6 @@ const EmployeeRegistrationForm = () => {
                     sx={fieldSx}
                     error={!!fieldErrors?.father_husband_name}
                     helperText={fieldErrors?.father_husband_name?.join(', ')}
-                  />
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-6 form-group">
-                  <TextField
-                    fullWidth
-                    label="Password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    sx={fieldSx}
-                    error={!!fieldErrors?.password}
-                    helperText={fieldErrors?.password?.join(', ')}
-                  />
-                </div>
-                <div className="col-md-6 form-group">
-                  <TextField
-                    fullWidth
-                    label="Confirm Password"
-                    type="password"
-                    value={passwordConfirmation}
-                    onChange={(e) => setPasswordConfirmation(e.target.value)}
-                    required
-                    sx={fieldSx}
-                    error={!!(passwordConfirmation && password && passwordConfirmation !== password) || !!fieldErrors?.password_confirmation}
-                    helperText={
-                      passwordConfirmation && password && passwordConfirmation !== password
-                        ? 'Passwords do not match'
-                        : fieldErrors?.password_confirmation?.join(', ') || ''
-                    }
                   />
                 </div>
               </div>
@@ -492,7 +451,6 @@ const EmployeeRegistrationForm = () => {
               </div>
 
               {/* Role */}
-              {roleOptions.length > 0 && (
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField
@@ -554,7 +512,6 @@ const EmployeeRegistrationForm = () => {
                   </TextField>
                 </div>
               </div>
-              )}
 
             </div>
 

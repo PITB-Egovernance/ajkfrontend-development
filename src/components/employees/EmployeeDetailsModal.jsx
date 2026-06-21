@@ -449,8 +449,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
               </TextField>
 
               {/* Role */}
-              {roleOptions.length > 0 && (
-                <TextField
+              <TextField
                   fullWidth
                   select
                   label="Role"
@@ -503,7 +502,6 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
                     </MenuItem>
                   ))}
                 </TextField>
-              )}
 
             </div>
           </div>
