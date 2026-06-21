@@ -220,7 +220,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
       gender:              resolvedGender,
       domicile:            resolvedDomicile,
       designation:         resolvedDesignation ? [resolvedDesignation] : [],
-      grade:               resolvedGrade,
+      grade:               selectedGrade?.id ? [selectedGrade.id] : [],
       role_permission:     selectedRoles,
       status:              form.status,
     };

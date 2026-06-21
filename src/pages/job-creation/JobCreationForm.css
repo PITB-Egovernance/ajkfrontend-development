@@ -227,6 +227,13 @@
   padding-left: 15px;
 }
 
+.job-creation-container .col-md-12 {
+  flex: 0 0 100%;
+  max-width: 100%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
 .job-creation-container .section-title {
   color: #064e3b;
   font-size: 1.1rem;

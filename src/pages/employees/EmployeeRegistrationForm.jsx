@@ -10,6 +10,33 @@ import '../job-creation/JobCreationForm.css';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 
+// Custom input component that renders permission chips inside an MUI
+// OutlinedInput — gives the proper notched-outline + floating label look.
+const ChipsInput = React.forwardRef(function ChipsInput(props, ref) {
+  // Strip out native input-only props MUI forwards so they don't hit the div.
+  const { ownerState, permissions, ...rest } = props;
+  return (
+    <div
+      ref={ref}
+      {...rest}
+      style={{
+        display: 'flex', flexWrap: 'wrap', gap: 6,
+        minHeight: 36,
+        alignContent: 'flex-start', width: '100%',
+      }}
+    >
+      {permissions?.length > 0 ? (
+        permissions.map((p, i) => (
+          <Chip key={i} label={p} size="small"
+            sx={{ backgroundColor: '#ecfdf5', color: '#065f46', fontWeight: 500, fontSize: '12px' }} />
+        ))
+      ) : (
+        <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 14 }}>Select a role to see permissions</span>
+      )}
+    </div>
+  );
+});
+
 
 const mapApiErrors = (apiErrors = {}) => {
   const mapped = { ...apiErrors };
@@ -31,13 +58,13 @@ const EmployeeRegistrationForm = () => {
   const [gender, setGender] = useState('');
   const [mobile, setMobile] = useState('');
   const [district, setDistrict] = useState(null);
-  const [designation, setDesignation] = useState([]);
-  const [grade, setGrade] = useState(null);
-  const [selectedRoles, setSelectedRoles] = useState([]);
+  const [designation, setDesignation] = useState(null);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedWings, setSelectedWings] = useState([]);
 
   const [districtOptions, setDistrictOptions] = useState([]);
   const [designationOptions, setDesignationOptions] = useState([]);
-  const [gradeOptions, setGradeOptions] = useState([]);
+  const [wingOptions, setWingOptions] = useState([]);
   const [roleOptions, setRoleOptions] = useState([]);
 
   useEffect(() => {
@@ -77,6 +104,11 @@ const EmployeeRegistrationForm = () => {
           ? (wingsResult.data?.data ?? wingsResult.data ?? [])
           : [];
 
+        setWingOptions(
+          wingsList.filter((w) => w.status === 'active' || !w.status)
+            .map((w) => ({ id: w.hash_id || String(w.id), name: w.name }))
+        );
+
         if (desigResult.success) {
           setDesignationOptions(
             (desigResult.data?.data ?? desigResult.data ?? [])
@@ -102,22 +134,6 @@ const EmployeeRegistrationForm = () => {
       }
     };
 
-    const fetchGrades = async () => {
-      try {
-        const response = await fetch(`${Config.apiUrl}/settings/grades?per_page=100`, { headers: authHeaders });
-        const result = await response.json();
-        if (result.success) {
-          setGradeOptions(
-            (result.data?.data ?? result.data ?? []).map((g) => ({
-              id: g.hash_id,
-              name: g.name,
-            }))
-          );
-        }
-      } catch (error) {
-        toast.error('Failed to load grades');
-      }
-    };
 
     const fetchRoles = async () => {
       try {
@@ -130,6 +146,7 @@ const EmployeeRegistrationForm = () => {
               .map((r) => ({
                 id: r.hash_id,
                 name: r.role_name,
+                permissions: r.permissions || [],
               }))
           );
         }
@@ -140,14 +157,14 @@ const EmployeeRegistrationForm = () => {
 
     fetchDistricts();
     fetchDesignations();
-    fetchGrades();
     fetchRoles();
+    // fetchGrades not needed — grade auto-derived from designation
   }, []);
 
   const fieldSx = {
-    '& .MuiOutlinedInput-root': { minHeight: 56 },
-    '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 56 },
-    '& .MuiOutlinedInput-input': { padding: '14px' },
+    '& .MuiOutlinedInput-root': { minHeight: 64 },
+    '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 64 },
+    '& .MuiOutlinedInput-input': { padding: '16px 14px', fontSize: '15px' },
   };
 
   const handleSubmit = async (e) => {
@@ -165,12 +182,9 @@ const EmployeeRegistrationForm = () => {
     if (!mobile.trim()) errors.mobile = ['Mobile number is required'];
     else if (mobile.length !== 11) errors.mobile = ['Mobile number must be exactly 11 digits'];
     if (!district) errors.domicile_district = ['Domicile district is required'];
-    if (!designation || designation.length === 0) errors.designation = ['Designation is required'];
-    const derivedGrades = [...new Set(
-      designation.map((id) => designationOptions.find((d) => d.id === id)?.gradeName).filter(Boolean)
-    )];
-    if (derivedGrades.length === 0) errors.grade = ['Select a designation with a valid grade'];
-    if (!selectedRoles || selectedRoles.length === 0) errors.role = ['Role is required'];
+    if (!designation) errors.designation = ['Designation is required'];
+    if (!selectedRole) errors.role = ['Role is required'];
+    if (!selectedWings || selectedWings.length === 0) errors.wing = ['At least one wing is required'];
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -190,14 +204,13 @@ const EmployeeRegistrationForm = () => {
         date_of_birth: dob,
         domicile: district.name,
         mobile: mobile.trim(),
-        designation: designation.map((id) => {
-          const opt = designationOptions.find((d) => d.id === id);
-          return opt ? opt.name : id;
+        designation: [designation.name],
+        grade: designation.gradeId ? [designation.gradeId] : [],
+        role_permission: [selectedRole.id],
+        wing: selectedWings.map((id) => {
+          const w = wingOptions.find((wo) => wo.id === id);
+          return w?.name || id;
         }),
-        grade: [...new Set(
-          designation.map((id) => designationOptions.find((d) => d.id === id)?.gradeName).filter(Boolean)
-        )].join(', '),
-        role_permission: selectedRoles,
       });
 
       toast.success(result?.message || 'Employee registered successfully', { id: loadingToast });
@@ -230,7 +243,7 @@ const EmployeeRegistrationForm = () => {
               </div>
             </div>
 
-            <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
+            <div className="mb-8 p-8 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full space-y-2">
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField
@@ -361,157 +374,113 @@ const EmployeeRegistrationForm = () => {
                 </div>
               </div>
 
+              {/* Designation (single select) + Grade (auto-filled) */}
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <TextField
-                    fullWidth
-                    required
-                    select
-                    label="Designation"
+                  <Autocomplete
+                    options={designationOptions}
+                    getOptionLabel={(o) => o.wingName ? `${o.name} — ${o.wingName}` : (o.name || '')}
+                    isOptionEqualToValue={(o, v) => o.id === v.id}
                     value={designation}
-                    error={!!fieldErrors?.designation}
-                    helperText={fieldErrors?.designation?.join(', ')}
+                    onChange={(_, v) => setDesignation(v)}
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.id}>
+                        <span>{option.name}</span>
+                        {option.wingName && <span style={{ marginLeft: 8, color: '#64748b', fontSize: '0.85em' }}>— {option.wingName}</span>}
+                      </li>
+                    )}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Designation" required sx={fieldSx}
+                        error={!!fieldErrors?.designation} helperText={fieldErrors?.designation?.join(', ')} />
+                    )}
+                  />
+                </div>
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Grade" value={designation?.gradeName || ''} InputProps={{ readOnly: true }}
+                    sx={{ ...fieldSx, '& .MuiOutlinedInput-root': { backgroundColor: '#f8fafc' } }}
+                    helperText={!designation ? 'Select a designation to auto-fill grade' : ''} />
+                </div>
+              </div>
+
+              {/* Row 6: Wing + Role */}
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth required select label="Wing" value={selectedWings}
+                    error={!!fieldErrors?.wing} helperText={fieldErrors?.wing?.join(', ')}
                     SelectProps={{
-                      multiple: true,
-                      onChange: () => {},
+                      multiple: true, onChange: () => {},
                       renderValue: (selected) => {
                         if (!selected || selected.length === 0) return '';
                         return (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                             {selected.map((id) => {
-                              const opt = designationOptions.find((d) => d.id === id);
-                              const label = opt ? (opt.wingName ? `${opt.name} — ${opt.wingName}` : opt.name) : id;
-                              return <Chip key={id} label={label} size="small" />;
+                              const opt = wingOptions.find((w) => w.id === id);
+                              return <Chip key={id} label={opt?.name || id} size="small"
+                                sx={{ backgroundColor: '#ecfdf5', color: '#065f46', fontWeight: 500 }} />;
                             })}
                           </Box>
                         );
                       },
                       MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
                     }}
-                    sx={{
-                      ...fieldSx,
-                      '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' },
-                    }}
-                  >
-                    {/* Select All */}
+                    sx={{ ...fieldSx, '& .MuiOutlinedInput-root': { minHeight: 64, height: 'auto' } }}>
                     <MenuItem dense onClick={(e) => {
                       e.preventDefault();
-                      const allIds = designationOptions.map((d) => d.id);
-                      const allSelected = allIds.length > 0 && allIds.every((id) => designation.includes(id));
-                      setDesignation(allSelected ? [] : allIds);
+                      const allIds = wingOptions.map((w) => w.id);
+                      const allSelected = allIds.length > 0 && allIds.every((id) => selectedWings.includes(id));
+                      setSelectedWings(allSelected ? [] : allIds);
                     }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                       <Checkbox size="small"
-                        checked={designationOptions.length > 0 && designationOptions.every((d) => designation.includes(d.id))}
-                        indeterminate={designationOptions.some((d) => designation.includes(d.id)) && !designationOptions.every((d) => designation.includes(d.id))}
-                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
-                      />
+                        checked={wingOptions.length > 0 && wingOptions.every((w) => selectedWings.includes(w.id))}
+                        indeterminate={wingOptions.some((w) => selectedWings.includes(w.id)) && !wingOptions.every((w) => selectedWings.includes(w.id))}
+                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }} />
                       <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
                     </MenuItem>
-
-                    {designationOptions.map((d) => (
-                      <MenuItem key={d.id} dense onClick={(e) => {
+                    {wingOptions.map((w) => (
+                      <MenuItem key={w.id} dense onClick={(e) => {
                         e.preventDefault();
-                        setDesignation((prev) =>
-                          prev.includes(d.id) ? prev.filter((id) => id !== d.id) : [...prev, d.id]
-                        );
+                        setSelectedWings((prev) => prev.includes(w.id) ? prev.filter((id) => id !== w.id) : [...prev, w.id]);
                       }}>
-                        <Checkbox
-                          size="small"
-                          checked={designation.includes(d.id)}
-                          sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
-                        />
-                        <ListItemText
-                          primary={d.wingName ? `${d.name} — ${d.wingName}` : d.name}
-                          primaryTypographyProps={{ fontSize: 13 }}
-                        />
+                        <Checkbox size="small" checked={selectedWings.includes(w.id)}
+                          sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }} />
+                        <ListItemText primary={w.name} primaryTypographyProps={{ fontSize: 13 }} />
                       </MenuItem>
                     ))}
                   </TextField>
                 </div>
                 <div className="col-md-6 form-group">
-                  <TextField
-                    fullWidth
-                    label="Grade"
-                    required
-                    value={(() => {
-                      const grades = designation
-                        .map((id) => designationOptions.find((d) => d.id === id)?.gradeName)
-                        .filter(Boolean);
-                      return [...new Set(grades)].join(', ');
-                    })()}
-                    InputProps={{ readOnly: true }}
-                    sx={{
-                      ...fieldSx,
-                      '& .MuiOutlinedInput-root': { backgroundColor: '#f8fafc' },
-                    }}
-                    helperText={designation.length === 0 ? 'Select a designation to auto-fill grade' : ''}
+                  <Autocomplete
+                    options={roleOptions}
+                    getOptionLabel={(o) => o.name || ''}
+                    isOptionEqualToValue={(o, v) => o.id === v.id}
+                    value={selectedRole}
+                    onChange={(_, v) => setSelectedRole(v)}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Role" required sx={fieldSx}
+                        error={!!fieldErrors?.role} helperText={fieldErrors?.role?.join(', ')} />
+                    )}
                   />
                 </div>
               </div>
 
-              {/* Role */}
+              {/* Row 7: Permissions (full width, outlined MUI style) */}
               <div className="row">
-                <div className="col-md-6 form-group">
+                <div className="col-md-12 form-group" style={{ width: '-webkit-fill-available' }}>
                   <TextField
                     fullWidth
-                    required
-                    select
-                    label="Role"
-                    value={selectedRoles}
-                    error={!!fieldErrors?.role}
-                    helperText={fieldErrors?.role?.join(', ')}
-                    SelectProps={{
-                      multiple: true,
-                      onChange: () => {},
-                      renderValue: (selected) => {
-                        if (!selected || selected.length === 0) return '';
-                        return (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
-                            {selected.map((id) => {
-                              const opt = roleOptions.find((r) => r.id === id);
-                              return <Chip key={id} label={opt?.name || id} size="small" />;
-                            })}
-                          </Box>
-                        );
-                      },
-                      MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+                    label="Permissions"
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{
+                      readOnly: true,
+                      inputComponent: ChipsInput,
+                      inputProps: { permissions: selectedRole?.permissions || [] },
                     }}
                     sx={{
-                      ...fieldSx,
-                      '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' },
+                      '& .MuiOutlinedInput-root': { minHeight: 64, height: 'auto', alignItems: 'flex-start', padding: '14px' },
+                      '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 'auto' },
+                      '& .MuiOutlinedInput-input': { padding: 0, height: 'auto' },
                     }}
-                  >
-                    {/* Select All */}
-                    <MenuItem dense onClick={(e) => {
-                      e.preventDefault();
-                      const allIds = roleOptions.map((r) => r.id);
-                      const allSelected = allIds.length > 0 && allIds.every((id) => selectedRoles.includes(id));
-                      setSelectedRoles(allSelected ? [] : allIds);
-                    }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <Checkbox size="small"
-                        checked={roleOptions.length > 0 && roleOptions.every((r) => selectedRoles.includes(r.id))}
-                        indeterminate={roleOptions.some((r) => selectedRoles.includes(r.id)) && !roleOptions.every((r) => selectedRoles.includes(r.id))}
-                        sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
-                      />
-                      <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
-                    </MenuItem>
-
-                    {roleOptions.map((r) => (
-                      <MenuItem key={r.id} dense onClick={(e) => {
-                        e.preventDefault();
-                        setSelectedRoles((prev) =>
-                          prev.includes(r.id) ? prev.filter((id) => id !== r.id) : [...prev, r.id]
-                        );
-                      }}>
-                        <Checkbox
-                          size="small"
-                          checked={selectedRoles.includes(r.id)}
-                          sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
-                        />
-                        <ListItemText primary={r.name} primaryTypographyProps={{ fontSize: 13 }} />
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                  />
                 </div>
               </div>
 

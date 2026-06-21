@@ -47,8 +47,10 @@ const mapUser = (user, idx) => ({
   email: user?.email || '-',
   mobile: user?.mobile || user?.phone || '-',
   father_husband_name: user?.father_husband_name || '-',
-  designation: user?.designation || '-',
+  designation: Array.isArray(user?.designation) ? user.designation.join(', ') : (user?.designation || '-'),
   scale: user?.scale || user?.grade || '-',
+  role: Array.isArray(user?.role_permission) ? user.role_permission.join(', ') : (user?.role || '-'),
+  wing: user?.wing || '-',
   status: user?.status || 'inactive',
   status_job: user?.status_job || '-',
 });
@@ -120,7 +122,9 @@ const EmployeeList = () => {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedHashId, setSelectedHashId] = useState(null);
   const [designationOptions, setDesignationOptions] = useState([]);
-  const [selectedDesignations, setSelectedDesignations] = useState([]);
+  const [wingOptions, setWingOptions] = useState([]);
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [selectedWings, setSelectedWings] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -144,15 +148,22 @@ const EmployeeList = () => {
       Accept: 'application/json',
       'X-API-KEY': Config.apiKey,
     };
-    const loadDesignations = async () => {
+    const loadOptions = async () => {
       try {
-        const [desigRes, wingsRes] = await Promise.all([
+        const [desigRes, wingsRes, rolesRes] = await Promise.all([
           fetch(`${Config.apiUrl}/settings/designations?per_page=200`, { headers }),
           fetch(`${Config.apiUrl}/settings/wings?per_page=200`, { headers }),
+          fetch(`${Config.apiUrl}/settings/roles`, { headers }),
         ]);
         const desigResult = await desigRes.json();
         const wingsResult = await wingsRes.json();
+        const rolesResult = await rolesRes.json();
         const wingsList = wingsResult.success ? (wingsResult.data?.data ?? wingsResult.data ?? []) : [];
+
+        setWingOptions(
+          wingsList.filter((w) => w.status === 'active' || !w.status)
+            .map((w) => ({ id: w.hash_id || String(w.id), name: w.name }))
+        );
 
         if (desigResult.success === true || desigResult.status === 200) {
           setDesignationOptions(
@@ -168,11 +179,21 @@ const EmployeeList = () => {
               })
           );
         }
+
+        if (rolesResult.success) {
+          setRoleOptions(
+            (rolesResult.data?.data ?? rolesResult.data ?? [])
+              .filter((r) => !r.deleted_at)
+              .map((r) => ({ id: r.hash_id, name: r.role_name, permissions: r.permissions || [] }))
+          );
+        }
       } catch {
         setDesignationOptions([]);
+        setWingOptions([]);
+        setRoleOptions([]);
       }
     };
-    loadDesignations();
+    loadOptions();
   }, []);
 
   const handleToggleStatus = async (employee) => {
@@ -233,7 +254,7 @@ const EmployeeList = () => {
 
   const handleClearFilters = () => {
     setFilters(EMPTY_FILTERS);
-    setSelectedDesignations([]);
+    setSelectedWings([]);
   };
 
   const filteredEmployees = employees.filter((emp) => {
@@ -251,12 +272,12 @@ const EmployeeList = () => {
     if (filters.cnic && !emp.cnic?.toLowerCase().includes(filters.cnic.toLowerCase())) return false;
     if (filters.email && !emp.email?.toLowerCase().includes(filters.email.toLowerCase())) return false;
     if (filters.mobile && !emp.mobile?.toLowerCase().includes(filters.mobile.toLowerCase())) return false;
-    if (selectedDesignations.length > 0) {
-      const selectedNames = selectedDesignations.map((id) => {
-        const opt = designationOptions.find((d) => d.id === id);
+    if (selectedWings.length > 0) {
+      const selectedNames = selectedWings.map((id) => {
+        const opt = wingOptions.find((w) => w.id === id);
         return opt?.name?.toLowerCase() || '';
       });
-      if (!selectedNames.some((n) => n && emp.designation?.toLowerCase().includes(n))) return false;
+      if (!selectedNames.some((n) => n && emp.wing?.toLowerCase().includes(n))) return false;
     }
     if (filters.status && emp.status !== filters.status) return false;
 
@@ -267,12 +288,37 @@ const EmployeeList = () => {
   const inactiveCount = employees.filter((e) => e.status !== 'active').length;
 
   const columns = [
-    { field: 'full_name',   headerName: 'Full Name',     flex: 1,   minWidth: 160 },
+    { field: 'full_name',   headerName: 'Name',          flex: 1,   minWidth: 160 },
     { field: 'cnic',        headerName: 'CNIC',          flex: 0.8, minWidth: 150 },
     { field: 'email',       headerName: 'Email',         flex: 1,   minWidth: 200 },
-    { field: 'mobile',      headerName: 'Mobile Number', width: 150 },
-    { field: 'designation', headerName: 'Designation',   flex: 0.8, minWidth: 150 },
-    { field: 'scale',       headerName: 'Scale',         width: 100 },
+    { field: 'mobile',      headerName: 'Mobile', width: 130 },
+    { field: 'designation', headerName: 'Designation',   width: 150 },
+    { field: 'role',        headerName: 'Role',          width: 150 },
+    {
+      field: 'permissions',
+      headerName: 'Permissions',
+      flex: 1,
+      minWidth: 200,
+      renderCell: (params) => {
+        const roleName = params.row.role;
+        if (!roleName || roleName === '-') return <span className="text-slate-400">—</span>;
+        const roleNames = roleName.split(',').map((r) => r.trim());
+        const perms = roleNames.flatMap((rn) => {
+          const found = roleOptions.find((ro) => ro.name?.toLowerCase() === rn.toLowerCase());
+          return found?.permissions || [];
+        });
+        const unique = [...new Set(perms)];
+        if (unique.length === 0) return <span className="text-slate-400">—</span>;
+        return (
+          <div className="flex flex-wrap gap-0.5 py-1">
+            {unique.slice(0, 3).map((p, i) => (
+              <span key={i} className="inline-block bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-medium">{p}</span>
+            ))}
+            {unique.length > 3 && <span className="text-[10px] text-slate-500">+{unique.length - 3}</span>}
+          </div>
+        );
+      },
+    },
     {
       field: 'status',
       headerName: 'Status',
@@ -375,12 +421,12 @@ const EmployeeList = () => {
           filterConfig={BASE_FILTER_CONFIG}
           title="Filter Employees"
           extraFilters={
-            designationOptions.length > 0 && (
+            wingOptions.length > 0 && (
               <TextField
                 fullWidth
                 select
-                label="Designation"
-                value={selectedDesignations}
+                label="Wing"
+                value={selectedWings}
                 size="small"
                 SelectProps={{
                   multiple: true,
@@ -390,9 +436,8 @@ const EmployeeList = () => {
                     return (
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
                         {selected.map((id) => {
-                          const opt = designationOptions.find((d) => d.id === id);
-                          const label = opt ? (opt.wingName ? `${opt.name} — ${opt.wingName}` : opt.name) : id;
-                          return <Chip key={id} label={label} size="small" />;
+                          const opt = wingOptions.find((w) => w.id === id);
+                          return <Chip key={id} label={opt?.name || id} size="small" />;
                         })}
                       </Box>
                     );
@@ -403,32 +448,29 @@ const EmployeeList = () => {
               >
                 <MenuItem dense onClick={(e) => {
                   e.preventDefault();
-                  const allIds = designationOptions.map((d) => d.id);
-                  const allSelected = allIds.length > 0 && allIds.every((id) => selectedDesignations.includes(id));
-                  setSelectedDesignations(allSelected ? [] : allIds);
+                  const allIds = wingOptions.map((w) => w.id);
+                  const allSelected = allIds.length > 0 && allIds.every((id) => selectedWings.includes(id));
+                  setSelectedWings(allSelected ? [] : allIds);
                 }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                   <Checkbox size="small"
-                    checked={designationOptions.length > 0 && designationOptions.every((d) => selectedDesignations.includes(d.id))}
-                    indeterminate={designationOptions.some((d) => selectedDesignations.includes(d.id)) && !designationOptions.every((d) => selectedDesignations.includes(d.id))}
+                    checked={wingOptions.length > 0 && wingOptions.every((w) => selectedWings.includes(w.id))}
+                    indeterminate={wingOptions.some((w) => selectedWings.includes(w.id)) && !wingOptions.every((w) => selectedWings.includes(w.id))}
                     sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
                   />
                   <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
                 </MenuItem>
-                {designationOptions.map((d) => (
-                  <MenuItem key={d.id} dense onClick={(e) => {
+                {wingOptions.map((w) => (
+                  <MenuItem key={w.id} dense onClick={(e) => {
                     e.preventDefault();
-                    setSelectedDesignations((prev) =>
-                      prev.includes(d.id) ? prev.filter((id) => id !== d.id) : [...prev, d.id]
+                    setSelectedWings((prev) =>
+                      prev.includes(w.id) ? prev.filter((id) => id !== w.id) : [...prev, w.id]
                     );
                   }}>
                     <Checkbox size="small"
-                      checked={selectedDesignations.includes(d.id)}
+                      checked={selectedWings.includes(w.id)}
                       sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
                     />
-                    <ListItemText
-                      primary={d.wingName ? `${d.name} — ${d.wingName}` : d.name}
-                      primaryTypographyProps={{ fontSize: 13 }}
-                    />
+                    <ListItemText primary={w.name} primaryTypographyProps={{ fontSize: 13 }} />
                   </MenuItem>
                 ))}
               </TextField>
