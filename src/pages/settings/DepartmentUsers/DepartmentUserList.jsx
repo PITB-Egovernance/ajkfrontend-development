@@ -153,7 +153,7 @@ const DepartmentUserList = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto space-y-6" style={{ minWidth: "-webkit-fill-available" }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate('/dashboard/settings')} className="text-sm text-gray-600 flex items-center">

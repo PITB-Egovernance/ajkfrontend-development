@@ -59,6 +59,7 @@ import DigitalSignatureManagement from 'pages/settings/DigitalSignature/DigitalS
 import SystemSettings from 'pages/settings/SystemSettings/SystemSettings';
 import WingsManagement from 'pages/settings/Wings/WingsManagement';
 import RolesManagement from 'pages/settings/Roles/RolesManagement';
+import RoleForm from 'pages/settings/Roles/RoleForm';
 import DepartmentUserList from 'pages/settings/DepartmentUsers/DepartmentUserList';
 import DepartmentUserForm from 'pages/settings/DepartmentUsers/DepartmentUserForm';
 import ApplicationsList from 'pages/applications/ApplicationsList';
@@ -199,6 +200,9 @@ function App() {
           <Route path="settings/system-settings" element={<SystemSettings />} />
           <Route path="settings/wings" element={<WingsManagement />} />
           <Route path="settings/roles" element={<RolesManagement />} />
+          <Route path="settings/roles/create" element={<RoleForm />} />
+          <Route path="settings/roles/:hashId" element={<RoleForm />} />
+          <Route path="settings/roles/:hashId/edit" element={<RoleForm />} />
           <Route path="settings/department-users" element={<DepartmentUserList />} />
           <Route path="settings/department-users/create" element={<DepartmentUserForm />} />
 

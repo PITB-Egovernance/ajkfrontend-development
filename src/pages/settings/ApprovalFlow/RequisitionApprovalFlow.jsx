@@ -482,7 +482,7 @@ const RequisitionApprovalFlow = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto" style={{ minWidth: "-webkit-fill-available" }}>
 
         {pageLoading && (
           <div className="flex items-center justify-center py-20">
