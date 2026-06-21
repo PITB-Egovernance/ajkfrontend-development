@@ -16,6 +16,7 @@ import { Plus, ArrowLeft, MoreVertical, PenTool, Trash2, CheckCircle, XCircle, U
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from "components/ui/ConfirmDelete";
+import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import Config from "config/baseUrl";
@@ -341,14 +342,16 @@ const DigitalSignatureManagement = () => {
   /* ── TOGGLE STATUS ── */
   const handleToggleStatus = async (row) => {
     const newStatus = row.status === "active" ? "inactive" : "active";
+    if (!await confirmStatus({ newStatus })) return;
     try {
       const fd = new FormData();
       fd.append("name",        row.name);
       fd.append("designation", row.designation);
       fd.append("status",      newStatus);
 
+      fd.append("_method", "PUT");
       const res    = await fetch(`${API_BASE}/settings/digital-signature/update/${row.hash_id}`, {
-        method: "PUT",
+        method: "POST",
         headers: authHeaders(),
         body: fd,
       });

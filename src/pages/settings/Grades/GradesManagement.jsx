@@ -17,6 +17,7 @@ import { Plus, ArrowLeft, MoreVertical, Filter, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from 'components/ui/ConfirmDelete';
+import confirmStatus from 'components/ui/confirmStatus';
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
@@ -140,7 +141,7 @@ const GradesManagement = () => {
         const dataArray = result.data?.data || result.data || [];
 
         const formatted = dataArray.map((item) => ({
-          id: item.id ?? item.hash_id,
+          id: item.hash_id,
           hash_id: item.hash_id,
           name: item.name,
           status: item.status ?? "active",
@@ -289,6 +290,7 @@ const GradesManagement = () => {
 
   const handleToggleStatus = async (row, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
+    if (!await confirmStatus({ newStatus })) return;
     try {
       // Use two-step workaround: name stays same → triggers unique bug on live backend
       await updateGradeOnLive(

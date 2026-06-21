@@ -9,6 +9,7 @@ import { Plus, ArrowLeft, MoreVertical, ClipboardCheck, Trash2, CheckCircle, XCi
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
+import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
@@ -192,6 +193,7 @@ const TestsManagement = () => {
   // TOGGLE STATUS — same method as edit (PUT /update), sends all required fields + new status
   const handleToggleStatus = async (row, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    if (!await confirmStatus({ newStatus })) return;
     try {
       const res = await fetch(`${API_BASE}/settings/tests/${row.hash_id || row.id}/update`, {
         method: 'PUT',

@@ -16,6 +16,7 @@ import { Plus, ArrowLeft, MoreVertical, BookOpen, Trash2, CheckCircle, XCircle }
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from "components/ui/ConfirmDelete";
+import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import SubjectApi from "api/subjectApi";
@@ -208,6 +209,7 @@ const SubjectManagement = () => {
   /* ── TOGGLE STATUS ── */
   const handleToggleStatus = async (row) => {
     const newStatus = row.status === "active" ? "inactive" : "active";
+    if (!await confirmStatus({ newStatus })) return;
     try {
       await SubjectApi.update(row.hash_id, {
         subject_name:  row.subject_name,

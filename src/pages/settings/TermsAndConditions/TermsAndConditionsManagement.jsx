@@ -12,14 +12,41 @@ import {
   Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
-import { Plus, ArrowLeft, MoreVertical, BadgeCheck, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical, ScrollText, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from "components/ui/ConfirmDelete";
 import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
-import CertificationApi from "api/certificationApi";
+
+/* ─── Dummy API ──────────────────────────────────────────────────────────────
+   Replace these helpers with real fetch() calls when the production endpoint
+   is available.
+────────────────────────────────────────────────────────────────────────────── */
+let _nextId = 6;
+const delay = (ms = 300) => new Promise((r) => setTimeout(r, ms));
+
+const SEED = [
+  { id: "t1", term_name: "Eligibility Criteria",           status: "active"   },
+  { id: "t2", term_name: "Age Limit Policy",               status: "active"   },
+  { id: "t3", term_name: "Document Submission Policy",     status: "active"   },
+  { id: "t4", term_name: "Examination Code of Conduct",    status: "active"   },
+  { id: "t5", term_name: "Disqualification Conditions",    status: "inactive" },
+];
+
+if (!window.__termsStore) window.__termsStore = [...SEED];
+const store = () => window.__termsStore;
+
+const dummyAPI = {
+  getAll:     async ()            => { await delay();    return [...store()]; },
+  create:     async (payload)     => { await delay(400); const row = { id: `t${_nextId++}`, ...payload, status: "active" }; store().push(row); return row; },
+  update:     async (id, patch)   => { await delay(400); const i = store().findIndex((r) => r.id === id); if (i < 0) throw new Error("Not found"); Object.assign(store()[i], patch); return store()[i]; },
+  remove:     async (id)          => { await delay(400); const i = store().findIndex((r) => r.id === id); if (i < 0) throw new Error("Not found"); store().splice(i, 1); },
+  bulkRemove: async (ids)         => { await delay(400); ids.forEach((id) => { const i = store().findIndex((r) => r.id === id); if (i >= 0) store().splice(i, 1); }); },
+  bulkStatus: async (ids, status) => { await delay(400); ids.forEach((id) => { const r = store().find((r) => r.id === id); if (r) r.status = status; }); },
+};
+/* ─────────────────────────────────────────────────────────────────────────── */
 
 const gridSx = {
   border: "none",
@@ -45,15 +72,15 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
-const EMPTY_FORM = { certification_name: "", status: "active" };
+const EMPTY_FORM = { term_name: "" };
 
-const CertificatesManagement = () => {
+const TermsAndConditionsManagement = () => {
   const navigate = useNavigate();
 
   const [allRows,    setAllRows]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
-  const [filters,    setFilters]    = useState({ certification_name: "", status: "" });
+  const [filters,    setFilters]    = useState({ term_name: "", status: "" });
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]  = useState([]);
@@ -68,19 +95,10 @@ const CertificatesManagement = () => {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const result = await CertificationApi.getAll();
-      const data = result.data?.data ?? result.data ?? [];
-      setAllRows(
-        (Array.isArray(data) ? data : []).map((item, i) => ({
-          id:                   item.hash_id || item.id,
-          hash_id:              item.hash_id || item.id,
-          sr_no:                i + 1,
-          certification_name:   item.certification_name,
-          status:               item.status ?? "active",
-        }))
-      );
+      const data = await dummyAPI.getAll();
+      setAllRows(data.map((item, i) => ({ ...item, sr_no: i + 1 })));
     } catch {
-      toast.error("Failed to load certifications");
+      toast.error("Failed to load terms and conditions");
       setAllRows([]);
     } finally {
       setLoading(false);
@@ -91,8 +109,8 @@ const CertificatesManagement = () => {
 
   /* ── FILTER CONFIG ── */
   const filterConfig = [
-    { name: "certification_name", label: "Certification Name", type: "text",   placeholder: "Filter by name" },
-    { name: "status",             label: "Status",             type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
+    { name: "term_name", label: "Term Name", type: "text",   placeholder: "Filter by name" },
+    { name: "status",    label: "Status",    type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
   ];
 
   const handleFilterChange = (e) => {
@@ -100,11 +118,11 @@ const CertificatesManagement = () => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleClearFilters = () => setFilters({ certification_name: "", status: "" });
+  const handleClearFilters = () => setFilters({ term_name: "", status: "" });
 
   /* ── CLIENT-SIDE FILTER ── */
   const filteredRows = allRows.filter((row) => {
-    if (filters.certification_name && !row.certification_name?.toLowerCase().includes(filters.certification_name.toLowerCase())) return false;
+    if (filters.term_name && !row.term_name?.toLowerCase().includes(filters.term_name.toLowerCase())) return false;
     if (filters.status && row.status !== filters.status) return false;
     return true;
   });
@@ -126,10 +144,7 @@ const CertificatesManagement = () => {
 
   const handleEdit = () => {
     setEditingRow(selectedRow);
-    setFormData({
-      certification_name: selectedRow.certification_name,
-      status:             selectedRow.status ?? "active",
-    });
+    setFormData({ term_name: selectedRow.term_name });
     setFormErrors({});
     setOpenModal(true);
     handleMenuClose();
@@ -138,7 +153,7 @@ const CertificatesManagement = () => {
   /* ── VALIDATION ── */
   const validate = () => {
     const errs = {};
-    if (!formData.certification_name.trim()) errs.certification_name = "Certification name is required";
+    if (!formData.term_name.trim()) errs.term_name = "Term name is required";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -147,10 +162,10 @@ const CertificatesManagement = () => {
   const handleDelete = async () => {
     if (!selectedRow) return;
     handleMenuClose();
-    if (!await confirmDelete({ title: "Delete Certification", identifier: selectedRow.certification_name })) return;
+    if (!await confirmDelete({ title: "Delete Term", identifier: selectedRow.term_name })) return;
     try {
-      await CertificationApi.delete(selectedRow.hash_id);
-      toast.success("Certification deleted successfully");
+      await dummyAPI.remove(selectedRow.id);
+      toast.success("Term deleted successfully");
       setSelectionModel((p) => p.filter((id) => id !== selectedRow.id));
       fetchAll();
     } catch {
@@ -161,11 +176,10 @@ const CertificatesManagement = () => {
   /* ── BULK ACTIONS ── */
   const handleBulkDelete = async () => {
     if (!selectionModel.length) return;
-    if (!await confirmDelete({ title: "Delete Certifications", message: `Delete ${selectionModel.length} certification${selectionModel.length > 1 ? "s" : ""}?` })) return;
+    if (!await confirmDelete({ title: "Delete Terms", message: `Delete ${selectionModel.length} term${selectionModel.length > 1 ? "s" : ""}?` })) return;
     try {
-      const rows = allRows.filter((r) => selectionModel.includes(r.id));
-      await Promise.all(rows.map((r) => CertificationApi.delete(r.hash_id)));
-      toast.success("Deleted selected certifications");
+      await dummyAPI.bulkRemove(selectionModel);
+      toast.success("Deleted selected terms");
       setSelectionModel([]);
       fetchAll();
     } catch {
@@ -176,15 +190,7 @@ const CertificatesManagement = () => {
   const handleBulkStatus = async (status) => {
     if (!selectionModel.length) return;
     try {
-      const rows = allRows.filter((r) => selectionModel.includes(r.id));
-      await Promise.all(
-        rows.map((r) =>
-          CertificationApi.update(r.hash_id, {
-            certification_name: r.certification_name,
-            status,
-          })
-        )
-      );
+      await dummyAPI.bulkStatus(selectionModel, status);
       toast.success(`Marked as ${status}`);
       setSelectionModel([]);
       fetchAll();
@@ -198,10 +204,7 @@ const CertificatesManagement = () => {
     const newStatus = row.status === "active" ? "inactive" : "active";
     if (!await confirmStatus({ newStatus })) return;
     try {
-      await CertificationApi.update(row.hash_id, {
-        certification_name: row.certification_name,
-        status: newStatus,
-      });
+      await dummyAPI.update(row.id, { status: newStatus });
       toast.success(`Marked as ${newStatus}`);
       fetchAll();
     } catch {
@@ -214,18 +217,18 @@ const CertificatesManagement = () => {
     if (!validate()) return;
     setSaving(true);
     try {
-      const payload = { certification_name: formData.certification_name.trim(), status: formData.status };
+      const payload = { term_name: formData.term_name.trim() };
       if (editingRow) {
-        await CertificationApi.update(editingRow.hash_id, payload);
-        toast.success("Certification updated successfully");
+        await dummyAPI.update(editingRow.id, payload);
+        toast.success("Term updated successfully");
       } else {
-        await CertificationApi.create(payload);
-        toast.success("Certification added successfully");
+        await dummyAPI.create(payload);
+        toast.success("Term added successfully");
       }
       setOpenModal(false);
       fetchAll();
-    } catch (err) {
-      toast.error(err.message || "Operation failed");
+    } catch {
+      toast.error("Operation failed");
     } finally {
       setSaving(false);
     }
@@ -233,8 +236,8 @@ const CertificatesManagement = () => {
 
   /* ── COLUMNS ── */
   const columns = [
-    { field: "sr_no",               headerName: "#",                   width: 65 },
-    { field: "certification_name",  headerName: "Certification Name",  flex: 1   },
+    { field: "sr_no",     headerName: "#",          width: 65 },
+    { field: "term_name", headerName: "Term Name",  flex: 1   },
     {
       field: "status",
       headerName: "Status",
@@ -243,7 +246,7 @@ const CertificatesManagement = () => {
         <Switch
           checked={p.value === "active"}
           onChange={() => handleToggleStatus(p.row)}
-          inputProps={{ "aria-label": "toggle certification status" }}
+          inputProps={{ "aria-label": "toggle term status" }}
           size="small"
           color={p.value === "active" ? "success" : "error"}
         />
@@ -265,7 +268,7 @@ const CertificatesManagement = () => {
   if (loading && allRows.length === 0)
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <InlineLoader text="Loading certifications..." variant="ring" size="lg" />
+        <InlineLoader text="Loading terms and conditions..." variant="ring" size="lg" />
       </div>
     );
 
@@ -284,11 +287,11 @@ const CertificatesManagement = () => {
             </button>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg">
-                <BadgeCheck size={22} className="text-emerald-700" />
+                <ScrollText size={22} className="text-emerald-700" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Certifications</h1>
-                <p className="text-sm text-slate-500">Manage certification entries</p>
+                <h1 className="text-2xl font-bold text-slate-900">Terms & Conditions</h1>
+                <p className="text-sm text-slate-500">Manage terms and conditions entries</p>
               </div>
             </div>
           </div>
@@ -297,7 +300,7 @@ const CertificatesManagement = () => {
             onClick={openAdd}
             className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm"
           >
-            <Plus size={15} /> Add Certification
+            <Plus size={15} /> Add Term
           </button>
         </div>
 
@@ -305,7 +308,7 @@ const CertificatesManagement = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-5">
-              <p className="text-sm text-blue-700 font-medium">Total Certifications</p>
+              <p className="text-sm text-blue-700 font-medium">Total Terms</p>
               <h2 className="text-3xl font-bold text-blue-900 mt-1">{total}</h2>
             </CardContent>
           </Card>
@@ -356,7 +359,7 @@ const CertificatesManagement = () => {
           onFilterChange={handleFilterChange}
           onClearFilters={handleClearFilters}
           filterConfig={filterConfig}
-          title="Filter Certifications"
+          title="Filter Terms & Conditions"
         />
 
         {/* GRID */}
@@ -385,37 +388,21 @@ const CertificatesManagement = () => {
         {/* ADD / EDIT MODAL */}
         <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
           <DialogTitle className="font-bold">
-            {editingRow ? "Edit Certification" : "Add Certification"}
+            {editingRow ? "Edit Term" : "Add Term"}
           </DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
-              label="Certification Name"
+              label="Term Name"
               margin="normal"
               size="small"
               autoFocus
-              value={formData.certification_name}
-              onChange={(e) => {
-                setFormData((f) => ({ ...f, certification_name: e.target.value }));
-                if (e.target.value.trim()) setFormErrors((errs) => ({ ...errs, certification_name: undefined }));
-              }}
-              error={!!formErrors.certification_name}
-              helperText={formErrors.certification_name}
-              placeholder="e.g. AWS Certified Developer"
+              value={formData.term_name}
+              onChange={(e) => setFormData((f) => ({ ...f, term_name: e.target.value }))}
+              error={!!formErrors.term_name}
+              helperText={formErrors.term_name}
+              placeholder="e.g. Eligibility Criteria"
             />
-
-            <TextField
-              select
-              fullWidth
-              label="Status"
-              margin="normal"
-              size="small"
-              value={formData.status}
-              onChange={(e) => setFormData((f) => ({ ...f, status: e.target.value }))}
-            >
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
           </DialogContent>
 
           <DialogActions className="px-4 pb-4 gap-2">
@@ -442,4 +429,4 @@ const CertificatesManagement = () => {
   );
 };
 
-export default CertificatesManagement;
+export default TermsAndConditionsManagement;

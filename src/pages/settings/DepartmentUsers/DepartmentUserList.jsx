@@ -10,6 +10,7 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import DepartmentUserService from 'services/DepartmentUserService';
 import DepartmentUserDetailsModal from 'components/departmentUsers/DepartmentUserDetailsModal';
 import { GRID_SX } from 'utils/gridStyles';
+import confirmStatus from 'components/ui/confirmStatus';
 
 const FILTER_CONFIG = [
   { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by name' },
@@ -79,6 +80,7 @@ const DepartmentUserList = () => {
 
   const handleToggleStatus = async (row) => {
     const newStatus = row.status === 'active' ? 'inactive' : 'active';
+    if (!await confirmStatus({ newStatus })) return;
     try {
       await DepartmentUserService.update(row.hash_id, { status: newStatus });
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: newStatus } : r));
