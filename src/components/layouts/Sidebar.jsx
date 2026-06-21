@@ -34,6 +34,21 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     location.pathname === path ||
     (path !== '/dashboard' && location.pathname.startsWith(path + '/'));
 
+  // Exact-match active check for submenu items — avoids a parent-style path
+  // (e.g. "/dashboard/requisitions") highlighting when a deeper child route
+  // (e.g. "/dashboard/requisitions/approval-flow") is open.
+  const isSubActive = (path) => {
+    if (location.pathname === path) return true;
+    // Only treat as active via prefix if no other submenu item is a more
+    // specific (longer) match for the current path.
+    if (!location.pathname.startsWith(path + '/')) return false;
+    const allSubPaths = MENU_ITEMS.flatMap((m) => (m.submenu || []).map((s) => s.path));
+    const moreSpecific = allSubPaths.some(
+      (p) => p !== path && p.startsWith(path + '/') && (location.pathname === p || location.pathname.startsWith(p + '/'))
+    );
+    return !moreSpecific;
+  };
+
   const menuItems = MENU_ITEMS;
 
   const RESTRICTED_ROLES = ['director', 'secretary', 'chairman'];
@@ -47,7 +62,10 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
 
   const NavItem = ({ item }) => {
     const hasSubmenu = item.submenu && item.submenu.length > 0;
-    const isMenuOpen = currentOpenMenu === item.id;
+    // A submenu is open if explicitly toggled OR one of its children is the
+    // active route (so the parent auto-expands and the item shows nested).
+    const hasActiveChild = hasSubmenu && item.submenu.some((s) => isActive(s.path));
+    const isMenuOpen = currentOpenMenu === item.id || hasActiveChild;
     const active = isActive(item.path);
     const [showHoverMenu, setShowHoverMenu] = useState(false);
 
@@ -90,14 +108,14 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
 
           {/* Submenu for expanded sidebar */}
           {isMenuOpen && isOpen && (
-            <div className="mt-1 space-y-1 overflow-hidden" style={{ height: 'auto' }}>
+            <div className="mt-1 mb-1 ml-5 pl-3 space-y-1 overflow-hidden border-l-2 border-emerald-700/40" style={{ height: 'auto' }}>
               {item.submenu.map((subItem) => (
                 <Link
                   key={subItem.path}
                   to={subItem.path}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-200 border-b border-emerald-700/20",
-                    isActive(subItem.path)
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                    isSubActive(subItem.path)
                       ? "bg-white text-emerald-800 shadow-md font-semibold"
                       : "text-emerald-200 hover:text-white hover:bg-white/5"
                   )}
@@ -106,13 +124,13 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
                     size={16}
                     className={cn(
                       "flex-shrink-0",
-                      isActive(subItem.path)
+                      isSubActive(subItem.path)
                         ? "text-emerald-700"
                         : "text-emerald-400"
                     )}
                   />
                   <span>{subItem.label}</span>
-                  {isActive(subItem.path) && (
+                  {isSubActive(subItem.path) && (
                     <ChevronRight
                       size={14}
                       className="ml-auto text-emerald-700"
@@ -140,7 +158,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
                       to={subItem.path}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 border-b border-emerald-700/20",
-                        isActive(subItem.path)
+                        isSubActive(subItem.path)
                           ? "bg-white text-emerald-800 shadow-md font-semibold"
                           : "text-emerald-200 hover:text-white hover:bg-white/5"
                       )}
@@ -149,13 +167,13 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
                         size={16}
                         className={cn(
                           "flex-shrink-0",
-                          isActive(subItem.path)
+                          isSubActive(subItem.path)
                             ? "text-emerald-700"
                             : "text-emerald-400"
                         )}
                       />
                       <span>{subItem.label}</span>
-                      {isActive(subItem.path) && (
+                      {isSubActive(subItem.path) && (
                         <ChevronRight
                           size={14}
                           className="ml-auto text-emerald-700"

@@ -112,7 +112,7 @@ const EmployeeRegistrationForm = () => {
         if (desigResult.success) {
           setDesignationOptions(
             (desigResult.data?.data ?? desigResult.data ?? [])
-              .filter((d) => d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
+              .filter((d) => !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
               .map((d) => {
                 let wingName = '';
                 if (d.wings) {

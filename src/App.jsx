@@ -192,7 +192,7 @@ function App() {
           <Route path="settings/nationalities" element={<NationalitiesManagement />} />
           <Route path="settings/tests" element={<TestsManagement />} />
           <Route path="settings/exam-fees" element={<ExamFeesManagement />} />
-          <Route path="settings/approval-flow" element={<RequisitionApprovalFlow />} />
+          <Route path="approval-flow" element={<RequisitionApprovalFlow />} />
           <Route path="settings/subjects" element={<SubjectManagement />} />
           <Route path="settings/certificates" element={<CertificatesManagement />} />
           <Route path="settings/digital-signatures" element={<DigitalSignatureManagement />} />

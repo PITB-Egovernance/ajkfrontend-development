@@ -80,13 +80,6 @@ const Settings = () => {
     //   link: '/dashboard/settings/contractors'
     // },
     {
-      icon: GitBranch,
-      title: 'Requisition Approval Flow',
-      description: 'Configure department approval hierarchy',
-      iconBg: 'bg-indigo-500',
-      link: '/dashboard/settings/approval-flow'
-    },
-    {
       icon: BookOpen,
       title: 'Subject Management',
       description: 'Manage subject groups and marks',

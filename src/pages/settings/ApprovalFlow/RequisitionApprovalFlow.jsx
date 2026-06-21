@@ -8,15 +8,26 @@ import {
   ArrowLeft, ChevronDown, ChevronRight, CheckCircle2,
   AlertCircle, RotateCcw, Save, GitBranch, User,
   ArrowRight, Info, Layers, GripVertical, Loader2,
+  ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
 const PROCESS_TYPES = [
   { value: 'requisition', label: 'Requisition' },
 ];
+
+// Designations are hardcoded (same under every wing), in descending hierarchy.
+const HARDCODED_DESIGNATIONS = [
+  { hash_id: 'assistant_director', name: 'Assistant Director' },
+  { hash_id: 'deputy_director', name: 'Deputy Director' },
+  { hash_id: 'director', name: 'Director' },
+];
+
+const HARDCODED_SECRETARY = { hash_id: 'secretary', name: 'Secretary' };
 
 const STEP_COLORS = [
   { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-600', ring: 'ring-emerald-300' },
@@ -57,14 +68,19 @@ const RequisitionApprovalFlow = () => {
   const [employeesMap, setEmployeesMap] = useState({});
   const [pageLoading, setPageLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [flowType, setFlowType] = useState('online');
+  const [secretarySelected, setSecretarySelected] = useState(false);
+  const [secretaryEmployees, setSecretaryEmployees] = useState({});
+  const [sortDir, setSortDir] = useState('asc');
 
-  const getDesignationsForWing = useCallback((wingId) => {
-    return allDesignations.filter((d) => d.wings === wingId);
-  }, [allDesignations]);
+  // Designations are hardcoded (Assistant Director, Deputy Director, Director)
+  // and shown identically under every dynamic wing. Wings come from the API,
+  // designations are fixed.
+  const getDesignationsForWing = useCallback(() => {
+    return sortDir === 'desc' ? [...HARDCODED_DESIGNATIONS].reverse() : HARDCODED_DESIGNATIONS;
+  }, [sortDir]);
 
-  const secretaryDesignation = useMemo(() => {
-    return allDesignations.find((d) => d.name.toLowerCase() === 'secretary');
-  }, [allDesignations]);
+  const secretaryDesignation = HARDCODED_SECRETARY;
 
   const [allEmployees, setAllEmployees] = useState([]);
 
@@ -101,19 +117,14 @@ const RequisitionApprovalFlow = () => {
   }, [allEmployees]);
 
   /* ── Build employeesMap from allEmployees whenever data changes ── */
-  const buildEmployeesMap = useCallback((empList, desigList, wingsList) => {
+  // Build employees keyed by the hardcoded designation ids, matching
+  // employees whose designation name contains the designation label.
+  const buildEmployeesMap = useCallback((empList) => {
     const empMap = {};
-    desigList.forEach((desig) => {
-      const wing = wingsList.find((w) => w.id === desig.wings);
-      const wingName = wing?.name || '';
-      empMap[desig.hash_id] = empList.filter((e) => {
-        const desigMatch = e.designation?.toLowerCase().includes(desig.name.toLowerCase());
-        if (!desigMatch) return false;
-        if (wingName && e.wing) {
-          return e.wing.toLowerCase().includes(wingName.toLowerCase());
-        }
-        return true;
-      });
+    [...HARDCODED_DESIGNATIONS, HARDCODED_SECRETARY].forEach((desig) => {
+      empMap[desig.hash_id] = empList.filter((e) =>
+        e.designation?.toLowerCase().includes(desig.name.toLowerCase())
+      );
     });
     return empMap;
   }, []);
@@ -165,8 +176,8 @@ const RequisitionApprovalFlow = () => {
         }));
         setAllEmployees(empList);
 
-        // Build employees map keyed by designation hash_id, filtered by wing
-        const empMap = buildEmployeesMap(empList, desigList, wingsList);
+        // Build employees map keyed by hardcoded designation ids
+        const empMap = buildEmployeesMap(empList);
         setEmployeesMap(empMap);
 
         // Fetch saved approval flow
@@ -181,21 +192,39 @@ const RequisitionApprovalFlow = () => {
             const restoredExpanded = {};
             const restoredEmps = {};
 
+            const restoredSecEmps = {};
+            let restoredSecSelected = false;
+
             assignments.forEach((a) => {
-              if (a.designation.toLowerCase() === 'secretary') return;
+              if (a.designation.toLowerCase() === 'secretary') {
+                restoredSecSelected = true;
+                const emps = empMap[HARDCODED_SECRETARY.hash_id] || [];
+                String(a.employee || '').split(',').map((s) => s.trim()).filter(Boolean).forEach((name) => {
+                  const matched = emps.find((e) => e.name === name);
+                  if (matched) restoredSecEmps[matched.id] = true;
+                });
+                return;
+              }
               const wing = wingsList.find((w) => w.name === a.wing);
               if (!wing) return;
-              const desig = desigList.find((d) => d.name === a.designation && d.wings === wing.id);
+              const desig = HARDCODED_DESIGNATIONS.find((d) => d.name.toLowerCase() === a.designation.toLowerCase());
               if (!desig) return;
 
               restoredWings[wing.id] = true;
-              restoredDesigMap[wing.id] = desig.hash_id;
+              if (!Array.isArray(restoredDesigMap[wing.id])) restoredDesigMap[wing.id] = [];
+              if (!restoredDesigMap[wing.id].includes(desig.hash_id)) restoredDesigMap[wing.id].push(desig.hash_id);
               restoredExpanded[wing.id] = true;
 
               const emps = empMap[desig.hash_id] || [];
-              const matchedEmp = emps.find((e) => e.name === a.employee);
-              if (matchedEmp) {
-                restoredEmps[`${wing.id}_${desig.hash_id}`] = { [matchedEmp.id]: true };
+              // Support comma-separated employee names (multiple per designation)
+              const empNames = String(a.employee || '').split(',').map((s) => s.trim()).filter(Boolean);
+              const empSel = restoredEmps[`${wing.id}_${desig.hash_id}`] || {};
+              empNames.forEach((name) => {
+                const matchedEmp = emps.find((e) => e.name === name);
+                if (matchedEmp) empSel[matchedEmp.id] = true;
+              });
+              if (Object.keys(empSel).length > 0) {
+                restoredEmps[`${wing.id}_${desig.hash_id}`] = empSel;
               }
             });
 
@@ -203,6 +232,8 @@ const RequisitionApprovalFlow = () => {
             setDesignationMap(restoredDesigMap);
             setExpandedWings(restoredExpanded);
             setSelectedEmployees(restoredEmps);
+            setSecretarySelected(restoredSecSelected);
+            setSecretaryEmployees(restoredSecEmps);
             setSaved(true);
           }
         } catch (err) {
@@ -218,32 +249,34 @@ const RequisitionApprovalFlow = () => {
     // eslint-disable-next-line
   }, []);
 
-  const usedDesignationNames = useMemo(() => {
-    const map = {};
-    Object.entries(designationMap).forEach(([wingId, desigHashId]) => {
-      const desig = allDesignations.find((d) => d.hash_id === desigHashId);
-      if (desig) {
-        const key = desig.name.toLowerCase();
-        if (!map[key]) map[key] = [];
-        map[key].push(wingId);
-      }
-    });
-    return map;
-  }, [designationMap, allDesignations]);
-
   const assignedCount = Object.keys(designationMap).length;
 
   const completeCount = useMemo(() => {
-    return Object.entries(designationMap).filter(([wingId, desigHashId]) => {
-      const mapKey = `${wingId}_${desigHashId}`;
-      const empMap = selectedEmployees[mapKey] || {};
-      return Object.values(empMap).some(Boolean);
-    }).length;
+    let count = 0;
+    Object.entries(designationMap).forEach(([wingId, desigList]) => {
+      (desigList || []).forEach((desigHashId) => {
+        const empMap = selectedEmployees[`${wingId}_${desigHashId}`] || {};
+        if (Object.values(empMap).some(Boolean)) count++;
+      });
+    });
+    return count;
   }, [designationMap, selectedEmployees]);
 
+  // Valid when: at least one wing selected, every selected wing has at least
+  // one designation, and every selected designation has at least one employee.
   const isValid = useMemo(() => {
-    return completeCount > 0 && !!processType;
-  }, [completeCount, processType]);
+    const wingIds = Object.keys(selectedWings);
+    if (wingIds.length === 0) return false;
+    for (const wingId of wingIds) {
+      const desigList = designationMap[wingId] || [];
+      if (desigList.length === 0) return false;
+      for (const desigHashId of desigList) {
+        const empMap = selectedEmployees[`${wingId}_${desigHashId}`] || {};
+        if (!Object.values(empMap).some(Boolean)) return false;
+      }
+    }
+    return true;
+  }, [selectedWings, designationMap, selectedEmployees]);
 
   const toggleWing = (wingId) => {
     setSelectedWings((prev) => {
@@ -252,6 +285,11 @@ const RequisitionApprovalFlow = () => {
         delete next[wingId];
         setDesignationMap((dm) => { const c = { ...dm }; delete c[wingId]; return c; });
         setExpandedWings((ew) => { const c = { ...ew }; delete c[wingId]; return c; });
+        setSelectedEmployees((se) => {
+          const c = { ...se };
+          Object.keys(c).forEach((k) => { if (k.startsWith(`${wingId}_`)) delete c[k]; });
+          return c;
+        });
       } else {
         next[wingId] = true;
         setExpandedWings((ew) => ({ ...ew, [wingId]: true }));
@@ -266,17 +304,18 @@ const RequisitionApprovalFlow = () => {
     setExpandedWings((prev) => ({ ...prev, [wingId]: !prev[wingId] }));
   };
 
+  // Multiple designations can be selected per wing. Toggles the designation
+  // in the wing's array; removing it also clears its selected employees.
   const selectDesignation = (wingId, desigHashId) => {
     setDesignationMap((prev) => {
       const copy = { ...prev };
-      if (copy[wingId] === desigHashId) {
-        delete copy[wingId];
+      const current = Array.isArray(copy[wingId]) ? [...copy[wingId]] : [];
+      if (current.includes(desigHashId)) {
+        const next = current.filter((id) => id !== desigHashId);
+        if (next.length === 0) delete copy[wingId]; else copy[wingId] = next;
         setSelectedEmployees((se) => { const c = { ...se }; delete c[`${wingId}_${desigHashId}`]; return c; });
       } else {
-        if (copy[wingId]) {
-          setSelectedEmployees((se) => { const c = { ...se }; delete c[`${wingId}_${copy[wingId]}`]; return c; });
-        }
-        copy[wingId] = desigHashId;
+        copy[wingId] = [...current, desigHashId];
       }
       return copy;
     });
@@ -284,12 +323,14 @@ const RequisitionApprovalFlow = () => {
     setFlowOrder(null);
   };
 
+  // Multiple employees can be selected per designation (standard checkbox).
   const toggleEmployee = (wingId, desigHashId, empId) => {
     const mapKey = `${wingId}_${desigHashId}`;
     setSelectedEmployees((prev) => {
-      const current = prev[mapKey] || {};
-      if (current[empId]) return { ...prev, [mapKey]: {} };
-      return { ...prev, [mapKey]: { [empId]: true } };
+      const current = { ...(prev[mapKey] || {}) };
+      if (current[empId]) delete current[empId];
+      else current[empId] = true;
+      return { ...prev, [mapKey]: current };
     });
     setSaved(false);
     setFlowOrder(null);
@@ -300,6 +341,8 @@ const RequisitionApprovalFlow = () => {
     setDesignationMap({});
     setExpandedWings({});
     setSelectedEmployees({});
+    setSecretarySelected(false);
+    setSecretaryEmployees({});
     setFlowOrder(null);
     setSaved(false);
     setProcessType('requisition');
@@ -318,55 +361,87 @@ const RequisitionApprovalFlow = () => {
   }, [getSelectedEmpNames]);
 
   const baseSummary = useMemo(() => {
-    return Object.entries(designationMap)
-      .map(([wingId, desigHashId]) => {
+    const items = [];
+    Object.entries(designationMap).forEach(([wingId, desigList]) => {
+      (desigList || []).forEach((desigHashId) => {
         const wing = wings.find((w) => w.id === wingId);
-        const desig = allDesignations.find((d) => d.hash_id === desigHashId);
-        return {
+        const desig = HARDCODED_DESIGNATIONS.find((d) => d.hash_id === desigHashId);
+        items.push({
+          key: `${wingId}_${desigHashId}`,
           wingId,
           wingName: wing?.name || 'Unknown',
           designation: desig?.name || 'Unknown',
           designationHashId: desigHashId,
           employees: getSelectedEmpNames(wingId, desigHashId),
-        };
+          isSecretary: false,
+        });
       });
-  }, [designationMap, getSelectedEmpNames, wings, allDesignations]);
+    });
+    // Secretary is now a normal (draggable) item, not pinned to the end.
+    if (secretarySelected) {
+      const secEmps = (employeesMap[HARDCODED_SECRETARY.hash_id] || []).filter((e) => secretaryEmployees[e.id]);
+      items.push({
+        key: 'secretary',
+        wingId: 'secretary',
+        wingName: 'Final Approval',
+        designation: 'Secretary',
+        designationHashId: HARDCODED_SECRETARY.hash_id,
+        employees: secEmps,
+        isSecretary: true,
+      });
+    }
+    return items;
+  }, [designationMap, getSelectedEmpNames, wings, secretarySelected, secretaryEmployees, employeesMap]);
 
   const summary = useMemo(() => {
     if (!flowOrder) return baseSummary;
-    const byWing = {};
-    baseSummary.forEach((item) => { byWing[item.wingId] = item; });
-    return flowOrder.filter((id) => byWing[id]).map((id) => byWing[id]);
+    const byKey = {};
+    baseSummary.forEach((item) => { byKey[item.key] = item; });
+    return flowOrder.filter((k) => byKey[k]).map((k) => byKey[k]);
   }, [baseSummary, flowOrder]);
+
+  // Sort the final flow by designation hierarchy rank (ascending/descending).
+  const applySort = (dir) => {
+    setSortDir(dir);
+    const rankOf = (item) => {
+      if (item.isSecretary) return HARDCODED_DESIGNATIONS.length;
+      const idx = HARDCODED_DESIGNATIONS.findIndex((d) => d.hash_id === item.designationHashId);
+      return idx === -1 ? HARDCODED_DESIGNATIONS.length : idx;
+    };
+    const ordered = [...baseSummary].sort((a, b) =>
+      dir === 'asc' ? rankOf(a) - rankOf(b) : rankOf(b) - rankOf(a)
+    );
+    setFlowOrder(ordered.map((s) => s.key));
+    setSaved(false);
+  };
 
   const handleSave = async () => {
     if (!isValid) {
-      toast.error('Please complete at least one wing: select wing, designation, and employee');
+      toast.error('Each selected wing needs a designation, and each designation needs at least one employee');
       return;
     }
 
+    const confirmed = await confirmDelete({
+      title: 'Save Approval Flow',
+      message: 'Are you sure you want to save this approval flow?',
+      warning: '',
+      confirmLabel: 'Yes, Save',
+      confirmColor: 'bg-emerald-600 hover:bg-emerald-700',
+    });
+    if (!confirmed) return;
+
     const orderedSummary = flowOrder
-      ? flowOrder.map((id) => baseSummary.find((s) => s.wingId === id)).filter(Boolean)
+      ? flowOrder.map((k) => baseSummary.find((s) => s.key === k)).filter(Boolean)
       : baseSummary;
 
     const assignments = orderedSummary.map((item, i) => ({
       step: i + 1,
       wing: item.wingName,
       designation: item.designation,
-      employee: (item.employees || [])[0]?.name || null,
+      employee: (item.employees || []).map((e) => e.name).join(', ') || null,
     }));
 
-    if (secretaryDesignation) {
-      const secEmps = employeesMap[secretaryDesignation.hash_id] || [];
-      assignments.push({
-        step: assignments.length + 1,
-        wing: 'Final Approval',
-        designation: 'Secretary',
-        employee: secEmps[0]?.name || null,
-      });
-    }
-
-    const payload = { process_type: processType, assignments };
+    const payload = { process_type: processType, flow_type: flowType, assignments };
 
     setSaving(true);
     try {
@@ -395,7 +470,7 @@ const RequisitionApprovalFlow = () => {
   const onDragOver = (e, idx) => { e.preventDefault(); setDragOverIdx(idx); };
   const onDragEnd = () => {
     if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
-      const ids = summary.map((s) => s.wingId);
+      const ids = summary.map((s) => s.key);
       const [moved] = ids.splice(dragIdx, 1);
       ids.splice(dragOverIdx, 0, moved);
       setFlowOrder(ids);
@@ -422,9 +497,9 @@ const RequisitionApprovalFlow = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
-            <button onClick={() => navigate('/dashboard/settings')}
+            <button onClick={() => navigate('/dashboard/requisitions')}
               className="text-sm text-gray-600 flex items-center mb-2">
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back to Settings
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back to Requisitions
             </button>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg">
@@ -436,46 +511,56 @@ const RequisitionApprovalFlow = () => {
               </div>
             </div>
           </div>
-          <div className="flex gap-3">
-            <button onClick={handleReset}
-              className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 flex items-center gap-2 text-sm">
-              <RotateCcw size={15} /> Reset
-            </button>
-            <button onClick={handleSave} disabled={!isValid || saving}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-              {saving ? 'Saving...' : 'Save Flow'}
-            </button>
-          </div>
         </div>
-
-        {/* Process Type */}
-        <Card className="mb-6 border border-slate-200">
-          <CardContent className="p-5">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Process Type</label>
-            <TextField
-              select size="small" value={processType}
-              onChange={(e) => setProcessType(e.target.value)}
-              sx={{ width: 320 }}
-            >
-              {PROCESS_TYPES.map((pt) => (
-                <MenuItem key={pt.value} value={pt.value}>{pt.label}</MenuItem>
-              ))}
-            </TextField>
-          </CardContent>
-        </Card>
 
         {/* Wing Selection — Tree View */}
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-2">Select Wings & Assign Designations</h2>
+          <h2 className="text-lg font-semibold text-slate-800 mb-2">Approval Flow</h2>
           <p className="text-sm text-slate-500 mb-4">
-            Select wings and assign a designation to each. Only designations linked to a wing are shown.
+            Select Below
             {assignedCount > 0 && (
               <span className="ml-2 text-emerald-700 font-medium">
                 ({assignedCount} wing{assignedCount !== 1 ? 's' : ''} assigned)
               </span>
             )}
           </p>
+
+          {/* Flow Type — Online / Hardcopy */}
+          <div className="flex items-center gap-6 mb-3">
+            <span className="text-sm font-semibold text-slate-700">Flow Type:</span>
+            {['online', 'hardcopy'].map((type) => (
+              <label key={type} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="flow_type"
+                  value={type}
+                  checked={flowType === type}
+                  onChange={(e) => setFlowType(e.target.value)}
+                  className="w-4 h-4 accent-emerald-700 cursor-pointer"
+                />
+                <span className={`text-sm ${flowType === type ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
+                  {type === 'online' ? 'Online' : 'Hardcopy'}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {/* Designation Order — Ascending / Descending */}
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-sm font-semibold text-slate-700">Order:</span>
+            <button type="button" onClick={() => applySort('asc')}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                sortDir === 'asc' ? 'bg-emerald-700 border-emerald-700 text-white' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}>
+              <ArrowUp size={14} /> Ascending
+            </button>
+            <button type="button" onClick={() => applySort('desc')}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                sortDir === 'desc' ? 'bg-emerald-700 border-emerald-700 text-white' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}>
+              <ArrowDown size={14} /> Descending
+            </button>
+          </div>
 
           <Card className="border border-slate-200">
             <CardContent className="p-0">
@@ -488,10 +573,9 @@ const RequisitionApprovalFlow = () => {
                 {wings.map((wing, wingIdx) => {
                   const isSelected = !!selectedWings[wing.id];
                   const isExpanded = !!expandedWings[wing.id];
-                  const assignedDesigHashId = designationMap[wing.id];
-                  const assignedDesig = assignedDesigHashId ? allDesignations.find((d) => d.hash_id === assignedDesigHashId) : null;
+                  const assignedDesigList = designationMap[wing.id] || [];
                   const isLastWing = wingIdx === wings.length - 1;
-                  const wingDesignations = getDesignationsForWing(wing.id);
+                  const wingDesignations = getDesignationsForWing();
                   const hasChildren = isSelected && isExpanded;
 
                   return (
@@ -512,10 +596,10 @@ const RequisitionApprovalFlow = () => {
                           onClick={() => { if (!isSelected) toggleWing(wing.id); else toggleExpand(wing.id); }}>
                           {wing.name}
                         </span>
-                        {assignedDesig && (
+                        {assignedDesigList.length > 0 && (
                           <span className="mr-3 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-sm font-semibold rounded flex items-center gap-1">
                             <CheckCircle2 size={13} />
-                            {assignedDesig.name}
+                            {assignedDesigList.length} selected
                           </span>
                         )}
                       </div>
@@ -529,11 +613,7 @@ const RequisitionApprovalFlow = () => {
                             </div>
                           ) : (
                             wingDesignations.map((desig, desigIdx) => {
-                              const isAssigned = designationMap[wing.id] === desig.hash_id;
-                              const nameKey = desig.name.toLowerCase();
-                              const usedInWings = usedDesignationNames[nameKey] || [];
-                              const isUsedElsewhere = usedInWings.length > 0 && !usedInWings.includes(wing.id);
-                              const isDisabled = isUsedElsewhere && !isAssigned;
+                              const isAssigned = assignedDesigList.includes(desig.hash_id);
                               const isLastDesig = desigIdx === wingDesignations.length - 1;
                               const employees = employeesMap[desig.hash_id] || [];
                               const hasEmps = isAssigned && employees.length > 0;
@@ -541,7 +621,7 @@ const RequisitionApprovalFlow = () => {
 
                               return (
                                 <React.Fragment key={desig.hash_id}>
-                                  <div className={`flex items-center gap-0 border-b border-slate-50 transition-colors duration-100 ${isAssigned ? 'bg-emerald-50/40' : isDisabled ? 'bg-slate-50/50' : 'hover:bg-slate-50'}`}>
+                                  <div className={`flex items-center gap-0 border-b border-slate-50 transition-colors duration-100 ${isAssigned ? 'bg-emerald-50/40' : 'hover:bg-slate-50'}`}>
                                     <div className="w-8 flex-shrink-0 flex justify-center relative h-9">
                                       {!isLastWing && <div className="absolute top-0 left-1/2 w-px bg-slate-300 h-full" />}
                                     </div>
@@ -554,19 +634,13 @@ const RequisitionApprovalFlow = () => {
                                         {isAssigned ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                                       </span>
                                     ) : <span className="w-4 flex-shrink-0" />}
-                                    <Checkbox checked={isAssigned} onChange={() => !isDisabled && selectDesignation(wing.id, desig.hash_id)}
-                                      disabled={isDisabled}
+                                    <Checkbox checked={isAssigned} onChange={() => selectDesignation(wing.id, desig.hash_id)}
                                       size="small"
-                                      sx={{ p: '4px', color: isDisabled ? '#cbd5e1' : '#94a3b8', '&.Mui-checked': { color: '#064e3b' }, '&.Mui-disabled': { color: '#e2e8f0' } }} />
-                                    <span className={`text-base py-2 flex-1 ${isAssigned ? 'font-semibold text-emerald-800 cursor-pointer' : isDisabled ? 'text-slate-400 cursor-not-allowed' : 'text-slate-600 hover:text-slate-800 cursor-pointer'}`}
-                                      onClick={() => !isDisabled && selectDesignation(wing.id, desig.hash_id)}>
+                                      sx={{ p: '4px', color: '#94a3b8', '&.Mui-checked': { color: '#064e3b' } }} />
+                                    <span className={`text-base py-2 flex-1 cursor-pointer ${isAssigned ? 'font-semibold text-emerald-800' : 'text-slate-600 hover:text-slate-800'}`}
+                                      onClick={() => selectDesignation(wing.id, desig.hash_id)}>
                                       {desig.name}
                                     </span>
-                                    {isUsedElsewhere && (
-                                      <span className="mr-3 text-xs text-amber-500 flex items-center gap-1">
-                                        <AlertCircle size={11} /> Assigned
-                                      </span>
-                                    )}
                                   </div>
 
                                   {hasEmps && employees.map((emp, empIdx) => {
@@ -604,6 +678,65 @@ const RequisitionApprovalFlow = () => {
                     </div>
                   );
                 })}
+
+                {/* Secretary — optional, not belonging to any wing (final step) */}
+                {secretaryDesignation && (() => {
+                  const secEmps = employeesMap[secretaryDesignation.hash_id] || [];
+                  return (
+                    <div>
+                      <div className={`flex items-center gap-0 border-b border-slate-100 transition-colors duration-100 ${secretarySelected ? 'bg-emerald-50/60' : 'hover:bg-slate-50'}`}>
+                        <div className="w-8 flex-shrink-0 flex justify-center relative h-10">
+                          <div className="absolute left-1/2 w-px bg-slate-300 top-0 h-1/2" />
+                          <div className="absolute top-1/2 left-1/2 w-3 h-px bg-slate-300" />
+                        </div>
+                        <span className="w-5 h-5 flex-shrink-0" />
+                        <Checkbox checked={secretarySelected} onChange={() => { setSecretarySelected((v) => !v); setSaved(false); }} size="small"
+                          sx={{ p: '4px', color: '#94a3b8', '&.Mui-checked': { color: '#064e3b' } }} />
+                        <Layers size={17} className={`flex-shrink-0 mr-1.5 ${secretarySelected ? 'text-emerald-700' : 'text-slate-400'}`} />
+                        <span className={`text-base py-2 cursor-pointer flex-1 ${secretarySelected ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}
+                          onClick={() => { setSecretarySelected((v) => !v); setSaved(false); }}>
+                          Secretary <span className="text-xs text-slate-400 font-normal">(optional — final approval)</span>
+                        </span>
+                      </div>
+
+                      {secretarySelected && secEmps.map((emp, empIdx) => {
+                        const isLastEmp = empIdx === secEmps.length - 1;
+                        const isEmpSelected = !!secretaryEmployees[emp.id];
+                        return (
+                          <div key={emp.id} className={`flex items-center gap-0 border-b border-slate-50 transition-colors duration-100 ${isEmpSelected ? 'bg-emerald-50/30' : 'hover:bg-slate-50'}`}>
+                            <div className="w-8 flex-shrink-0 flex justify-center relative h-8" />
+                            <div className="w-6 flex-shrink-0 relative flex justify-center h-8">
+                              <div className={`absolute top-0 left-1/2 w-px bg-slate-200 ${isLastEmp ? 'h-1/2' : 'h-full'}`} />
+                              <div className="absolute top-1/2 left-1/2 w-3 h-px bg-slate-200" />
+                            </div>
+                            <Checkbox checked={isEmpSelected} size="small"
+                              onChange={() => {
+                                setSecretaryEmployees((prev) => {
+                                  const c = { ...prev };
+                                  if (c[emp.id]) delete c[emp.id]; else c[emp.id] = true;
+                                  return c;
+                                });
+                                setSaved(false);
+                              }}
+                              sx={{ p: '3px', color: '#94a3b8', '&.Mui-checked': { color: '#064e3b' } }} />
+                            <User size={15} className="text-slate-400 flex-shrink-0 mr-1.5" />
+                            <span className={`text-sm py-1.5 flex-1 cursor-pointer ${isEmpSelected ? 'font-semibold text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                              onClick={() => {
+                                setSecretaryEmployees((prev) => {
+                                  const c = { ...prev };
+                                  if (c[emp.id]) delete c[emp.id]; else c[emp.id] = true;
+                                  return c;
+                                });
+                                setSaved(false);
+                              }}>
+                              {emp.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -626,24 +759,16 @@ const RequisitionApprovalFlow = () => {
             </div>
 
             {/* Hierarchy preview row */}
-            {summary.length > 0 && (() => {
-              const allSteps = [
-                ...summary.map((item, i) => ({ ...item, stepNum: i + 1, isSecretary: false })),
-                ...(secretaryDesignation ? [{ stepNum: summary.length + 1, isSecretary: true, designationHashId: secretaryDesignation.hash_id, designation: 'Secretary' }] : []),
-              ];
-              const totalSteps = allSteps.length;
-              return (
+            {summary.length > 0 && (
                 <div className="flex items-center gap-0 mb-6 pb-5 border-b border-slate-200 w-full">
-                  {allSteps.map((step, i) => {
+                  {summary.map((step, i) => {
                     const colors = step.isSecretary ? SECRETARY_COLORS : getStepColors(i);
-                    const emp = step.isSecretary
-                      ? (employeesMap[secretaryDesignation?.hash_id] || [])[0]
-                      : (step.employees || [])[0];
+                    const emp = (step.employees || [])[0];
                     return (
-                      <React.Fragment key={step.isSecretary ? 'secretary' : step.wingId}>
+                      <React.Fragment key={step.key}>
                         <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border flex-1 min-w-0 ${colors.bg} ${colors.border}`}>
                           <div className={`w-7 h-7 rounded-full ${colors.dot} text-white flex items-center justify-center text-xs font-bold flex-shrink-0`}>
-                            {step.stepNum}
+                            {i + 1}
                           </div>
                           <div className="min-w-0">
                             <span className={`text-sm font-semibold ${colors.text} block truncate`}>{step.designation}</span>
@@ -658,15 +783,14 @@ const RequisitionApprovalFlow = () => {
                             </div>
                           </div>
                         </div>
-                        {i < totalSteps - 1 && (
+                        {i < summary.length - 1 && (
                           <ArrowRight size={18} className="text-slate-400 flex-shrink-0 mx-1" />
                         )}
                       </React.Fragment>
                     );
                   })}
                 </div>
-              );
-            })()}
+            )}
 
             {/* Draggable assignment summary */}
             {summary.length === 0 ? (
@@ -678,11 +802,11 @@ const RequisitionApprovalFlow = () => {
             ) : (
               <div className="space-y-2">
                 {summary.map((item, i) => {
-                  const colors = getStepColors(i);
+                  const colors = item.isSecretary ? SECRETARY_COLORS : getStepColors(i);
                   const isDragging = dragIdx === i;
                   const isDragOver = dragOverIdx === i;
                   return (
-                    <React.Fragment key={item.wingId}>
+                    <React.Fragment key={item.key}>
                       <div
                         draggable
                         onDragStart={() => onDragStart(i)}
@@ -702,7 +826,7 @@ const RequisitionApprovalFlow = () => {
                         </div>
                         {(item.employees || []).length > 0 && (
                           <span className="text-xs text-slate-500 flex items-center gap-1">
-                            <User size={10} /> {item.employees[0].name}
+                            <User size={10} /> {item.employees.map((e) => e.name).join(', ')}
                           </span>
                         )}
                       </div>
@@ -714,44 +838,8 @@ const RequisitionApprovalFlow = () => {
                     </React.Fragment>
                   );
                 })}
-
-                {/* Secretary — fixed, not draggable */}
-                {secretaryDesignation && (
-                  <>
-                    <div className="flex justify-center">
-                      <div className="w-0.5 h-3 bg-slate-300 rounded" />
-                    </div>
-                    <div className={`p-3 rounded-lg border flex items-center gap-3 ${SECRETARY_COLORS.bg} ${SECRETARY_COLORS.border} opacity-80`}>
-                      <div className="w-4 flex-shrink-0" />
-                      <div className={`w-7 h-7 rounded-full ${SECRETARY_COLORS.dot} text-white flex items-center justify-center text-xs font-bold flex-shrink-0`}>
-                        {summary.length + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-800">Final Approval</p>
-                        <p className={`text-xs font-medium ${SECRETARY_COLORS.text}`}>Secretary</p>
-                      </div>
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                        <User size={10} /> {(employeesMap[secretaryDesignation.hash_id] || [])[0]?.name}
-                      </span>
-                    </div>
-                  </>
-                )}
               </div>
             )}
-
-            {/* Validation Status */}
-            <div className="mt-5 pt-4 border-t border-slate-200">
-              <div className="space-y-2 text-xs">
-                <div className={`flex items-center gap-2 ${processType ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  {processType ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                  Process type selected
-                </div>
-                <div className={`flex items-center gap-2 ${completeCount > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  {completeCount > 0 ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                  At least one complete selection (wing + designation + employee)
-                </div>
-              </div>
-            </div>
 
             {saved && summary.length > 0 && (
               <div className="mt-4">
@@ -763,6 +851,19 @@ const RequisitionApprovalFlow = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Bottom Action Buttons */}
+        <div className="flex justify-end gap-3 mb-6">
+          <button onClick={handleReset}
+            className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 flex items-center gap-2 text-sm">
+            <RotateCcw size={15} /> Reset
+          </button>
+          <button onClick={handleSave} disabled={!isValid || saving}
+            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {saving ? 'Saving...' : 'Save Flow'}
+          </button>
+        </div>
 
         {/* Flow Hierarchy Dialog */}
         <Dialog open={showFlowDialog} onClose={() => setShowFlowDialog(false)} maxWidth="md" fullWidth>
@@ -786,10 +887,10 @@ const RequisitionApprovalFlow = () => {
                 <div className="pb-2" style={{ width: '-webkit-fill-available' }}>
                   <div className="flex items-start w-full">
                     {summary.map((item, i) => {
-                      const colors = getStepColors(i);
+                      const colors = item.isSecretary ? SECRETARY_COLORS : getStepColors(i);
                       const emp = (item.employees || [])[0];
                       return (
-                        <React.Fragment key={item.wingId}>
+                        <React.Fragment key={item.key}>
                           <div className="flex flex-col items-center flex-1 min-w-0">
                             <div className={`w-12 h-12 rounded-full ${colors.dot} text-white flex items-center justify-center text-lg font-bold shadow-md`}>
                               {i + 1}
@@ -804,34 +905,15 @@ const RequisitionApprovalFlow = () => {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center self-center mt-1 flex-shrink-0 w-10">
-                            <div className="flex-1 h-0.5 bg-emerald-300" />
-                            <ArrowRight size={16} className="text-emerald-500 -ml-1" />
-                          </div>
+                          {i < summary.length - 1 && (
+                            <div className="flex items-center self-center mt-1 flex-shrink-0 w-10">
+                              <div className="flex-1 h-0.5 bg-emerald-300" />
+                              <ArrowRight size={16} className="text-emerald-500 -ml-1" />
+                            </div>
+                          )}
                         </React.Fragment>
                       );
                     })}
-
-                    {/* Secretary final step */}
-                    {secretaryDesignation && (() => {
-                      const secEmp = (employeesMap[secretaryDesignation.hash_id] || [])[0];
-                      return (
-                        <div className="flex flex-col items-center flex-1 min-w-0">
-                          <div className={`w-12 h-12 rounded-full ${SECRETARY_COLORS.dot} text-white flex items-center justify-center text-lg font-bold shadow-md`}>
-                            {summary.length + 1}
-                          </div>
-                          <div className="mt-2 text-center w-full px-1">
-                            <p className={`text-xs font-bold ${SECRETARY_COLORS.text} truncate`}>Secretary</p>
-                            <p className="text-xs text-slate-500 mt-0.5 truncate">Final Approval</p>
-                            {secEmp && (
-                              <span className="text-xs text-slate-600 flex items-center justify-center gap-1 mt-1 truncate">
-                                <User size={10} className="text-slate-400 flex-shrink-0" /> {secEmp.name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 </div>
 
@@ -848,9 +930,9 @@ const RequisitionApprovalFlow = () => {
                     </thead>
                     <tbody>
                       {summary.map((item, i) => {
-                        const colors = getStepColors(i);
+                        const colors = item.isSecretary ? SECRETARY_COLORS : getStepColors(i);
                         return (
-                          <tr key={item.wingId} className="border-t border-slate-100">
+                          <tr key={item.key} className="border-t border-slate-100">
                             <td className="px-4 py-3">
                               <span className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold text-white ${colors.dot}`}>{i + 1}</span>
                             </td>
@@ -858,22 +940,10 @@ const RequisitionApprovalFlow = () => {
                             <td className="px-4 py-3">
                               <span className={`px-2 py-0.5 rounded text-xs font-semibold ${colors.bg} ${colors.text}`}>{item.designation}</span>
                             </td>
-                            <td className="px-4 py-3 text-slate-600">{(item.employees || [])[0]?.name || ''}</td>
+                            <td className="px-4 py-3 text-slate-600">{(item.employees || []).map((e) => e.name).join(', ')}</td>
                           </tr>
                         );
                       })}
-                      {secretaryDesignation && (
-                        <tr className="border-t border-slate-100">
-                          <td className="px-4 py-3">
-                            <span className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold text-white ${SECRETARY_COLORS.dot}`}>{summary.length + 1}</span>
-                          </td>
-                          <td className="px-4 py-3 font-medium text-slate-800">Final Approval</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${SECRETARY_COLORS.bg} ${SECRETARY_COLORS.text}`}>Secretary</span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">{(employeesMap[secretaryDesignation.hash_id] || [])[0]?.name || ''}</td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
