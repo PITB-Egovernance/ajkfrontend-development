@@ -27,10 +27,10 @@ const extractList = (result) => {
 
 class EmployeeService {
   // ──────────────────────────────────────────────────────
-  // 1) Register a new department employee
+  // 1) Create a new employee
   // ──────────────────────────────────────────────────────
   static async register(data) {
-    const response = await fetch(`${API_BASE}/dept-employee/register`, {
+    const response = await fetch(`${API_BASE}/employee/create`, {
       method: 'POST',
       headers: getHeaders(true),
       body: JSON.stringify(data),
@@ -49,7 +49,7 @@ class EmployeeService {
   }
 
   // ──────────────────────────────────────────────────────
-  // 2) Get paginated list of users
+  // 2) Get list of employees
   // ──────────────────────────────────────────────────────
   static async getUsers(params = {}) {
     const query = new URLSearchParams(params).toString();
@@ -71,10 +71,10 @@ class EmployeeService {
   }
 
   // ──────────────────────────────────────────────────────
-  // 3) Get a single user's details
+  // 3) Get a single employee's details
   // ──────────────────────────────────────────────────────
   static async getUserDetails(id) {
-    const response = await fetch(`${API_BASE}/users/${id}`, {
+    const response = await fetch(`${API_BASE}/employee/${id}`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -82,17 +82,17 @@ class EmployeeService {
     const result = await safeJson(response);
 
     if (!response.ok) {
-      throw new Error(result?.message || 'Failed to load user details');
+      throw new Error(result?.message || 'Failed to load employee details');
     }
 
     return result?.data || result;
   }
 
   // ──────────────────────────────────────────────────────
-  // 4) Update a user (admin)
+  // 4) Update an employee
   // ──────────────────────────────────────────────────────
   static async updateUser(id, data) {
-    const response = await fetch(`${API_BASE}/users/${id}`, {
+    const response = await fetch(`${API_BASE}/employee/update/${id}`, {
       method: 'PUT',
       headers: getHeaders(true),
       body: JSON.stringify(data),
@@ -101,13 +101,31 @@ class EmployeeService {
     const result = await safeJson(response);
 
     if (!response.ok) {
-      const error = new Error(result?.message || 'Failed to update user');
+      const error = new Error(result?.message || 'Failed to update employee');
       error.status = response.status;
       error.errors = result?.errors || {};
       throw error;
     }
 
     return result?.data || result;
+  }
+
+  // ──────────────────────────────────────────────────────
+  // 5) Delete an employee
+  // ──────────────────────────────────────────────────────
+  static async deleteEmployee(hashId) {
+    const response = await fetch(`${API_BASE}/employee/${hashId}/delete`, {
+      method: 'DELETE',
+      headers: getHeaders(false),
+    });
+
+    const result = await safeJson(response);
+
+    if (!response.ok) {
+      throw new Error(result?.message || 'Failed to delete employee');
+    }
+
+    return result;
   }
 
   // ──────────────────────────────────────────────────────

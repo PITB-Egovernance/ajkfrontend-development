@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
-import { Menu, MenuItem, IconButton, Switch, TextField, Checkbox, ListItemText, Chip, Box } from '@mui/material';
+import { Menu, MenuItem, IconButton, Switch, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
@@ -12,6 +12,7 @@ import {
   Upload,
   MoreVertical,
   Eye,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
@@ -52,7 +53,7 @@ const mapUser = (user, idx) => ({
   status_job: user?.status_job || '-',
 });
 
-const ActionCell = ({ employee, onViewDetails }) => {
+const ActionCell = ({ employee, onViewDetails, onDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
@@ -100,6 +101,12 @@ const ActionCell = ({ employee, onViewDetails }) => {
         <MenuItem onClick={(e) => { handleClose(e); onViewDetails(employee); }}>
           <Eye className="w-4 h-4" /> View / Edit Details
         </MenuItem>
+        <MenuItem
+          onClick={(e) => { handleClose(e); onDelete(employee); }}
+          sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}
+        >
+          <Trash2 className="w-4 h-4" /> Delete Employee
+        </MenuItem>
       </Menu>
     </div>
   );
@@ -114,6 +121,8 @@ const EmployeeList = () => {
   const [selectedHashId, setSelectedHashId] = useState(null);
   const [designationOptions, setDesignationOptions] = useState([]);
   const [selectedDesignations, setSelectedDesignations] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -181,6 +190,21 @@ const EmployeeList = () => {
 
   const handleViewDetails = (employee) => {
     setSelectedHashId(employee.hash_id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await EmployeeService.deleteEmployee(deleteTarget.hash_id);
+      setEmployees((prev) => prev.filter((emp) => emp.id !== deleteTarget.id));
+      toast.success(`${deleteTarget.full_name} deleted successfully`);
+    } catch (error) {
+      toast.error(error.message || 'Failed to delete employee');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   const handleEmployeeUpdated = (updated) => {
@@ -275,7 +299,7 @@ const EmployeeList = () => {
       sortable: false,
       filterable: false,
       renderCell: (params) => (
-        <ActionCell employee={params.row} onViewDetails={handleViewDetails} />
+        <ActionCell employee={params.row} onViewDetails={handleViewDetails} onDelete={setDeleteTarget} />
       ),
     },
   ];
@@ -433,6 +457,27 @@ const EmployeeList = () => {
         onClose={() => setSelectedHashId(null)}
         onUpdated={handleEmployeeUpdated}
       />
+
+      <Dialog open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle className="text-lg font-semibold">Delete Employee</DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-slate-600">
+            Are you sure you want to delete <strong>{deleteTarget?.full_name}</strong>? This action cannot be undone.
+          </p>
+        </DialogContent>
+        <DialogActions className="px-6 pb-4">
+          <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            disabled={deleting}
+            className="!bg-red-600 hover:!bg-red-700 !text-white"
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
