@@ -37,7 +37,7 @@ const ConfirmStatusDialog = ({ newStatus, onConfirm, onCancel }) => {
 
         {/* Title */}
         <h2 className="text-xl font-bold text-gray-800 mb-2">
-          {isActivating ? 'Activate Record?' : 'Deactivate Record?'}
+          {isActivating ? 'Active?' : 'Inactive?'}
         </h2>
 
         {/* Message */}
@@ -62,10 +62,10 @@ const ConfirmStatusDialog = ({ newStatus, onConfirm, onCancel }) => {
             className={`flex-1 px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-colors ${
               isActivating
                 ? 'bg-emerald-500 hover:bg-emerald-600'
-                : 'bg-orange-500 hover:bg-orange-600'
+                : 'bg-red-500 hover:bg-red-600'
             }`}
           >
-            Yes, {isActivating ? 'Activate' : 'Deactivate'}
+            Yes, {isActivating ? 'Active' : 'Inactive'}
           </button>
         </div>
       </div>
