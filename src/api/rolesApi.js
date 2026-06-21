@@ -35,9 +35,9 @@ const RolesApi = {
     return handle(res);
   },
 
-  // POST /settings/roles
+  // POST /settings/roles/store
   create: async (data) => {
-    const res = await fetch(`${API_BASE}/settings/roles`, {
+    const res = await fetch(`${API_BASE}/settings/roles/store`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -45,9 +45,9 @@ const RolesApi = {
     return handle(res);
   },
 
-  // PUT /settings/roles/{hash}
+  // PUT /settings/roles/update/{hash}
   update: async (hashId, data) => {
-    const res = await fetch(`${API_BASE}/settings/roles/${hashId}`, {
+    const res = await fetch(`${API_BASE}/settings/roles/update/${hashId}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -55,9 +55,9 @@ const RolesApi = {
     return handle(res);
   },
 
-  // PATCH /settings/roles/{hash}/status  { status: 'active' | 'inactive' }
+  // PATCH /settings/roles/{hash}  { status: 'active' | 'inactive' }
   updateStatus: async (hashId, status) => {
-    const res = await fetch(`${API_BASE}/settings/roles/${hashId}/status`, {
+    const res = await fetch(`${API_BASE}/settings/roles/${hashId}`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ status }),
@@ -65,9 +65,9 @@ const RolesApi = {
     return handle(res);
   },
 
-  // DELETE /settings/roles/{hash}
+  // DELETE /settings/roles/{hash}/delete
   remove: async (hashId) => {
-    const res = await fetch(`${API_BASE}/settings/roles/${hashId}`, {
+    const res = await fetch(`${API_BASE}/settings/roles/${hashId}/delete`, {
       method: 'DELETE',
       headers: getHeaders(false),
     });
