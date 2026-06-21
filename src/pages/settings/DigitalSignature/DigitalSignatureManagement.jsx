@@ -67,11 +67,13 @@ const DigitalSignatureManagement = () => {
   const navigate     = useNavigate();
   const fileInputRef = useRef(null);
 
-  const [allRows,       setAllRows]       = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [saving,        setSaving]        = useState(false);
-  const [designations,  setDesignations]  = useState([]);
-  const [filters,       setFilters]       = useState({ name: "", designation: "", status: "" });
+  const [allRows,          setAllRows]          = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [saving,           setSaving]           = useState(false);
+  const [designations,     setDesignations]     = useState([]);
+  const [employees,        setEmployees]        = useState([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [filters,          setFilters]          = useState({ name: "", designation: "", status: "" });
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]  = useState([]);
@@ -122,6 +124,25 @@ const DigitalSignatureManagement = () => {
       setDesignations(Array.isArray(data) ? data.filter((d) => !d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase())) : []);
     } catch {
       setDesignations([]);
+    }
+  };
+
+  const fetchActiveEmployees = async (designation) => {
+    if (!designation) { setEmployees([]); return; }
+    setLoadingEmployees(true);
+    try {
+      const res    = await fetch(`${API_BASE}/employees/active`, { headers: authHeaders() });
+      const result = await res.json();
+      const data   = result.data?.data ?? result.data ?? [];
+      const list   = Array.isArray(data) ? data : [];
+      const filtered = list.filter(
+        (emp) => emp.designation?.toLowerCase().trim() === designation.toLowerCase().trim()
+      );
+      setEmployees(filtered);
+    } catch {
+      setEmployees([]);
+    } finally {
+      setLoadingEmployees(false);
     }
   };
 
@@ -179,6 +200,7 @@ const DigitalSignatureManagement = () => {
     setEditingRow(null);
     setFormData(EMPTY_FORM);
     setFormErrors({});
+    setEmployees([]);
     setOpenModal(true);
   };
 
@@ -192,6 +214,7 @@ const DigitalSignatureManagement = () => {
       status:       selectedRow.status ?? "active",
     });
     setFormErrors({});
+    fetchActiveEmployees(selectedRow.designation);
     setOpenModal(true);
     handleMenuClose();
   };
@@ -516,34 +539,20 @@ const DigitalSignatureManagement = () => {
           </DialogTitle>
           <DialogContent>
 
-            {/* Name */}
-            <TextField
-              fullWidth
-              label="Name"
-              margin="normal"
-              size="small"
-              autoFocus
-              value={formData.name}
-              onChange={(e) => {
-                setFormData((f) => ({ ...f, name: e.target.value }));
-                if (e.target.value.trim()) setFormErrors((errs) => ({ ...errs, name: undefined }));
-              }}
-              error={!!formErrors.name}
-              helperText={formErrors.name}
-              placeholder="e.g. Ahmad Ali"
-            />
-
-            {/* Designation */}
+            {/* Designation — first */}
             <TextField
               select
               fullWidth
               label="Designation"
               margin="normal"
               size="small"
+              autoFocus
               value={formData.designation}
               onChange={(e) => {
-                setFormData((f) => ({ ...f, designation: e.target.value }));
-                if (e.target.value) setFormErrors((errs) => ({ ...errs, designation: undefined }));
+                const val = e.target.value;
+                setFormData((f) => ({ ...f, designation: val, name: "" }));
+                if (val) setFormErrors((errs) => ({ ...errs, designation: undefined }));
+                fetchActiveEmployees(val);
               }}
               error={!!formErrors.designation}
               helperText={formErrors.designation}
@@ -556,6 +565,46 @@ const DigitalSignatureManagement = () => {
                   {d.name}
                 </option>
               ))}
+            </TextField>
+
+            {/* Name — populated from employees matching the selected designation */}
+            <TextField
+              select
+              fullWidth
+              label="Name"
+              margin="normal"
+              size="small"
+              value={formData.name}
+              onChange={(e) => {
+                setFormData((f) => ({ ...f, name: e.target.value }));
+                if (e.target.value) setFormErrors((errs) => ({ ...errs, name: undefined }));
+              }}
+              error={!!formErrors.name}
+              helperText={formErrors.name}
+              disabled={!formData.designation || loadingEmployees}
+              SelectProps={{ native: true }}
+              InputLabelProps={{ shrink: true }}
+            >
+              <option value="">
+                {loadingEmployees
+                  ? "Loading employees…"
+                  : !formData.designation
+                  ? "Select designation first"
+                  : employees.length === 0
+                  ? "No employees found"
+                  : "— Select Name —"}
+              </option>
+              {employees.map((emp) => {
+                const empName =
+                  emp.first_name && emp.last_name
+                    ? `${emp.first_name} ${emp.last_name}`
+                    : emp.username || emp.name || emp.full_name || "-";
+                return (
+                  <option key={emp.hash_id ?? emp.id} value={empName}>
+                    {empName}
+                  </option>
+                );
+              })}
             </TextField>
 
             {/* Signature Image Upload */}

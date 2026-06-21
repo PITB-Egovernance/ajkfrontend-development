@@ -15,7 +15,8 @@ import {
   ScrollText,
   PenTool,
   UserCog,
-  LayoutList
+  LayoutList,
+  ShieldCheck
 } from 'lucide-react';
 
 const Settings = () => {
@@ -126,6 +127,13 @@ const Settings = () => {
       description: 'Manage wings and sections hierarchy',
       iconBg: 'bg-indigo-600',
       link: '/dashboard/settings/wings'
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Roles & Permissions',
+      description: 'Manage roles and module access permissions',
+      iconBg: 'bg-violet-700',
+      link: '/dashboard/settings/roles'
     }
   ];
 
