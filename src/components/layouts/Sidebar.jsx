@@ -65,7 +65,9 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     // A submenu is open if explicitly toggled OR one of its children is the
     // active route (so the parent auto-expands and the item shows nested).
     const hasActiveChild = hasSubmenu && item.submenu.some((s) => isActive(s.path));
-    const isMenuOpen = currentOpenMenu === item.id || hasActiveChild;
+    // Accordion: an explicit selection wins (only that menu is open). Fall back
+    // to auto-expanding the active route's parent only when nothing is explicitly open.
+    const isMenuOpen = currentOpenMenu ? currentOpenMenu === item.id : hasActiveChild;
     const active = isActive(item.path);
     const [showHoverMenu, setShowHoverMenu] = useState(false);
 

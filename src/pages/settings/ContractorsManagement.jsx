@@ -560,20 +560,22 @@ const ContractorsManagement = () => {
                       />
                     </div>
 
-                    <div>
-                      <TextField
-                        select
-                        fullWidth
-                        label="Status"
-                        id="status"
-                        name="status"
-                        value={formData.status}
-                        onChange={handleInputChange}
-                      >
-                        <MenuItem value="active">Active</MenuItem>
-                        <MenuItem value="inactive">Inactive</MenuItem>
-                      </TextField>
-                    </div>
+                    {editingContractor && (
+                      <div>
+                        <TextField
+                          select
+                          fullWidth
+                          label="Status"
+                          id="status"
+                          name="status"
+                          value={formData.status}
+                          onChange={handleInputChange}
+                        >
+                          <MenuItem value="active">Active</MenuItem>
+                          <MenuItem value="inactive">Inactive</MenuItem>
+                        </TextField>
+                      </div>
+                    )}
                   </div>
                 </div>
 

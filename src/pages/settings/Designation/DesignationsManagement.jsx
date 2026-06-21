@@ -246,6 +246,26 @@ const DesignationsManagement = () => {
   try {
     const isUpdate = !!editingDesignation;
 
+    // Prevent duplicate designation names (case-insensitive, regardless of grade).
+    // Fetch the full list so duplicates on other pages are also caught.
+    try {
+      const dupRes = await fetch(`${API_BASE}/settings/designations?per_page=1000`, { headers: getHeaders(false) });
+      const dupResult = await dupRes.json();
+      const all = dupResult.data?.data || dupResult.data || [];
+      const target = formData.name.trim().toLowerCase();
+      const duplicate = all.some(
+        (d) => d.name?.trim().toLowerCase() === target &&
+          (!isUpdate || (d.hash_id !== editingDesignation.hash_id))
+      );
+      if (duplicate) {
+        toast.error("This designation already exists");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // if the duplicate check fails, fall through and let the backend validate
+    }
+
     const url = isUpdate
       ? `${API_BASE}/settings/designations/${editingDesignation.hash_id}/update`
       : `${API_BASE}/settings/designations/create`;
@@ -343,12 +363,6 @@ const DesignationsManagement = () => {
   {
     field: "grade_name",
     headerName: "Grade",
-    width: 150,
-  },
-
-  {
-    field: "type",
-    headerName: "Type",
     width: 150,
   },
 
