@@ -24,8 +24,6 @@ export const PERMISSION_MODULES = {
     label: 'Advertisement',
     modules: {
       advertisement: { label: 'Advertisement', actions: ['add', 'edit', 'delete', 'view', 'job_pool', 'reopen', 'temporary_closed', 'permanent_closed'] },
-      result:        { label: 'Result',        actions: ['add', 'edit', 'delete', 'view'] },
-      archive:       { label: 'Archive',       actions: ['add', 'edit', 'delete', 'view'] },
     },
   },
   result: {
