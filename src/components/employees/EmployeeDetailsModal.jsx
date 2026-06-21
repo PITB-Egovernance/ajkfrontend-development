@@ -44,7 +44,7 @@ const toDisplayDate = (isoStr) => {
   const datePart = String(isoStr).slice(0, 10); // YYYY-MM-DD
   const [y, m, d] = datePart.split('-');
   if (!y || !m || !d) return isoStr;
-  return `${d}-${m}-${y}`;
+  return `${d}/${m}/${y}`;
 };
 
 

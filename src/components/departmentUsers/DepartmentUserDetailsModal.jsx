@@ -24,7 +24,7 @@ const FIELD_LABELS = {
 const toDisplayDate = (isoStr) => {
   if (!isoStr) return '';
   const [y, m, d] = String(isoStr).slice(0, 10).split('-');
-  return y && m && d ? `${d}-${m}-${y}` : isoStr;
+  return y && m && d ? `${d}/${m}/${y}` : isoStr;
 };
 
 const fieldSx = {

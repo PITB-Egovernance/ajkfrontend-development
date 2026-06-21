@@ -64,6 +64,7 @@ export const MENU_ITEMS = [
       { label: "Designations",       path: "/dashboard/settings/designations",        icon: Briefcase },
       { label: "Grades",             path: "/dashboard/settings/grades",              icon: ClipboardList },
       { label: "Departments",        path: "/dashboard/settings/departments",         icon: Building2 },
+      { label: "Department Users", path: "/dashboard/settings/department-users", icon: Users },
       { label: "Nationalities",      path: "/dashboard/settings/nationalities",       icon: Flag },
       { label: "Exam Test & Fee",    path: "/dashboard/settings/tests",              icon: DollarSign },
       { label: "Cities",             path: "/dashboard/settings/cities",              icon: Map },
@@ -78,7 +79,6 @@ export const MENU_ITEMS = [
       { label: "Wings / Sections",        path: "/dashboard/settings/wings",        icon: LayoutList },
       { label: "Requisition Approval Flow", path: "/dashboard/settings/approval-flow", icon: CheckCircle },
       { label: "Roles & Permissions", path: "/dashboard/settings/roles",              icon: ShieldCheck },
-      { label: "Department Users",   path: "/dashboard/settings/department-users",  icon: Building2 },
     ],
   },
 ];

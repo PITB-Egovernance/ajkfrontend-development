@@ -25,7 +25,6 @@ const DepartmentUserForm = () => {
   const [username, setUsername] = useState('');
   const [cnic, setCnic] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [fatherHusbandName, setFatherHusbandName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
@@ -97,8 +96,6 @@ const DepartmentUserForm = () => {
     if (!cnic.trim()) errors.cnic = ['CNIC is required'];
     else if (cnic.length !== 13) errors.cnic = ['CNIC must be exactly 13 digits'];
     if (!email.trim()) errors.email = ['Email address is required'];
-    if (!password) errors.password = ['Password is required'];
-    else if (password.length < 8) errors.password = ['Password must be at least 8 characters'];
     if (!fatherHusbandName.trim()) errors.father_husband_name = ['Father/Husband name is required'];
     if (!dob) errors.dob = ['Date of birth is required'];
     if (!gender) errors.gender = ['Gender is required'];
@@ -120,7 +117,6 @@ const DepartmentUserForm = () => {
       const result = await DepartmentUserService.create({
         username: username.trim(),
         cnic: cnic.trim().replace(/[^0-9]/g, ''),
-        password,
         father_husband_name: fatherHusbandName.trim(),
         email: email.trim(),
         gender: gender.toLowerCase(),
@@ -162,6 +158,7 @@ const DepartmentUserForm = () => {
             </div>
 
             <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
+              {/* Row 1: Username + CNIC */}
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Username" value={username}
@@ -176,6 +173,7 @@ const DepartmentUserForm = () => {
                 </div>
               </div>
 
+              {/* Row 2: Email + Father/Husband */}
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Email Address" type="email" value={email}
@@ -189,21 +187,14 @@ const DepartmentUserForm = () => {
                 </div>
               </div>
 
+              {/* Row 3: DOB + Gender */}
               <div className="row">
-                <div className="col-md-6 form-group">
-                  <TextField fullWidth label="Password" type="password" value={password}
-                    onChange={(e) => setPassword(e.target.value)} required sx={fieldSx}
-                    error={!!fieldErrors?.password} helperText={fieldErrors?.password?.join(', ')} />
-                </div>
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Date of Birth" type="date" value={dob}
                     onChange={(e) => setDob(e.target.value)} required
                     InputLabelProps={{ shrink: true }} inputProps={{ style: { height: 28 } }}
                     sx={fieldSx} error={!!fieldErrors?.dob} helperText={fieldErrors?.dob?.join(', ')} />
                 </div>
-              </div>
-
-              <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField select fullWidth label="Gender" value={gender}
                     onChange={(e) => setGender(e.target.value)} required sx={fieldSx}
@@ -212,15 +203,16 @@ const DepartmentUserForm = () => {
                     {GENDER_OPTIONS.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
                   </TextField>
                 </div>
+              </div>
+
+              {/* Row 4: Mobile + Domicile */}
+              <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Mobile Number" placeholder="11 digits e.g. 03001234567"
                     value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
                     required inputProps={{ maxLength: 11, inputMode: 'numeric' }} sx={fieldSx}
                     error={!!fieldErrors?.mobile} helperText={fieldErrors?.mobile?.join(', ') || `${mobile.length}/11 digits`} />
                 </div>
-              </div>
-
-              <div className="row">
                 <div className="col-md-6 form-group">
                   <Autocomplete options={districtOptions} getOptionLabel={(o) => o.name || ''}
                     isOptionEqualToValue={(o, v) => o.id === v.id} value={district}
@@ -230,6 +222,10 @@ const DepartmentUserForm = () => {
                         error={!!fieldErrors?.domicile_district} helperText={fieldErrors?.domicile_district?.join(', ')} />
                     )} />
                 </div>
+              </div>
+
+              {/* Row 5: Department + Role */}
+              <div className="row">
                 <div className="col-md-6 form-group">
                   <Autocomplete options={departmentOptions} getOptionLabel={(o) => o.name || ''}
                     isOptionEqualToValue={(o, v) => o.id === v.id} value={selectedDepartment}
@@ -239,10 +235,6 @@ const DepartmentUserForm = () => {
                         error={!!fieldErrors?.department} helperText={fieldErrors?.department?.join(', ')} />
                     )} />
                 </div>
-              </div>
-
-              {/* Role */}
-              <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField fullWidth required select label="Role" value={selectedRoles}
                     error={!!fieldErrors?.role} helperText={fieldErrors?.role?.join(', ')}
