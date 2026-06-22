@@ -498,6 +498,17 @@ const RequisitionList = () => {
     return 'bg-gray-100 text-gray-700';
   };
 
+  // Maps every known requisition_status value (old + new) to a single clean label.
+  const getReceivedLabel = (value) => {
+    const v = (value || '').toString().trim().toLowerCase();
+    if (!v) return '—';
+    if (v.includes('admin')) return 'Created by Admin';
+    if (v.includes('department')) return 'Received from Department';
+    if (v.includes('reject')) return 'Rejected by PSC';
+    if (v === 'pending') return 'Pending';
+    return value;
+  };
+
   const columns = [
     { field: 'id', headerName: 'Ref', width: 100 },
     { field: 'designation', headerName: 'Designation', flex: 1 },
@@ -533,11 +544,7 @@ const RequisitionList = () => {
       width: 120,
       renderCell: (params) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(params.value)}`}>
-          {params.value == "requisition received by department"
-          ? "Received from department"
-          : params.value == "requisition created by admin"
-          ? "Created by Admin"
-          : params.value}
+          {getReceivedLabel(params.value)}
               </span>
             ),
     },
