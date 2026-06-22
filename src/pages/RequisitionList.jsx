@@ -453,6 +453,14 @@ const RequisitionList = () => {
     }
     handleMenuClose();
   };
+  const handleTrack = () => {
+    if (selectedRow) {
+      // Use hash_id for editing to match API endpoint
+      const editId = selectedRow.hash_id || selectedRow.id;
+      navigate(`/dashboard/requisitions/${editId}/approval-tracking`);
+    }
+    handleMenuClose();
+  };
 
   const handleDelete = async () => {
     if (!selectedRow) return;
@@ -502,7 +510,7 @@ const RequisitionList = () => {
     { field: 'num_posts', headerName: 'Requisitioned Posts', width: 150 },
     {
       field: 'status',
-      headerName: 'Status',
+      headerName: 'Requisition Status',
       width: 120,
       renderCell: (params) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(params.value)}`}>
@@ -515,7 +523,22 @@ const RequisitionList = () => {
           : params.value}
               </span>
             ),
-        },
+    },
+
+     {
+      field: 'requisition_status',
+      headerName: 'Received Requisition',
+      width: 120,
+      renderCell: (params) => (
+        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(params.value)}`}>
+          {params.value === "received_department"
+          ? "Received from department"
+          : params.value === "admin_department"
+          ? "Created by Admin"
+          : params.value}
+              </span>
+            ),
+    },
     {
       field: 'actions',
       headerName: 'Actions',
@@ -650,6 +673,12 @@ const RequisitionList = () => {
             Edit
           </MenuItem>
         )}
+       
+          <MenuItem onClick={handleTrack}>
+            <Pencil size={18} style={{ marginRight: '8px' }} />
+            Track Approval
+          </MenuItem>
+      
         {canDelete && (
           <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
             <Trash2 size={18} style={{ marginRight: '8px' }} />
