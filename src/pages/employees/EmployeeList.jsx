@@ -446,7 +446,7 @@ const EmployeeList = () => {
               <Upload size={16} className="mr-2" />
               Import Employees
             </Button>
-            <Button onClick={() => navigate('/dashboard/employees/create')}>
+            <Button onClick={() => navigate('/dashboard/employees')}>
               <Plus size={16} className="mr-2" />
               Register Employee
             </Button>

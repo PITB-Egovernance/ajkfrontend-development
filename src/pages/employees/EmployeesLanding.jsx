@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
+  ArrowLeft,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
@@ -87,6 +88,14 @@ const EmployeesLanding = () => {
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* Back */}
+        <button
+          onClick={() => navigate('/dashboard/employees/list')}
+          className="text-sm text-gray-600 flex items-center hover:text-emerald-700"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Employees
+        </button>
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">

@@ -160,9 +160,12 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
         const response = await fetch(`${Config.apiUrl}/settings/roles`, { headers: authHeaders });
         const result = await response.json();
         if (result.success) {
+          const EXCLUDED_ROLES = ['root / super admin', 'super admin', 'root', 'admin', 'secretary', 'chairman'];
           setRoleOptions(
             (result.data?.data ?? result.data ?? [])
               .filter((r) => !r.deleted_at)
+              .filter((r) => !r.is_super_admin && !r.is_default)
+              .filter((r) => !EXCLUDED_ROLES.includes(String(r.role_name || '').trim().toLowerCase()))
               .map((r) => ({
                 id: r.hash_id,
                 name: r.role_name,
@@ -658,7 +661,7 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
               <button
                 type="button"
                 className="btn btn-prev"
-                onClick={() => (onCancel ? onCancel() : navigate(isEdit ? '/dashboard/employees/list' : '/dashboard/employees'))}
+                onClick={() => (onCancel ? onCancel() : navigate('/dashboard/employees/list'))}
               >
                 Cancel
               </button>
