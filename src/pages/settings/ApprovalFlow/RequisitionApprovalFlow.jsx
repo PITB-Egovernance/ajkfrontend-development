@@ -301,19 +301,20 @@ const RequisitionApprovalFlow = () => {
 
   // Valid when: at least one wing selected, every selected wing has at least
   // one designation, and every selected designation has at least one employee.
+  // Valid as soon as there is at least one fully-configured step
+  // (wing → designation → employee). Half-selected wings without an employee are
+  // ignored — they're never sent in the payload — so they no longer keep Save
+  // disabled. Any number of steps and repeated employees are allowed.
   const isValid = useMemo(() => {
-    const wingIds = Object.keys(selectedWings);
-    if (wingIds.length === 0) return false;
-    for (const wingId of wingIds) {
-      const desigList = designationMap[wingId] || [];
-      if (desigList.length === 0) return false;
-      for (const desigHashId of desigList) {
+    let completeSteps = 0;
+    Object.entries(designationMap).forEach(([wingId, desigList]) => {
+      (desigList || []).forEach((desigHashId) => {
         const empMap = selectedEmployees[`${wingId}_${desigHashId}`] || {};
-        if (!Object.values(empMap).some(Boolean)) return false;
-      }
-    }
-    return true;
-  }, [selectedWings, designationMap, selectedEmployees]);
+        if (Object.values(empMap).some(Boolean)) completeSteps += 1;
+      });
+    });
+    return completeSteps > 0;
+  }, [designationMap, selectedEmployees]);
 
   const toggleWing = (wingId) => {
     setSelectedWings((prev) => {
@@ -458,7 +459,7 @@ const RequisitionApprovalFlow = () => {
 
   const handleSave = async () => {
     if (!isValid) {
-      toast.error('Each selected wing needs a designation, and each designation needs at least one employee');
+      toast.error('Select at least one wing with a designation and an employee before saving');
       return;
     }
 

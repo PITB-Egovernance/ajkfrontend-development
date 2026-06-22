@@ -7,14 +7,22 @@ import { Card, CardContent } from 'components/ui/Card';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import EmployeeService from 'services/EmployeeService';
 
-const ROLE_DESIGNATIONS = ['chairman', 'secretary', 'super admin'];
+const ROLE_DESIGNATIONS = ['chairman', 'secretary', 'admin'];
 
-const HIERARCHY_ORDER = ['chairman', 'secretary', 'super admin'];
+const HIERARCHY_ORDER = ['chairman', 'secretary', 'admin'];
 
 const getHierarchyRank = (designation) => {
   const d = designation?.toLowerCase() || '';
   const idx = HIERARCHY_ORDER.findIndex((r) => d.includes(r));
   return idx === -1 ? 99 : idx;
+};
+
+// Designation now arrives as a relation object ({ name, hash_id }) instead of
+// a plain string — normalise both shapes to the display name.
+const getDesignationName = (designation) => {
+  if (!designation) return '';
+  if (typeof designation === 'object') return designation.name || '';
+  return String(designation);
 };
 
 const FILTER_CONFIG = [
@@ -43,18 +51,18 @@ const SystemSettings = () => {
     EmployeeService.getUsers({ per_page: 100 })
       .then((result) => {
         const filtered = result.data
-          .filter(
-            (emp) =>
+          .filter((emp) => {
+            const desigName = getDesignationName(emp.designation).toLowerCase();
+            return (
               emp.status_job === 'active' &&
-              ROLE_DESIGNATIONS.some((role) =>
-                emp.designation?.toLowerCase().includes(role)
-              )
-          )
+              ROLE_DESIGNATIONS.some((role) => desigName.includes(role))
+            );
+          })
           .map((emp, idx) => ({
             id: emp.hash_id || emp.id || `emp-${idx}`,
             hash_id: emp.hash_id || emp.id,
             full_name: emp.username || emp.name || emp.full_name || '-',
-            designation: emp.designation || '-',
+            designation: getDesignationName(emp.designation) || '-',
             status_job: emp.status_job || '-',
           }))
           .sort((a, b) => getHierarchyRank(a.designation) - getHierarchyRank(b.designation));
@@ -87,7 +95,7 @@ const SystemSettings = () => {
 
   const chairmanCount = employees.filter((e) => e.designation?.toLowerCase().includes('chairman')).length;
   const secretaryCount = employees.filter((e) => e.designation?.toLowerCase().includes('secretary')).length;
-  const superAdminCount = employees.filter((e) => e.designation?.toLowerCase().includes('super admin')).length;
+  const adminCount = employees.filter((e) => e.designation?.toLowerCase().includes('admin')).length;
 
   const columns = [
     { field: 'full_name',   headerName: 'Full Name',   flex: 1, minWidth: 180 },
@@ -124,7 +132,7 @@ const SystemSettings = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">System Settings</h1>
-              <p className="text-sm text-slate-500 mt-1">Active Chairman, Secretary and Super Admin users</p>
+              <p className="text-sm text-slate-500 mt-1">Active Chairman, Secretary and Admin users</p>
             </div>
           </div>
         </div>
@@ -145,8 +153,8 @@ const SystemSettings = () => {
           </Card>
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
             <CardContent className="p-6">
-              <p className="text-sm text-emerald-700 font-medium">Super Admin</p>
-              <h2 className="text-3xl font-bold text-emerald-900 mt-2">{superAdminCount}</h2>
+              <p className="text-sm text-emerald-700 font-medium">Admin</p>
+              <h2 className="text-3xl font-bold text-emerald-900 mt-2">{adminCount}</h2>
             </CardContent>
           </Card>
         </div>
