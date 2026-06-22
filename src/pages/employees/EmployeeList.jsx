@@ -50,6 +50,44 @@ const asText = (v) => {
   return String(v);
 };
 
+const getPermissionLabels = (permissions) => {
+  if (!permissions) return [];
+
+  // If permissions is already an array
+  if (Array.isArray(permissions)) {
+    return permissions
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object') return item.name || item.label || item.key || null;
+        return String(item);
+      })
+      .filter(Boolean);
+  }
+
+  // If permissions is object like { settings: { city: { add: true } } }
+  if (typeof permissions === 'object') {
+    const labels = [];
+
+    Object.entries(permissions).forEach(([moduleKey, subModules]) => {
+      if (!subModules || typeof subModules !== 'object') return;
+
+      Object.entries(subModules).forEach(([subModuleKey, actions]) => {
+        if (!actions || typeof actions !== 'object') return;
+
+        Object.entries(actions).forEach(([actionKey, allowed]) => {
+          if (allowed === true) {
+            labels.push(`${moduleKey}.${subModuleKey}.${actionKey}`);
+          }
+        });
+      });
+    });
+
+    return labels;
+  }
+
+  return [];
+};
+
 const mapUser = (user, idx) => ({
   id: user?.hash_id || user?.id || `user-${idx}`,
   hash_id: user?.hash_id || user?.id,
@@ -286,31 +324,80 @@ const EmployeeList = () => {
     { field: 'mobile',      headerName: 'Mobile', width: 130 },
     { field: 'designation', headerName: 'Designation',   width: 150 },
     { field: 'role',        headerName: 'Role',          width: 150 },
-    {
-      field: 'permissions',
-      headerName: 'Permissions',
-      flex: 1,
-      minWidth: 200,
-      renderCell: (params) => {
-        const roleName = params.row.role;
-        if (!roleName || roleName === '-') return <span className="text-slate-400">—</span>;
-        const roleNames = roleName.split(',').map((r) => r.trim());
-        const perms = roleNames.flatMap((rn) => {
-          const found = roleOptions.find((ro) => ro.name?.toLowerCase() === rn.toLowerCase());
-          return found?.permissions || [];
-        });
-        const unique = [...new Set(perms)];
-        if (unique.length === 0) return <span className="text-slate-400">—</span>;
-        return (
-          <div className="flex flex-wrap gap-0.5 py-1">
-            {unique.slice(0, 3).map((p, i) => (
-              <span key={i} className="inline-block bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-medium">{p}</span>
-            ))}
-            {unique.length > 3 && <span className="text-[10px] text-slate-500">+{unique.length - 3}</span>}
-          </div>
-        );
-      },
-    },
+    // {
+    //   field: 'permissions',
+    //   headerName: 'Permissions',
+    //   flex: 1,
+    //   minWidth: 200,
+    //   renderCell: (params) => {
+    //     const roleName = params.row.role;
+    //     if (!roleName || roleName === '-') return <span className="text-slate-400">—</span>;
+    //     const roleNames = roleName.split(',').map((r) => r.trim());
+    //     const perms = roleNames.flatMap((rn) => {
+    //       const found = roleOptions.find((ro) => ro.name?.toLowerCase() === rn.toLowerCase());
+    //       return found?.permissions || [];
+    //     });
+    //     const unique = [...new Set(perms)];
+    //     if (unique.length === 0) return <span className="text-slate-400">—</span>;
+    //     return (
+    //       <div className="flex flex-wrap gap-0.5 py-1">
+    //         {unique.slice(0, 3).map((p, i) => (
+    //           <span key={i} className="inline-block bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-medium">{p}</span>
+    //         ))}
+    //         {unique.length > 3 && <span className="text-[10px] text-slate-500">+{unique.length - 3}</span>}
+    //       </div>
+    //     );
+    //   },
+    // },
+
+    //     {
+    //   field: 'permissions',
+    //   headerName: 'Permissions',
+    //   flex: 1,
+    //   minWidth: 200,
+    //   renderCell: (params) => {
+    //     const roleName = params.row.role;
+
+    //     if (!roleName || roleName === '-') {
+    //       return <span className="text-slate-400">—</span>;
+    //     }
+
+    //     const roleNames = roleName.split(',').map((r) => r.trim());
+
+    //     const perms = roleNames.flatMap((rn) => {
+    //       const found = roleOptions.find(
+    //         (ro) => ro.name?.toLowerCase() === rn.toLowerCase()
+    //       );
+
+    //       return getPermissionLabels(found?.permissions);
+    //     });
+
+    //     const unique = [...new Set(perms)];
+
+    //     if (unique.length === 0) {
+    //       return <span className="text-slate-400">—</span>;
+    //     }
+
+    //     return (
+    //       <div className="flex flex-wrap gap-0.5 py-1">
+    //         {unique.slice(0, 3).map((p, i) => (
+    //           <span
+    //             key={i}
+    //             className="inline-block bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-medium"
+    //           >
+    //             {p}
+    //           </span>
+    //         ))}
+
+    //         {unique.length > 3 && (
+    //           <span className="text-[10px] text-slate-500">
+    //             +{unique.length - 3}
+    //           </span>
+    //         )}
+    //       </div>
+    //     );
+    //   },
+    // },
     {
       field: 'status',
       headerName: 'Status',

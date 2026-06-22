@@ -188,6 +188,7 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
     (async () => {
       try {
         const data = await EmployeeService.getUserDetails(effectiveHashId);
+        console.log("Data", data)
         if (!active) return;
         setRawEmployee(data);
         setUsername(data.username || data.name || data.full_name || '');
@@ -276,13 +277,16 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
     if (!designation) errors.designation = ['Designation is required'];
     // Role is not validated/sent while backend role assignment is unavailable.
     if (!selectedWings || selectedWings.length === 0) errors.wing = ['At least one wing is required'];
+    if (!selectedRole) errors.wing = ['At least one wing is required'];
 
+     
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       toast.error('Please fill in all required fields');
       return;
     }
 
+    console.log("Role:", selectedRole.id)
     setLoading(true);
     const loadingToast = toast.loading(isEdit ? 'Updating employee...' : 'Registering employee...');
     try {
@@ -298,12 +302,11 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
         // Send hash_id strings so the backend links the relations correctly.
         designation: designation.id,
         grade: designation.gradeId || '',
-        wing: selectedWings.map((id) => {
-          const w = wingOptions.find((wo) => wo.id === id);
-          return w?.name || id;
-        }),
+        role_permission:selectedRole.id,
+        wings: selectedWings,
       };
 
+      console.log('Paylod', payload)
       // role_permission should carry the selected role's hash_id (from /settings/roles),
       // but the live backend currently throws "Failed to ..." on any non-empty value
       // (and ignores the `permission` field). Sending it breaks every save, so it is
