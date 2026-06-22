@@ -180,6 +180,7 @@ const RequisitionList = () => {
       const data = result.data || result;
       const dataArray = Array.isArray(data) ? data : (data.data || []);
       const total = result.meta?.total || result.total || data.total || data.meta?.total || data.last_page * pageSize || (Array.isArray(dataArray) ? dataArray.length : 0);
+       console.log('Data Array Requisiotnn', dataArray)
       if (Array.isArray(dataArray) && dataArray.length > 0) {
         const requisitions = dataArray.map((item, index) => ({
           id: item.hash_id || item.id || item.temp_id || item.tempId || `temp-${index}-${Date.now()}`,
@@ -191,6 +192,7 @@ const RequisitionList = () => {
           scale: item.scale,
           num_posts: item.num_posts,
           status: item.status || (item.temp_id ? 'Draft' : 'Pending'),
+          requisition_status: item.requisition_status,
         }));
         setRows(requisitions);
         setTotal(total);
@@ -531,9 +533,9 @@ const RequisitionList = () => {
       width: 120,
       renderCell: (params) => (
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(params.value)}`}>
-          {params.value === "received_department"
+          {params.value == "requisition received by department"
           ? "Received from department"
-          : params.value === "admin_department"
+          : params.value == "requisition created by admin"
           ? "Created by Admin"
           : params.value}
               </span>
