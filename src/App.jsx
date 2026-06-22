@@ -85,7 +85,7 @@ import ResultsDashboard from 'pages/results/ResultsDashboard';
 import ResultsViewPage from 'pages/results/ResultsViewPage';
 import ApprovalsPage from 'pages/results/ApprovalsPage';
 import ResultSearchPage from 'pages/results/ResultSearchPage';
-
+import CreateDepartmentUser from 'pages/settings/DepartmentUsers/EditDepartmentUser';
 
 function App() {
   return (
@@ -274,6 +274,15 @@ function App() {
                 <PublicationPage />
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="/dashboard/settings/department-users/create"
+            element={<CreateDepartmentUser />}
+          />
+
+          <Route
+            path="/dashboard/settings/department-users/:hashId/edit"
+            element={<CreateDepartmentUser />}
           />
         </Route>
       </Routes>

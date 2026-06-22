@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Menu, MenuItem, IconButton, Switch, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import toast from 'react-hot-toast';
-import { Building2, Search, Plus, MoreVertical, Eye, Trash2, ArrowLeft } from 'lucide-react';
+import { Building2, Search, Plus, MoreVertical, Edit, Trash2, ArrowLeft } from 'lucide-react';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
@@ -16,41 +16,111 @@ import { hasPermission } from 'utils/permissions';
 const PERM = 'settings.department_users';
 
 const FILTER_CONFIG = [
-  { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by name' },
-  { name: 'cnic', label: 'CNIC', type: 'text', placeholder: 'Filter by CNIC' },
+  { name: 'dept_user_name', label: 'Departmen Employee Name', type: 'text', placeholder: 'Filter by name' },
+  // { name: 'cnic', label: 'CNIC', type: 'text', placeholder: 'Filter by CNIC' },
   { name: 'email', label: 'Email', type: 'text', placeholder: 'Filter by email' },
+  { name: 'mobile', label: 'Mobile', type: 'text', placeholder: 'Filter by mobile' },
   { name: 'department', label: 'Department', type: 'text', placeholder: 'Filter by department' },
   { name: 'status', label: 'Status', type: 'select', options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
 ];
 
-const EMPTY_FILTERS = { full_name: '', cnic: '', email: '', department: '', status: '' };
+const EMPTY_FILTERS = { dept_user_name: '', mobile: '', email: '', department: '', status: '' };
 
 const mapUser = (user, idx) => ({
   id: user?.hash_id || user?.id || `dept-${idx}`,
   hash_id: user?.hash_id || user?.id,
-  full_name: user?.username || user?.name || user?.full_name || '-',
-  cnic: user?.cnic || '-',
+  dept_user_name: user?.dept_user_name || user?.dept_user_name || user?.dept_user_name || '-',
+  // cnic: user?.cnic || '-',
   email: user?.email || '-',
   mobile: user?.mobile || user?.phone || '-',
-  department: user?.department || '-',
+
+   department:
+    user?.department?.department_name ||
+    user?.department?.name ||
+    user?.department_name ||
+    '-',
+
+  department_hash_id:
+    user?.department?.hash_id ||
+    user?.department_id ||
+    '',
   status: user?.status || 'inactive',
 });
 
-const ActionCell = ({ user, onView, onDelete, canEdit, canDelete }) => {
+// const ActionCell = ({ user, onView, onDelete }) => {
+//   const [anchorEl, setAnchorEl] = useState(null);
+//   return (
+//     <div className="flex justify-center items-center h-full w-full">
+//       <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAnchorEl(e.currentTarget); }}>
+//         <MoreVertical size={18} />
+//       </IconButton>
+//       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
+//         PaperProps={{ elevation: 0, sx: { filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))', mt: 1.5, minWidth: 200, '& .MuiMenuItem-root': { fontSize: '14px', color: '#334155', display: 'flex', gap: '8px', padding: '10px 16px' } } }}
+//         transformOrigin={{ horizontal: 'right', vertical: 'top' }} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}>
+//         <MenuItem onClick={() => { setAnchorEl(null); onView(user); }}>
+//           <Eye className="w-4 h-4" /> Edit
+//         </MenuItem>
+//         <MenuItem onClick={() => { setAnchorEl(null); onDelete(user); }} sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}>
+//           <Trash2 className="w-4 h-4" /> Delete
+//         </MenuItem>
+//       </Menu>
+//     </div>
+//   );
+// };
+
+const ActionCell = ({ user, onEdit, onDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
-  if (!canEdit && !canDelete) return null;
+
   return (
     <div className="flex justify-center items-center h-full w-full">
-      <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAnchorEl(e.currentTarget); }}>
+      <IconButton
+        size="small"
+        onClick={(e) => {
+          e.stopPropagation();
+          setAnchorEl(e.currentTarget);
+        }}
+      >
         <MoreVertical size={18} />
       </IconButton>
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
-        PaperProps={{ elevation: 0, sx: { filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))', mt: 1.5, minWidth: 200, '& .MuiMenuItem-root': { fontSize: '14px', color: '#334155', display: 'flex', gap: '8px', padding: '10px 16px' } } }}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}>
-        {canEdit && <MenuItem onClick={() => { setAnchorEl(null); onView(user); }}>
-          <Eye className="w-4 h-4" /> View / Edit
-        </MenuItem>}
-        {canDelete && <MenuItem onClick={() => { setAnchorEl(null); onDelete(user); }} sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
+            mt: 1.5,
+            minWidth: 200,
+            '& .MuiMenuItem-root': {
+              fontSize: '14px',
+              color: '#334155',
+              display: 'flex',
+              gap: '8px',
+              padding: '10px 16px',
+            },
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem
+          onClick={() => {
+            setAnchorEl(null);
+            onEdit(user);
+          }}
+        >
+          <Edit className="w-4 h-4" /> Edit
+        </MenuItem>
+
+        <MenuItem
+          onClick={() => {
+            setAnchorEl(null);
+            onDelete(user);
+          }}
+          sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}
+        >
           <Trash2 className="w-4 h-4" /> Delete
         </MenuItem>}
       </Menu>
@@ -92,7 +162,7 @@ const DepartmentUserList = () => {
     try {
       await DepartmentUserService.update(row.hash_id, { status: newStatus });
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: newStatus } : r));
-      toast.success(`User marked as ${newStatus}`);
+      toast.success(`Department Employee marked as ${newStatus}`);
     } catch (error) {
       toast.error(error.message || 'Failed to update status');
     }
@@ -115,7 +185,7 @@ const DepartmentUserList = () => {
 
   const handleUpdated = (updated) => {
     setRows((prev) => prev.map((r) =>
-      r.hash_id === updated.hash_id ? { ...r, full_name: updated.full_name || updated.username || r.full_name, email: updated.email ?? r.email, department: updated.department ?? r.department, status: updated.status ?? r.status } : r
+      r.hash_id === updated.hash_id ? { ...r, full_name: updated.dept_user_name || updated.username || r.full_name, email: updated.email ?? r.email, department: updated.department ?? r.department, status: updated.status ?? r.status } : r
     ));
   };
 
@@ -124,7 +194,7 @@ const DepartmentUserList = () => {
       const t = searchTerm.toLowerCase();
       if (!(r.full_name?.toLowerCase().includes(t) || r.cnic?.toLowerCase().includes(t) || r.email?.toLowerCase().includes(t) || r.department?.toLowerCase().includes(t))) return false;
     }
-    if (filters.full_name && !r.full_name?.toLowerCase().includes(filters.full_name.toLowerCase())) return false;
+    if (filters.dept_user_name && !r.dept_user_name?.toLowerCase().includes(filters.dept_user_name.toLowerCase())) return false;
     if (filters.cnic && !r.cnic?.toLowerCase().includes(filters.cnic.toLowerCase())) return false;
     if (filters.email && !r.email?.toLowerCase().includes(filters.email.toLowerCase())) return false;
     if (filters.department && !r.department?.toLowerCase().includes(filters.department.toLowerCase())) return false;
@@ -136,11 +206,11 @@ const DepartmentUserList = () => {
   const inactiveCount = rows.filter((r) => r.status !== 'active').length;
 
   const columns = [
-    { field: 'full_name', headerName: 'Full Name', flex: 1, minWidth: 160 },
-    { field: 'cnic', headerName: 'CNIC', flex: 0.8, minWidth: 150 },
+    { field: 'dept_user_name', headerName: 'Department Employee Name', flex: 1, minWidth: 160 },
+    { field: 'department', headerName: 'Department', flex: 0.8, minWidth: 150 },
+    // { field: 'cnic', headerName: 'CNIC', flex: 0.8, minWidth: 150 },
     { field: 'email', headerName: 'Email', flex: 1, minWidth: 200 },
     { field: 'mobile', headerName: 'Mobile', width: 140 },
-    { field: 'department', headerName: 'Department', flex: 0.8, minWidth: 150 },
     {
       field: 'status', headerName: 'Status', width: 140,
       renderCell: (params) => (
@@ -148,16 +218,26 @@ const DepartmentUserList = () => {
           <Switch checked={params.value === 'active'} onChange={() => handleToggleStatus(params.row)} size="small"
             disabled={!canEdit}
             color={params.value === 'active' ? 'success' : 'error'} />
-          <span className={`text-xs font-bold ${params.value === 'active' ? 'text-emerald-700' : 'text-red-600'}`}>
+          {/* <span className={`text-xs font-bold ${params.value === 'active' ? 'text-emerald-700' : 'text-red-600'}`}>
             {params.value === 'active' ? 'Active' : 'Inactive'}
-          </span>
+          </span> */}
         </div>
       ),
     },
-    ...(canRowActions ? [{
-      field: 'actions', headerName: 'Actions', width: 100, sortable: false, filterable: false,
-      renderCell: (params) => <ActionCell user={params.row} onView={(u) => setSelectedHashId(u.hash_id)} onDelete={(u) => setDeleteTarget(u)} canEdit={canEdit} canDelete={canDelete} />,
-    }] : []),
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => (
+        <ActionCell
+          user={params.row}
+          onEdit={(u) => navigate(`/dashboard/settings/department-users/${u.hash_id}/edit`)}
+          onDelete={(u) => setDeleteTarget(u)}
+        />
+      ),
+    }
   ];
 
   return (

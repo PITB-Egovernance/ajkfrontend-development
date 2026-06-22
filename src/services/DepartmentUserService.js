@@ -23,7 +23,8 @@ const extractList = (result) => {
 
 class DepartmentUserService {
   static async create(data) {
-    const response = await fetch(`${API_BASE}/department-user/create`, {
+    console.log("Data", data)
+    const response = await fetch(`${API_BASE}/department/register`, {
       method: 'POST',
       headers: getHeaders(true),
       body: JSON.stringify(data),
@@ -40,7 +41,7 @@ class DepartmentUserService {
 
   static async getAll(params = {}) {
     const query = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE}/department-user/list${query ? `?${query}` : ''}`, {
+    const response = await fetch(`${API_BASE}/department-users`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -52,34 +53,75 @@ class DepartmentUserService {
     };
   }
 
-  static async getById(id) {
-    const response = await fetch(`${API_BASE}/department-user/${id}`, {
+  // static async getById(id) {
+  //   const response = await fetch(`${API_BASE}/department-user/${id}`, {
+  //     method: 'GET',
+  //     headers: getHeaders(false),
+  //   });
+  //   const result = await safeJson(response);
+  //   if (!response.ok) throw new Error(result?.message || 'Failed to load department user');
+  //   return result?.data || result;
+  // }
+
+  static async getById(hashId) {
+    const response = await fetch(`${Config.apiUrl}/department-users/${hashId}`, {
       method: 'GET',
-      headers: getHeaders(false),
+      headers: {
+        Authorization: `Bearer ${AuthService.getToken()}`,
+        Accept: 'application/json',
+        'X-API-KEY': Config.apiKey,
+      },
     });
-    const result = await safeJson(response);
-    if (!response.ok) throw new Error(result?.message || 'Failed to load department user');
-    return result?.data || result;
+
+    const result = await response.json();
+
+    if (!response.ok || result.success === false) {
+      throw result;
+    }
+
+    return result.data;
   }
 
-  static async update(id, data) {
-    const response = await fetch(`${API_BASE}/department-user/update/${id}`, {
-      method: 'POST',
-      headers: getHeaders(true),
-      body: JSON.stringify(data),
+  // static async update(id, data) {
+  //   const response = await fetch(`${API_BASE}/department-user/update/${id}`, {
+  //     method: 'POST',
+  //     headers: getHeaders(true),
+  //     body: JSON.stringify(data),
+  //   });
+  //   const result = await safeJson(response);
+  //   if (!response.ok) {
+  //     const error = new Error(result?.message || 'Failed to update department user');
+  //     error.status = response.status;
+  //     error.errors = result?.errors || {};
+  //     throw error;
+  //   }
+  //   return result?.data || result;
+  // }
+
+  static async update(hashId, payload) {
+    const response = await fetch(`${API_BASE}/department-users/update/${hashId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${AuthService.getToken()}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-KEY': Config.apiKey,
+      },
+      body: JSON.stringify(payload),
     });
-    const result = await safeJson(response);
-    if (!response.ok) {
-      const error = new Error(result?.message || 'Failed to update department user');
-      error.status = response.status;
-      error.errors = result?.errors || {};
-      throw error;
+
+    const result = await response.json();
+
+    if (!response.ok || result.success === false) {
+      throw result;
     }
-    return result?.data || result;
+
+    return result;
   }
+
 
   static async delete(id) {
-    const response = await fetch(`${API_BASE}/department-user/${id}/delete`, {
+    const response = await fetch(`${API_BASE}/department-users/${id}/delete`, {
       method: 'DELETE',
       headers: getHeaders(false),
     });

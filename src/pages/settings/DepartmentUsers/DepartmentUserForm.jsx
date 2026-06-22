@@ -25,6 +25,7 @@ const DepartmentUserForm = () => {
   const [username, setUsername] = useState('');
   const [cnic, setCnic] = useState('');
   const [email, setEmail] = useState('');
+  const [designation, setDesignation] = useState('');
   const [fatherHusbandName, setFatherHusbandName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
@@ -93,17 +94,18 @@ const DepartmentUserForm = () => {
 
     const errors = {};
     if (!username.trim()) errors.username = ['Username is required'];
-    if (!cnic.trim()) errors.cnic = ['CNIC is required'];
-    else if (cnic.length !== 13) errors.cnic = ['CNIC must be exactly 13 digits'];
+    // if (!cnic.trim()) errors.cnic = ['CNIC is required'];
+    // else if (cnic.length !== 13) errors.cnic = ['CNIC must be exactly 13 digits'];
     if (!email.trim()) errors.email = ['Email address is required'];
-    if (!fatherHusbandName.trim()) errors.father_husband_name = ['Father/Husband name is required'];
-    if (!dob) errors.dob = ['Date of birth is required'];
-    if (!gender) errors.gender = ['Gender is required'];
+    // if (!fatherHusbandName.trim()) errors.father_husband_name = ['Father/Husband name is required'];
+    // if (!dob) errors.dob = ['Date of birth is required'];
+    // if (!gender) errors.gender = ['Gender is required'];
     if (!mobile.trim()) errors.mobile = ['Mobile number is required'];
+    if (!designation.trim()) errors.email = ['Designation'];
     else if (mobile.length !== 11) errors.mobile = ['Mobile number must be exactly 11 digits'];
-    if (!district) errors.domicile_district = ['Domicile district is required'];
-    if (!selectedDepartment) errors.department = ['Department is required'];
-    if (!selectedRoles || selectedRoles.length === 0) errors.role = ['Role is required'];
+    // if (!district) errors.domicile_district = ['Domicile district is required'];
+    if (!selectedDepartment) errors.department = ['Department designation is required'];
+    // if (!selectedRoles || selectedRoles.length === 0) errors.role = ['Role is required'];
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -113,18 +115,21 @@ const DepartmentUserForm = () => {
 
     setLoading(true);
     const loadingToast = toast.loading('Creating department user...');
+
+    console.log("department id", selectedDepartment.id)
     try {
       const result = await DepartmentUserService.create({
-        username: username.trim(),
-        cnic: cnic.trim().replace(/[^0-9]/g, ''),
-        father_husband_name: fatherHusbandName.trim(),
+        dept_user_name: username.trim(),
         email: email.trim(),
-        gender: gender.toLowerCase(),
-        date_of_birth: dob,
-        domicile: district.name,
         mobile: mobile.trim(),
-        department: selectedDepartment.name,
-        role_permission: selectedRoles,
+        designation:designation.trim(),
+        department_id: selectedDepartment.id,
+        // cnic: cnic.trim().replace(/[^0-9]/g, ''),
+        // father_husband_name: fatherHusbandName.trim(),
+        // gender: gender.toLowerCase(),
+        // date_of_birth: dob,
+        // domicile: district.name,
+        // role_permission: selectedRoles,
       });
 
       toast.success(result?.message || 'Department user created successfully', { id: loadingToast });
@@ -161,72 +166,6 @@ const DepartmentUserForm = () => {
               {/* Row 1: Username + CNIC */}
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <TextField fullWidth label="Username" value={username}
-                    onChange={(e) => setUsername(e.target.value)} required sx={fieldSx}
-                    error={!!fieldErrors?.username} helperText={fieldErrors?.username?.join(', ')} />
-                </div>
-                <div className="col-md-6 form-group">
-                  <TextField fullWidth label="CNIC" placeholder="13 digits e.g. 3740512345671"
-                    value={cnic} onChange={(e) => setCnic(e.target.value.replace(/\D/g, '').slice(0, 13))}
-                    required inputProps={{ maxLength: 13, inputMode: 'numeric' }} sx={fieldSx}
-                    error={!!fieldErrors?.cnic} helperText={fieldErrors?.cnic?.join(', ') || `${cnic.length}/13 digits`} />
-                </div>
-              </div>
-
-              {/* Row 2: Email + Father/Husband */}
-              <div className="row">
-                <div className="col-md-6 form-group">
-                  <TextField fullWidth label="Email Address" type="email" value={email}
-                    onChange={(e) => setEmail(e.target.value)} required sx={fieldSx}
-                    error={!!fieldErrors?.email} helperText={fieldErrors?.email?.join(', ')} />
-                </div>
-                <div className="col-md-6 form-group">
-                  <TextField fullWidth label="Father/Husband Name" value={fatherHusbandName}
-                    onChange={(e) => setFatherHusbandName(e.target.value)} required sx={fieldSx}
-                    error={!!fieldErrors?.father_husband_name} helperText={fieldErrors?.father_husband_name?.join(', ')} />
-                </div>
-              </div>
-
-              {/* Row 3: DOB + Gender */}
-              <div className="row">
-                <div className="col-md-6 form-group">
-                  <TextField fullWidth label="Date of Birth" type="date" value={dob}
-                    onChange={(e) => setDob(e.target.value)} required
-                    InputLabelProps={{ shrink: true }} inputProps={{ style: { height: 28 } }}
-                    sx={fieldSx} error={!!fieldErrors?.dob} helperText={fieldErrors?.dob?.join(', ')} />
-                </div>
-                <div className="col-md-6 form-group">
-                  <TextField select fullWidth label="Gender" value={gender}
-                    onChange={(e) => setGender(e.target.value)} required sx={fieldSx}
-                    error={!!fieldErrors?.gender} helperText={fieldErrors?.gender?.join(', ')}>
-                    <MenuItem value=""><em>— Select Gender —</em></MenuItem>
-                    {GENDER_OPTIONS.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
-                  </TextField>
-                </div>
-              </div>
-
-              {/* Row 4: Mobile + Domicile */}
-              <div className="row">
-                <div className="col-md-6 form-group">
-                  <TextField fullWidth label="Mobile Number" placeholder="11 digits e.g. 03001234567"
-                    value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                    required inputProps={{ maxLength: 11, inputMode: 'numeric' }} sx={fieldSx}
-                    error={!!fieldErrors?.mobile} helperText={fieldErrors?.mobile?.join(', ') || `${mobile.length}/11 digits`} />
-                </div>
-                <div className="col-md-6 form-group">
-                  <Autocomplete options={districtOptions} getOptionLabel={(o) => o.name || ''}
-                    isOptionEqualToValue={(o, v) => o.id === v.id} value={district}
-                    onChange={(_, v) => setDistrict(v)}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Domicile District" required sx={fieldSx}
-                        error={!!fieldErrors?.domicile_district} helperText={fieldErrors?.domicile_district?.join(', ')} />
-                    )} />
-                </div>
-              </div>
-
-              {/* Row 5: Department + Role */}
-              <div className="row">
-                <div className="col-md-6 form-group">
                   <Autocomplete options={departmentOptions} getOptionLabel={(o) => o.name || ''}
                     isOptionEqualToValue={(o, v) => o.id === v.id} value={selectedDepartment}
                     onChange={(_, v) => setSelectedDepartment(v)}
@@ -236,6 +175,49 @@ const DepartmentUserForm = () => {
                     )} />
                 </div>
                 <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Department Employee Name" value={username}
+                    onChange={(e) => setUsername(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.username} helperText={fieldErrors?.username?.join(', ')} />
+                </div>
+               
+                {/*  */}
+              </div>
+
+              {/* Row 2: Email + Father/Husband */}
+              {/* <div className="row">
+                
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Father/Husband Name" value={fatherHusbandName}
+                    onChange={(e) => setFatherHusbandName(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.father_husband_name} helperText={fieldErrors?.father_husband_name?.join(', ')} />
+                </div>
+              </div> */}
+
+              {/* Row 3: DOB + Gender */}
+              <div className="row">
+                 <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Email Address" type="email" value={email}
+                    onChange={(e) => setEmail(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.email} helperText={fieldErrors?.email?.join(', ')} />
+                </div>
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Mobile Number" placeholder="11 digits e.g. 03001234567"
+                    value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    required inputProps={{ maxLength: 11, inputMode: 'numeric' }} sx={fieldSx}
+                    error={!!fieldErrors?.mobile} helperText={fieldErrors?.mobile?.join(', ') || `${mobile.length}/11 digits`} />
+                </div>
+               
+              </div>
+
+
+              {/* Row 5: Department + Role */}
+              <div className="row">
+                <div className="col-md-6 form-group">
+                  <TextField fullWidth label="Designation" value={designation}
+                    onChange={(e) => setDesignation(e.target.value)} required sx={fieldSx}
+                    error={!!fieldErrors?.designation} helperText={fieldErrors?.designation?.join(', ')} />
+                </div>
+                {/* <div className="col-md-6 form-group">
                   <TextField fullWidth required select label="Role" value={selectedRoles}
                     error={!!fieldErrors?.role} helperText={fieldErrors?.role?.join(', ')}
                     SelectProps={{
@@ -277,7 +259,7 @@ const DepartmentUserForm = () => {
                       </MenuItem>
                     ))}
                   </TextField>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -286,7 +268,7 @@ const DepartmentUserForm = () => {
                 onClick={() => navigate('/dashboard/settings/department-users')}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={loading}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                {loading ? 'Saving...' : <><Save size={16} /><span>Create Department User</span></>}
+                {loading ? 'Saving...' : <><Save size={16} /><span>Create</span></>}
               </button>
             </div>
           </form>
