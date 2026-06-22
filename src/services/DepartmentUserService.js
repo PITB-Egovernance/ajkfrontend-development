@@ -99,7 +99,7 @@ class DepartmentUserService {
   // }
 
   static async update(hashId, payload) {
-    const response = await fetch(`${API_BASE}/department-users/${hashId}`, {
+    const response = await fetch(`${API_BASE}/department-users/update/${hashId}`, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${AuthService.getToken()}`,
@@ -121,7 +121,7 @@ class DepartmentUserService {
 
 
   static async delete(id) {
-    const response = await fetch(`${API_BASE}/department-users/${id}`, {
+    const response = await fetch(`${API_BASE}/department-users/${id}/delete`, {
       method: 'DELETE',
       headers: getHeaders(false),
     });
