@@ -26,6 +26,13 @@ const handleResponse = async (response) => {
 };
 
 const RequisitionApprovalApi = {
+  // API 10 — employee personal work queue (tab: assigned | pending | returned | completed)
+  myQueue: (tab = 'assigned') =>
+    fetch(`${API_BASE}/requisition-approvals/my-queue?tab=${encodeURIComponent(tab)}`, {
+      method: 'GET',
+      headers: getHeaders(false),
+    }).then(handleResponse),
+
   // API 11 — full detail (requisition, workflow_steps, timeline, workflow_info, can_approve, can_reject)
   getDetail: (hashId) =>
     fetch(`${API_BASE}/requisition-approvals/${hashId}`, {

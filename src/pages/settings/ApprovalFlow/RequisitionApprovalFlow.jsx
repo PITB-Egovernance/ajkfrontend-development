@@ -222,8 +222,30 @@ const RequisitionApprovalFlow = () => {
           const flowRes = await fetch(`${API_BASE}/settings/approval-flow?process_type=requisition`, { headers });
           const flowResult = await flowRes.json();
 
-          if (flowResult.success && flowResult.data?.assignments?.length > 0) {
-            const assignments = flowResult.data.assignments;
+          // The API returns the saved flow either as a mapped `assignments` array
+          // or as the raw `steps` relation. Normalise both into a uniform shape:
+          //   { step, wing, designation: '<string>', employee: '<names>' }
+          // designation may arrive as a plain string, an array, or a JSON-encoded
+          // array string ("[\"Director\"]"); employee may be `employee` or `employee_name`.
+          const rawList = flowResult.data?.assignments ?? flowResult.data?.steps ?? [];
+          const assignments = (Array.isArray(rawList) ? rawList : []).map((a) => {
+            let designation = a.designation;
+            if (typeof designation === 'string' && designation.trim().startsWith('[')) {
+              try {
+                const parsed = JSON.parse(designation);
+                if (Array.isArray(parsed)) designation = parsed[0] ?? '';
+              } catch { /* leave as-is */ }
+            }
+            if (Array.isArray(designation)) designation = designation[0] ?? '';
+            return {
+              step: a.step,
+              wing: a.wing,
+              designation: designation ?? '',
+              employee: a.employee ?? a.employee_name ?? '',
+            };
+          });
+
+          if (flowResult.success && assignments.length > 0) {
             const restoredWings = {};
             const restoredDesigMap = {};
             const restoredExpanded = {};

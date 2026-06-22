@@ -53,6 +53,7 @@ const MENU_MODULE_MAP = {
   candidates: ['candidates', 'roll_number', 'review_appeal'],
   employees: ['employee_management'],
   requisitions: ['requisitions', 'advertisement'],
+  'my-requisitions': null, // always visible; backend scopes the queue per logged-in employee
   'approval-flow': ['requisitions'],
   results: ['result'],
   'workflow-tracking': ['requisitions', 'result'],

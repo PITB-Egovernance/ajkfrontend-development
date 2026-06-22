@@ -42,6 +42,12 @@ export const MENU_ITEMS = [
     ],
   },
   {
+    id: "my-requisitions",
+    label: "My Requisitions",
+    icon: ClipboardList,
+    path: "/dashboard/my-requisitions",
+  },
+  {
     id: "approval-flow",
     label: "Approval Flow",
     icon: GitBranch,

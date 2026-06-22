@@ -54,6 +54,7 @@ import TestsManagement from 'pages/settings/Tests/TestsManagement';
 import ExamFeesManagement from 'pages/settings/ExamFees/ExamFeesManagement';
 import RequisitionApprovalFlow from 'pages/settings/ApprovalFlow/RequisitionApprovalFlow';
 import RequisitionApprovalTrackPage from 'pages/requisition/RequisitionApprovalTrackPage';
+import MyRequisitionsQueue from 'pages/requisition/MyRequisitionsQueue';
 import SubjectManagement from 'pages/settings/Subject/SubjectManagement';
 import CertificatesManagement from 'pages/settings/Certificates/CertificatesManagement';
 import DigitalSignatureManagement from 'pages/settings/DigitalSignature/DigitalSignatureManagement';
@@ -120,6 +121,7 @@ function App() {
           <Route path="requisitions/:id/edit" element={<RequisitionEdit />} />
           <Route path="requisitions/:id" element={<RequisitionDetail />} />
           <Route path="requisitions/:id/approval-tracking" element={<RequisitionApprovalTrackPage />} />
+          <Route path="my-requisitions" element={<MyRequisitionsQueue />} />
           <Route path="approved-requisitions" element={<ApprovedRequisitions />} />
           <Route path="add-notes" element={<AddNotes />} />
           <Route path="advertisement-records" element={<AdvertisementRecords />} />
