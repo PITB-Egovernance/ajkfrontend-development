@@ -11,14 +11,14 @@ import '../job-creation/JobCreationForm.css';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 
-// Date helpers — UI shows dd/mm/yyyy, API uses yyyy-mm-dd.
+// Date helpers — UI shows dd mm yyyy, API uses yyyy-mm-dd.
 const isoToDmy = (iso) => {
   if (!iso) return '';
   const [y, m, d] = String(iso).slice(0, 10).split('-');
-  return (y && m && d) ? `${d}/${m}/${y}` : '';
+  return (y && m && d) ? `${d} ${m} ${y}` : '';
 };
 const dmyToIso = (dmy) => {
-  const match = String(dmy).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const match = String(dmy).match(/^(\d{2}) (\d{2}) (\d{4})$/);
   if (!match) return '';
   const [, d, m, y] = match;
   return `${y}-${m}-${d}`;
@@ -436,13 +436,13 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
                     <TextField
                       fullWidth
                       label="Date of Birth"
-                      placeholder="dd/mm/yyyy"
+                      placeholder="dd mm yyyy"
                       value={dobInput}
                       onChange={(e) => {
                         const digits = e.target.value.replace(/\D/g, '').slice(0, 8); // ddmmyyyy
                         let out = digits;
-                        if (digits.length > 4) out = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-                        else if (digits.length > 2) out = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                        if (digits.length > 4) out = `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
+                        else if (digits.length > 2) out = `${digits.slice(0, 2)} ${digits.slice(2)}`;
                         setDobInput(out);
                         setDob(dmyToIso(out));
                       }}
@@ -470,7 +470,7 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
                       }}
                       sx={fieldSx}
                       error={!!fieldErrors?.dob}
-                      helperText={fieldErrors?.dob?.join(', ') || 'Format: dd/mm/yyyy'}
+                      helperText={fieldErrors?.dob?.join(', ') || 'Format: dd mm yyyy'}
                     />
                     {/* Hidden native date input — provides the calendar popup */}
                     <input

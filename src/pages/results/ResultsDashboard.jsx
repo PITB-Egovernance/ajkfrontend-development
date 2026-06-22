@@ -27,6 +27,9 @@ import { getJobRouteId } from 'utils/jobMapper';
 import OfficialPublicationModal from 'components/results/OfficialPublicationModal';
 import MarkApprovalConsole from 'components/results/MarkApprovalConsole';
 import { formatDate } from 'utils/dateUtils';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'result.result_publishing'; // permission scope for publishing actions
 
 /**
  * ResultsDashboard
@@ -40,6 +43,9 @@ const ResultsDashboard = () => {
 
   const isAdmin = ['admin', 'chairman', 'secretary'].includes(userRole);
   const isDirector = ['director', 'admin', 'chairman', 'secretary'].includes(userRole);
+
+  // Action-level permission for the current role (publish = verify_result on publishing).
+  const canPublish = hasPermission(`${PERM}.verify_result`);
 
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -475,13 +481,15 @@ const ResultsDashboard = () => {
                                     </Button>
                                   </Link>
 
-                                  <Button
-                                    onClick={() => handleOpenPublish(job)}
-                                    className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
-                                  >
-                                    <Send size={14} strokeWidth={3} />
-                                    Official Publication
-                                  </Button>
+                                  {canPublish && (
+                                    <Button
+                                      onClick={() => handleOpenPublish(job)}
+                                      className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
+                                    >
+                                      <Send size={14} strokeWidth={3} />
+                                      Official Publication
+                                    </Button>
+                                  )}
 
                                   {(isAdmin || isDirector || userRole === 'data_entry' || userRole === 'dataentry' || userRole === 'senior_admin' || userRole === 'secretary') && (
                                     <Link to={`/dashboard/results/merit/${getJobRouteId(job)}`}>

@@ -21,7 +21,10 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { hasPermission } from "utils/permissions";
 import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+
+const PERM = "settings.cities";
 
 const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   <button type="button" onClick={onClick}
@@ -52,6 +55,10 @@ const getHeaders = (json = true) => {
 };
 
 const CitiesManagement = () => {
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
   const navigate = useNavigate();
 
   // City→district mapping cache (backend doesn't return district_id yet)
@@ -294,12 +301,13 @@ const CitiesManagement = () => {
           onChange={() => handleToggleStatus(p.row, p.value)}
           inputProps={{ "aria-label": "toggle city status" }}
           size="small"
+          disabled={!canEdit}
           color={p.value === "active" ? "success" : "error"}
         />
       ),
     },
-    { field: "actions",    headerName: "Actions",    width: 75, sortable: false,
-      renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> },
+    ...(canRowActions ? [{ field: "actions",    headerName: "Actions",    width: 75, sortable: false,
+      renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> }] : []),
   ];
 
   if (loading && allRows.length === 0)
@@ -323,13 +331,15 @@ const CitiesManagement = () => {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={openAdd}
-            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm"
-          >
-            <Plus size={15} /> Add City
-          </button>
+          {canAdd && (
+            <button
+              type="button"
+              onClick={openAdd}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm"
+            >
+              <Plus size={15} /> Add City
+            </button>
+          )}
         </div>
 
         {/* STATS */}
@@ -384,8 +394,8 @@ const CitiesManagement = () => {
 
         {/* MENU */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={handleEdit}>Edit</MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={handleEdit}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>}
         </Menu>
 
         {/* MODAL */}

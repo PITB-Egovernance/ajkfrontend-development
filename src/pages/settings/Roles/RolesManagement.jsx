@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+  import React, { useState, useEffect } from "react";
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { IconButton, Menu, MenuItem, Switch } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
@@ -11,11 +11,19 @@ import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import RolesApi from "api/rolesApi";
+import EmployeeService from "services/EmployeeService";
 import { countPermissions } from "config/permissionModules";
 import { GRID_SX } from 'utils/gridStyles';
+import { hasPermission } from "utils/permissions";
+
+const PERM = "roles_permissions.roles";
 
 const RolesManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,13 +49,44 @@ const RolesManagement = () => {
       const search = (filters.name || searchTerm).trim();
       if (search) params.search = search;
       if (filters.status) params.status = filters.status;
-      const result = await RolesApi.getAll(params);
-      const payload = result.data ?? {};
-      const data = payload.data ?? result.data ?? [];
+
+      // Fetch roles and employees in parallel
+      const [rolesResult, employeesResult] = await Promise.all([
+        RolesApi.getAll(params),
+        EmployeeService.getUsers({ per_page: 1000 }).catch(() => ({ data: [] })),
+      ]);
+
+      // Build a case-insensitive map of role name → employee count
+      const roleCountMap = {};
+      const empList = employeesResult.data || [];
+      console.log('[DEBUG] Employee count:', empList.length);
+      if (empList.length > 0) {
+        console.log('[DEBUG] First employee role_permission:', JSON.stringify(empList[0].role_permission));
+        console.log('[DEBUG] First employee role:', empList[0].role);
+        console.log('[DEBUG] First employee role_name:', empList[0].role_name);
+      }
+      empList.forEach((emp) => {
+        // role_permission can be an object { role_name, permissions } or an array of such
+        const rp = emp.role_permission;
+        const rpObj = Array.isArray(rp) ? rp[0] : rp;
+        const roleName = (
+          (rpObj && typeof rpObj === 'object' ? (rpObj.role_name || rpObj.name) : rpObj) ||
+          emp.role_name || emp.role || ''
+        ).toString().trim().toLowerCase();
+        if (roleName) {
+          roleCountMap[roleName] = (roleCountMap[roleName] || 0) + 1;
+        }
+      });
+      console.log('[DEBUG] roleCountMap:', JSON.stringify(roleCountMap));
+
+      const payload = rolesResult.data ?? {};
+      const data = payload.data ?? rolesResult.data ?? [];
       const formatted = (Array.isArray(data) ? data : []).map((item) => {
         const isSuperAdmin = item.is_super_admin || item.is_default;
         const permsObj = typeof item.permissions === 'object' && !Array.isArray(item.permissions)
           ? item.permissions : {};
+        const roleName = (item.role_name ?? item.name ?? '').trim().toLowerCase();
+        console.log('[DEBUG] Role item:', JSON.stringify({ role_name: item.role_name, name: item.name, roleName, employees_count: item.employees_count, matched: roleCountMap[roleName] }));
         return {
           id: item.hash_id,
           hash_id: item.hash_id,
@@ -55,7 +94,7 @@ const RolesManagement = () => {
           totalPermissions: isSuperAdmin
             ? 'All Permissions'
             : (item.total_permissions ?? countPermissions(permsObj)),
-          employeesCount: item.employees_count ?? 0,
+          employeesCount: roleCountMap[roleName] ?? item.employees_count ?? 0,
           status: item.status ?? "active",
           isSuperAdmin,
         };
@@ -185,21 +224,21 @@ const RolesManagement = () => {
           <Switch
             checked={params.value === "active"}
             onChange={() => handleToggleStatus(params.row)}
-            disabled={params.row.isSuperAdmin}
+            disabled={params.row.isSuperAdmin || !canEdit}
             size="small"
             color={params.value === "active" ? "success" : "error"}
           />
         </div>
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: "actions", headerName: "Actions", width: 80, sortable: false, filterable: false,
       renderCell: (params) => (
         <IconButton onClick={(e) => { e.stopPropagation(); setAnchorEl(e.currentTarget); setSelectedRow(params.row); }}>
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && rows.length === 0) {
@@ -226,9 +265,11 @@ const RolesManagement = () => {
               </div>
             </div>
           </div>
+          {canAdd && (
           <Button onClick={() => navigate("/dashboard/settings/roles/create")}>
             <Plus className="w-4 h-4 mr-2" /> Add New Role
           </Button>
+          )}
         </div>
 
         {/* STATS */}
@@ -284,12 +325,12 @@ const RolesManagement = () => {
           <MenuItem onClick={() => { navigate(`/dashboard/settings/roles/${selectedRow?.hash_id}`); setAnchorEl(null); }}>
             <Eye size={14} /> View
           </MenuItem>
-          {!selectedRow?.isSuperAdmin && (
+          {!selectedRow?.isSuperAdmin && canEdit && (
             <MenuItem onClick={() => { navigate(`/dashboard/settings/roles/${selectedRow?.hash_id}/edit`); setAnchorEl(null); }}>
               <Pencil size={14} /> Edit
             </MenuItem>
           )}
-          {!selectedRow?.isSuperAdmin && (
+          {!selectedRow?.isSuperAdmin && canDelete && (
             <MenuItem onClick={handleDelete} sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}>
               <Trash2 size={14} /> Delete
             </MenuItem>

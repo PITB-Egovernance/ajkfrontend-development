@@ -7,8 +7,12 @@ import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { formatDate } from 'utils/dateUtils';
+import { hasPermission } from 'utils/permissions';
 
 const ApprovedRequisitions = () => {
+  // Creating an advertisement from the job pool requires advertisement add rights.
+  const canCreateAdvertisement = hasPermission('advertisement.advertisement.add');
+
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -338,7 +342,7 @@ const ApprovedRequisitions = () => {
           <h3 className="text-lg font-semibold">Approved Requisitions</h3>
           <p className="text-slate-500">Approved requisitions list.</p>
         </div>
-        {selectionModel.length > 0 && (
+        {selectionModel.length > 0 && canCreateAdvertisement && (
           <button
             type="button"
             onClick={() => {

@@ -12,6 +12,9 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'settings.exam_test_fee';
 
 const API_BASE = Config.apiUrl;
 
@@ -37,6 +40,10 @@ const emptyForm = { test_type: 'MCQs', label: '', amount: '' };
 
 const ExamFeesManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const [rows,        setRows]        = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -160,7 +167,7 @@ const ExamFeesManagement = () => {
       renderCell: (p) => p.value || <span className="text-slate-400 text-xs">—</span> },
     { field: 'amount',    headerName: 'Fee (PKR)',  width: 140,
       renderCell: (p) => Number(p.value).toLocaleString('en-PK', { minimumFractionDigits: 2 }) },
-    {
+    ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
       width: 80,
@@ -170,7 +177,7 @@ const ExamFeesManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading) return <InlineLoader text="Loading exam fees..." variant="ring" size="lg" />;
@@ -193,10 +200,12 @@ const ExamFeesManagement = () => {
               </div>
             </div>
           </div>
+          {canAdd && (
           <button onClick={openAdd}
             className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
             <Plus size={15} /> Add Exam Fee
           </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 mb-6">
@@ -238,8 +247,8 @@ const ExamFeesManagement = () => {
         />
 
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) openEdit(r); }}>Edit</MenuItem>
-          <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) handleDelete(r); }} sx={{ color: 'red' }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) openEdit(r); }}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) handleDelete(r); }} sx={{ color: 'red' }}>Delete</MenuItem>}
         </Menu>
 
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">

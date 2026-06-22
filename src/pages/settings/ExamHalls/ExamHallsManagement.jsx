@@ -19,6 +19,9 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import { GRID_SX } from 'utils/gridStyles';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'settings.exam_center';
 
 const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   <button
@@ -34,6 +37,10 @@ const emptyForm = { exam_center_id: "", name: "", floor: "", capacity: "" };
 
 const ExamHallsManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
   const API_KEY  = Config.apiKey;
@@ -198,8 +205,8 @@ const ExamHallsManagement = () => {
     { field: "floor",       headerName: "Floor",      width: 120 },
     { field: "capacity",    headerName: "Capacity",   width: 110,
       renderCell: (p) => <span className="font-semibold text-slate-700">{Number(p.value).toLocaleString()}</span> },
-    { field: "actions", headerName: "Actions", width: 75, sortable: false,
-      renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> },
+    ...(canRowActions ? [{ field: "actions", headerName: "Actions", width: 75, sortable: false,
+      renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> }] : []),
   ];
 
   if (loading && allRows.length === 0)
@@ -223,6 +230,7 @@ const ExamHallsManagement = () => {
               </div>
             </div>
           </div>
+          {canAdd && (
           <button
             type="button"
             onClick={openAdd}
@@ -230,6 +238,7 @@ const ExamHallsManagement = () => {
           >
             <Plus size={15} /> Add Hall
           </button>
+          )}
         </div>
 
         {/* STATS */}
@@ -305,8 +314,8 @@ const ExamHallsManagement = () => {
 
         {/* ROW MENU */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={handleEdit}>Edit</MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={handleEdit}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>}
         </Menu>
 
         {/* ADD / EDIT MODAL */}

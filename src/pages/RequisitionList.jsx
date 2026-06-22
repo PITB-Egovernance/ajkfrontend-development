@@ -10,6 +10,9 @@ import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'requisitions.admin_requisition'; // permission scope for this module
 
 const isDraftStatusValue = (status) => {
   return (status || '').toLowerCase().includes('draft');
@@ -20,6 +23,11 @@ const hasDraftIdentity = (row) => {
 };
 
 const RequisitionList = () => {
+  // Action-level permissions for the current role.
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -542,12 +550,14 @@ const RequisitionList = () => {
                 <ArrowRight className="w-4 h-4" /> Resume Draft
               </Link>
             )}
-            <button
-              onClick={() => navigate('create')}
-              className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              + Add New
-            </button>
+            {canAdd && (
+              <button
+                onClick={() => navigate('create')}
+                className="px-6 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                + Add New
+              </button>
+            )}
           </div>
         </div>
 
@@ -634,14 +644,18 @@ const RequisitionList = () => {
               Resume Draft
             </MenuItem>
           )}
-        <MenuItem onClick={handleEdit}>
-          <Pencil size={18} style={{ marginRight: '8px' }} />
-          Edit
-        </MenuItem>
-        <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
-          <Trash2 size={18} style={{ marginRight: '8px' }} />
-          Delete
-        </MenuItem>
+        {canEdit && (
+          <MenuItem onClick={handleEdit}>
+            <Pencil size={18} style={{ marginRight: '8px' }} />
+            Edit
+          </MenuItem>
+        )}
+        {canDelete && (
+          <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
+            <Trash2 size={18} style={{ marginRight: '8px' }} />
+            Delete
+          </MenuItem>
+        )}
       </Menu>
 
       {/* Upload Modal */}

@@ -1,4 +1,4 @@
-  import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
@@ -22,7 +22,10 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { hasPermission } from "utils/permissions";
 import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+
+const PERM = "settings.designations";
 
 const API_BASE = Config.apiUrl;
 
@@ -38,6 +41,10 @@ const getHeaders = (json = true) => {
 
 const DesignationsManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -376,6 +383,7 @@ const DesignationsManagement = () => {
         onChange={() => handleToggleStatus(params.row, params.value)}
         inputProps={{ "aria-label": "toggle designation status" }}
         size="small"
+        disabled={!canEdit}
         color={params.value === "active" ? "success" : "error"}
       />
     ),
@@ -383,7 +391,7 @@ const DesignationsManagement = () => {
 
 
 
-  {
+  ...(canRowActions ? [{
     field: "actions",
     headerName: "Actions",
     width: 80,
@@ -398,7 +406,7 @@ const DesignationsManagement = () => {
         <MoreVertical size={18} />
       </IconButton>
     ),
-  },
+  }] : []),
 ];
 
   if (loading && rows.length === 0) {
@@ -424,21 +432,23 @@ const DesignationsManagement = () => {
             </h1>
           </div>
 
-          <Button
-            onClick={() => {
-              setEditingDesignation(null);
-              setFormData({
-                name: "",
-                grade_id: "",
-                type: "",
-                status: "active",
-              });
-              setOpenModal(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Designation
-          </Button>
+          {canAdd && (
+            <Button
+              onClick={() => {
+                setEditingDesignation(null);
+                setFormData({
+                  name: "",
+                  grade_id: "",
+                  type: "",
+                  status: "active",
+                });
+                setOpenModal(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Designation
+            </Button>
+          )}
         </div>
 
         {/* STATS CARDS */}
@@ -508,33 +518,37 @@ const DesignationsManagement = () => {
           open={Boolean(anchorEl)}
           onClose={() => setAnchorEl(null)}
         >
-          <MenuItem
-            onClick={() => {
-              setEditingDesignation(selectedRow);
+          {canEdit && (
+            <MenuItem
+              onClick={() => {
+                setEditingDesignation(selectedRow);
 
-              setFormData({
-                name: selectedRow.name || "",
-                grade_id: String(selectedRow.grade_id ?? selectedRow.grade?.id ?? ""),
-                type: selectedRow.type || "",
-                status: selectedRow.status || "active",
-              });
+                setFormData({
+                  name: selectedRow.name || "",
+                  grade_id: String(selectedRow.grade_id ?? selectedRow.grade?.id ?? ""),
+                  type: selectedRow.type || "",
+                  status: selectedRow.status || "active",
+                });
 
 
-              setOpenModal(true);
-              setAnchorEl(null);
-            }}
-          >
-            Edit
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              handleDelete();
-              setAnchorEl(null);
-            }}
-            sx={{ color: "red" }}
-          >
-            Delete
-          </MenuItem>
+                setOpenModal(true);
+                setAnchorEl(null);
+              }}
+            >
+              Edit
+            </MenuItem>
+          )}
+          {canDelete && (
+            <MenuItem
+              onClick={() => {
+                handleDelete();
+                setAnchorEl(null);
+              }}
+              sx={{ color: "red" }}
+            >
+              Delete
+            </MenuItem>
+          )}
         </Menu>
 
         {/* MODAL */}

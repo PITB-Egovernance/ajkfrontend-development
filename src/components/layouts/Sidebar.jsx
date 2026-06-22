@@ -5,7 +5,58 @@ import { MENU_ITEMS } from "config/sidebarMenu";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
 import { useAuth } from "context/AuthContext";
-import { getUserRole } from "utils/roleUtils";
+import { isAdminUser, hasAnyModuleAccess, hasSubModuleAccess } from "utils/permissions";
+
+// Maps a submenu item path → [permissionModule, subModule] so each sub-tab is
+// shown only when the role has access to that specific sub-module.
+// Same technique as the Settings sub-tabs: each leaf maps to its closest existing
+// permission sub-module (no new keys invented — mirrors the backend catalog).
+const SUBMENU_PERMISSION_MAP = {
+  // Candidates
+  "/dashboard/applications":                ["candidates", "job_applications"],
+  "/dashboard/roll-numbers":                ["roll_number", "roll_number_generation"],
+  "/dashboard/award-lists":                 ["candidates", "award_lists"],
+  // Employees
+  "/dashboard/employees/list":              ["employee_management", "employees"],
+  // Requisitions
+  "/dashboard/requisitions":                ["requisitions", "admin_requisition"],
+  "/dashboard/psc-table":                   ["requisitions", "department_requisition"],
+  "/dashboard/approved-requisitions":       ["requisitions", "job_pool"],
+  "/dashboard/advertisement-records":       ["advertisement", "advertisement"],
+  // Settings
+  "/dashboard/settings/districts":          ["settings", "districts"],
+  "/dashboard/settings/designations":       ["settings", "designations"],
+  "/dashboard/settings/grades":             ["settings", "grades"],
+  "/dashboard/settings/departments":        ["settings", "departments"],
+  "/dashboard/settings/department-users":   ["settings", "department_users"],
+  "/dashboard/settings/nationalities":      ["settings", "nationalities"],
+  "/dashboard/settings/tests":              ["settings", "tests"],
+  "/dashboard/settings/cities":             ["settings", "cities"],
+  "/dashboard/settings/exam-centers":       ["settings", "exam_centers"],
+  "/dashboard/settings/qualifications":     ["settings", "qualifications"],
+  "/dashboard/settings/degrees":            ["settings", "degrees"],
+  "/dashboard/settings/companies":          ["settings", "companies"],
+  "/dashboard/settings/subjects":           ["settings", "subjects"],
+  "/dashboard/settings/certificates":       ["settings", "certificates"],
+  "/dashboard/settings/digital-signatures": ["settings", "digital_signatures"],
+  "/dashboard/settings/system-settings":    ["settings", "system_settings"],
+  "/dashboard/settings/wings":              ["settings", "wings"],
+  "/dashboard/settings/roles":              ["roles_permissions", "roles"],
+};
+
+// Maps each top-level sidebar item to the permission module(s) that grant access.
+// `null` = always visible (e.g. Dashboard). Items not listed are hidden for
+// non-admin users who lack the mapped module permission.
+const MENU_MODULE_MAP = {
+  dashboard: null,
+  candidates: ['candidates', 'roll_number', 'review_appeal'],
+  employees: ['employee_management'],
+  requisitions: ['requisitions', 'advertisement'],
+  'approval-flow': ['requisitions'],
+  results: ['result'],
+  'workflow-tracking': ['requisitions', 'result'],
+  settings: ['settings', 'roles_permissions'],
+};
 
 const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   // Use context if available, fallback to props for backward compatibility
@@ -14,7 +65,6 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   const setIsOpen = propSetIsOpen !== undefined ? propSetIsOpen : sidebarContext.setIsOpen;
   const { openMenu, toggleMenu: contextToggleMenu } = sidebarContext;
   const { user } = useAuth();
-  const userRole = getUserRole(user);
 
   const [localOpenMenu, setLocalOpenMenu] = useState("");
   const location = useLocation();
@@ -50,21 +100,31 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   };
 
   const menuItems = MENU_ITEMS;
-
-  const RESTRICTED_ROLES = ['director', 'secretary', 'chairman'];
+  const admin = isAdminUser(user);
 
   const allowedMenuItems = menuItems.filter((item) => {
-    // Admin or unknown role sees everything (backward compatible)
-    if (!userRole || !RESTRICTED_ROLES.includes(userRole)) return true;
-    // Restricted roles only see items explicitly tagged for them
-    return Array.isArray(item.roles) && item.roles.includes(userRole);
+    // Admin / super admin sees everything.
+    if (admin) return true;
+    // Dashboard is always visible.
+    const mods = MENU_MODULE_MAP[item.id];
+    if (mods === null) return true;
+    // Non-admin: show only modules the role has permission for.
+    if (!mods) return false;
+    return hasAnyModuleAccess(mods);
   });
 
   const NavItem = ({ item }) => {
-    const hasSubmenu = item.submenu && item.submenu.length > 0;
+    // Show only the sub-tabs the role can access (admin sees all; unmapped items stay visible).
+    const submenu = (item.submenu || []).filter((sub) => {
+      if (admin) return true;
+      const map = SUBMENU_PERMISSION_MAP[sub.path];
+      if (!map) return true;
+      return hasSubModuleAccess(map[0], map[1]);
+    });
+    const hasSubmenu = submenu.length > 0;
     // A submenu is open if explicitly toggled OR one of its children is the
     // active route (so the parent auto-expands and the item shows nested).
-    const hasActiveChild = hasSubmenu && item.submenu.some((s) => isActive(s.path));
+    const hasActiveChild = hasSubmenu && submenu.some((s) => isActive(s.path));
     // Accordion: an explicit selection wins (only that menu is open). Fall back
     // to auto-expanding the active route's parent only when nothing is explicitly open.
     const isMenuOpen = currentOpenMenu ? currentOpenMenu === item.id : hasActiveChild;
@@ -111,7 +171,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           {/* Submenu for expanded sidebar */}
           {isMenuOpen && isOpen && (
             <div className="mt-1 mb-1 ml-5 pl-3 space-y-1 overflow-hidden border-l-2 border-emerald-700/40" style={{ height: 'auto' }}>
-              {item.submenu.map((subItem) => (
+              {submenu.map((subItem) => (
                 <Link
                   key={subItem.path}
                   to={subItem.path}
@@ -154,7 +214,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
                   <span className="text-white font-semibold text-sm">{item.label}</span>
                 </div>
                 <div className="space-y-1">
-                  {item.submenu.map((subItem) => (
+                  {submenu.map((subItem) => (
                     <Link
                       key={subItem.path}
                       to={subItem.path}

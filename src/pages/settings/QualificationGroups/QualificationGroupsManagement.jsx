@@ -15,6 +15,9 @@ import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { GRID_SX } from 'utils/gridStyles';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'settings.qualifications';
 
 const API_BASE = Config.apiUrl;
 const getApiHeaders = () => ({
@@ -31,6 +34,10 @@ const emptyForm = { name: '', qualification_id: '', degree_ids: [] };
 
 const QualificationGroupsManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const [rows,           setRows]           = useState([]);
   const [qualifications, setQualifications] = useState([]);
@@ -208,22 +215,22 @@ const QualificationGroupsManagement = () => {
         </div>
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
       width: 90,
       sortable: false,
       renderCell: (p) => (
         <div className="flex gap-1">
-          <IconButton size="small" onClick={() => openEdit(p.row)} title="Edit">
+          {canEdit && <IconButton size="small" onClick={() => openEdit(p.row)} title="Edit">
             <Layers size={15} />
-          </IconButton>
-          <IconButton size="small" onClick={() => handleDelete(p.row)} sx={{ color: 'red' }} title="Delete">
+          </IconButton>}
+          {canDelete && <IconButton size="small" onClick={() => handleDelete(p.row)} sx={{ color: 'red' }} title="Delete">
             <Trash2 size={15} />
-          </IconButton>
+          </IconButton>}
         </div>
       ),
-    },
+    }] : []),
   ];
 
   if (loading) return <InlineLoader text="Loading groups..." variant="ring" size="lg" />;
@@ -251,10 +258,12 @@ const QualificationGroupsManagement = () => {
               </div>
             </div>
           </div>
+          {canAdd && (
           <button onClick={openAdd}
             className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
             <Plus size={15} /> Add Group
           </button>
+          )}
         </div>
 
         {/* STATS */}

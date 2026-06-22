@@ -207,11 +207,23 @@ export function AuthProvider({ children }) {
       setUser(JSON.parse(storedUser));
     }
 
-    setIsLoading(false);
+    // Refresh the full user (incl. role_permission.permissions) for access control.
+    if (token) {
+      AuthService.fetchCurrentUser()
+        .then((fresh) => { if (fresh) setUser(fresh); })
+        .catch(() => {})
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
+    }
   }, []);
 
   const login = (userData) => {
     setUser(userData);
+    // Pull the full user (with permissions) right after login.
+    AuthService.fetchCurrentUser()
+      .then((fresh) => { if (fresh) setUser(fresh); })
+      .catch(() => {});
   };
 
   const updateUser = (userData) => {

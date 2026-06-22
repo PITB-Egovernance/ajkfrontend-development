@@ -7,8 +7,14 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'requisitions.department_requisition'; // permission scope for this module
 
 const PscTable = () => {
+  // Action-level permissions for the current role (status changes = edit).
+  const canEdit = hasPermission(`${PERM}.edit`);
+
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -285,16 +291,17 @@ const PscTable = () => {
       headerName: 'Actions',
       width: 80, minWidth: 80,
       sortable: false,
-      renderCell: (params) => (
-        <IconButton
-          onClick={(e) => handleMenuOpen(e, params.row)}
-          size="small"
-          sx={{ color: 'text.secondary' }}
-          disabled={updating}
-        >
-          <MoreVertical size={20} />
-        </IconButton>
-      ),
+      renderCell: (params) =>
+        canEdit ? (
+          <IconButton
+            onClick={(e) => handleMenuOpen(e, params.row)}
+            size="small"
+            sx={{ color: 'text.secondary' }}
+            disabled={updating}
+          >
+            <MoreVertical size={20} />
+          </IconButton>
+        ) : null,
     },
   ];
 

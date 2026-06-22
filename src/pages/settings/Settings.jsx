@@ -18,124 +18,115 @@ import {
   LayoutList,
   ShieldCheck
 } from 'lucide-react';
+import { hasSubModuleAccess, isAdminUser } from 'utils/permissions';
 
 const Settings = () => {
   const navigate = useNavigate();
+  const isAdmin = isAdminUser();
 
   const settingsModules = [
-    // {
-    //   icon: Building2,
-    //   title: 'Organization Information',
-    //   description: 'Manage profile and contact information',
-    //   iconBg: 'bg-emerald-500',
-    //   link: '/dashboard/settings/organization'
-    // },
-    // {
-    //   icon: Network,
-    //   title: 'Organizational Hierarchy',
-    //   description: 'Configure departments and structure',
-    //   iconBg: 'bg-blue-500',
-    //   link: '/dashboard/settings/hierarchy'
-    // },
     {
       icon: MapPin,
       title: 'Districts Management',
       description: 'Add and manage district data',
       iconBg: 'bg-amber-500',
-      link: '/dashboard/settings/districts'
+      link: '/dashboard/settings/districts',
+      permModule: 'settings', permSub: 'districts',
     },
-    // {
-    //   icon: Map,
-    //   title: 'Tehsils Management',
-    //   description: 'Manage tehsil data and districts',
-    //   iconBg: 'bg-purple-500',
-    //   link: '/dashboard/settings/tehsils'
-    // },
     {
       icon: Briefcase,
       title: 'Designations Management',
       description: 'Manage designation and grade assignments',
       iconBg: 'bg-indigo-500',
-      link: '/dashboard/settings/designations'
+      link: '/dashboard/settings/designations',
+      permModule: 'settings', permSub: 'designations',
     },
     {
       icon: Award,
       title: 'Grades Management',
       description: 'Configure BPS grade and pay structure',
       iconBg: 'bg-cyan-500',
-      link: '/dashboard/settings/grades'
+      link: '/dashboard/settings/grades',
+      permModule: 'settings', permSub: 'grades',
     },
     {
       icon: Building,
       title: 'Companies Management',
       description: 'Manage vendors and service providers',
       iconBg: 'bg-teal-500',
-      link: '/dashboard/settings/companies'
+      link: '/dashboard/settings/companies',
+      permModule: 'settings', permSub: 'companies',
     },
-    // {
-    //   icon: Users,
-    //   title: 'Individual Contractors',
-    //   description: 'Manage freelance contractors',
-    //   iconBg: 'bg-violet-500',
-    //   link: '/dashboard/settings/contractors'
-    // },
     {
       icon: BookOpen,
       title: 'Subject Management',
       description: 'Manage subject groups and marks',
       iconBg: 'bg-rose-500',
-      link: '/dashboard/settings/subjects'
+      link: '/dashboard/settings/subjects',
+      permModule: 'settings', permSub: 'subjects',
     },
     {
       icon: Award,
       title: 'Certificates',
       description: 'Manage certificate entries',
       iconBg: 'bg-sky-500',
-      link: '/dashboard/settings/certificates'
+      link: '/dashboard/settings/certificates',
+      permModule: 'settings', permSub: 'certificates',
     },
     {
       icon: ScrollText,
       title: 'Terms & Conditions',
       description: 'Manage terms and conditions entries',
       iconBg: 'bg-violet-500',
-      link: '/dashboard/settings/terms-and-conditions'
+      link: '/dashboard/settings/terms-and-conditions',
+      permModule: 'settings', permSub: 'terms_conditions',
     },
     {
       icon: PenTool,
       title: 'Digital Signatures',
       description: 'Manage employee digital signature images',
       iconBg: 'bg-emerald-600',
-      link: '/dashboard/settings/digital-signatures'
+      link: '/dashboard/settings/digital-signatures',
+      permModule: 'settings', permSub: 'digital_signatures',
     },
     {
       icon: UserCog,
       title: 'System Settings',
       description: 'View Chairman, Secretary and Super Admin users',
       iconBg: 'bg-slate-700',
-      link: '/dashboard/settings/system-settings'
+      link: '/dashboard/settings/system-settings',
+      permModule: 'settings', permSub: 'system_settings',
     },
     {
       icon: LayoutList,
       title: 'Wings / Sections',
       description: 'Manage wings and sections hierarchy',
       iconBg: 'bg-indigo-600',
-      link: '/dashboard/settings/wings'
+      link: '/dashboard/settings/wings',
+      permModule: 'settings', permSub: 'wings',
     },
     {
       icon: ShieldCheck,
       title: 'Roles & Permissions',
       description: 'Manage roles and module access permissions',
       iconBg: 'bg-violet-700',
-      link: '/dashboard/settings/roles'
+      link: '/dashboard/settings/roles',
+      permModule: 'roles_permissions', permSub: 'roles',
     },
     {
       icon: Building2,
       title: 'Department Users',
       description: 'Manage department login accounts and permissions',
       iconBg: 'bg-cyan-700',
-      link: '/dashboard/settings/department-users'
+      link: '/dashboard/settings/department-users',
+      permModule: 'settings', permSub: 'department_users',
     }
   ];
+
+  // Filter cards: admin sees all; others see only modules they have any permission for.
+  const visibleModules = settingsModules.filter(
+    (m) => isAdmin || hasSubModuleAccess(m.permModule, m.permSub)
+  );
 
   return (
     <div className="min-h-screen p-6">
@@ -149,7 +140,7 @@ const Settings = () => {
 
         {/* Settings Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {settingsModules.map((module) => (
+          {visibleModules.map((module) => (
             <Card 
               key={module.title}
               className="border border-slate-200 cursor-pointer"

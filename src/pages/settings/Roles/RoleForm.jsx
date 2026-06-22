@@ -43,7 +43,15 @@ const RoleForm = () => {
       try {
         const res = await RolesApi.getModules();
         const norm = normalizeModules(res.data ?? res);
-        if (norm) mods = norm;
+        if (norm) {
+          // Use the backend structure, but make sure every module we know about
+          // locally (e.g. Candidates) is present even if the backend hasn't
+          // started returning it yet — otherwise those tabs would be missing.
+          mods = { ...norm };
+          Object.entries(PERMISSION_MODULES).forEach(([key, mod]) => {
+            if (!mods[key]) mods[key] = mod;
+          });
+        }
       } catch (_) {
         // backend unavailable → keep local fallback structure
       }
