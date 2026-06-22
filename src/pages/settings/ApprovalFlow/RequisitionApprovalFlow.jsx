@@ -87,6 +87,9 @@ const RequisitionApprovalFlow = () => {
   const [employeesMap, setEmployeesMap] = useState({});
   const [pageLoading, setPageLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // hash_id of the currently saved flow. Null = nothing saved yet (Save creates),
+  // set = a flow exists (Save updates, Reset deletes).
+  const [flowId, setFlowId] = useState(null);
   const [flowType, setFlowType] = useState('online');
   const [secretarySelected, setSecretarySelected] = useState(false);
   const [secretaryEmployees, setSecretaryEmployees] = useState({});
@@ -245,6 +248,12 @@ const RequisitionApprovalFlow = () => {
             };
           });
 
+          // Remember the saved flow's id so Save updates it (instead of creating a
+          // duplicate) and Reset can delete it.
+          if (flowResult.success && flowResult.data) {
+            setFlowId(flowResult.data.hash_id || flowResult.data.id || null);
+          }
+
           if (flowResult.success && assignments.length > 0) {
             const restoredWings = {};
             const restoredDesigMap = {};
@@ -396,7 +405,7 @@ const RequisitionApprovalFlow = () => {
     setFlowOrder(null);
   };
 
-  const handleReset = () => {
+  const clearForm = () => {
     setSelectedWings({});
     setDesignationMap({});
     setExpandedWings({});
@@ -406,6 +415,44 @@ const RequisitionApprovalFlow = () => {
     setFlowOrder(null);
     setSaved(false);
     setProcessType('requisition');
+  };
+
+  // Reset removes the saved flow: if one exists in the DB it is deleted via the
+  // API, then the form is cleared. With nothing saved yet, it just clears the form.
+  const handleReset = async () => {
+    if (!flowId) {
+      clearForm();
+      return;
+    }
+
+    const confirmed = await confirmDelete({
+      title: 'Delete Approval Flow',
+      message: 'This permanently deletes the saved approval flow. Are you sure?',
+      warning: '',
+      confirmLabel: 'Yes, Delete',
+    });
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/settings/approval-flow/delete/${flowId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const result = await res.json();
+      if (result.success) {
+        setFlowId(null);
+        clearForm();
+        toast.success('Approval flow deleted successfully');
+      } else {
+        toast.error(result.message || 'Failed to delete approval flow');
+      }
+    } catch (err) {
+      console.error('Delete approval flow error:', err);
+      toast.error(err.message || 'Network error while deleting');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getSelectedEmpNames = useCallback((wingId, desigHashId) => {
@@ -507,18 +554,26 @@ const RequisitionApprovalFlow = () => {
 
     const payload = { process_type: processType, flow_type: flowType, assignments };
 
+    // Existing flow → PUT update/{id}; first save → POST save.
+    const isUpdate = Boolean(flowId);
+    const url = isUpdate
+      ? `${API_BASE}/settings/approval-flow/update/${flowId}`
+      : `${API_BASE}/settings/approval-flow/save`;
+
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/settings/approval-flow/save`, {
-        method: 'POST',
+      const res = await fetch(url, {
+        method: isUpdate ? 'PUT' : 'POST',
         headers,
         body: JSON.stringify(payload),
       });
       const result = await res.json();
       if (result.success) {
+        // Capture the id so the next save updates instead of creating a duplicate.
+        setFlowId(result.data?.hash_id || result.data?.id || flowId);
         setSaved(true);
         setShowFlowDialog(true);
-        toast.success('Approval flow saved successfully');
+        toast.success(isUpdate ? 'Approval flow updated successfully' : 'Approval flow saved successfully');
       } else {
         toast.error(result.message || 'Failed to save approval flow');
       }
@@ -918,15 +973,15 @@ const RequisitionApprovalFlow = () => {
 
         {/* Bottom Action Buttons */}
         <div className="flex justify-end gap-3 mb-6">
-          <button onClick={handleReset}
-            className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 flex items-center gap-2 text-sm">
-            <RotateCcw size={15} /> Reset
+          <button onClick={handleReset} disabled={saving}
+            className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            <RotateCcw size={15} /> {flowId ? 'Delete Flow' : 'Reset'}
           </button>
           {canEdit && (
             <button onClick={handleSave} disabled={!isValid || saving}
               className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
               {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-              {saving ? 'Saving...' : 'Save Flow'}
+              {saving ? 'Saving...' : (flowId ? 'Update Flow' : 'Save Flow')}
             </button>
           )}
         </div>
