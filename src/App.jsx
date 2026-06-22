@@ -86,7 +86,7 @@ import ResultsViewPage from 'pages/results/ResultsViewPage';
 import ApprovalsPage from 'pages/results/ApprovalsPage';
 import ResultSearchPage from 'pages/results/ResultSearchPage';
 import CreateDepartmentUser from 'pages/settings/DepartmentUsers/EditDepartmentUser';
-
+import TermsAndConditionsManagement from "pages/settings/TermsAndConditions/TermsAndConditionsManagement";
 function App() {
   return (
     <Router>
@@ -205,6 +205,7 @@ function App() {
           <Route path="settings/roles/:hashId/edit" element={<RoleForm />} />
           <Route path="settings/department-users" element={<DepartmentUserList />} />
           <Route path="settings/department-users/create" element={<DepartmentUserForm />} />
+          <Route path="settings/terms-conditions/" element={<TermsAndConditionsManagement />} />
 
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />

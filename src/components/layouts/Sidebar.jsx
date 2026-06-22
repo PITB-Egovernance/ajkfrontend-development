@@ -42,6 +42,7 @@ const SUBMENU_PERMISSION_MAP = {
   "/dashboard/settings/system-settings":    ["settings", "system_settings"],
   "/dashboard/settings/wings":              ["settings", "wings"],
   "/dashboard/settings/roles":              ["roles_permissions", "roles"],
+  "/dashboard/settings/terms-conditions/":  ["settings", "terms-conditions"],
 };
 
 // Maps each top-level sidebar item to the permission module(s) that grant access.
