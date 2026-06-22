@@ -54,7 +54,7 @@ const fieldSx = {
   '& .MuiOutlinedInput-input': { padding: '14px' },
 };
 
-const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
+const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing = false }) => {
   const [loading,        setLoading]        = useState(false);
   const [saving,         setSaving]         = useState(false);
   const [editing,        setEditing]        = useState(false);
@@ -79,7 +79,8 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
     if (!open || !hashId) return;
 
     setLoading(true);
-    setEditing(false);
+    setEditing(initialEditing);
+    if (initialEditing) loadOptions();
     EmployeeService.getUserDetails(hashId)
       .then((data) => {
         const rawGender = data?.gender || '';

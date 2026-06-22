@@ -86,11 +86,23 @@ const RolesManagement = () => {
     if (!selectedRow) return;
     setAnchorEl(null);
     if (selectedRow.isSuperAdmin) {
-      toast.error("Root / Super Admin role cannot be deleted");
+      await confirmDelete({
+        title: "Action Not Allowed",
+        message: "Root / Super Admin role cannot be deleted.",
+        warning: "",
+        confirmLabel: "OK",
+        confirmColor: "bg-emerald-600 hover:bg-emerald-700",
+      });
       return;
     }
     if (selectedRow.employeesCount > 0) {
-      toast.error("This role cannot be deleted because employees are assigned to it");
+      await confirmDelete({
+        title: "Cannot Delete Role",
+        message: "This role cannot be deleted because employees are assigned to this role.",
+        warning: "",
+        confirmLabel: "OK",
+        confirmColor: "bg-emerald-600 hover:bg-emerald-700",
+      });
       return;
     }
     if (!await confirmDelete({ title: "Delete Role", message: `Are you sure you want to delete "${selectedRow.name}"?` })) return;
@@ -105,17 +117,29 @@ const RolesManagement = () => {
 
   const handleToggleStatus = async (row) => {
     if (row.isSuperAdmin) {
-      toast.error("Root / Super Admin role cannot be inactive");
+      await confirmDelete({
+        title: "Action Not Allowed",
+        message: "Root / Super Admin role cannot be inactive.",
+        warning: "",
+        confirmLabel: "OK",
+        confirmColor: "bg-emerald-600 hover:bg-emerald-700",
+      });
       return;
     }
     const newStatus = row.status === "active" ? "inactive" : "active";
     if (newStatus === "inactive" && row.employeesCount > 0) {
-      toast.error("This role cannot be inactive because employees are assigned to it");
+      await confirmDelete({
+        title: "Cannot Deactivate Role",
+        message: "This role cannot be inactive because employees are assigned to this role.",
+        warning: "",
+        confirmLabel: "OK",
+        confirmColor: "bg-emerald-600 hover:bg-emerald-700",
+      });
       return;
     }
     if (!await confirmStatus({ newStatus })) return;
     try {
-      await RolesApi.updateStatus(row.hash_id, newStatus);
+      await RolesApi.updateStatus(row.hash_id, newStatus, row.name);
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: newStatus } : r));
       toast.success(`Role marked as ${newStatus}`);
     } catch (error) {
@@ -250,7 +274,6 @@ const RolesManagement = () => {
             autoHeight
             disableRowSelectionOnClick
             sx={GRID_SX}
-            onRowClick={(params) => navigate(`/dashboard/settings/roles/${params.row.hash_id}`)}
           />
         </div>
 

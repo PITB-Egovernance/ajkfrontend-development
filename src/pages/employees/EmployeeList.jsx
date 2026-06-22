@@ -11,13 +11,12 @@ import {
   Plus,
   Upload,
   MoreVertical,
-  Eye,
+  Pencil,
   Trash2,
 } from 'lucide-react';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
-import EmployeeDetailsModal from 'components/employees/EmployeeDetailsModal';
 import EmployeeService from 'services/EmployeeService';
 import { GRID_SX } from 'utils/gridStyles';
 import confirmStatus from 'components/ui/confirmStatus';
@@ -40,6 +39,17 @@ const BASE_FILTER_CONFIG = [
 
 const EMPTY_FILTERS = { full_name: '', cnic: '', email: '', mobile: '', status: '' };
 
+// Safely turn any value (string, array, or relation object {name, hash_id}) into display text.
+const asText = (v) => {
+  if (v == null || v === '') return '-';
+  if (Array.isArray(v)) {
+    const parts = v.map(asText).filter((x) => x && x !== '-');
+    return parts.length ? parts.join(', ') : '-';
+  }
+  if (typeof v === 'object') return v.name || v.role_name || v.title || '-';
+  return String(v);
+};
+
 const mapUser = (user, idx) => ({
   id: user?.hash_id || user?.id || `user-${idx}`,
   hash_id: user?.hash_id || user?.id,
@@ -48,10 +58,10 @@ const mapUser = (user, idx) => ({
   email: user?.email || '-',
   mobile: user?.mobile || user?.phone || '-',
   father_husband_name: user?.father_husband_name || '-',
-  designation: Array.isArray(user?.designation) ? user.designation.join(', ') : (user?.designation || '-'),
-  scale: user?.scale || user?.grade || '-',
-  role: Array.isArray(user?.role_permission) ? user.role_permission.join(', ') : (user?.role || '-'),
-  wing: user?.wing || '-',
+  designation: asText(user?.designation),
+  scale: asText(user?.scale ?? user?.grade),
+  role: asText(user?.role_permission ?? user?.role),
+  wing: asText(user?.wing),
   status: user?.status || 'inactive',
   status_job: user?.status_job || '-',
 });
@@ -102,13 +112,13 @@ const ActionCell = ({ employee, onViewDetails, onDelete }) => {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
         <MenuItem onClick={(e) => { handleClose(e); onViewDetails(employee); }}>
-          <Eye className="w-4 h-4" /> View / Edit Details
+          <Pencil className="w-4 h-4" /> Edit
         </MenuItem>
         <MenuItem
           onClick={(e) => { handleClose(e); onDelete(employee); }}
           sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}
         >
-          <Trash2 className="w-4 h-4" /> Delete Employee
+          <Trash2 className="w-4 h-4" /> Delete
         </MenuItem>
       </Menu>
     </div>
@@ -121,7 +131,6 @@ const EmployeeList = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [selectedHashId, setSelectedHashId] = useState(null);
   const [designationOptions, setDesignationOptions] = useState([]);
   const [wingOptions, setWingOptions] = useState([]);
   const [roleOptions, setRoleOptions] = useState([]);
@@ -212,7 +221,7 @@ const EmployeeList = () => {
   };
 
   const handleViewDetails = (employee) => {
-    setSelectedHashId(employee.hash_id);
+    navigate(`/dashboard/employees/edit/${employee.hash_id}`);
   };
 
   const handleDeleteConfirm = async () => {
@@ -228,25 +237,6 @@ const EmployeeList = () => {
       setDeleting(false);
       setDeleteTarget(null);
     }
-  };
-
-  const handleEmployeeUpdated = (updated) => {
-    setEmployees((prev) =>
-      prev.map((emp) =>
-        emp.hash_id === updated.hash_id
-          ? {
-              ...emp,
-              full_name: updated.name || updated.full_name || emp.full_name,
-              email: updated.email ?? emp.email,
-              mobile: updated.mobile ?? emp.mobile,
-              father_husband_name: updated.father_husband_name ?? emp.father_husband_name,
-              designation: updated.designation ?? emp.designation,
-              scale: updated.scale || updated.grade || emp.scale,
-              status: updated.status ?? emp.status,
-            }
-          : emp
-      )
-    );
   };
 
   const handleFilterChange = (e) => {
@@ -495,12 +485,6 @@ const EmployeeList = () => {
         </div>
       </div>
 
-      <EmployeeDetailsModal
-        open={!!selectedHashId}
-        hashId={selectedHashId}
-        onClose={() => setSelectedHashId(null)}
-        onUpdated={handleEmployeeUpdated}
-      />
 
       <Dialog open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle className="text-lg font-semibold">Delete Employee</DialogTitle>

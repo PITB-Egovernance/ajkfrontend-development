@@ -199,6 +199,26 @@ export const buildEmptyPermissionsFrom = (modules = PERMISSION_MODULES) => {
 // Builds an empty permissions object from the default (fallback) structure.
 export const buildEmptyPermissions = () => buildEmptyPermissionsFrom(PERMISSION_MODULES);
 
+// Flattens a nested permissions object into readable label strings, e.g.
+// { settings: { city: { add: true } } } → ["City: Add"].
+export const permissionsToLabels = (permissions) => {
+  if (!permissions || typeof permissions !== 'object' || Array.isArray(permissions)) return [];
+  const labels = [];
+  Object.entries(permissions).forEach(([moduleKey, subs]) => {
+    if (!subs || typeof subs !== 'object') return;
+    Object.entries(subs).forEach(([subKey, actions]) => {
+      if (!actions || typeof actions !== 'object') return;
+      const subLabel = PERMISSION_MODULES[moduleKey]?.modules?.[subKey]?.label || prettyLabel(subKey);
+      Object.entries(actions).forEach(([action, val]) => {
+        if (val === true) {
+          labels.push(`${subLabel}: ${ACTION_LABELS[action] || prettyLabel(action)}`);
+        }
+      });
+    });
+  });
+  return labels;
+};
+
 // Counts the number of `true` permissions in a permissions object.
 export const countPermissions = (permissions = {}) => {
   let count = 0;

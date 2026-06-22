@@ -55,12 +55,14 @@ const RolesApi = {
     return handle(res);
   },
 
-  // PATCH /settings/roles/{hash}  { status: 'active' | 'inactive' }
-  updateStatus: async (hashId, status) => {
+  // PATCH /settings/roles/{hash}  { role_name, status }
+  // The endpoint runs full update validation (role_name is required); sending
+  // role_name + status toggles the status while the backend preserves permissions.
+  updateStatus: async (hashId, status, roleName) => {
     const res = await fetch(`${API_BASE}/settings/roles/${hashId}`, {
       method: 'PATCH',
       headers: getHeaders(),
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ role_name: roleName, status }),
     });
     return handle(res);
   },

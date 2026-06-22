@@ -1,14 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { TextField, MenuItem, Autocomplete, Checkbox, ListItemText, Chip, Box } from '@mui/material';
-import { UserPlus, Save } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { TextField, MenuItem, Autocomplete, Checkbox, ListItemText, Chip, Box, InputAdornment, IconButton } from '@mui/material';
+import { UserPlus, Save, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Config from '../../config/baseUrl';
 import AuthService from '../../services/authService';
 import EmployeeService from '../../services/EmployeeService';
+import { permissionsToLabels } from 'config/permissionModules';
 import '../job-creation/JobCreationForm.css';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+
+// Date helpers — UI shows dd/mm/yyyy, API uses yyyy-mm-dd.
+const isoToDmy = (iso) => {
+  if (!iso) return '';
+  const [y, m, d] = String(iso).slice(0, 10).split('-');
+  return (y && m && d) ? `${d}/${m}/${y}` : '';
+};
+const dmyToIso = (dmy) => {
+  const match = String(dmy).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return '';
+  const [, d, m, y] = match;
+  return `${y}-${m}-${d}`;
+};
 
 // Custom input component that renders permission chips inside an MUI
 // OutlinedInput — gives the proper notched-outline + floating label look.
@@ -45,16 +59,22 @@ const mapApiErrors = (apiErrors = {}) => {
   return mapped;
 };
 
-const EmployeeRegistrationForm = () => {
+const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSuccess, onCancel } = {}) => {
   const navigate = useNavigate();
+  const { hashId: routeHashId } = useParams();
+  const effectiveHashId = employeeHashId || routeHashId || null;
+  const isEdit = mode === 'edit' || !!routeHashId;
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [rawEmployee, setRawEmployee] = useState(null);
 
   const [username, setUsername] = useState('');
   const [cnic, setCnic] = useState('');
   const [email, setEmail] = useState('');
   const [fatherHusbandName, setFatherHusbandName] = useState('');
-  const [dob, setDob] = useState('');
+  const [dob, setDob] = useState('');        // ISO yyyy-mm-dd (for the API)
+  const [dobInput, setDobInput] = useState(''); // display dd/mm/yyyy
+  const dobPickerRef = useRef(null);            // hidden native date input (calendar)
   const [gender, setGender] = useState('');
   const [mobile, setMobile] = useState('');
   const [district, setDistrict] = useState(null);
@@ -146,7 +166,7 @@ const EmployeeRegistrationForm = () => {
               .map((r) => ({
                 id: r.hash_id,
                 name: r.role_name,
-                permissions: r.permissions || [],
+                permissions: permissionsToLabels(r.permissions),
               }))
           );
         }
@@ -160,6 +180,77 @@ const EmployeeRegistrationForm = () => {
     fetchRoles();
     // fetchGrades not needed — grade auto-derived from designation
   }, []);
+
+  // Edit mode: load the employee, prefill the plain text fields.
+  useEffect(() => {
+    if (!isEdit || !effectiveHashId) return;
+    let active = true;
+    (async () => {
+      try {
+        const data = await EmployeeService.getUserDetails(effectiveHashId);
+        if (!active) return;
+        setRawEmployee(data);
+        setUsername(data.username || data.name || data.full_name || '');
+        setCnic(String(data.cnic || '').replace(/\D/g, '').slice(0, 13));
+        setEmail(data.email || '');
+        setFatherHusbandName(data.father_husband_name || '');
+        const iso = String(data.date_of_birth || '').slice(0, 10);
+        setDob(iso);
+        setDobInput(isoToDmy(iso));
+        const g = String(data.gender || '');
+        setGender(g ? g.charAt(0).toUpperCase() + g.slice(1).toLowerCase() : '');
+        setMobile(String(data.mobile || data.phone || '').replace(/\D/g, '').slice(0, 11));
+      } catch (error) {
+        toast.error(error.message || 'Failed to load employee details');
+      }
+    })();
+    return () => { active = false; };
+  }, [isEdit, effectiveHashId]);
+
+  // Edit mode: once option lists are loaded, match the saved values to objects.
+  useEffect(() => {
+    if (!isEdit || !rawEmployee) return;
+
+    const e = rawEmployee;
+
+    if (districtOptions.length && (e.domicile || e.domicile_district)) {
+      const name = String(e.domicile || e.domicile_district).toLowerCase();
+      setDistrict(districtOptions.find((d) => d.name.toLowerCase() === name) || null);
+    }
+
+    if (designationOptions.length) {
+      const desigRaw = Array.isArray(e.designation) ? e.designation[0] : e.designation;
+      if (desigRaw) {
+        const name = String(typeof desigRaw === 'object' ? desigRaw.name : desigRaw).toLowerCase();
+        setDesignation(designationOptions.find((d) => d.name.toLowerCase() === name) || null);
+      }
+    }
+
+    if (roleOptions.length) {
+      const roleRaw = (Array.isArray(e.role_permission) ? e.role_permission[0] : e.role_permission) ?? e.role;
+      if (roleRaw) {
+        const val = typeof roleRaw === 'object' ? (roleRaw.hash_id || roleRaw.id) : roleRaw;
+        const found = roleOptions.find(
+          (r) => r.id === val || r.name.toLowerCase() === String(val).toLowerCase()
+        );
+        setSelectedRole(found || null);
+      }
+    }
+
+    if (wingOptions.length && e.wing) {
+      const wingsArr = Array.isArray(e.wing) ? e.wing : String(e.wing).split(',').map((w) => w.trim());
+      const ids = wingsArr
+        .map((w) => {
+          const val = typeof w === 'object' ? (w.hash_id || w.id || w.name) : w;
+          const found = wingOptions.find(
+            (wo) => wo.id === val || wo.name.toLowerCase() === String(val).toLowerCase()
+          );
+          return found?.id;
+        })
+        .filter(Boolean);
+      setSelectedWings(ids);
+    }
+  }, [isEdit, rawEmployee, districtOptions, designationOptions, roleOptions, wingOptions]);
 
   const fieldSx = {
     '& .MuiOutlinedInput-root': { minHeight: 64 },
@@ -183,7 +274,7 @@ const EmployeeRegistrationForm = () => {
     else if (mobile.length !== 11) errors.mobile = ['Mobile number must be exactly 11 digits'];
     if (!district) errors.domicile_district = ['Domicile district is required'];
     if (!designation) errors.designation = ['Designation is required'];
-    if (!selectedRole) errors.role = ['Role is required'];
+    // Role is not validated/sent while backend role assignment is unavailable.
     if (!selectedWings || selectedWings.length === 0) errors.wing = ['At least one wing is required'];
 
     if (Object.keys(errors).length > 0) {
@@ -193,9 +284,9 @@ const EmployeeRegistrationForm = () => {
     }
 
     setLoading(true);
-    const loadingToast = toast.loading('Registering employee...');
+    const loadingToast = toast.loading(isEdit ? 'Updating employee...' : 'Registering employee...');
     try {
-      const result = await EmployeeService.register({
+      const payload = {
         username: username.trim(),
         cnic: cnic.trim().replace(/[^0-9]/g, ''),
         father_husband_name: fatherHusbandName.trim(),
@@ -204,22 +295,40 @@ const EmployeeRegistrationForm = () => {
         date_of_birth: dob,
         domicile: district.name,
         mobile: mobile.trim(),
-        designation: [designation.name],
-        grade: designation.gradeId ? [designation.gradeId] : [],
-        role_permission: [selectedRole.id],
+        // Send hash_id strings so the backend links the relations correctly.
+        designation: designation.id,
+        grade: designation.gradeId || '',
         wing: selectedWings.map((id) => {
           const w = wingOptions.find((wo) => wo.id === id);
           return w?.name || id;
         }),
-      });
+      };
 
-      toast.success(result?.message || 'Employee registered successfully', { id: loadingToast });
-      navigate('/dashboard/employees/list');
+      // role_permission should carry the selected role's hash_id (from /settings/roles),
+      // but the live backend currently throws "Failed to ..." on any non-empty value
+      // (and ignores the `permission` field). Sending it breaks every save, so it is
+      // held behind this flag until the backend accepts it. Flip to true once fixed.
+      const SEND_ROLE_PERMISSION = false;
+      if (SEND_ROLE_PERMISSION && selectedRole?.id) {
+        payload.role_permission = selectedRole.id;
+      }
+
+      const result = isEdit
+        ? await EmployeeService.updateUser(effectiveHashId, payload)
+        : await EmployeeService.register(payload);
+
+      toast.success(
+        result?.message || (isEdit ? 'Employee updated successfully' : 'Employee registered successfully'),
+        { id: loadingToast }
+      );
+
+      if (onSuccess) onSuccess(result);
+      else navigate('/dashboard/employees/list');
     } catch (error) {
       if (error.errors && Object.keys(error.errors).length > 0) {
         setFieldErrors(mapApiErrors(error.errors));
       }
-      toast.error(error.message || 'Failed to register employee', { id: loadingToast });
+      toast.error(error.message || (isEdit ? 'Failed to update employee' : 'Failed to register employee'), { id: loadingToast });
     } finally {
       setLoading(false);
     }
@@ -227,11 +336,11 @@ const EmployeeRegistrationForm = () => {
 
   return (
     <div className="job-creation-container">
-      <div className="container">
+      <div className="container" style={{ minWidth: "-webkit-fill-available" }}>
         <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white py-4 px-6 rounded-t-xl text-center text-2xl font-bold shadow-lg mb-6">
           <div className="flex items-center justify-center gap-3">
             <UserPlus className="w-8 h-8" />
-            <span>Employee Manual Registration</span>
+            <span>{isEdit ? 'Edit Employee' : 'Employee Manual Registration'}</span>
           </div>
         </div>
 
@@ -304,19 +413,62 @@ const EmployeeRegistrationForm = () => {
               {/* Row 3: DOB + Gender */}
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <TextField
-                    fullWidth
-                    label="Date of Birth"
-                    type="date"
-                    value={dob}
-                    onChange={(e) => setDob(e.target.value)}
-                    required
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{ style: { height: 28 } }}
-                    sx={fieldSx}
-                    error={!!fieldErrors?.dob}
-                    helperText={fieldErrors?.dob?.join(', ')}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <TextField
+                      fullWidth
+                      label="Date of Birth"
+                      placeholder="dd/mm/yyyy"
+                      value={dobInput}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 8); // ddmmyyyy
+                        let out = digits;
+                        if (digits.length > 4) out = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+                        else if (digits.length > 2) out = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                        setDobInput(out);
+                        setDob(dmyToIso(out));
+                      }}
+                      required
+                      InputLabelProps={{ shrink: true }}
+                      inputProps={{ inputMode: 'numeric', maxLength: 10 }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              aria-label="Open calendar"
+                              onClick={() => {
+                                const el = dobPickerRef.current;
+                                if (!el) return;
+                                if (typeof el.showPicker === 'function') el.showPicker();
+                                else el.click();
+                              }}
+                            >
+                              <CalendarDays size={18} />
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={fieldSx}
+                      error={!!fieldErrors?.dob}
+                      helperText={fieldErrors?.dob?.join(', ') || 'Format: dd/mm/yyyy'}
+                    />
+                    {/* Hidden native date input — provides the calendar popup */}
+                    <input
+                      ref={dobPickerRef}
+                      type="date"
+                      value={dob}
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => {
+                        const iso = e.target.value;
+                        setDob(iso);
+                        setDobInput(isoToDmy(iso));
+                      }}
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      style={{ position: 'absolute', right: 12, bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+                    />
+                  </div>
                 </div>
                 <div className="col-md-6 form-group">
                   <TextField
@@ -490,7 +642,7 @@ const EmployeeRegistrationForm = () => {
               <button
                 type="button"
                 className="btn btn-prev"
-                onClick={() => navigate('/dashboard/employees')}
+                onClick={() => (onCancel ? onCancel() : navigate(isEdit ? '/dashboard/employees/list' : '/dashboard/employees'))}
               >
                 Cancel
               </button>
@@ -505,7 +657,7 @@ const EmployeeRegistrationForm = () => {
                 ) : (
                   <>
                     <Save size={16} />
-                    <span>Register Employee</span>
+                    <span>{isEdit ? 'Update Employee' : 'Register Employee'}</span>
                   </>
                 )}
               </button>

@@ -74,7 +74,8 @@ class EmployeeService {
   // 3) Get a single employee's details
   // ──────────────────────────────────────────────────────
   static async getUserDetails(id) {
-    const response = await fetch(`${API_BASE}/employee/${id}`, {
+    // No single-employee GET route exists — resolve the detail from the list.
+    const response = await fetch(`${API_BASE}/employee/list?per_page=1000`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -85,7 +86,14 @@ class EmployeeService {
       throw new Error(result?.message || 'Failed to load employee details');
     }
 
-    return result?.data || result;
+    const list = extractList(result);
+    const found = list.find((e) => (e.hash_id ?? e.id) === id || String(e.id) === String(id));
+
+    if (!found) {
+      throw new Error('Employee not found');
+    }
+
+    return found;
   }
 
   // ──────────────────────────────────────────────────────

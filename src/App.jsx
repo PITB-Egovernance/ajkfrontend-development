@@ -220,6 +220,7 @@ function App() {
           {/* Employee Management Routes */}
           <Route path="employees" element={<EmployeesLanding />} />
           <Route path="employees/create" element={<EmployeeRegistrationForm />} />
+          <Route path="employees/edit/:hashId" element={<EmployeeRegistrationForm />} />
           <Route path="employees/list" element={<EmployeeList />} />
 
           {/* Results Module Routes */}
