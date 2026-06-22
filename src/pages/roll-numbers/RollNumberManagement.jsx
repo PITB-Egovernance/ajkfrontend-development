@@ -32,6 +32,9 @@ import {
   getApplicationOcrBatchPillClass,
 } from 'utils/applicationOcrUtils';
 import { formatDate } from 'utils/dateUtils';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'roll_number.roll_number_generation'; // permission scope for this module
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -57,6 +60,11 @@ const gridSx = {
 
 const RollNumberManagement = () => {
   const navigate = useNavigate();
+
+  // Action-level permissions for the current role.
+  const canGenerate = hasPermission(`${PERM}.generate`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
 
   const [rows,            setRows]            = useState([]);
   const [loading,         setLoading]         = useState(true);
@@ -543,16 +551,18 @@ const RollNumberManagement = () => {
                 {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
               </span>
               <div className="flex gap-2">
-                {!hasGeneratedSelected && (
+                {canGenerate && !hasGeneratedSelected && (
                   <Button onClick={openSlipGenerator} variant="primary" size="sm" className="flex items-center gap-2">
                     <Send size={14} /> Generate Roll No Slip
                   </Button>
                 )}
-                <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
-                  className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
-                  disabled={rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
-                  <Trash2 size={14} /> Delete Roll No Slip
-                </Button>
+                {canDelete && (
+                  <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
+                    className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
+                    disabled={rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
+                    <Trash2 size={14} /> Delete Roll No Slip
+                  </Button>
+                )}
               </div>
             </div>
             {hasGeneratedSelected && (
@@ -609,24 +619,28 @@ const RollNumberManagement = () => {
         <MenuItem key="view" onClick={handleView}>
           <Eye size={16} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
         </MenuItem>
-        {!selectedRow?.roll_number && (
+        {canGenerate && !selectedRow?.roll_number && (
           <MenuItem key="generate" onClick={handleGenerateOne}>
             <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
           </MenuItem>
         )}
-        <MenuItem key="edit"
-          onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate('/dashboard/roll-numbers/edit-slip/' + row.application_number, { state: { row } }); }}
-          disabled={!selectedRow?.roll_number}>
-          <Pencil size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Edit Slip
-        </MenuItem>
+        {canEdit && (
+          <MenuItem key="edit"
+            onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate('/dashboard/roll-numbers/edit-slip/' + row.application_number, { state: { row } }); }}
+            disabled={!selectedRow?.roll_number}>
+            <Pencil size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Edit Slip
+          </MenuItem>
+        )}
         <MenuItem key="download" onClick={() => { downloadSlip(selectedRow?.application_number); handleMenuClose(); }}
           disabled={!selectedRow?.roll_number}>
           <Download size={16} style={{ marginRight: '8px' }} className="text-violet-600" /> Download Slip PDF
         </MenuItem>
-        <MenuItem key="delete" onClick={() => { const row = selectedRow; handleMenuClose(); deleteSlip(row); }}
-          disabled={!selectedRow?.roll_number}>
-          <Trash2 size={16} style={{ marginRight: '8px' }} className="text-red-600" /> Delete Slip
-        </MenuItem>
+        {canDelete && (
+          <MenuItem key="delete" onClick={() => { const row = selectedRow; handleMenuClose(); deleteSlip(row); }}
+            disabled={!selectedRow?.roll_number}>
+            <Trash2 size={16} style={{ marginRight: '8px' }} className="text-red-600" /> Delete Slip
+          </MenuItem>
+        )}
       </Menu>
 
     </div>

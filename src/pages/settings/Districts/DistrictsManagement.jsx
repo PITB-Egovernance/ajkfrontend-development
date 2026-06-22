@@ -28,6 +28,9 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { PageLoader, InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { hasPermission } from "utils/permissions";
+
+const PERM = "settings.districts"; // permission scope for this module
 
 const gridSx = {
   border: "none",
@@ -45,6 +48,12 @@ const gridSx = {
 
 const DistrictsManagement = () => {
   const navigate = useNavigate();
+
+  // Action-level permissions for the current role.
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -343,12 +352,13 @@ const DistrictsManagement = () => {
           onChange={() => handleToggleStatus(params.row, params.row.status)}
           inputProps={{ "aria-label": "toggle district status" }}
           size="small"
+          disabled={!canEdit}
           color={params.row.status === "active" ? "success" : "error"}
         />
       ),
     },
 
-    {
+    ...(canRowActions ? [{
       field: "actions",
       headerName: "Actions",
       width: 80,
@@ -360,7 +370,7 @@ const DistrictsManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && rows.length === 0) {
@@ -394,16 +404,18 @@ const DistrictsManagement = () => {
           </h1>
         </div>
 
-        <Button
-          onClick={() => {
-            setEditingDistrict(null);
-            setFormData({ name: "", code: "" });
-            setOpenModal(true);
-          }}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add District
-        </Button>
+        {canAdd && (
+          <Button
+            onClick={() => {
+              setEditingDistrict(null);
+              setFormData({ name: "", code: "" });
+              setOpenModal(true);
+            }}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add District
+          </Button>
+        )}
       </div>
 
       {/* STATS CARDS */}
@@ -478,10 +490,12 @@ const DistrictsManagement = () => {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleEdit}>Edit</MenuItem>
-        <MenuItem onClick={handleDelete} sx={{ color: "red" }}>
-          Delete
-        </MenuItem>
+        {canEdit && <MenuItem onClick={handleEdit}>Edit</MenuItem>}
+        {canDelete && (
+          <MenuItem onClick={handleDelete} sx={{ color: "red" }}>
+            Delete
+          </MenuItem>
+        )}
       </Menu>
 
       {/* MODAL */}

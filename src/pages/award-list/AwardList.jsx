@@ -10,6 +10,9 @@ import { Plus, Search, X, RefreshCw, ExternalLink, Download } from 'lucide-react
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'candidates.award_lists'; // permission scope for this module
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
@@ -32,6 +35,9 @@ const defaultForm = {
 
 export default function AwardList() {
   const navigate = useNavigate();
+
+  // Action-level permission for the current role.
+  const canAdd = hasPermission(`${PERM}.add`);
 
   const [rows, setRows]           = useState([]);
   const [total, setTotal]         = useState(0);
@@ -196,13 +202,15 @@ export default function AwardList() {
           <Tooltip title="Refresh">
             <IconButton onClick={fetchList}><RefreshCw size={18} /></IconButton>
           </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<Plus size={16} />}
-            onClick={() => { setCreateOpen(true); setFormError(''); }}
-          >
-            New Award List
-          </Button>
+          {canAdd && (
+            <Button
+              variant="contained"
+              startIcon={<Plus size={16} />}
+              onClick={() => { setCreateOpen(true); setFormError(''); }}
+            >
+              New Award List
+            </Button>
+          )}
         </Box>
       </Box>
 

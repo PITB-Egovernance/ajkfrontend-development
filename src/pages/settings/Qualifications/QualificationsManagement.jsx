@@ -12,7 +12,9 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
+const PERM = 'settings.qualifications';
 
 const API_BASE = Config.apiUrl;
 
@@ -24,6 +26,10 @@ const getHeaders = () => ({
 });
 
 const QualificationsManagement = () => {
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
   const navigate = useNavigate();
 
   const [rows,     setRows]     = useState([]);
@@ -133,7 +139,7 @@ const QualificationsManagement = () => {
   const columns = [
     { field: 'sr_no', headerName: '#',             width: 60 },
     { field: 'name',  headerName: 'Qualification',  flex: 1 },
-    {
+    ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
       width: 80,
@@ -143,7 +149,7 @@ const QualificationsManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading) return <InlineLoader text="Loading qualifications..." variant="ring" size="lg" />;
@@ -166,10 +172,12 @@ const QualificationsManagement = () => {
               </div>
             </div>
           </div>
-          <button onClick={openAdd}
-            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
-            <Plus size={15} /> Add Qualification
-          </button>
+          {canAdd && (
+            <button onClick={openAdd}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+              <Plus size={15} /> Add Qualification
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 mb-6">
@@ -189,8 +197,8 @@ const QualificationsManagement = () => {
 
         {/* 3-dot action menu */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) openEdit(r); }}>Edit</MenuItem>
-          <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) handleDelete(r); }} sx={{ color: 'red' }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) openEdit(r); }}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) handleDelete(r); }} sx={{ color: 'red' }}>Delete</MenuItem>}
         </Menu>
 
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
@@ -216,3 +224,4 @@ const QualificationsManagement = () => {
 };
 
 export default QualificationsManagement;
+

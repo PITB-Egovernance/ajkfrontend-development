@@ -15,6 +15,10 @@ import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import EmployeeService from 'services/EmployeeService';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'requisitions.admin_requisition'; // permission scope for the approval flow
 
 const PROCESS_TYPES = [
   { value: 'requisition', label: 'Requisition' },
@@ -28,6 +32,18 @@ const HARDCODED_DESIGNATIONS = [
 ];
 
 const HARDCODED_SECRETARY = { hash_id: 'secretary', name: 'Secretary' };
+
+// Safely turn any value (string, array, or relation object {name, hash_id})
+// into a comma-separated display string — matches the Employees list page.
+const asText = (v) => {
+  if (v == null || v === '') return '';
+  if (Array.isArray(v)) return v.map(asText).filter(Boolean).join(', ');
+  if (typeof v === 'object') return v.name || v.role_name || v.title || '';
+  return String(v);
+};
+
+// Split a comma-separated value into trimmed, lower-cased tokens for exact matching.
+const toTokens = (v) => asText(v).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 
 const STEP_COLORS = [
   { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-600', ring: 'ring-emerald-300' },
@@ -43,6 +59,9 @@ const getStepColors = (index) => STEP_COLORS[index % STEP_COLORS.length];
 
 const RequisitionApprovalFlow = () => {
   const navigate = useNavigate();
+
+  // Action-level permission for the current role (configuring the flow = edit).
+  const canEdit = hasPermission(`${PERM}.edit`);
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -117,15 +136,24 @@ const RequisitionApprovalFlow = () => {
   }, [allEmployees]);
 
   /* ── Build employeesMap from allEmployees whenever data changes ── */
-  // Build employees keyed by the hardcoded designation ids, matching
-  // employees whose designation name contains the designation label.
-  const buildEmployeesMap = useCallback((empList) => {
+  // An employee is listed under a wing→designation node when their designation
+  // spelling matches the hardcoded designation AND their wing matches, so each
+  // wing only lists its own staff. Keyed by `${wingId}_${designationHashId}`;
+  // the wing-independent Secretary is keyed by its hash_id alone.
+  const buildEmployeesMap = useCallback((empList, wingsList) => {
     const empMap = {};
-    [...HARDCODED_DESIGNATIONS, HARDCODED_SECRETARY].forEach((desig) => {
-      empMap[desig.hash_id] = empList.filter((e) =>
-        e.designation?.toLowerCase().includes(desig.name.toLowerCase())
-      );
+    wingsList.forEach((wing) => {
+      const wingName = (wing.name || '').toLowerCase();
+      HARDCODED_DESIGNATIONS.forEach((desig) => {
+        empMap[`${wing.id}_${desig.hash_id}`] = empList.filter((e) =>
+          e.designationTokens.includes(desig.name.toLowerCase()) &&
+          e.wingTokens.includes(wingName)
+        );
+      });
     });
+    empMap[HARDCODED_SECRETARY.hash_id] = empList.filter((e) =>
+      e.designationTokens.includes(HARDCODED_SECRETARY.name.toLowerCase())
+    );
     return empMap;
   }, []);
 
@@ -134,15 +162,16 @@ const RequisitionApprovalFlow = () => {
     const init = async () => {
       setPageLoading(true);
       try {
-        const [wingsRes, desigRes, usersRes] = await Promise.all([
+        const [wingsRes, desigRes, usersResult] = await Promise.all([
           fetch(`${API_BASE}/settings/wings?per_page=200`, { headers }),
           fetch(`${API_BASE}/settings/designations?per_page=200`, { headers }),
-          fetch(`${API_BASE}/users?per_page=500`, { headers }),
+          // Same source as the Employees list (/employee/list) so we get all
+          // employees with their designation, wings and role_permission.
+          EmployeeService.getUsers({ per_page: 1000 }),
         ]);
 
         const wingsResult = await wingsRes.json();
         const desigResult = await desigRes.json();
-        const usersResult = await usersRes.json();
 
         let wingsList = [];
         if (wingsResult.success) {
@@ -166,18 +195,26 @@ const RequisitionApprovalFlow = () => {
           setAllDesignations(desigList);
         }
 
-        // Parse all employees
-        const usersList = usersResult?.data?.data ?? usersResult?.data ?? [];
-        const empList = (Array.isArray(usersList) ? usersList : []).map((e) => ({
+        // Parse all employees. Designation, wing and role can each arrive as a
+        // string, array, or relation object — normalise to display text + tokens.
+        const usersList = usersResult?.data ?? [];
+        const empList = (Array.isArray(usersList) ? usersList : [])
+          // Approval flow uses active employees only.
+          .filter((e) => String(e.status || '').toLowerCase() === 'active')
+          .map((e) => ({
           id: e.hash_id || e.id,
           name: e.username || e.name || e.full_name || '',
-          designation: e.designation || '',
-          wing: e.wing || '',
+          designation: asText(e.designation),
+          wing: asText(e.wings ?? e.wing),
+          // Match the employee's designation spelling against the hardcoded
+          // approval designations — role is intentionally ignored.
+          designationTokens: toTokens(e.designation),
+          wingTokens: toTokens(e.wings ?? e.wing),
         }));
         setAllEmployees(empList);
 
-        // Build employees map keyed by hardcoded designation ids
-        const empMap = buildEmployeesMap(empList);
+        // Build employees map keyed by `${wingId}_${designationHashId}`
+        const empMap = buildEmployeesMap(empList, wingsList);
         setEmployeesMap(empMap);
 
         // Fetch saved approval flow
@@ -215,7 +252,7 @@ const RequisitionApprovalFlow = () => {
               if (!restoredDesigMap[wing.id].includes(desig.hash_id)) restoredDesigMap[wing.id].push(desig.hash_id);
               restoredExpanded[wing.id] = true;
 
-              const emps = empMap[desig.hash_id] || [];
+              const emps = empMap[`${wing.id}_${desig.hash_id}`] || [];
               // Support comma-separated employee names (multiple per designation)
               const empNames = String(a.employee || '').split(',').map((s) => s.trim()).filter(Boolean);
               const empSel = restoredEmps[`${wing.id}_${desig.hash_id}`] || {};
@@ -353,7 +390,7 @@ const RequisitionApprovalFlow = () => {
     const empMap = selectedEmployees[mapKey] || {};
     const selectedIds = Object.keys(empMap).filter((id) => empMap[id]);
     if (selectedIds.length === 0) return [];
-    return (employeesMap[desigHashId] || []).filter((e) => selectedIds.includes(String(e.id)));
+    return (employeesMap[mapKey] || []).filter((e) => selectedIds.includes(String(e.id)));
   }, [selectedEmployees, employeesMap]);
 
   const hasEmployeeSelected = useCallback((wingId, desigHashId) => {
@@ -364,6 +401,9 @@ const RequisitionApprovalFlow = () => {
     const items = [];
     Object.entries(designationMap).forEach(([wingId, desigList]) => {
       (desigList || []).forEach((desigHashId) => {
+        const employees = getSelectedEmpNames(wingId, desigHashId);
+        // A wing→designation only enters the flow once an employee is selected.
+        if (employees.length === 0) return;
         const wing = wings.find((w) => w.id === wingId);
         const desig = HARDCODED_DESIGNATIONS.find((d) => d.hash_id === desigHashId);
         items.push({
@@ -372,12 +412,13 @@ const RequisitionApprovalFlow = () => {
           wingName: wing?.name || 'Unknown',
           designation: desig?.name || 'Unknown',
           designationHashId: desigHashId,
-          employees: getSelectedEmpNames(wingId, desigHashId),
+          employees,
           isSecretary: false,
         });
       });
     });
-    // Secretary is now a normal (draggable) item, not pinned to the end.
+    // Secretary is added to the flow as soon as it's ticked — it does not
+    // depend on selecting an employee (approver is optional).
     if (secretarySelected) {
       const secEmps = (employeesMap[HARDCODED_SECRETARY.hash_id] || []).filter((e) => secretaryEmployees[e.id]);
       items.push({
@@ -615,9 +656,9 @@ const RequisitionApprovalFlow = () => {
                             wingDesignations.map((desig, desigIdx) => {
                               const isAssigned = assignedDesigList.includes(desig.hash_id);
                               const isLastDesig = desigIdx === wingDesignations.length - 1;
-                              const employees = employeesMap[desig.hash_id] || [];
-                              const hasEmps = isAssigned && employees.length > 0;
                               const empMapKey = `${wing.id}_${desig.hash_id}`;
+                              const employees = employeesMap[empMapKey] || [];
+                              const hasEmps = isAssigned && employees.length > 0;
 
                               return (
                                 <React.Fragment key={desig.hash_id}>
@@ -858,11 +899,13 @@ const RequisitionApprovalFlow = () => {
             className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 flex items-center gap-2 text-sm">
             <RotateCcw size={15} /> Reset
           </button>
-          <button onClick={handleSave} disabled={!isValid || saving}
-            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-            {saving ? 'Saving...' : 'Save Flow'}
-          </button>
+          {canEdit && (
+            <button onClick={handleSave} disabled={!isValid || saving}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+              {saving ? 'Saving...' : 'Save Flow'}
+            </button>
+          )}
         </div>
 
         {/* Flow Hierarchy Dialog */}

@@ -19,8 +19,11 @@ import confirmDelete from "components/ui/ConfirmDelete";
 import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
+
+const PERM = "settings.digital_signatures";
 
 const API_BASE    = Config.apiUrl;
 const API_KEY     = Config.apiKey;
@@ -67,6 +70,10 @@ const EMPTY_FORM = { name: "", designation: "", imageFile: null, imagePreview: "
 const DigitalSignatureManagement = () => {
   const navigate     = useNavigate();
   const fileInputRef = useRef(null);
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const [allRows,          setAllRows]          = useState([]);
   const [loading,          setLoading]          = useState(true);
@@ -399,11 +406,12 @@ const DigitalSignatureManagement = () => {
           onChange={() => handleToggleStatus(p.row)}
           inputProps={{ "aria-label": "toggle signature status" }}
           size="small"
+          disabled={!canEdit}
           color={p.value === "active" ? "success" : "error"}
         />
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: "actions",
       headerName: "Actions",
       width: 75,
@@ -413,7 +421,7 @@ const DigitalSignatureManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && allRows.length === 0)
@@ -446,6 +454,7 @@ const DigitalSignatureManagement = () => {
               </div>
             </div>
           </div>
+          {canAdd && (
           <button
             type="button"
             onClick={openAdd}
@@ -453,6 +462,7 @@ const DigitalSignatureManagement = () => {
           >
             <Plus size={15} /> Add Signature
           </button>
+          )}
         </div>
 
         {/* STATS */}
@@ -531,8 +541,8 @@ const DigitalSignatureManagement = () => {
 
         {/* ROW CONTEXT MENU */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={handleEdit}>Edit</MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={handleEdit}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>}
         </Menu>
 
         {/* ADD / EDIT MODAL */}

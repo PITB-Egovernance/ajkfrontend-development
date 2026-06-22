@@ -20,6 +20,9 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import EmployeeService from 'services/EmployeeService';
 import { GRID_SX } from 'utils/gridStyles';
 import confirmStatus from 'components/ui/confirmStatus';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'employee_management.employees'; // permission scope for this module
 
 const BASE_FILTER_CONFIG = [
   { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by full name' },
@@ -48,6 +51,17 @@ const asText = (v) => {
   }
   if (typeof v === 'object') return v.name || v.role_name || v.title || '-';
   return String(v);
+};
+
+// Turn any value (string, array, or relation object) into an array of display names.
+const asList = (v) => {
+  if (v == null || v === '') return [];
+  if (Array.isArray(v)) return v.flatMap(asList);
+  if (typeof v === 'object') {
+    const name = v.name || v.role_name || v.title;
+    return name ? [name] : [];
+  }
+  return String(v).split(',').map((s) => s.trim()).filter(Boolean);
 };
 
 const getPermissionLabels = (permissions) => {
@@ -100,11 +114,12 @@ const mapUser = (user, idx) => ({
   scale: asText(user?.scale ?? user?.grade),
   role: asText(user?.role_permission ?? user?.role),
   wing: asText(user?.wings ?? user?.wing),
+  wingList: asList(user?.wings ?? user?.wing),
   status: user?.status || 'inactive',
   status_job: user?.status_job || '-',
 });
 
-const ActionCell = ({ employee, onViewDetails, onDelete }) => {
+const ActionCell = ({ employee, onViewDetails, onDelete, canEdit, canDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
@@ -149,15 +164,19 @@ const ActionCell = ({ employee, onViewDetails, onDelete }) => {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={(e) => { handleClose(e); onViewDetails(employee); }}>
-          <Pencil className="w-4 h-4" /> Edit
-        </MenuItem>
-        <MenuItem
-          onClick={(e) => { handleClose(e); onDelete(employee); }}
-          sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}
-        >
-          <Trash2 className="w-4 h-4" /> Delete
-        </MenuItem>
+        {canEdit && (
+          <MenuItem onClick={(e) => { handleClose(e); onViewDetails(employee); }}>
+            <Pencil className="w-4 h-4" /> Edit
+          </MenuItem>
+        )}
+        {canDelete && (
+          <MenuItem
+            onClick={(e) => { handleClose(e); onDelete(employee); }}
+            sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}
+          >
+            <Trash2 className="w-4 h-4" /> Delete
+          </MenuItem>
+        )}
       </Menu>
     </div>
   );
@@ -165,6 +184,12 @@ const ActionCell = ({ employee, onViewDetails, onDelete }) => {
 
 const EmployeeList = () => {
   const navigate = useNavigate();
+
+  // Action-level permissions for the current role.
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -323,6 +348,28 @@ const EmployeeList = () => {
     { field: 'email',       headerName: 'Email',         flex: 1,   minWidth: 200 },
     { field: 'mobile',      headerName: 'Mobile', width: 130 },
     { field: 'designation', headerName: 'Designation',   width: 150 },
+    {
+      field: 'wing',
+      headerName: 'Wing',
+      width: 200,
+      sortable: false,
+      renderCell: (params) => {
+        const wings = params.row.wingList || [];
+        if (wings.length === 0) return <span className="text-slate-400">—</span>;
+        return (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center', height: '100%', py: 0.5, minWidth: '-webkit-fill-available' }}>
+            {wings.map((name, i) => (
+              <Chip
+                key={i}
+                label={name}
+                size="small"
+                sx={{ backgroundColor: '#ecfdf5', color: '#065f46', fontWeight: 500 }}
+              />
+            ))}
+          </Box>
+        );
+      },
+    },
     { field: 'role',        headerName: 'Role',          width: 150 },
     // {
     //   field: 'permissions',
@@ -421,14 +468,14 @@ const EmployeeList = () => {
       sortable: false,
       filterable: false,
       renderCell: (params) => (
-        <ActionCell employee={params.row} onViewDetails={handleViewDetails} onDelete={setDeleteTarget} />
+        <ActionCell employee={params.row} onViewDetails={handleViewDetails} onDelete={setDeleteTarget} canEdit={canEdit} canDelete={canDelete} />
       ),
     },
   ];
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto space-y-6" style={{ minWidth: '-webkit-fill-available' }}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -442,14 +489,18 @@ const EmployeeList = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => navigate('/dashboard/employees')}>
-              <Upload size={16} className="mr-2" />
-              Import Employees
-            </Button>
-            <Button onClick={() => navigate('/dashboard/employees')}>
-              <Plus size={16} className="mr-2" />
-              Register Employee
-            </Button>
+            {canAdd && (
+              <Button variant="outline" onClick={() => navigate('/dashboard/employees')}>
+                <Upload size={16} className="mr-2" />
+                Import Employees
+              </Button>
+            )}
+            {canAdd && (
+              <Button onClick={() => navigate('/dashboard/employees')}>
+                <Plus size={16} className="mr-2" />
+                Register Employee
+              </Button>
+            )}
           </div>
         </div>
 

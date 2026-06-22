@@ -19,6 +19,9 @@ import confirmDelete from "components/ui/ConfirmDelete";
 import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { hasPermission } from "utils/permissions";
+
+const PERM = "settings.terms_conditions";
 
 /* ─── Dummy API ──────────────────────────────────────────────────────────────
    Replace these helpers with real fetch() calls when the production endpoint
@@ -76,6 +79,10 @@ const EMPTY_FORM = { term_name: "" };
 
 const TermsAndConditionsManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const [allRows,    setAllRows]    = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -248,11 +255,12 @@ const TermsAndConditionsManagement = () => {
           onChange={() => handleToggleStatus(p.row)}
           inputProps={{ "aria-label": "toggle term status" }}
           size="small"
+          disabled={!canEdit}
           color={p.value === "active" ? "success" : "error"}
         />
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: "actions",
       headerName: "Actions",
       width: 75,
@@ -262,7 +270,7 @@ const TermsAndConditionsManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && allRows.length === 0)
@@ -295,6 +303,7 @@ const TermsAndConditionsManagement = () => {
               </div>
             </div>
           </div>
+          {canAdd && (
           <button
             type="button"
             onClick={openAdd}
@@ -302,6 +311,7 @@ const TermsAndConditionsManagement = () => {
           >
             <Plus size={15} /> Add Term
           </button>
+          )}
         </div>
 
         {/* STATS */}
@@ -381,8 +391,8 @@ const TermsAndConditionsManagement = () => {
 
         {/* ROW CONTEXT MENU */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={handleEdit}>Edit</MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={handleEdit}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>}
         </Menu>
 
         {/* ADD / EDIT MODAL */}

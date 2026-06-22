@@ -23,9 +23,16 @@ import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { GRID_SX } from 'utils/gridStyles';
+import { hasPermission } from "utils/permissions";
+
+const PERM = "settings.grades";
 
 const GradesManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   // Use productionUrl explicitly — avoids stale apiUrl in cached bundles
   const API_BASE = Config.apiUrl;
@@ -319,11 +326,12 @@ const GradesManagement = () => {
           onChange={() => handleToggleStatus(params.row, params.value)}
           inputProps={{ "aria-label": "toggle grade status" }}
           size="small"
+          disabled={!canEdit}
           color={params.value === "active" ? "success" : "error"}
         />
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: "actions",
       headerName: "Actions",
       width: 80,
@@ -338,7 +346,7 @@ const GradesManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && rows.length === 0) {
@@ -362,16 +370,18 @@ const GradesManagement = () => {
             <h1 className="text-2xl font-bold">Grades Management</h1>
           </div>
 
-          <Button
-            onClick={() => {
-              setEditingGrade(null);
-              setFormData({ name: "", status: "active" });
-              setOpenModal(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Grade
-          </Button>
+          {canAdd && (
+            <Button
+              onClick={() => {
+                setEditingGrade(null);
+                setFormData({ name: "", status: "active" });
+                setOpenModal(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Grade
+            </Button>
+          )}
         </div>
 
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -439,29 +449,33 @@ const GradesManagement = () => {
           open={Boolean(anchorEl)}
           onClose={() => setAnchorEl(null)}
         >
-          <MenuItem
-            onClick={() => {
-              setEditingGrade(selectedRow);
-              setFormData({
-                name: selectedRow.name,
-                status: selectedRow.status,
-              });
-              setOpenModal(true);
-              setAnchorEl(null);
-            }}
-          >
-            Edit
-          </MenuItem>
+          {canEdit && (
+            <MenuItem
+              onClick={() => {
+                setEditingGrade(selectedRow);
+                setFormData({
+                  name: selectedRow.name,
+                  status: selectedRow.status,
+                });
+                setOpenModal(true);
+                setAnchorEl(null);
+              }}
+            >
+              Edit
+            </MenuItem>
+          )}
 
-          <MenuItem
-            onClick={() => {
-              handleDelete();
-              setAnchorEl(null);
-            }}
-            sx={{ color: "red" }}
-          >
-            Delete
-          </MenuItem>
+          {canDelete && (
+            <MenuItem
+              onClick={() => {
+                handleDelete();
+                setAnchorEl(null);
+              }}
+              sx={{ color: "red" }}
+            >
+              Delete
+            </MenuItem>
+          )}
         </Menu>
 
         {/* MODAL */}

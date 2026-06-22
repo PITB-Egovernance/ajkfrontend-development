@@ -41,6 +41,13 @@ export const PERMISSION_MODULES = {
       advertisement: { label: 'Advertisement', actions: ['add', 'edit', 'delete', 'view', 'job_pool', 'reopen', 'temporary_closed', 'permanent_closed'] },
     },
   },
+  candidates: {
+    label: 'Candidates',
+    modules: {
+      job_applications: { label: 'Job Applications', actions: ['add', 'edit', 'delete', 'view'] },
+      award_lists:      { label: 'Award Lists',      actions: ['add', 'edit', 'delete', 'view', 'publish'] },
+    },
+  },
   result: {
     label: 'Result',
     modules: {

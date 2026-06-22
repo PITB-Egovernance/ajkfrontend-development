@@ -22,6 +22,9 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { hasPermission } from "utils/permissions";
+
+const PERM = "settings.wings";
 
 const gridSx = {
   border: "none",
@@ -39,6 +42,10 @@ const gridSx = {
 
 const WingsManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const API_BASE = Config.apiUrl;
   const TOKEN    = AuthService.getToken();
@@ -245,11 +252,12 @@ const WingsManagement = () => {
           checked={params.row.status === "active"}
           onChange={() => handleToggleStatus(params.row, params.row.status)}
           size="small"
+          disabled={!canEdit}
           color={params.row.status === "active" ? "success" : "error"}
         />
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: "actions",
       headerName: "Actions",
       width: 80,
@@ -264,7 +272,7 @@ const WingsManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && rows.length === 0) {
@@ -288,6 +296,7 @@ const WingsManagement = () => {
             <h1 className="text-2xl font-bold text-slate-900">Wings / Sections</h1>
           </div>
 
+          {canAdd && (
           <Button
             onClick={() => {
               setEditingWing(null);
@@ -298,6 +307,7 @@ const WingsManagement = () => {
             <Plus className="w-4 h-4 mr-2" />
             Add Wing / Section
           </Button>
+          )}
         </div>
 
         {/* STATS */}
@@ -362,6 +372,7 @@ const WingsManagement = () => {
 
         {/* ACTION MENU */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+          {canEdit && (
           <MenuItem
             onClick={() => {
               setEditingWing(selectedRow);
@@ -375,9 +386,12 @@ const WingsManagement = () => {
           >
             Edit
           </MenuItem>
+          )}
+          {canDelete && (
           <MenuItem onClick={handleDelete} sx={{ color: "red" }}>
             Delete
           </MenuItem>
+          )}
         </Menu>
 
         {/* MODAL */}

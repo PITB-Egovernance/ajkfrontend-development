@@ -12,6 +12,9 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'settings.departments';
 
 const API_BASE = Config.apiUrl;
 
@@ -39,6 +42,10 @@ const emptyForm = {
 };
 
 const DepartmentsManagement = () => {
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
   const navigate = useNavigate();
 
   const [rows,    setRows]    = useState([]);
@@ -173,7 +180,7 @@ const DepartmentsManagement = () => {
       renderCell: (p) => p.value || <span className="text-slate-400 text-xs">—</span> },
     { field: 'phone_number',    headerName: 'Phone',           width: 140,
       renderCell: (p) => p.value || <span className="text-slate-400 text-xs">—</span> },
-    {
+    ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
       width: 80,
@@ -183,7 +190,7 @@ const DepartmentsManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading) return <InlineLoader text="Loading departments..." variant="ring" size="lg" />;
@@ -206,10 +213,12 @@ const DepartmentsManagement = () => {
               </div>
             </div>
           </div>
-          <button onClick={openAdd}
-            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
-            <Plus size={15} /> Add Department
-          </button>
+          {canAdd && (
+            <button onClick={openAdd}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+              <Plus size={15} /> Add Department
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-6 mb-8">
@@ -239,8 +248,8 @@ const DepartmentsManagement = () => {
         />
 
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={() => openEdit(selectedRow)}>Edit</MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: 'red' }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={() => openEdit(selectedRow)}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={handleDelete} sx={{ color: 'red' }}>Delete</MenuItem>}
         </Menu>
 
         <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>

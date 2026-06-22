@@ -13,7 +13,10 @@ import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
+
+const PERM = 'settings.tests';
 
 const API_BASE = Config.apiUrl;
 
@@ -37,6 +40,10 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = '' }) => (
 );
 
 const TestsManagement = () => {
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
   const navigate = useNavigate();
 
   const [rows,     setRows]     = useState([]);
@@ -228,11 +235,12 @@ const TestsManagement = () => {
           onChange={() => handleToggleStatus(p.row, p.value)}
           inputProps={{ 'aria-label': 'toggle test status' }}
           size="small"
+          disabled={!canEdit}
           color={p.value === 'active' ? 'success' : 'error'}
         />
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
       width: 80,
@@ -242,7 +250,7 @@ const TestsManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && rows.length === 0) return <InlineLoader text="Loading tests..." variant="ring" size="lg" />;
@@ -265,10 +273,12 @@ const TestsManagement = () => {
               </div>
             </div>
           </div>
-          <button onClick={openAdd}
-            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
-            <Plus size={15} /> Add Test
-          </button>
+          {canAdd && (
+            <button onClick={openAdd}
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+              <Plus size={15} /> Add Test
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -330,8 +340,8 @@ const TestsManagement = () => {
         />
 
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) openEdit(r); }}>Edit</MenuItem>
-          <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) handleDelete(r); }} sx={{ color: 'red' }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) openEdit(r); }}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) handleDelete(r); }} sx={{ color: 'red' }}>Delete</MenuItem>}
         </Menu>
 
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">

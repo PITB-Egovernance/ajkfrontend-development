@@ -21,9 +21,16 @@ import confirmStatus from 'components/ui/confirmStatus';
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
+import { hasPermission } from "utils/permissions";
 import { GRID_SX } from 'utils/gridStyles';
 
+const PERM = "settings.companies";
+
 const CompaniesManagement = () => {
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
   const navigate = useNavigate();
 
   const API_BASE = Config.apiUrl;
@@ -268,12 +275,13 @@ const CompaniesManagement = () => {
           checked={params.row.status === "active"}
           onChange={() => handleToggleStatus(params.row)}
           size="small"
+          disabled={!canEdit}
           color={params.row.status === "active" ? "success" : "error"}
           inputProps={{ "aria-label": "toggle company status" }}
         />
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: "actions",
       headerName: "Actions",
       width: 80,
@@ -288,7 +296,7 @@ const CompaniesManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && rows.length === 0) {
@@ -314,24 +322,26 @@ const CompaniesManagement = () => {
             </h1>
           </div>
 
-          <Button
-            onClick={() => {
-              setEditingCompany(null);
-              setFormData({
-                name: "",
-                contact_person: "",
-                contact_number: "",
-                email: "",
-                address: "",
-                ntn: "",
-                status: "active",
-              });
-              setOpenModal(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Company
-          </Button>
+          {canAdd && (
+            <Button
+              onClick={() => {
+                setEditingCompany(null);
+                setFormData({
+                  name: "",
+                  contact_person: "",
+                  contact_number: "",
+                  email: "",
+                  address: "",
+                  ntn: "",
+                  status: "active",
+                });
+                setOpenModal(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Company
+            </Button>
+          )}
         </div>
 
         {/* STATS CARDS */}
@@ -400,7 +410,7 @@ const CompaniesManagement = () => {
           open={Boolean(anchorEl)}
           onClose={() => setAnchorEl(null)}
         >
-         <MenuItem
+         {canEdit && <MenuItem
             onClick={() => {
               setEditingCompany(selectedRow);
               setFormData({
@@ -418,8 +428,8 @@ const CompaniesManagement = () => {
             }}
           >
             Edit
-          </MenuItem>
-          <MenuItem
+          </MenuItem>}
+          {canDelete && <MenuItem
             onClick={() => {
               handleDelete();
               setAnchorEl(null);
@@ -427,7 +437,7 @@ const CompaniesManagement = () => {
             sx={{ color: "red" }}
           >
             Delete
-          </MenuItem>
+          </MenuItem>}
         </Menu>
 
         {/* MODAL */}

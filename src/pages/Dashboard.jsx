@@ -5,6 +5,7 @@ import { useAuth } from 'context/AuthContext';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import ApplicationApi from 'api/applicationApi';
+import { isAdminUser, hasModuleAccess, hasAnyModuleAccess } from 'utils/permissions';
 import {
   FileText, Megaphone, Briefcase, Users, Clock, CheckCircle2,
   BarChart3, PieChart, Send, Settings, Plus, Award, ArrowRight, TrendingUp,
@@ -237,27 +238,52 @@ const Dashboard = () => {
 
   const fmt = (v) => (v == null ? '–' : Number(v).toLocaleString());
 
+  // Permission gating — admin sees all; others only what their role allows.
+  const dashAdmin = isAdminUser();
+  const canShow = (m) => dashAdmin || (m && hasModuleAccess(m));
+  const canShowAny = (mods) => dashAdmin || hasAnyModuleAccess(mods);
+
+  // Each chart is tied to the main module(s) that own its data, so the graphs
+  // shown adapt to the role's allowed modules (admin sees them all).
+  const charts = {
+    appTrends:  canShow('candidates'),
+    overview:   canShowAny(['requisitions', 'advertisement', 'candidates', 'result']),
+    dispatch:   canShow('requisitions'),
+    reqStatus:  canShow('requisitions'),
+    adStatus:   canShow('advertisement'),
+  };
+  const anyChartVisible = Object.values(charts).some(Boolean);
+
+  // System Overview aggregates several modules — only count the ones the role can see.
+  const OVERVIEW_MODULE_MAP = {
+    'Applications':   'candidates',
+    'Requisitions':   'requisitions',
+    'Advertisements': 'advertisement',
+    'Disp. Received': 'requisitions',
+    'Disp. Sent':     'requisitions',
+  };
+  const visibleOverviewChart = overviewChart.filter((o) => canShow(OVERVIEW_MODULE_MAP[o.module]));
+
   const statCards = [
-    { label: 'Total Requisitions',  value: liveStats.totalRequisitions,   icon: Briefcase,    iconBg: 'bg-emerald-500' },
-    { label: 'Pending Requisitions',value: liveStats.pendingApprovals,    icon: Clock,        iconBg: 'bg-amber-500'   },
-    { label: 'Advertisements',      value: liveStats.totalAdvertisements, icon: CheckCircle2, iconBg: 'bg-blue-500'    },
-    { label: 'Total Applicants',    value: liveStats.totalApplicants,     icon: Users,        iconBg: 'bg-purple-500'  },
-  ];
+    { label: 'Total Requisitions',  value: liveStats.totalRequisitions,   icon: Briefcase,    iconBg: 'bg-emerald-500', module: 'requisitions'  },
+    { label: 'Pending Requisitions',value: liveStats.pendingApprovals,    icon: Clock,        iconBg: 'bg-amber-500',   module: 'requisitions'  },
+    { label: 'Advertisements',      value: liveStats.totalAdvertisements, icon: CheckCircle2, iconBg: 'bg-blue-500',    module: 'advertisement' },
+    { label: 'Total Applicants',    value: liveStats.totalApplicants,     icon: Users,        iconBg: 'bg-purple-500',  module: 'candidates'    },
+  ].filter((s) => canShow(s.module));
 
   const quickActions = [
-    { icon: FileText, title: 'Requisitions',   link: '/dashboard/requisitions',          iconBg: 'bg-emerald-500', count: statsLoading ? '…' : `${fmt(liveStats.totalRequisitions)} total`       },
-    { icon: Megaphone,title: 'Advertisements', link: '/dashboard/advertisement-records', iconBg: 'bg-amber-500',   count: statsLoading ? '…' : `${fmt(liveStats.totalAdvertisements)} published` },
-    { icon: Award,    title: 'Award Lists',    link: '/dashboard/award-lists',           iconBg: 'bg-indigo-500',  count: 'Merit Lists'                                                            },
-  ];
+    { icon: FileText, title: 'Requisitions',   link: '/dashboard/requisitions',          iconBg: 'bg-emerald-500', count: statsLoading ? '…' : `${fmt(liveStats.totalRequisitions)} total`,       module: 'requisitions'  },
+    { icon: Megaphone,title: 'Advertisements', link: '/dashboard/advertisement-records', iconBg: 'bg-amber-500',   count: statsLoading ? '…' : `${fmt(liveStats.totalAdvertisements)} published`, module: 'advertisement' },
+    { icon: Award,    title: 'Award Lists',    link: '/dashboard/award-lists',           iconBg: 'bg-indigo-500',  count: 'Merit Lists',                                                           module: 'candidates'    },
+  ].filter((a) => canShow(a.module));
 
   const quickLinks = [
-    { label: 'Candidates', icon: Users,     link: '/dashboard/applications',          iconBg: 'bg-emerald-500' },
-    { label: 'Dispatch',   icon: Send,      link: '/dashboard/dispatch/received',     iconBg: 'bg-blue-500'    },
-    { label: 'Submitted Requisitions',  icon: BarChart3, link: '/dashboard/psc-table',             iconBg: 'bg-purple-500'  },
-    { label: 'Requisitions',    icon: PieChart,  link: '/dashboard/requisitions',          iconBg: 'bg-amber-500'   },
-    { label: 'Approved Requisitions',  icon: Award,     link: '/dashboard/approved-requisitions', iconBg: 'bg-rose-500'    },
-    { label: 'Settings',   icon: Settings,  link: '/dashboard/settings',             iconBg: 'bg-slate-500'   },
-  ];
+    { label: 'Candidates', icon: Users,     link: '/dashboard/applications',          iconBg: 'bg-emerald-500', module: 'candidates'   },
+    { label: 'Dispatch',   icon: Send,      link: '/dashboard/dispatch/received',     iconBg: 'bg-blue-500',    module: 'requisitions' },
+    { label: 'Submitted Requisitions',  icon: BarChart3, link: '/dashboard/psc-table',             iconBg: 'bg-purple-500',  module: 'requisitions' },
+    { label: 'Requisitions',    icon: PieChart,  link: '/dashboard/requisitions',          iconBg: 'bg-amber-500',   module: 'requisitions' },
+    { label: 'Approved Requisitions',  icon: Award,     link: '/dashboard/approved-requisitions', iconBg: 'bg-rose-500',    module: 'requisitions' },
+  ].filter((l) => canShow(l.module));
 
   return (
     <div className="min-h-screen p-2">
@@ -294,7 +320,9 @@ const Dashboard = () => {
         </div>
 
         {/* Main Content */}
+        {(quickActions.length > 0 || quickLinks.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {quickActions.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-base font-semibold text-slate-900">Featured Modules</h2>
             <div className="space-y-3">
@@ -318,7 +346,9 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+          )}
 
+          {quickLinks.length > 0 && (
           <div className="lg:col-span-2 space-y-4">
             <h2 className="text-base font-semibold text-slate-900">Quick Shortcuts</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -338,12 +368,16 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+          )}
         </div>
+        )}
 
-        {/* Charts */}
+        {/* Charts — each tied to its module; the grid reflows to whatever the role can see */}
+        {anyChartVisible && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* Application Trends — full-width row */}
+          {charts.appTrends && (
           <Card className="border border-slate-200 lg:col-span-2">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -382,8 +416,10 @@ const Dashboard = () => {
               ) : <EmptyChart message="No application data yet" />}
             </CardContent>
           </Card>
+          )}
 
           {/* System Overview — real data */}
+          {charts.overview && (
           <Card className="border border-slate-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -397,9 +433,9 @@ const Dashboard = () => {
                 <div className="h-[280px] flex items-center justify-center">
                   <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : overviewChart.length > 0 ? (
+              ) : visibleOverviewChart.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={overviewChart}>
+                  <BarChart data={visibleOverviewChart}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="module" tick={{ fontSize: 11 }} stroke="#64748b" />
                     <YAxis tick={{ fontSize: 12 }} stroke="#64748b" allowDecimals={false} />
@@ -410,8 +446,10 @@ const Dashboard = () => {
               ) : <EmptyChart message="No data available" />}
             </CardContent>
           </Card>
+          )}
 
           {/* Dispatch Overview — real data */}
+          {charts.dispatch && (
           <Card className="border border-slate-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -441,8 +479,10 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* Requisition Status — real data */}
+          {charts.reqStatus && (
           <Card className="border border-slate-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -478,8 +518,10 @@ const Dashboard = () => {
               ) : <EmptyChart message="No requisition data" />}
             </CardContent>
           </Card>
+          )}
 
           {/* Advertisement Status — real data */}
+          {charts.adStatus && (
           <Card className="border border-slate-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -517,8 +559,10 @@ const Dashboard = () => {
               ) : <EmptyChart message="No advertisement data" />}
             </CardContent>
           </Card>
+          )}
 
         </div>
+        )}
       </div>
     </div>
   );

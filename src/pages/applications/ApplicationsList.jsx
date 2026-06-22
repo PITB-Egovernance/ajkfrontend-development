@@ -16,6 +16,9 @@ import {
   getApplicationOcrBatchPillClass,
 } from 'utils/applicationOcrUtils';
 import { formatDate } from 'utils/dateUtils';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'candidates.job_applications'; // permission scope for this module
 
 // ── Module-level constants ────────────────────────────────────────────────────
 
@@ -34,6 +37,9 @@ const STATUS_COLORS = {
 };
 
 const ApplicationsList = () => {
+  // Action-level permissions for the current role (status changes = edit).
+  const canEdit = hasPermission(`${PERM}.edit`);
+
   const navigate = useNavigate();
   const apiRef = useGridApiRef();
   const [rows, setRows] = useState([]);
@@ -539,7 +545,7 @@ const ApplicationsList = () => {
         </div>
 
         {/* Bulk Actions */}
-        {selectionModel.length > 0 && (
+        {canEdit && selectionModel.length > 0 && (
           <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
             <div className="flex items-center justify-between">
               <span className="text-emerald-800 font-medium">{selectionModel.length} applications selected</span>
@@ -633,7 +639,7 @@ const ApplicationsList = () => {
         <MenuItem onClick={handleView}>
           <Eye size={18} style={{ marginRight: '8px' }} className="text-blue-600" /> View Details
         </MenuItem>
-        {selectedRow?.status?.toLowerCase() === 'shortlisted' ? (
+        {canEdit && (selectedRow?.status?.toLowerCase() === 'shortlisted' ? (
           <MenuItem onClick={() => updateStatus(selectedRow?.id, 'submitted')}>
             <RefreshCw size={18} style={{ marginRight: '8px' }} className="text-yellow-600" /> Unshortlist
           </MenuItem>
@@ -641,10 +647,12 @@ const ApplicationsList = () => {
           <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Shortlisted')}>
             <CheckCircle size={18} style={{ marginRight: '8px' }} className="text-green-600" /> Mark Shortlisted
           </MenuItem>
+        ))}
+        {canEdit && (
+          <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Rejected')}>
+            <XCircle size={18} style={{ marginRight: '8px' }} className="text-red-600" /> Mark Rejected
+          </MenuItem>
         )}
-        <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Rejected')}>
-          <XCircle size={18} style={{ marginRight: '8px' }} className="text-red-600" /> Mark Rejected
-        </MenuItem>
       </Menu>
     </div>
   );

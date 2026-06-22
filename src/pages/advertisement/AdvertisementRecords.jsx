@@ -9,8 +9,6 @@ import {
   Eye,
   Calendar,
   Search,
-  ChevronLeft,
-  ChevronRight,
   FileText,
   Clock,
   Filter,
@@ -31,6 +29,9 @@ import { Menu, MenuItem, IconButton, TextField } from '@mui/material';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { Link } from 'react-router-dom';
 import { formatDate } from 'utils/dateUtils';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'advertisement.advertisement'; // permission scope for this module
 
 const STATUS_BADGES = {
   pending:             { label: 'Pending',            className: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
@@ -42,7 +43,7 @@ const STATUS_BADGES = {
   published:           { label: 'Published',          className: 'bg-green-50 border-green-200 text-green-700' },
 };
 
-const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish }) => {
+const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
@@ -93,34 +94,38 @@ const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish }) => {
         <MenuItem onClick={(e) => { handleClose(e); onView(ad.id); }}>
           <Eye className="w-4 h-4" /> View
         </MenuItem>
-        <MenuItem onClick={(e) => { handleClose(e); onEdit(ad.id); }}>
-          <Pencil className="w-4 h-4" /> Edit
-        </MenuItem>
-        <MenuItem onClick={(e) => { handleClose(e); onPublish(ad); }}>
-          <Send className="w-4 h-4" /> Publish
-        </MenuItem>
-        <MenuItem 
-          onClick={(e) => { handleClose(e); onDelete(ad.id); }}
-          sx={{ color: '#ef4444 !important' }}
-        >
-          <Trash2 className="w-4 h-4" /> Delete
-        </MenuItem>
+        {canEdit && (
+          <MenuItem onClick={(e) => { handleClose(e); onEdit(ad.id); }}>
+            <Pencil className="w-4 h-4" /> Edit
+          </MenuItem>
+        )}
+        {canEdit && (
+          <MenuItem onClick={(e) => { handleClose(e); onPublish(ad); }}>
+            <Send className="w-4 h-4" /> Publish
+          </MenuItem>
+        )}
+        {canDelete && (
+          <MenuItem
+            onClick={(e) => { handleClose(e); onDelete(ad.id); }}
+            sx={{ color: '#ef4444 !important' }}
+          >
+            <Trash2 className="w-4 h-4" /> Delete
+          </MenuItem>
+        )}
       </Menu>
     </div>
   );
 };
 
 const AdvertisementRecords = () => {
+  // Action-level permissions for the current role (Publish treated as edit).
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+
   const location = useLocation();
   const navigate = useNavigate();
   const [advertisements, setAdvertisements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({
-    current_page: 1,
-    last_page: 1,
-    total: 0,
-    per_page: 10,
-  });
   const [searchTerm, setSearchTerm] = useState('');
   const [groupByDept, setGroupByDept] = useState(false);
   const [expandedDept, setExpandedDept] = useState(null);     // null = first one auto-expanded; string id = manually expanded
@@ -219,7 +224,7 @@ const AdvertisementRecords = () => {
       if (result.success) {
         toast.success(result.message || 'Advertisement published successfully');
         closePublishModal();
-        fetchAdvertisements(pagination.current_page);
+        fetchAdvertisements();
       } else {
         toast.error(result.message || 'Failed to publish advertisement');
       }
@@ -231,7 +236,7 @@ const AdvertisementRecords = () => {
   };
 
   useEffect(() => {
-    fetchAdvertisements(1);
+    fetchAdvertisements();
   }, []);
 
   useEffect(() => {
@@ -253,42 +258,52 @@ const AdvertisementRecords = () => {
     }
   }, [location.state]);
 
-  const fetchAdvertisements = async (page = 1) => {
+  // Fetch every page from the API so the DataGrid's built-in footer can
+  // paginate the full result set client-side.
+  const fetchAdvertisements = async () => {
     setLoading(true);
     try {
-      const result = await AdvertisementApi.getAll(page);
-      
-      const apiData = result?.data;
-      const adsList = Array.isArray(apiData?.data)
-        ? apiData.data
-        : Array.isArray(apiData)
-          ? apiData
-          : [];
+      const first = await AdvertisementApi.getAll(1);
 
-      if (result.success) {
-        let ads = adsList;
-        try {
-          const notesRaw = localStorage.getItem('advertisement_notes_cache');
-          const notesCache = notesRaw ? JSON.parse(notesRaw) : {};
-          ads = ads.map(ad => {
-            const key = (ad.adv_number || '').trim();
-            const cachedNote = key ? notesCache[key] : undefined;
-            return {
-              ...ad,
-              note: ad.note || cachedNote || ad.notes || ad.ad_note || ad.note
-            };
-          });
-        } catch {}
-        setAdvertisements(ads);
-        setPagination({
-          current_page: apiData?.current_page || 1,
-          last_page: apiData?.last_page || 1,
-          total: apiData?.total || ads.length,
-          per_page: apiData?.per_page || 10,
-        });
-      } else {
-        toast.error(result.message || 'Failed to fetch advertisements');
+      if (!first.success) {
+        toast.error(first.message || 'Failed to fetch advertisements');
+        return;
       }
+
+      const extractList = (result) => {
+        const apiData = result?.data;
+        return Array.isArray(apiData?.data)
+          ? apiData.data
+          : Array.isArray(apiData)
+            ? apiData
+            : [];
+      };
+
+      let ads = extractList(first);
+      const lastPage = first?.data?.last_page || 1;
+
+      if (lastPage > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) => AdvertisementApi.getAll(i + 2))
+        );
+        rest.forEach((result) => {
+          if (result.success) ads = ads.concat(extractList(result));
+        });
+      }
+
+      try {
+        const notesRaw = localStorage.getItem('advertisement_notes_cache');
+        const notesCache = notesRaw ? JSON.parse(notesRaw) : {};
+        ads = ads.map(ad => {
+          const key = (ad.adv_number || '').trim();
+          const cachedNote = key ? notesCache[key] : undefined;
+          return {
+            ...ad,
+            note: ad.note || cachedNote || ad.notes || ad.ad_note || ad.note
+          };
+        });
+      } catch {}
+      setAdvertisements(ads);
     } catch (error) {
       toast.error(error.message || 'Error loading advertisements');
     } finally {
@@ -315,7 +330,7 @@ const AdvertisementRecords = () => {
 
       if (result.success) {
         toast.success(result.message || 'Advertisement deleted successfully', { id: loadingToast });
-        fetchAdvertisements(pagination.current_page);
+        fetchAdvertisements();
       } else {
         toast.error(result.message || 'Failed to delete advertisement', { id: loadingToast });
       }
@@ -439,12 +454,14 @@ const AdvertisementRecords = () => {
       sortable: false,
       filterable: false,
       renderCell: (params) => (
-        <ActionCell 
-          ad={params.row} 
-          onView={viewAdvertisement} 
-          onEdit={editAdvertisement} 
+        <ActionCell
+          ad={params.row}
+          onView={viewAdvertisement}
+          onEdit={editAdvertisement}
           onDelete={deleteAdvertisement}
           onPublish={openPublishModal}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       )
     }
@@ -590,55 +607,6 @@ const AdvertisementRecords = () => {
             />
           )}
         </div>
-
-        {/* Pagination */}
-        {!loading && pagination.last_page > 1 && (
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-slate-600">
-                Showing {(pagination.current_page - 1) * pagination.per_page + 1} to{' '}
-                {Math.min(pagination.current_page * pagination.per_page, pagination.total)} of{' '}
-                {pagination.total} results
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => fetchAdvertisements(pagination.current_page - 1)}
-                  disabled={pagination.current_page === 1}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Previous
-                </button>
-                <div className="flex items-center gap-1">
-                  {[...Array(Math.min(pagination.last_page, 5))].map((_, i) => {
-                    const pageNum = i + 1;
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => fetchAdvertisements(pageNum)}
-                        className={`w-10 h-10 rounded-lg font-medium transition-all ${
-                          pagination.current_page === pageNum
-                            ? 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white'
-                            : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  onClick={() => fetchAdvertisements(pagination.current_page + 1)}
-                  disabled={pagination.current_page === pagination.last_page}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
-                >
-                  Next
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Publish Modal */}

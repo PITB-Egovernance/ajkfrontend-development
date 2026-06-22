@@ -19,7 +19,9 @@ import confirmDelete from "components/ui/ConfirmDelete";
 import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { hasPermission } from "utils/permissions";
 import SubjectApi from "api/subjectApi";
+const PERM = "settings.subjects";
 
 const GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E", "Group F", "Group G"];
 
@@ -51,6 +53,10 @@ const EMPTY_FORM = { subject_name: "", total_marks: "", subject_group: "", statu
 
 const SubjectManagement = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
 
   const [allRows,    setAllRows]    = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -267,11 +273,12 @@ const SubjectManagement = () => {
           onChange={() => handleToggleStatus(p.row)}
           inputProps={{ "aria-label": "toggle subject status" }}
           size="small"
+          disabled={!canEdit}
           color={p.value === "active" ? "success" : "error"}
         />
       ),
     },
-    {
+    ...(canRowActions ? [{
       field: "actions",
       headerName: "Actions",
       width: 75,
@@ -281,7 +288,7 @@ const SubjectManagement = () => {
           <MoreVertical size={18} />
         </IconButton>
       ),
-    },
+    }] : []),
   ];
 
   if (loading && allRows.length === 0)
@@ -314,6 +321,7 @@ const SubjectManagement = () => {
               </div>
             </div>
           </div>
+          {canAdd && (
           <button
             type="button"
             onClick={openAdd}
@@ -321,6 +329,7 @@ const SubjectManagement = () => {
           >
             <Plus size={15} /> Add Subject
           </button>
+          )}
         </div>
 
         {/* STATS */}
@@ -400,8 +409,8 @@ const SubjectManagement = () => {
 
         {/* ROW CONTEXT MENU */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-          <MenuItem onClick={handleEdit}>Edit</MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>
+          {canEdit && <MenuItem onClick={handleEdit}>Edit</MenuItem>}
+          {canDelete && <MenuItem onClick={handleDelete} sx={{ color: "red" }}>Delete</MenuItem>}
         </Menu>
 
         {/* ADD / EDIT MODAL */}
@@ -504,3 +513,4 @@ const SubjectManagement = () => {
 };
 
 export default SubjectManagement;
+

@@ -11,6 +11,9 @@ import DepartmentUserService from 'services/DepartmentUserService';
 import DepartmentUserDetailsModal from 'components/departmentUsers/DepartmentUserDetailsModal';
 import { GRID_SX } from 'utils/gridStyles';
 import confirmStatus from 'components/ui/confirmStatus';
+import { hasPermission } from 'utils/permissions';
+
+const PERM = 'settings.department_users';
 
 const FILTER_CONFIG = [
   { name: 'dept_user_name', label: 'Departmen Employee Name', type: 'text', placeholder: 'Filter by name' },
@@ -119,7 +122,7 @@ const ActionCell = ({ user, onEdit, onDelete }) => {
           sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}
         >
           <Trash2 className="w-4 h-4" /> Delete
-        </MenuItem>
+        </MenuItem>}
       </Menu>
     </div>
   );
@@ -127,6 +130,10 @@ const ActionCell = ({ user, onEdit, onDelete }) => {
 
 const DepartmentUserList = () => {
   const navigate = useNavigate();
+  const canAdd = hasPermission(`${PERM}.add`);
+  const canEdit = hasPermission(`${PERM}.edit`);
+  const canDelete = hasPermission(`${PERM}.delete`);
+  const canRowActions = canEdit || canDelete;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -209,6 +216,7 @@ const DepartmentUserList = () => {
       renderCell: (params) => (
         <div className="flex items-center h-full gap-2">
           <Switch checked={params.value === 'active'} onChange={() => handleToggleStatus(params.row)} size="small"
+            disabled={!canEdit}
             color={params.value === 'active' ? 'success' : 'error'} />
           {/* <span className={`text-xs font-bold ${params.value === 'active' ? 'text-emerald-700' : 'text-red-600'}`}>
             {params.value === 'active' ? 'Active' : 'Inactive'}
@@ -248,9 +256,11 @@ const DepartmentUserList = () => {
               <p className="text-sm text-slate-500 mt-1">Manage department login accounts</p>
             </div>
           </div>
+          {canAdd && (
           <Button onClick={() => navigate('/dashboard/settings/department-users/create')}>
             <Plus size={16} className="mr-2" /> Create Department User
           </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
