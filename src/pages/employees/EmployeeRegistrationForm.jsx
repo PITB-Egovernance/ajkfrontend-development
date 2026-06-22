@@ -219,32 +219,45 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
       setDistrict(districtOptions.find((d) => d.name.toLowerCase() === name) || null);
     }
 
+    // designation: stored as { name, hash_id } — match by hash_id, fallback name.
     if (designationOptions.length) {
       const desigRaw = Array.isArray(e.designation) ? e.designation[0] : e.designation;
       if (desigRaw) {
-        const name = String(typeof desigRaw === 'object' ? desigRaw.name : desigRaw).toLowerCase();
-        setDesignation(designationOptions.find((d) => d.name.toLowerCase() === name) || null);
-      }
-    }
-
-    if (roleOptions.length) {
-      const roleRaw = (Array.isArray(e.role_permission) ? e.role_permission[0] : e.role_permission) ?? e.role;
-      if (roleRaw) {
-        const val = typeof roleRaw === 'object' ? (roleRaw.hash_id || roleRaw.id) : roleRaw;
-        const found = roleOptions.find(
-          (r) => r.id === val || r.name.toLowerCase() === String(val).toLowerCase()
+        const hid = typeof desigRaw === 'object' ? (desigRaw.hash_id || desigRaw.id) : null;
+        const nm = String(typeof desigRaw === 'object' ? desigRaw.name : desigRaw).toLowerCase();
+        setDesignation(
+          designationOptions.find((d) => (hid && d.id === hid) || d.name.toLowerCase() === nm) || null
         );
-        setSelectedRole(found || null);
       }
     }
 
-    if (wingOptions.length && e.wing) {
-      const wingsArr = Array.isArray(e.wing) ? e.wing : String(e.wing).split(',').map((w) => w.trim());
+    // role: stored as role_permission { role_name, permissions } (no hash_id) — match by role_name.
+    if (roleOptions.length) {
+      const roleRaw = Array.isArray(e.role_permission) ? e.role_permission[0] : e.role_permission;
+      if (roleRaw && typeof roleRaw === 'object') {
+        const hid = roleRaw.hash_id || roleRaw.id;
+        const nm = String(roleRaw.role_name || roleRaw.name || '').toLowerCase();
+        setSelectedRole(
+          roleOptions.find((r) => (hid && r.id === hid) || (nm && r.name.toLowerCase() === nm)) || null
+        );
+      } else if (roleRaw) {
+        setSelectedRole(
+          roleOptions.find((r) => r.id === roleRaw || r.name.toLowerCase() === String(roleRaw).toLowerCase()) || null
+        );
+      }
+    }
+
+    // wings: stored as `wings` array of { name, hash_id } — match by hash_id, fallback name.
+    if (wingOptions.length) {
+      const wingsArr = Array.isArray(e.wings)
+        ? e.wings
+        : (Array.isArray(e.wing) ? e.wing : (e.wing ? String(e.wing).split(',').map((w) => w.trim()) : []));
       const ids = wingsArr
         .map((w) => {
-          const val = typeof w === 'object' ? (w.hash_id || w.id || w.name) : w;
+          const hid = typeof w === 'object' ? (w.hash_id || w.id) : null;
+          const nm = typeof w === 'object' ? w.name : w;
           const found = wingOptions.find(
-            (wo) => wo.id === val || wo.name.toLowerCase() === String(val).toLowerCase()
+            (wo) => (hid && wo.id === hid) || wo.name.toLowerCase() === String(nm).toLowerCase()
           );
           return found?.id;
         })

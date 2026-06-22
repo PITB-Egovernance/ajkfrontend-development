@@ -99,7 +99,7 @@ const mapUser = (user, idx) => ({
   designation: asText(user?.designation),
   scale: asText(user?.scale ?? user?.grade),
   role: asText(user?.role_permission ?? user?.role),
-  wing: asText(user?.wing),
+  wing: asText(user?.wings ?? user?.wing),
   status: user?.status || 'inactive',
   status_job: user?.status_job || '-',
 });
@@ -411,9 +411,6 @@ const EmployeeList = () => {
             size="small"
             color={params.value === 'active' ? 'success' : 'error'}
           />
-          <span className={`text-xs font-bold ${params.value === 'active' ? 'text-emerald-700' : 'text-red-600'}`}>
-            {params.value === 'active' ? 'Active' : 'Inactive'}
-          </span>
         </div>
       ),
     },
