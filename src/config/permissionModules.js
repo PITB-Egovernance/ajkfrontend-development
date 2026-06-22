@@ -35,6 +35,14 @@ export const PERMISSION_MODULES = {
       job_pool:               { label: 'Job Pool',               actions: ['add', 'edit', 'delete', 'view'] },
     },
   },
+  myrequisitions: {
+    label: 'My Requisitions',
+    modules: {
+      requisition_approval: { label: 'Requisition Approval', actions: ['add', 'edit', 'delete', 'view'] },
+      // admin_requisition:      { label: 'Admin Requisition',      actions: ['add', 'edit', 'delete', 'view'] },
+      // job_pool:               { label: 'Job Pool',               actions: ['add', 'edit', 'delete', 'view'] },
+    },
+  },
   advertisement: {
     label: 'Advertisement',
     modules: {

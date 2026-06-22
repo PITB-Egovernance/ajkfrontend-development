@@ -43,7 +43,7 @@ export const MENU_ITEMS = [
   },
   {
     id: "my-requisitions",
-    label: "My Requisitions",
+    label: "Requisition Approvals",
     icon: ClipboardList,
     path: "/dashboard/my-requisitions",
   },
