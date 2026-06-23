@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Menu, MenuItem, IconButton } from '@mui/material';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { InlineLoader } from 'components/ui/Loader';
-import { Inbox, Clock, CornerUpLeft, CheckCircle2 } from 'lucide-react';
+import { Inbox, Clock, CornerUpLeft, CheckCircle2, MoreVertical, Eye, GitBranch } from 'lucide-react';
 import toast from 'react-hot-toast';
 import RequisitionApprovalApi from 'api/requisitionApprovalApi';
 
@@ -27,6 +28,11 @@ const MyRequisitionsQueue = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
+
+  const openMenu = (e, row) => { e.stopPropagation(); setAnchorEl(e.currentTarget); setSelectedRow(row); };
+  const closeMenu = () => setAnchorEl(null);
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
@@ -37,9 +43,14 @@ const MyRequisitionsQueue = () => {
         id: r.hash_id || r.id || `row-${i}`,
         hash_id: r.hash_id || r.id,
         designation: r.designation || '—',
-        department: typeof r.department === 'object'
-          ? (r.department?.department_name || r.department?.name || '—')
-          : (r.department || '—'),
+        department: (() => {
+          // Department can arrive at the top level or nested on the job detail,
+          // and as a string or a relation object — normalise all of them.
+          const raw = r.department ?? r.department_name ?? r.job_detail?.department
+            ?? r.jobDetail?.department ?? r.requisition?.department ?? r.job?.department ?? '';
+          if (raw && typeof raw === 'object') return raw.department_name || raw.name || '—';
+          return raw || '—';
+        })(),
         case_number: r.case_number || r.hash_id || '—',
         current_step: r.current_step ?? '—',
         status: r.workflow_status || r.requisition_status || '—',
@@ -58,6 +69,9 @@ const MyRequisitionsQueue = () => {
 
   const openTracking = (row) =>
     navigate(`/dashboard/requisitions/${row.hash_id}/approval-tracking`);
+
+  const openView = (row) =>
+    navigate(`/dashboard/requisitions/${row.hash_id}`);
 
   const columns = [
     { field: 'case_number', headerName: 'Ref / Case #', width: 160 },
@@ -78,15 +92,12 @@ const MyRequisitionsQueue = () => {
     {
       field: 'actions',
       headerName: 'Action',
-      width: 120,
+      width: 90,
       sortable: false,
       renderCell: (p) => (
-        <button
-          onClick={() => openTracking(p.row)}
-          className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition-colors"
-        >
-          Open
-        </button>
+        <IconButton size="small" onClick={(e) => openMenu(e, p.row)}>
+          <MoreVertical size={18} />
+        </IconButton>
       ),
     },
   ];
@@ -148,6 +159,23 @@ const MyRequisitionsQueue = () => {
             />
           )}
         </div>
+
+        {/* Row action menu */}
+        <Menu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={closeMenu}
+          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          PaperProps={{ elevation: 0, sx: { filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.12))', mt: 1, minWidth: 210, '& .MuiMenuItem-root': { fontSize: '14px', display: 'flex', gap: '8px', padding: '10px 16px' } } }}
+        >
+          <MenuItem onClick={() => { openView(selectedRow); closeMenu(); }}>
+            <Eye size={16} /> View Requisition
+          </MenuItem>
+          <MenuItem onClick={() => { openTracking(selectedRow); closeMenu(); }} sx={{ '&.MuiMenuItem-root': { color: '#047857' } }}>
+            <GitBranch size={16} /> Open Approval
+          </MenuItem>
+        </Menu>
       </div>
     </div>
   );
