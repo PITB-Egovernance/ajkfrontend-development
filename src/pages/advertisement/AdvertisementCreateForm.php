@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Autocomplete, Checkbox, TextField, MenuItem } from "@mui/material";
-import { FileText, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
+import { TextField, MenuItem } from "@mui/material";
+import { FileText, CheckCircle2, Plus, Trash2, Save, StickyNote, FileCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
 import RequisitionApi from "../../api/requisitionApi";
@@ -9,14 +9,15 @@ import Config from "../../config/baseUrl";
 import AuthService from "../../services/authService";
 import "../job-creation/JobCreationForm.css";
 
+// Hardcoded fallback list of tests used while the live admin
+// server's /settings/tests endpoint is being populated. The
+// `id` field stores the test's hash_id (or the legacy numeric
+// code) so the wire format for the API matches what the
+// backend expects. Once the live API responds, this fallback
+// is overridden by the live data.
 const FALLBACK_TESTS = [
-  { id: "1", test_name: "MCQs", test_fees: 505 },
-  { id: "2", test_name: "Written Exam", test_fees: 1010 },
-];
-
-const CCE_STAGES = [
-  { value: "screening", label: "Screening" },
-  { value: "written_test", label: "Written Test" },
+  { id: '1', test_name: 'MCQs',         test_fees: 505  },
+  { id: '2', test_name: 'Written Exam', test_fees: 1010 },
 ];
 
 const AdvertisementCreateForm = () => {
@@ -32,7 +33,6 @@ const AdvertisementCreateForm = () => {
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   });
-
   const [advNumber, setAdvNumber] = useState("");
   const [closingDate, setClosingDate] = useState("");
   const [advertisementFee, setAdvertisementFee] = useState("");
@@ -43,206 +43,96 @@ const AdvertisementCreateForm = () => {
   const [jobTitles, setJobTitles] = useState({});
   const [examTests, setExamTests] = useState(FALLBACK_TESTS);
   const [testTypes, setTestTypes] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [existingAdvNumbers, setExistingAdvNumbers] = useState([]);
 
+  // Fetch the active test types for the dropdown
   useEffect(() => {
     let aborted = false;
-
-    (async () => {
-      try {
-        const headers = {
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          Accept: "application/json",
-          "X-API-KEY": Config.apiKey,
-        };
-        const fetchPage = async (page) => {
-          const res = await fetch(
-            `${Config.apiUrl}/settings/subjects?page=${page}&per_page=100`,
-            { method: "GET", headers }
-          );
-          const result = await res.json();
-
-          if (!res.ok) {
-            throw new Error(result.message || "Failed to load subjects");
-          }
-
-          return result.data ?? {};
-        };
-
-        const firstPage = await fetchPage(1);
-        const lastPage = Number(firstPage.last_page) || 1;
-        const remainingPages = await Promise.all(
-          Array.from({ length: Math.max(lastPage - 1, 0) }, (_, index) =>
-            fetchPage(index + 2)
-          )
-        );
-        if (aborted) return;
-
-        const list = [firstPage, ...remainingPages].flatMap((page) =>
-          Array.isArray(page.data) ? page.data : []
-        );
-
-        setSubjects(
-          list
-            .map((subject) => ({
-              hash_id: subject.hash_id || String(subject.id),
-              name:
-                subject.name ||
-                subject.subject_name ||
-                subject.title ||
-                "",
-              total_marks: Number(subject.total_marks) || 0,
-            }))
-            .filter((subject) => subject.hash_id && subject.name)
-        );
-      } catch {
-        setSubjects([]);
-      }
-    })();
-
-    return () => {
-      aborted = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let aborted = false;
-
     (async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/settings/test-types/dropdown`, {
           headers: {
             Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept: "application/json",
-            "X-API-KEY": Config.apiKey,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
           },
         });
-
         const result = await res.json();
         if (aborted) return;
-
         if (res.ok && (result.success || result.status === 200)) {
           const list = result.data?.data ?? result.data ?? [];
-
-          setTestTypes(
-            list.map((t) => ({
-              hash_id: t.hash_id || String(t.id),
-              name: t.name || t.label || "",
-            }))
-          );
+          setTestTypes(list.map((t) => ({
+            hash_id: t.hash_id || String(t.id),
+            name:    t.name || t.label || '',
+          })));
         }
-      } catch {}
+      } catch { /* dropdown falls back to the test-fee records below */ }
     })();
-
-    return () => {
-      aborted = true;
-    };
+    return () => { aborted = true; };
   }, []);
 
   useEffect(() => {
     let aborted = false;
-
     (async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/settings/tests`, {
           headers: {
             Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept: "application/json",
-            "X-API-KEY": Config.apiKey,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
           },
         });
-
         const result = await res.json();
         if (aborted) return;
-
         if (res.ok && (result.success || result.status === 200)) {
           const list = result.data?.data ?? result.data ?? [];
-
           const active = list
-            .filter((t) => (t.status ?? "active") === "active")
+            .filter((t) => (t.status ?? 'active') === 'active')
             .map((t) => {
-              const ttObj =
-                t.test_type && typeof t.test_type === "object"
-                  ? t.test_type
-                  : null;
-
+              // The test-type relation may arrive nested, as a flat hash, or just a name
+              const ttObj = t.test_type && typeof t.test_type === 'object' ? t.test_type : null;
               return {
-                id: t.hash_id || String(t.id),
-                test_type_id: ttObj?.hash_id || t.test_type_id || "",
-                test_name: ttObj?.name || t.test_type_name || t.test_name,
-                test_fees: Number(t.test_fees ?? t.fees ?? 0),
+                id:           t.hash_id || String(t.id),
+                test_type_id: ttObj?.hash_id || t.test_type_id || '',
+                test_name:    ttObj?.name || t.test_type_name || t.test_name,
+                test_fees:    Number(t.test_fees ?? t.fees ?? 0),
               };
             });
-
           if (active.length) setExamTests(active);
         }
-      } catch {}
+      } catch { /* keep fallback */ }
     })();
-
-    return () => {
-      aborted = true;
-    };
+    return () => { aborted = true; };
   }, []);
 
+  // Dropdown options — prefer the test-types endpoint, fall back to the test-fee records
   const testTypeOptions = testTypes.length
     ? testTypes
-    : examTests.map((t) => ({
-        hash_id: t.test_type_id || t.id,
-        name: t.test_name,
-      }));
+    : examTests.map((t) => ({ hash_id: t.test_type_id || t.id, name: t.test_name }));
 
+  // The fee for a selected test type comes from its matching test-fee record
   const feeForTestType = (typeId) => {
     const rec = examTests.find((t) => (t.test_type_id || t.id) === typeId);
     return rec ? String(rec.test_fees) : "";
   };
 
-  const getTestTypeName = (typeId) => {
-    const option = testTypeOptions.find(
-      (t) => String(t.hash_id) === String(typeId)
-    );
-    return (option?.name || "").toLowerCase().trim();
-  };
-
-  const isWrittenTestType = (typeId) => {
-    const name = getTestTypeName(typeId);
-    return name.includes("written") && !name.includes("combined");
-  };
-
-  const isCombinedCompetitiveExam = (typeId) => {
-    const name = getTestTypeName(typeId);
-    return (
-      name.includes("combined") ||
-      name.includes("competitive") ||
-      name.includes("cce")
-    );
-  };
-
-  const getSelectedSubjectMarks = (subjectIds = []) =>
-    subjects.reduce(
-      (total, subject) =>
-        subjectIds.includes(subject.hash_id)
-          ? total + subject.total_marks
-          : total,
-      0
-    );
-
   const selectedIds = useMemo(() => {
     const raw = searchParams.get("ids");
     if (!raw) return [];
-
     try {
-      if (raw.startsWith("[")) return JSON.parse(raw);
+      if (raw.startsWith("[")) {
+        return JSON.parse(raw);
+      }
       return raw.split(",").map((s) => s.trim()).filter(Boolean);
     } catch {
       return raw.split(",").map((s) => s.trim()).filter(Boolean);
     }
   }, [searchParams]);
 
+  const [existingAdvNumbers, setExistingAdvNumbers] = useState([]);
+
   const getNextAdvNumber = (list) => {
     const yy = String(new Date().getFullYear()).slice(-2);
     let next = 1;
-
     const nums = list
       .map((v) => {
         const m = v.match(/Advertisement\s+(\d+)-(\d+)/i);
@@ -252,54 +142,44 @@ const AdvertisementCreateForm = () => {
       .filter(Boolean)
       .filter((item) => item.yy === yy)
       .map((item) => item.n);
-
-    if (nums.length) next = Math.max(...nums) + 1;
-
+    if (nums.length) {
+      next = Math.max(...nums) + 1;
+    }
     return `Advertisement ${next}-${yy}`;
   };
 
   const fetchAdvertisementNotes = async () => {
     try {
       const result = await AdvertisementApi.getApprovedRequisitions();
-
       if (result?.success) {
         const payload = result.data || result;
         const notes = payload.notes || payload;
-
         setImportantNotes(notes.important_notes || "");
-
-        const tc =
-          Array.isArray(notes.terms_conditions) &&
-          notes.terms_conditions.length
+        const tc = Array.isArray(notes.terms_conditions) && notes.terms_conditions.length
             ? notes.terms_conditions
             : [""];
-
         setTermsConditions(tc);
       }
-    } catch {}
+    } catch (err) {
+    }
   };
 
   useEffect(() => {
     (async () => {
       try {
         const result = await AdvertisementApi.getAll();
-
         if (result?.success && Array.isArray(result?.data?.data)) {
-          const list = result.data.data
-            .map((ad) => ad.adv_number)
-            .filter(Boolean);
-
+          const list = result.data.data.map((ad) => ad.adv_number).filter(Boolean);
           setExistingAdvNumbers(list);
           setAdvNumber(getNextAdvNumber(list));
         } else {
           const yy = String(new Date().getFullYear()).slice(-2);
           setAdvNumber(`Advertisement 1-${yy}`);
         }
-      } catch {
+      } catch (err) {
         const yy = String(new Date().getFullYear()).slice(-2);
         setAdvNumber(`Advertisement 1-${yy}`);
       }
-
       fetchAdvertisementNotes();
     })();
   }, []);
@@ -309,18 +189,11 @@ const AdvertisementCreateForm = () => {
 
     setJobConfigs((prev) => {
       const next = { ...prev };
-
       selectedIds.forEach((id) => {
         if (!next[id]) {
-          next[id] = {
-            fee: "",
-            testType: "",
-            subjectIds: [],
-            cceStage: "",
-          };
+          next[id] = { fee: "", testType: "" };
         }
       });
-
       return next;
     });
 
@@ -330,87 +203,67 @@ const AdvertisementCreateForm = () => {
         const allResult = await RequisitionApi.getAll(1, 100);
 
         let allJobs = [];
-
         if (adsResult?.success) {
-          const adsJobs =
-            adsResult?.data?.jobs?.data || adsResult?.data?.jobs || [];
+          const adsJobs = adsResult?.data?.jobs?.data || adsResult?.data?.jobs || [];
           if (Array.isArray(adsJobs)) allJobs = [...allJobs, ...adsJobs];
         }
-
         if (allResult?.success) {
           const moreJobs = allResult?.data?.data || allResult?.data || [];
           if (Array.isArray(moreJobs)) allJobs = [...allJobs, ...moreJobs];
         }
 
         const titlesMap = {};
-
         allJobs.forEach((j) => {
           const id = j.hash_id || j.id;
-
           if (id && selectedIds.includes(String(id))) {
             titlesMap[String(id)] = j.designation;
           }
         });
 
         const missingIds = selectedIds.filter((id) => !titlesMap[id]);
-
         if (missingIds.length > 0) {
           const individualFetches = missingIds.map(async (id) => {
             try {
               const result = await RequisitionApi.getById(id);
-
               if (result?.success) {
                 const job = result.data || result;
-                if (job.designation) titlesMap[id] = job.designation;
+                if (job.designation) {
+                  titlesMap[id] = job.designation;
+                }
               }
-            } catch {}
+            } catch (err) {}
           });
-
           await Promise.all(individualFetches);
         }
 
         setJobTitles((prev) => ({ ...prev, ...titlesMap }));
-      } catch {}
+      } catch (err) {
+      }
     };
-
     fetchTitles();
   }, [selectedIds]);
 
   const addTerm = () => setTermsConditions((prev) => [...prev, ""]);
-
   const removeTerm = (idx) =>
     setTermsConditions((prev) => prev.filter((_, i) => i !== idx));
-
   const updateTerm = (idx, value) =>
-    setTermsConditions((prev) =>
-      prev.map((t, i) => (i === idx ? value : t))
-    );
+    setTermsConditions((prev) => prev.map((t, i) => (i === idx ? value : t)));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFieldErrors({});
-
-    if (
-      existingAdvNumbers.some(
-        (num) =>
-          num.toLowerCase().trim() === advNumber.toLowerCase().trim()
-      )
-    ) {
+    if (existingAdvNumbers.some(num => num.toLowerCase().trim() === advNumber.toLowerCase().trim())) {
       setFieldErrors((prev) => ({
         ...prev,
-        adv_number: [
-          "This advertisement number already exists. Please choose a unique number.",
-        ],
+        adv_number: ["This advertisement number already exists. Please choose a unique number."],
       }));
       toast.error("Advertisement number already exists");
       return;
     }
-
     if (!closingDate) {
       toast.error("Closing date is required");
       return;
     }
-
     if (new Date(closingDate) <= new Date(advDate)) {
       setFieldErrors((prev) => ({
         ...prev,
@@ -419,54 +272,21 @@ const AdvertisementCreateForm = () => {
       toast.error("Closing date must be after the advertisement date");
       return;
     }
-
     if (!selectedIds || selectedIds.length === 0) {
       toast.error("Please select at least one requisition");
       return;
     }
-
-    const filteredTerms = termsConditions.filter(
-      (t) => t.trim().length > 0
-    );
-
+    const filteredTerms = termsConditions.filter((t) => t.trim().length > 0);
     if (filteredTerms.length === 0) {
       toast.error("Please add at least one term & condition");
       return;
     }
 
-    for (const jobId of selectedIds) {
-      const config = jobConfigs[jobId] || {};
-
-      if (
-        isWrittenTestType(config.testType) &&
-        (!Array.isArray(config.subjectIds) || config.subjectIds.length === 0)
-      ) {
-        setFieldErrors((prev) => ({
-          ...prev,
-          [`subject_${jobId}`]: [
-            "Please select at least one subject for Written Exam",
-          ],
-        }));
-        toast.error("Please select at least one subject for Written Exam");
-        return;
-      }
-
-      if (isCombinedCompetitiveExam(config.testType) && !config.cceStage) {
-        setFieldErrors((prev) => ({
-          ...prev,
-          [`cce_stage_${jobId}`]: ["Please select CCE stage"],
-        }));
-        toast.error("Please select CCE stage");
-        return;
-      }
-    }
-
     setLoading(true);
     const loadingToast = toast.loading("Saving advertisement...");
-
+    
     try {
       const fd = new FormData();
-
       fd.append("job_ids", (selectedIds || []).join(","));
       fd.append("adv_date", advDate);
       fd.append("adv_number", advNumber);
@@ -477,51 +297,30 @@ const AdvertisementCreateForm = () => {
 
       const feesPayload = {};
       const testTypesPayload = {};
-      const subjectsPayload = {};
-      const cceStagesPayload = {};
-
       Object.keys(jobConfigs).forEach((jobId) => {
-        const config = jobConfigs[jobId] || {};
-
-        feesPayload[jobId] = config.fee || "";
-        testTypesPayload[jobId] = config.testType || "";
-
-        subjectsPayload[jobId] = isWrittenTestType(config.testType)
-          ? config.subjectIds || []
-          : [];
-
-        cceStagesPayload[jobId] = isCombinedCompetitiveExam(
-          config.testType
-        )
-          ? config.cceStage || ""
-          : "";
+        feesPayload[jobId] = jobConfigs[jobId].fee || "";
+        testTypesPayload[jobId] = jobConfigs[jobId].testType || "";
       });
 
       fd.append("job_fees", JSON.stringify(feesPayload));
       fd.append("job_test_types", JSON.stringify(testTypesPayload));
-      fd.append("job_subjects", JSON.stringify(subjectsPayload));
-      fd.append("job_cce_stages", JSON.stringify(cceStagesPayload));
-
       filteredTerms.forEach((t) => fd.append("terms_conditions[]", t));
 
       const result = await AdvertisementApi.create(fd);
 
       if (result.success) {
         toast.success("Advertisement created", { id: loadingToast });
-
         navigate("/dashboard/advertisement-records", {
           state: { created: advNumber, note },
         });
       }
     } catch (err) {
       if (err.errors) {
-        setFieldErrors(err.errors);
-
-        if (err.errors.adv_number) {
-          setAdvNumber(getNextAdvNumber(existingAdvNumbers));
-        }
+          setFieldErrors(err.errors);
+          if (err.errors.adv_number) {
+              setAdvNumber(getNextAdvNumber(existingAdvNumbers));
+          }
       }
-
       toast.error(err.message || "Failed to create advertisement", {
         id: loadingToast,
       });
@@ -545,44 +344,6 @@ const AdvertisementCreateForm = () => {
     },
   };
 
-  const subjectFieldSx = {
-    ...fieldSx,
-    width: "100%",
-    minWidth: 0,
-    "& .MuiOutlinedInput-root": {
-      minHeight: 56,
-      height: "auto",
-      alignItems: "flex-start",
-      flexWrap: "wrap",
-      padding: "8px 40px 8px 8px !important",
-    },
-    "& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)": {
-      height: "auto",
-    },
-    "& .MuiAutocomplete-tag": {
-      maxWidth: "calc(100% - 8px)",
-      margin: "3px",
-    },
-    "& .MuiChip-label": {
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-    },
-    "& .MuiAutocomplete-input": {
-      minWidth: "140px !important",
-      padding: "7px 4px !important",
-    },
-    "@media (max-width: 600px)": {
-      "& .MuiAutocomplete-tag": {
-        maxWidth: "100%",
-      },
-      "& .MuiAutocomplete-input": {
-        width: "100% !important",
-        minWidth: "100% !important",
-      },
-    },
-  };
-
   return (
     <div className="job-creation-container">
       <div className="container">
@@ -597,12 +358,10 @@ const AdvertisementCreateForm = () => {
           <form onSubmit={handleSubmit} className="card-body">
             <div className="row" style={{ margin: 0 }}>
               <div className="col-md-12">
-                <h6 className="section-title">
-                  Advertisement Information
-                </h6>
+                <h6 className="section-title">Advertisement Information</h6>
               </div>
             </div>
-
+            
             <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
               <div className="row">
                 <div className="col-md-6 form-group">
@@ -617,7 +376,6 @@ const AdvertisementCreateForm = () => {
                     sx={fieldSx}
                   />
                 </div>
-
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
@@ -626,19 +384,10 @@ const AdvertisementCreateForm = () => {
                     onChange={(e) => {
                       const val = e.target.value;
                       setAdvNumber(val);
-
-                      if (
-                        existingAdvNumbers.some(
-                          (num) =>
-                            num.toLowerCase().trim() ===
-                            val.toLowerCase().trim()
-                        )
-                      ) {
+                      if (existingAdvNumbers.some(num => num.toLowerCase().trim() === val.toLowerCase().trim())) {
                         setFieldErrors((prev) => ({
                           ...prev,
-                          adv_number: [
-                            "This advertisement number already exists. Please choose a unique number.",
-                          ],
+                          adv_number: ["This advertisement number already exists. Please choose a unique number."]
                         }));
                       } else {
                         setFieldErrors((prev) => {
@@ -656,7 +405,6 @@ const AdvertisementCreateForm = () => {
                         : fieldErrors?.adv_number
                     }
                   />
-
                   <div style={{ marginTop: 8 }}>
                     <button
                       type="button"
@@ -681,6 +429,8 @@ const AdvertisementCreateForm = () => {
                 </div>
               </div>
 
+              {/* ── FIX: both columns col-md-6, date input height forced to 28px
+                   so padding(14+14) + height(28) = 56px total — matches the row above ── */}
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField
@@ -691,74 +441,40 @@ const AdvertisementCreateForm = () => {
                     onChange={(e) => {
                       const val = e.target.value;
                       setClosingDate(val);
-
                       if (val && advDate && val <= advDate) {
-                        setFieldErrors((prev) => ({
-                          ...prev,
-                          closing_date: [
-                            "Closing date must be after the advertisement date (same date not allowed)",
-                          ],
-                        }));
+                        setFieldErrors((prev) => ({ ...prev, closing_date: ['Closing date must be after the advertisement date (same date not allowed)'] }));
                       } else {
-                        setFieldErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.closing_date;
-                          return next;
-                        });
+                        setFieldErrors((prev) => { const next = { ...prev }; delete next.closing_date; return next; });
                       }
                     }}
                     required
                     InputLabelProps={{ shrink: true }}
                     sx={fieldSx}
-                    inputProps={{
-                      min: advDate
-                        ? (() => {
-                            const d = new Date(advDate);
-                            d.setDate(d.getDate() + 1);
-                            return d.toISOString().split("T")[0];
-                          })()
-                        : undefined,
-                      style: { height: 28 },
-                    }}
-                    error={
-                      !!(
-                        fieldErrors?.closing_date ||
-                        (closingDate && advDate && closingDate <= advDate)
-                      )
-                    }
+                    inputProps={{ min: advDate ? (() => { const d = new Date(advDate); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })() : undefined, style: { height: 28 } }}
+                    error={!!(fieldErrors?.closing_date || (closingDate && advDate && closingDate <= advDate))}
                     helperText={
-                      closingDate && advDate && closingDate <= advDate
-                        ? "Closing date must be after advertisement date (same date not allowed)"
+                      (closingDate && advDate && closingDate <= advDate)
+                        ? 'Closing date must be after advertisement date (same date not allowed)'
                         : Array.isArray(fieldErrors?.closing_date)
-                        ? fieldErrors.closing_date.join(", ")
-                        : fieldErrors?.closing_date || ""
+                          ? fieldErrors.closing_date.join(", ")
+                          : (fieldErrors?.closing_date || '')
                     }
                   />
-
-                  {advDate &&
-                    closingDate &&
-                    (() => {
-                      const start = new Date(advDate);
-                      const end = new Date(closingDate);
-                      const days = Math.round(
-                        (end - start) / (1000 * 60 * 60 * 24)
-                      );
-
-                      if (Number.isNaN(days) || days < 0) return null;
-
-                      return (
-                        <div className="total-duration-pill">
-                          <span className="total-duration-label">
-                            Total Duration:
-                          </span>
-                          <span className="total-duration-value">
-                            {days} day{days === 1 ? "" : "s"}
-                          </span>
-                        </div>
-                      );
-                    })()}
+                  {advDate && closingDate && (() => {
+                    const start = new Date(advDate);
+                    const end   = new Date(closingDate);
+                    const days  = Math.round((end - start) / (1000 * 60 * 60 * 24));
+                    if (Number.isNaN(days) || days < 0) return null;
+                    return (
+                      <div className="total-duration-pill">
+                        <span className="total-duration-label">Total Duration:</span>
+                        <span className="total-duration-value">
+                          {days} day{days === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
-
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
@@ -780,31 +496,26 @@ const AdvertisementCreateForm = () => {
 
             <div className="row" style={{ margin: 0 }}>
               <div className="col-md-12">
-                <h6 className="section-title">
-                  Requisition Specific Details
-                </h6>
+                <h6 className="section-title">Requisition Specific Details</h6>
               </div>
             </div>
-
             {selectedIds.map((jobId) => {
               const designation = jobTitles[jobId];
-
               return (
                 <div
                   key={jobId}
                   className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full"
                 >
-                  <h6 className="text-lg font-bold text-emerald-900 mb-6 flex items-center gap-3 pb-3 border-b border-emerald-100">
+                  <h6
+                    className="text-lg font-bold text-emerald-900 mb-6 flex items-center gap-3 pb-3 border-b border-emerald-100"
+                  >
                     <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center shadow-inner">
                       <CheckCircle2 size={20} />
                     </div>
-
                     {designation ? (
                       <div className="flex flex-col">
                         <span>{designation}</span>
-                        <span className="text-xs font-normal text-emerald-600 uppercase tracking-wider">
-                          Designation / Job ID: {jobId}
-                        </span>
+                        <span className="text-xs font-normal text-emerald-600 uppercase tracking-wider">Designation / Job ID: {jobId}</span>
                       </div>
                     ) : (
                       <span className="text-slate-400 font-medium italic animate-pulse">
@@ -812,7 +523,6 @@ const AdvertisementCreateForm = () => {
                       </span>
                     )}
                   </h6>
-
                   <div className="row">
                     <div className="col-md-6 form-group">
                       <TextField
@@ -822,59 +532,35 @@ const AdvertisementCreateForm = () => {
                         value={jobConfigs[jobId]?.testType || ""}
                         onChange={(e) => {
                           const newType = e.target.value;
+                          // Look up the fee for the chosen test type and auto-fill it
                           const matchedFee = feeForTestType(newType);
-
                           setJobConfigs((prev) => {
                             const prevFee = prev[jobId]?.fee;
                             const prevType = prev[jobId]?.testType;
-
-                            const nextFee =
-                              prevFee && prevType === newType
-                                ? prevFee
-                                : matchedFee;
-
+                            const nextFee = (prevFee && prevType === newType)
+                              ? prevFee
+                              : matchedFee;
                             return {
                               ...prev,
                               [jobId]: {
                                 ...prev[jobId],
                                 testType: newType,
                                 fee: nextFee,
-                                subjectIds: isWrittenTestType(newType)
-                                  ? prev[jobId]?.subjectIds || []
-                                  : [],
-                                cceStage: isCombinedCompetitiveExam(newType)
-                                  ? prev[jobId]?.cceStage || ""
-                                  : "",
                               },
                             };
-                          });
-
-                          setFieldErrors((prev) => {
-                            const next = { ...prev };
-                            delete next[`test_type_${jobId}`];
-                            delete next[`subject_${jobId}`];
-                            delete next[`cce_stage_${jobId}`];
-                            return next;
                           });
                         }}
                         sx={fieldSx}
                         error={!!fieldErrors?.[`test_type_${jobId}`]}
                         helperText={
                           fieldErrors?.[`test_type_${jobId}`]
-                            ? Array.isArray(
-                                fieldErrors[`test_type_${jobId}`]
-                              )
-                              ? fieldErrors[
-                                  `test_type_${jobId}`
-                                ].join(", ")
-                              : fieldErrors[`test_type_${jobId}`]
+                            ? (Array.isArray(fieldErrors[`test_type_${jobId}`])
+                                ? fieldErrors[`test_type_${jobId}`].join(", ")
+                                : fieldErrors[`test_type_${jobId}`])
                             : "Choose the test type — fee auto-fills"
                         }
                       >
-                        <MenuItem value="">
-                          <em>— Select Test Type —</em>
-                        </MenuItem>
-
+                        <MenuItem value=""><em>— Select Test Type —</em></MenuItem>
                         {testTypeOptions.map((t) => (
                           <MenuItem key={t.hash_id} value={t.hash_id}>
                             {t.name}
@@ -882,7 +568,6 @@ const AdvertisementCreateForm = () => {
                         ))}
                       </TextField>
                     </div>
-
                     <div className="col-md-6 form-group">
                       <TextField
                         fullWidth
@@ -891,7 +576,6 @@ const AdvertisementCreateForm = () => {
                         value={jobConfigs[jobId]?.fee ?? ""}
                         onChange={(e) => {
                           const v = e.target.value;
-
                           setJobConfigs((prev) => ({
                             ...prev,
                             [jobId]: {
@@ -906,165 +590,18 @@ const AdvertisementCreateForm = () => {
                           ...fieldSx,
                           "& .MuiInputBase-input": {
                             backgroundColor: "#f8fafc",
-                          },
+                          }
                         }}
                         error={!!fieldErrors?.[`fee_${jobId}`]}
                         helperText={
                           fieldErrors?.[`fee_${jobId}`]
-                            ? Array.isArray(fieldErrors[`fee_${jobId}`])
-                              ? fieldErrors[`fee_${jobId}`].join(", ")
-                              : fieldErrors[`fee_${jobId}`]
+                            ? (Array.isArray(fieldErrors[`fee_${jobId}`])
+                                ? fieldErrors[`fee_${jobId}`].join(", ")
+                                : fieldErrors[`fee_${jobId}`])
                             : "Auto-filled from the chosen Test Type; editable if you need a different amount"
                         }
                       />
                     </div>
-
-                    {isWrittenTestType(jobConfigs[jobId]?.testType) && (
-                      <>
-                        <div className="col-md-6 form-group">
-                        <Autocomplete
-                          multiple
-                          disableCloseOnSelect
-                          limitTags={2}
-                          options={subjects}
-                          sx={{ width: "100%", minWidth: 0 }}
-                          value={subjects.filter((subject) =>
-                            (jobConfigs[jobId]?.subjectIds || []).includes(
-                              subject.hash_id
-                            )
-                          )}
-                          getOptionLabel={(option) => option.name}
-                          isOptionEqualToValue={(option, value) =>
-                            option.hash_id === value.hash_id
-                          }
-                          onChange={(_, selectedSubjects) => {
-
-                            setJobConfigs((prev) => ({
-                              ...prev,
-                              [jobId]: {
-                                ...prev[jobId],
-                                subjectIds: selectedSubjects.map(
-                                  (subject) => subject.hash_id
-                                ),
-                              },
-                            }));
-
-                            setFieldErrors((prev) => {
-                              const next = { ...prev };
-                              delete next[`subject_${jobId}`];
-                              return next;
-                            });
-                          }}
-                          renderOption={(props, option, { selected }) => (
-                            <li {...props}>
-                              <Checkbox
-                                checked={selected}
-                                size="small"
-                                sx={{ mr: 1 }}
-                              />
-                              {option.name}
-                              <span className="ml-auto pl-3 text-sm text-slate-500">
-                                {option.total_marks} marks
-                              </span>
-                            </li>
-                          )}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label="Subjects"
-                              placeholder="Search subjects..."
-                              sx={subjectFieldSx}
-                              error={!!fieldErrors?.[`subject_${jobId}`]}
-                              helperText={
-                                fieldErrors?.[`subject_${jobId}`]
-                                  ? Array.isArray(
-                                      fieldErrors[`subject_${jobId}`]
-                                    )
-                                    ? fieldErrors[`subject_${jobId}`].join(", ")
-                                    : fieldErrors[`subject_${jobId}`]
-                                  : "Search and select subjects for Written Exam"
-                              }
-                            />
-                          )}
-                        />
-                        </div>
-
-                        <div className="col-md-6 form-group">
-                          <TextField
-                            fullWidth
-                            label="Total Marks"
-                            value={getSelectedSubjectMarks(
-                              jobConfigs[jobId]?.subjectIds
-                            )}
-                            InputProps={{ readOnly: true }}
-                            sx={{
-                              ...fieldSx,
-                              "& .MuiOutlinedInput-input": {
-                                backgroundColor: "#f8fafc",
-                                fontWeight: 700,
-                              },
-                            }}
-                            helperText="Total marks of selected subjects"
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    {isCombinedCompetitiveExam(
-                      jobConfigs[jobId]?.testType
-                    ) && (
-                      <div className="col-md-6 form-group">
-                        <TextField
-                          select
-                          fullWidth
-                          label="CCE Stage"
-                          value={jobConfigs[jobId]?.cceStage || ""}
-                          onChange={(e) => {
-                            const value = e.target.value;
-
-                            setJobConfigs((prev) => ({
-                              ...prev,
-                              [jobId]: {
-                                ...prev[jobId],
-                                cceStage: value,
-                              },
-                            }));
-
-                            setFieldErrors((prev) => {
-                              const next = { ...prev };
-                              delete next[`cce_stage_${jobId}`];
-                              return next;
-                            });
-                          }}
-                          sx={fieldSx}
-                          error={!!fieldErrors?.[`cce_stage_${jobId}`]}
-                          helperText={
-                            fieldErrors?.[`cce_stage_${jobId}`]
-                              ? Array.isArray(
-                                  fieldErrors[`cce_stage_${jobId}`]
-                                )
-                                ? fieldErrors[
-                                    `cce_stage_${jobId}`
-                                  ].join(", ")
-                                : fieldErrors[`cce_stage_${jobId}`]
-                              : "Select CCE stage"
-                          }
-                        >
-                          <MenuItem value="">
-                            <em>— Select CCE Stage —</em>
-                          </MenuItem>
-
-                          {CCE_STAGES.map((stage) => (
-                            <MenuItem
-                              key={stage.value}
-                              value={stage.value}
-                            >
-                              {stage.label}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -1078,14 +615,11 @@ const AdvertisementCreateForm = () => {
 
             <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
               <div className="row" style={{ width: "-webkit-fill-available" }}>
-                <div
-                  className="col-md-6 form-group"
-                  style={{
-                    width: "-webkit-fill-available",
-                    flex: "0 !important",
-                    minWidth: "-webkit-fill-available",
-                  }}
-                >
+                <div className="col-md-6 form-group" style={{
+                  width: "-webkit-fill-available",
+                  flex: "0 !important",
+                  minWidth: "-webkit-fill-available"
+                }}>
                   <TextField
                     fullWidth
                     label="Important Notes"
@@ -1111,14 +645,11 @@ const AdvertisementCreateForm = () => {
 
             <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
               <div className="row" style={{ width: "-webkit-fill-available" }}>
-                <div
-                  className="col-md-6"
-                  style={{
-                    width: "-webkit-fill-available",
-                    flex: "0 !important",
-                    minWidth: "-webkit-fill-available",
-                  }}
-                >
+                <div className="col-md-6" style={{
+                  width: "-webkit-fill-available",
+                  flex: "0 !important",
+                  minWidth: "-webkit-fill-available"
+                }}>
                   {termsConditions.map((term, idx) => (
                     <div
                       key={idx}
@@ -1136,7 +667,6 @@ const AdvertisementCreateForm = () => {
                         onChange={(e) => updateTerm(idx, e.target.value)}
                         sx={fieldSx}
                       />
-
                       {termsConditions.length > 1 && (
                         <button
                           type="button"
@@ -1150,7 +680,6 @@ const AdvertisementCreateForm = () => {
                       )}
                     </div>
                   ))}
-
                   <button
                     type="button"
                     className="btn btn-primary"
@@ -1165,29 +694,15 @@ const AdvertisementCreateForm = () => {
                     <Plus size={18} />
                     <span>Add Term & Condition</span>
                   </button>
-
                   {!!fieldErrors?.terms_conditions && (
-                    <div
-                      style={{
-                        marginTop: 6,
-                        color: "#dc3545",
-                        fontSize: 12,
-                      }}
-                    >
+                    <div style={{ marginTop: 6, color: "#dc3545", fontSize: 12 }}>
                       {Array.isArray(fieldErrors.terms_conditions)
                         ? fieldErrors.terms_conditions.join(", ")
                         : fieldErrors.terms_conditions}
                     </div>
                   )}
-
                   {!!fieldErrors?.job_ids && (
-                    <div
-                      style={{
-                        marginTop: 6,
-                        color: "#dc3545",
-                        fontSize: 12,
-                      }}
-                    >
+                    <div style={{ marginTop: 6, color: "#dc3545", fontSize: 12 }}>
                       {Array.isArray(fieldErrors.job_ids)
                         ? fieldErrors.job_ids.join(", ")
                         : fieldErrors.job_ids}
@@ -1205,7 +720,6 @@ const AdvertisementCreateForm = () => {
               >
                 Cancel
               </button>
-
               <button
                 type="submit"
                 className="btn btn-primary"
