@@ -737,8 +737,9 @@ const AdvertisementDetail = () => {
               alt="Azad Jammu & Kashmir Crest" 
               className="adv-crest-img" 
             />
-            <div className="adv-gov">Government of Azad Jammu &amp; Kashmir</div>
-            <div className="adv-org">Azad Jammu &amp; Kashmir Public Service Commission</div>
+            <div className="adv-gov">Azad Government of the State &amp; of Jammu & Kashmir</div>
+            <div className="adv-gov"></div>
+            {/* <div className="adv-org">Azad Jammu &amp; Kashmir Public Service Commission</div> */}
             <div className="adv-seat">Jalalabad, Muzaffarabad</div>
             <div className="adv-web">https://ajkpsc.punjab.gov.pk/</div>
             <div className="adv-bar">
@@ -819,11 +820,20 @@ const AdvertisementDetail = () => {
                         </tr>
                         <tr>
                           <td>
+                            <span className="adv-m-lbl">Exam category</span>
+                            <span className="adv-m-val">
+                              {/* {job.pivot?.fee ? `Rs. ${Number(job.pivot.fee).toLocaleString()}/-` : 'Rs. 505/-'} */}
+                            </span>
+                          </td>
+                          <td>
                             <span className="adv-m-lbl">Fee</span>
                             <span className="adv-m-val">
                               {job.pivot?.fee ? `Rs. ${Number(job.pivot.fee).toLocaleString()}/-` : 'Rs. 505/-'}
                             </span>
                           </td>
+                        </tr>
+                        <tr>
+                          
                           <td>
                             <span className="adv-m-lbl">Gender</span>
                             <span className="adv-m-val">{job.eligibility?.gender_basis || 'Male/Female'}</span>
