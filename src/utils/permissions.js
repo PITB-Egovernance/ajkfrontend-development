@@ -1,4 +1,5 @@
 import AuthService from 'services/authService';
+import { getRoutePermissionMap } from 'config/permissionRegistry';
 
 // Reads the authenticated user (with role + permissions) from storage.
 const getAuthUser = () => {
@@ -98,7 +99,12 @@ export const getAllowedActions = (moduleKey, subKey) => {
 // Exact sub-tab leaf paths → [module, subModule]. Mirrors the Settings technique:
 // the main sidebar tab/sub-tab is gated at sub-module level, while deeper
 // create/edit/detail routes fall back to the module-level prefix rules below.
+// Derived from the sidebar (so a newly added page is auto-guarded by its own
+// permission key), with the manual entries layered on top as authoritative
+// overrides. Current pages keep their existing keys because the registry uses
+// the same legacy map.
 const ROUTE_SUBMODULE_EXACT = {
+  ...getRoutePermissionMap(),
   '/dashboard/applications':          ['candidates', 'job_applications'],
   '/dashboard/roll-numbers':          ['roll_number', 'roll_number_generation'],
   '/dashboard/award-lists':           ['candidates', 'award_lists'],

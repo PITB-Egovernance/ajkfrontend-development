@@ -82,6 +82,18 @@ const RolesApi = {
     return handle(res);
   },
 
+  // POST /settings/permissions/sync  { modules }
+  // Pushes the sidebar-derived permission tree so the backend catalog stays in
+  // sync (new pages added, removed pages marked inactive). Idempotent.
+  syncModules: async (modules) => {
+    const res = await fetch(`${API_BASE}/settings/permissions/sync`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ modules }),
+    });
+    return handle(res);
+  },
+
   // POST /settings/employees/{employeeHash}/assign-role  { role_id: roleHash }
   assignRole: async (employeeHash, roleHash) => {
     const res = await fetch(`${API_BASE}/settings/employees/${employeeHash}/assign-role`, {

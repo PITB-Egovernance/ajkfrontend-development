@@ -9,6 +9,7 @@ import confirmDelete from "components/ui/ConfirmDelete";
 import { InlineLoader } from "components/ui/Loader";
 import RolesApi from "api/rolesApi";
 import { PERMISSION_MODULES, ACTION_LABELS, buildEmptyPermissionsFrom, normalizeModules } from "config/permissionModules";
+import { mergeModuleTrees, applyFullActions } from "config/permissionRegistry";
 
 const RoleForm = () => {
   const { hashId } = useParams();
@@ -38,22 +39,21 @@ const RoleForm = () => {
     (async () => {
       setLoading(true);
 
-      // 1) Canonical module structure from the backend (fall back to local config).
+      // 1) Canonical module structure. Deep-merge the backend response with the
+      // dynamic local tree (curated + every sidebar page) so no module, sub-page
+      // or action is ever missing — even if the backend hasn't caught up yet.
+      // Idempotent union; sidebar pages always appear in the matrix.
       let mods = PERMISSION_MODULES;
       try {
         const res = await RolesApi.getModules();
         const norm = normalizeModules(res.data ?? res);
         if (norm) {
-          // Use the backend structure, but make sure every module we know about
-          // locally (e.g. Candidates) is present even if the backend hasn't
-          // started returning it yet — otherwise those tabs would be missing.
-          mods = { ...norm };
-          Object.entries(PERMISSION_MODULES).forEach(([key, mod]) => {
-            if (!mods[key]) mods[key] = mod;
-          });
+          // Local (sidebar) tree first so pages keep their sidebar labels; the
+          // backend response still contributes any extra modules/actions.
+          mods = applyFullActions(mergeModuleTrees(PERMISSION_MODULES, norm));
         }
       } catch (_) {
-        // backend unavailable → keep local fallback structure
+        // backend unavailable → keep local dynamic structure
       }
       if (!active) return;
       setModules(mods);

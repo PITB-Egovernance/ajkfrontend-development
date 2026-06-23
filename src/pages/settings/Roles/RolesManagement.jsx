@@ -12,7 +12,7 @@ import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import RolesApi from "api/rolesApi";
 import EmployeeService from "services/EmployeeService";
-import { countPermissions } from "config/permissionModules";
+import { countPermissions, PERMISSION_MODULES } from "config/permissionModules";
 import { GRID_SX } from 'utils/gridStyles';
 import { hasPermission } from "utils/permissions";
 
@@ -33,6 +33,12 @@ const RolesManagement = () => {
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
+
+  // Keep the backend permission catalog in sync with the sidebar — runs once when
+  // an admin opens the Roles area. Fire-and-forget; never blocks the UI.
+  useEffect(() => {
+    RolesApi.syncModules(PERMISSION_MODULES).catch(() => {});
+  }, []);
 
   const filterConfig = [
     { name: "name", label: "Role Name", type: "text", placeholder: "Filter by role name" },

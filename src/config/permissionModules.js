@@ -4,7 +4,11 @@
 // It is used as a fallback when the live modules endpoint is unavailable; at
 // runtime the form fetches the canonical structure from the backend.
 
-export const PERMISSION_MODULES = {
+import { buildSidebarModules, mergeModuleTrees, applyFullActions } from './permissionRegistry';
+
+// Curated base: legacy/back-end modules (incl. ones with no sidebar page yet,
+// e.g. Review/Appeal, Interview — kept, never deleted).
+const PERMISSION_MODULES_BASE = {
   settings: {
     label: 'Settings',
     modules: {
@@ -125,6 +129,17 @@ export const PERMISSION_MODULES = {
   },
 };
 
+// The canonical matrix structure. Built dynamically so EVERY sidebar page is
+// guaranteed to be present (synced from MENU_ITEMS), curated/back-end modules are
+// preserved, and every page exposes the full action set. Idempotent — rebuilding
+// from the same inputs yields the same tree, never duplicates.
+// Sidebar tree is listed FIRST so each page is labelled by its sidebar name
+// (e.g. "Submitted Requisitions" rather than the generic "Department Requisition"),
+// then curated/back-end modules are layered on for anything not in the sidebar.
+export const PERMISSION_MODULES = applyFullActions(
+  mergeModuleTrees(buildSidebarModules(), PERMISSION_MODULES_BASE)
+);
+
 // Human-readable labels for action slugs (column headers / chips).
 export const ACTION_LABELS = {
   add: 'Add',
@@ -140,6 +155,11 @@ export const ACTION_LABELS = {
   verify_result: 'Verify',
   approve: 'Approve',
   reject: 'Reject',
+  assign: 'Assign',
+  export: 'Export',
+  import: 'Import',
+  print: 'Print',
+  download: 'Download',
   verify: 'Verify',
   verify_approve: 'Verify / Approve',
   publish: 'Publish',
