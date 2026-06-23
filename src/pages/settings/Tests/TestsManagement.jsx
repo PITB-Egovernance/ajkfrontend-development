@@ -30,7 +30,7 @@ const getHeaders = (json = true) => {
   return h;
 };
 
-const emptyForm = { test_name: '', test_fees: '' };
+const emptyForm = { test_type_id: '', test_fees: '' };
 
 const BulkBtn = ({ onClick, icon: Icon, label, className = '' }) => (
   <button type="button" onClick={onClick}
@@ -63,6 +63,26 @@ const TestsManagement = () => {
   const [search,   setSearch]   = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
+  // Exam types for the form dropdown — fetched from the test-types dropdown endpoint (active only)
+  const [examTypes,    setExamTypes]    = useState([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
+
+  const fetchExamTypes = async () => {
+    setLoadingTypes(true);
+    try {
+      const res    = await fetch(`${API_BASE}/settings/test-types/dropdown`, { headers: getHeaders() });
+      const result = await res.json();
+      if (result.success || result.status === 200) {
+        const data = result.data?.data ?? result.data ?? [];
+        setExamTypes(data.map((t) => ({
+          hash_id: t.hash_id || t.id,
+          name:    t.name || t.label || '',
+        })));
+      }
+    } catch { /* non-critical — exam-type dropdown stays empty */ }
+    finally { setLoadingTypes(false); }
+  };
+
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -70,14 +90,21 @@ const TestsManagement = () => {
       const result = await res.json();
       if (result.success || result.status === 200) {
         const data = result.data?.data ?? result.data ?? [];
-        setRows(data.map((item, i) => ({
-          id:         item.hash_id || item.id,
-          sr_no:      i + 1,
-          hash_id:    item.hash_id,
-          test_name:  item.test_name  || item.name || '',
-          test_fees:  item.test_fees  ?? item.fees ?? 0,
-          status:     item.status     ?? 'active',
-        })));
+        setRows(data.map((item, i) => {
+          // The test-type relation may arrive as a nested object, a flat hash id, or just a name
+          const ttObj = item.test_type && typeof item.test_type === 'object' ? item.test_type : null;
+          return {
+            id:         item.hash_id || item.id,
+            sr_no:      i + 1,
+            hash_id:    item.hash_id,
+            test_type_id:   ttObj?.hash_id || item.test_type_id || item.test_type_hash_id || item.exam_test_type_id || '',
+            test_type_name: ttObj?.name || item.test_type_name
+              || (typeof item.test_type === 'string' ? item.test_type : '') || '',
+            test_name:  item.test_name  || item.name || '',
+            test_fees:  item.test_fees  ?? item.fees ?? 0,
+            status:     item.status     ?? 'active',
+          };
+        }));
       } else {
         toast.error(result.message || 'Failed to load tests');
       }
@@ -85,13 +112,16 @@ const TestsManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); fetchExamTypes(); }, []);
+
+  // Resolve a test-type display name — prefer the name from the list, fall back to the dropdown options
+  const typeNameById = (id) => examTypes.find((t) => t.hash_id === id)?.name || '';
 
   const filtered = rows.filter((r) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
-      r.test_name?.toLowerCase().includes(q) ||
+      (r.test_type_name || typeNameById(r.test_type_id)).toLowerCase().includes(q) ||
       String(r.test_fees).includes(q)
     );
   });
@@ -134,7 +164,7 @@ const TestsManagement = () => {
   const openEdit = (row) => {
     setEditing(row);
     setFormData({
-      test_name: row.test_name || '',
+      test_type_id: row.test_type_id || '',
       test_fees: row.test_fees ?? '',
     });
     setFormError('');
@@ -142,12 +172,12 @@ const TestsManagement = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.test_name.trim()) { setFormError('Test name is required.'); return; }
+    if (!formData.test_type_id)     { setFormError('Test type is required.'); return; }
     if (formData.test_fees === '' || formData.test_fees === null) {
-      setFormError('Test fees is required.'); return;
+      setFormError('Test fee is required.'); return;
     }
     const fees = Number(formData.test_fees);
-    if (Number.isNaN(fees) || fees < 0) { setFormError('Test fees must be a non-negative number.'); return; }
+    if (Number.isNaN(fees) || fees < 0) { setFormError('Test fee must be a non-negative number.'); return; }
 
     setSaving(true);
     setFormError('');
@@ -160,7 +190,9 @@ const TestsManagement = () => {
         method:  isUpdate ? 'PUT' : 'POST',
         headers: getHeaders(),
         body:    JSON.stringify({
-          test_name: formData.test_name.trim(),
+          test_type_id: formData.test_type_id,
+          // No separate test name in the UI — backend still expects test_name, so derive it from the test type
+          test_name: typeNameById(formData.test_type_id) || (editing?.test_name ?? ''),
           test_fees: fees,
           // Backend UpdateTestRequest requires status on every update — preserve current status on edit,
           // default to 'active' on create (server default; explicit for clarity)
@@ -169,18 +201,18 @@ const TestsManagement = () => {
       });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
-        toast.success(isUpdate ? 'Test updated successfully' : 'Test added successfully');
+        toast.success(isUpdate ? 'Test fee updated successfully' : 'Test fee added successfully');
         setOpen(false);
         fetchAll();
       } else {
-        toast.error(result.message || (isUpdate ? 'Failed to update test' : 'Failed to add test'));
+        toast.error(result.message || (isUpdate ? 'Failed to update test fee' : 'Failed to add test fee'));
       }
-    } catch { toast.error('Server error while saving test'); }
+    } catch { toast.error('Server error while saving test fee'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (row) => {
-    if (!await confirmDelete({ title: 'Delete Test', identifier: row.test_name })) return;
+    if (!await confirmDelete({ title: 'Delete Test Fee', identifier: row.test_type_name || typeNameById(row.test_type_id) })) return;
     try {
       const res = await fetch(`${API_BASE}/settings/tests/${row.hash_id}/delete`, {
         method:  'DELETE',
@@ -206,14 +238,15 @@ const TestsManagement = () => {
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify({
-          test_name: row.test_name,
+          test_type_id: row.test_type_id,
+          test_name: row.test_type_name || typeNameById(row.test_type_id) || row.test_name || '',
           test_fees: Number(row.test_fees) || 0,
           status:    newStatus,
         }),
       });
       const r = await res.json();
       if (res.ok || r.status === 200 || r.success) {
-        toast.success(`Test marked as ${newStatus}`);
+        toast.success(`Test fee marked as ${newStatus}`);
         fetchAll();
       } else {
         // Show backend validation messages if present (Laravel returns { errors: { field: [..] } })
@@ -225,7 +258,9 @@ const TestsManagement = () => {
 
   const columns = [
     { field: 'sr_no',     headerName: '#',         width: 60 },
-    { field: 'test_name', headerName: 'Test Name', flex: 1, minWidth: 220 },
+    { field: 'test_type', headerName: 'Test Type', flex: 1, minWidth: 220,
+      renderCell: (p) => p.row.test_type_name || typeNameById(p.row.test_type_id)
+        || <span className="text-slate-400 text-xs">—</span> },
     { field: 'test_fees', headerName: 'Fees (PKR)', width: 160,
       renderCell: (p) => Number(p.value || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
     { field: 'status',    headerName: 'Status',    width: 110,
@@ -276,7 +311,7 @@ const TestsManagement = () => {
           {canAdd && (
             <button onClick={openAdd}
               className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
-              <Plus size={15} /> Add Test
+              <Plus size={15} /> Add Test Fee
             </button>
           )}
         </div>
@@ -345,15 +380,18 @@ const TestsManagement = () => {
         </Menu>
 
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
-          <DialogTitle className="font-bold">{editing ? 'Edit Test' : 'Add Test'}</DialogTitle>
+          <DialogTitle className="font-bold">{editing ? 'Update Test Fee' : 'Add Test Fee'}</DialogTitle>
           <DialogContent>
             {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
-            <TextField fullWidth autoFocus required label="Test Name" margin="normal" size="small"
-              value={formData.test_name}
-              onChange={(e) => { setFormData((f) => ({ ...f, test_name: e.target.value })); setFormError(''); }}
-              placeholder="e.g. NTS, MDCAT"
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} />
-            <TextField fullWidth required type="number" label="Test Fees (PKR)" margin="normal" size="small"
+            <TextField fullWidth select required autoFocus label="Test Type" margin="normal" size="small"
+              value={formData.test_type_id}
+              onChange={(e) => { setFormData((f) => ({ ...f, test_type_id: e.target.value })); setFormError(''); }}
+              disabled={loadingTypes}
+              helperText={loadingTypes ? 'Loading test types…' : ''}>
+              <MenuItem value="">— Select Test Type —</MenuItem>
+              {examTypes.map((t) => (<MenuItem key={t.hash_id} value={t.hash_id}>{t.name}</MenuItem>))}
+            </TextField>
+            <TextField fullWidth required type="number" label="Test Fee (PKR)" margin="normal" size="small"
               value={formData.test_fees}
               onChange={(e) => { setFormData((f) => ({ ...f, test_fees: e.target.value })); setFormError(''); }}
               inputProps={{ min: 0, step: '0.01' }}
@@ -366,7 +404,7 @@ const TestsManagement = () => {
             </button>
             <button onClick={handleSubmit} disabled={saving}
               className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white font-medium rounded-lg text-sm disabled:opacity-60">
-              {saving ? 'Saving…' : editing ? 'Update' : 'Add'}
+              {saving ? 'Saving…' : editing ? 'Update Test Fee' : 'Add Test Fee'}
             </button>
           </DialogActions>
         </Dialog>

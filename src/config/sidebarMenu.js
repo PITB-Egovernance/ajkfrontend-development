@@ -79,7 +79,7 @@ export const MENU_ITEMS = [
       { label: "Department Users", path: "/dashboard/settings/department-users", icon: Users },
       { label: "Nationalities",      path: "/dashboard/settings/nationalities",       icon: Flag },
       { label: "Exam Test & Fee",    path: "/dashboard/settings/tests",              icon: DollarSign },
-      { label: "Test Types",         path: "/dashboard/settings/test-types",         icon: FileText },
+      { label: "Exam Test Types",    path: "/dashboard/settings/test-types",         icon: FileText },
       { label: "Cities",             path: "/dashboard/settings/cities",              icon: Map },
       { label: "Exam Center",        path: "/dashboard/settings/exam-centers",       icon: MapPin },
       { label: "Qualifications",     path: "/dashboard/settings/qualifications",     icon: GraduationCap },

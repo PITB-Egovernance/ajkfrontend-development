@@ -101,9 +101,9 @@ const TestTypesManagement = () => {
           status:    item.status ?? 'active',
         })));
       } else {
-        toast.error(result.message || 'Failed to load test types');
+        toast.error(result.message || 'Failed to load exam test types');
       }
-    } catch { toast.error('Server error while loading test types'); }
+    } catch { toast.error('Server error while loading exam test types'); }
     finally { setLoading(false); }
   };
 
@@ -175,7 +175,6 @@ const TestTypesManagement = () => {
 
   const handleSubmit = async () => {
     if (!formData.name.trim())       { setFormError('Name is required.'); return; }
-    if (!formData.exam_category)     { setFormError('Exam category is required.'); return; }
     if (String(formData.total_marks).trim() === '') { setFormError('Total marks is required.'); return; }
     const marks = Number(formData.total_marks);
     if (Number.isNaN(marks) || marks < 0) { setFormError('Total marks must be a non-negative number.'); return; }
@@ -194,19 +193,19 @@ const TestTypesManagement = () => {
       });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
-        toast.success(isUpdate ? 'Test type updated successfully' : 'Test type added successfully');
+        toast.success(isUpdate ? 'Exam test type updated successfully' : 'Exam test type added successfully');
         setOpen(false);
         fetchAll();
       } else {
         const fieldErrors = result.errors ? Object.values(result.errors).flat().join(', ') : '';
-        toast.error(fieldErrors || result.message || (isUpdate ? 'Failed to update test type' : 'Failed to add test type'));
+        toast.error(fieldErrors || result.message || (isUpdate ? 'Failed to update exam test type' : 'Failed to add exam test type'));
       }
-    } catch { toast.error('Server error while saving test type'); }
+    } catch { toast.error('Server error while saving exam test type'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (row) => {
-    if (!await confirmDelete({ title: 'Delete Test Type', identifier: row.name })) return;
+    if (!await confirmDelete({ title: 'Delete Exam Test Type', identifier: row.name })) return;
     try {
       const res = await fetch(`${API_BASE}/settings/test-types/${row.hash_id}/delete`, {
         method:  'DELETE',
@@ -214,12 +213,12 @@ const TestTypesManagement = () => {
       });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
-        toast.success('Test type deleted successfully');
+        toast.success('Exam test type deleted successfully');
         fetchAll();
       } else {
-        toast.error(result.message || 'Failed to delete test type');
+        toast.error(result.message || 'Failed to delete exam test type');
       }
-    } catch { toast.error('Server error while deleting test type'); }
+    } catch { toast.error('Server error while deleting exam test type'); }
   };
 
   // TOGGLE STATUS — same method as edit (PUT /update), sends all required fields + new status
@@ -240,7 +239,7 @@ const TestTypesManagement = () => {
       });
       const r = await res.json();
       if (res.ok || r.status === 200 || r.success) {
-        toast.success(`Test type marked as ${newStatus}`);
+        toast.success(`Exam test type marked as ${newStatus}`);
         fetchAll();
       } else {
         const fieldErrors = r.errors ? Object.values(r.errors).flat().join(', ') : '';
@@ -261,7 +260,7 @@ const TestTypesManagement = () => {
         <Switch
           checked={p.value === 'active'}
           onChange={() => handleToggleStatus(p.row, p.value)}
-          inputProps={{ 'aria-label': 'toggle test type status' }}
+          inputProps={{ 'aria-label': 'toggle exam test type status' }}
           size="small"
           disabled={!canEdit}
           color={p.value === 'active' ? 'success' : 'error'}
@@ -281,7 +280,7 @@ const TestTypesManagement = () => {
     }] : []),
   ];
 
-  if (loading && rows.length === 0) return <InlineLoader text="Loading test types..." variant="ring" size="lg" />;
+  if (loading && rows.length === 0) return <InlineLoader text="Loading exam test types..." variant="ring" size="lg" />;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
@@ -296,7 +295,7 @@ const TestTypesManagement = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg"><FileText size={22} className="text-emerald-700" /></div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Test Types</h1>
+                <h1 className="text-2xl font-bold text-slate-900">Exam Test Types</h1>
                 <p className="text-sm text-slate-500">Manage exam categories, marks and passing criteria</p>
               </div>
             </div>
@@ -304,7 +303,7 @@ const TestTypesManagement = () => {
           {canAdd && (
             <button onClick={openAdd}
               className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
-              <Plus size={15} /> Add Test Type
+              <Plus size={15} /> Add Exam Test Type
             </button>
           )}
         </div>
@@ -312,7 +311,7 @@ const TestTypesManagement = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-5">
-              <p className="text-sm text-blue-700 font-medium">Total Test Types</p>
+              <p className="text-sm text-blue-700 font-medium">Total Exam Test Types</p>
               <h2 className="text-3xl font-bold text-blue-900 mt-1">{total}</h2>
             </CardContent>
           </Card>
@@ -332,7 +331,7 @@ const TestTypesManagement = () => {
 
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div className="mb-0">
-            <TextField size="small" placeholder="Search test types..."
+            <TextField size="small" placeholder="Search exam test types..."
               value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 320 }} />
           </div>
         </div>
@@ -357,22 +356,17 @@ const TestTypesManagement = () => {
         </Menu>
 
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-          <DialogTitle className="font-bold">{editing ? 'Edit Test Type' : 'Add Test Type'}</DialogTitle>
+          <DialogTitle className="font-bold">{editing ? 'Edit Exam Test Type' : 'Add Exam Test Type'}</DialogTitle>
           <DialogContent>
             {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
             <TextField fullWidth autoFocus required label="Name" margin="normal" size="small"
               value={formData.name}
               onChange={(e) => { setFormData((f) => ({ ...f, name: e.target.value })); setFormError(''); }}
               placeholder="e.g. PMS Two Paper MCQ" />
-            <TextField fullWidth select required label="Exam Category" margin="normal" size="small"
-              value={formData.exam_category}
-              onChange={(e) => { setFormData((f) => ({ ...f, exam_category: e.target.value })); setFormError(''); }}>
-              {EXAM_CATEGORIES.map((c) => (<MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>))}
-            </TextField>
             <TextField fullWidth multiline minRows={2} label="Description (optional)" margin="normal" size="small"
               value={formData.description}
               onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Short description of this test type" />
+              placeholder="Short description of this exam test type" />
 
             <div className="grid grid-cols-2 gap-3">
               <TextField fullWidth required type="number" label="Total Marks" margin="normal" size="small"
