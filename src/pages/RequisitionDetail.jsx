@@ -10,10 +10,15 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import { extractFilePath, getPersistedDraftFilePath } from 'utils';
+import { isAdminUser } from 'utils/permissions';
 
 const RequisitionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  const handleBack = () => {
+    navigate(isAdminUser() ? '/dashboard/requisitions' : '/dashboard/my-requisitions');
+  };
   const [requisition, setRequisition] = useState(null);
   const [loading, setLoading] = useState(true);
   const [districtOptions, setDistrictOptions] = useState([]);
@@ -303,7 +308,7 @@ const RequisitionDetail = () => {
       }
     } catch (err) {
       toast.error(err.message || 'Error loading requisition details');
-      navigate('/dashboard/requisitions');
+      handleBack();
     } finally {
       setLoading(false);
     }
@@ -569,7 +574,7 @@ const RequisitionDetail = () => {
     >
       <div className="flex justify-between items-center mb-4">
         <button
-          onClick={() => navigate('/dashboard/requisitions')}
+          onClick={handleBack}
           className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
         >
           <ArrowLeft size={18} />
@@ -839,7 +844,7 @@ const RequisitionDetail = () => {
 
       <div className="text-center mt-6">
         <button
-          onClick={() => navigate('/dashboard/requisitions')}
+          onClick={handleBack}
           className="flex items-center gap-2 px-6 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 transition-colors mx-auto"
         >
           <ArrowLeft size={18} />
