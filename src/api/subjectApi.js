@@ -21,8 +21,12 @@ const handleResponse = async (response) => {
 };
 
 const SubjectApi = {
-  getAll: async () => {
-    const response = await fetch(`${API_BASE}/settings/subjects`, {
+  getAll: async (page = 1, perPage = 15) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      per_page: String(perPage),
+    });
+    const response = await fetch(`${API_BASE}/settings/subjects?${params.toString()}`, {
       method: 'GET',
       headers: getHeaders(),
     });

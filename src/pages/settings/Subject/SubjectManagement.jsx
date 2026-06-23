@@ -61,6 +61,7 @@ const SubjectManagement = () => {
   const [allRows,    setAllRows]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
+  const [totalRows,  setTotalRows]  = useState(0);
   const [filters,    setFilters]    = useState({ subject_name: "", subject_group: "", status: "" });
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
@@ -73,31 +74,40 @@ const SubjectManagement = () => {
   const [formErrors,  setFormErrors]  = useState({});
 
   /* ── FETCH ── */
-  const fetchAll = async () => {
+  const fetchAll = async (
+    page = paginationModel.page,
+    pageSize = paginationModel.pageSize
+  ) => {
     setLoading(true);
     try {
-      const result = await SubjectApi.getAll();
-      const data = result.data?.data ?? result.data ?? [];
+      const result = await SubjectApi.getAll(page + 1, pageSize);
+      const pagination = result.data ?? {};
+      const data = pagination.data ?? result.data ?? [];
       setAllRows(
         (Array.isArray(data) ? data : []).map((item, i) => ({
           id:            item.hash_id || item.id,
           hash_id:       item.hash_id || item.id,
-          sr_no:         i + 1,
+          sr_no:         page * pageSize + i + 1,
           subject_name:  item.subject_name,
           subject_group: item.subject_group,
           total_marks:   item.total_marks,
           status:        item.status ?? "active",
         }))
       );
+      setTotalRows(Number(pagination.total) || 0);
     } catch {
       toast.error("Failed to load subject data");
       setAllRows([]);
+      setTotalRows(0);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchAll(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchAll(paginationModel.page, paginationModel.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize]);
 
   /* ── FILTER CONFIG ── */
   const filterConfig = [
@@ -121,7 +131,7 @@ const SubjectManagement = () => {
     return true;
   });
 
-  const total         = allRows.length;
+  const total         = totalRows;
   const activeCount   = allRows.filter((r) => r.status === "active").length;
   const inactiveCount = allRows.filter((r) => r.status === "inactive").length;
 
@@ -398,6 +408,8 @@ const SubjectManagement = () => {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
+          paginationMode="server"
+          rowCount={totalRows}
           loading={loading}
           autoHeight
           checkboxSelection
