@@ -65,8 +65,15 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
-const EMPTY_FORM = { name: "", designation: "", imageFile: null, imagePreview: "", status: "active" };
-
+// const EMPTY_FORM = { name: "", designation: "", imageFile: null, imagePreview: "", status: "active" };
+const EMPTY_FORM = {
+  name: "",
+  designation: "", // selected designation hash_id
+  designationName: "",
+  imageFile: null,
+  imagePreview: "",
+  status: "active",
+};
 const DigitalSignatureManagement = () => {
   const navigate     = useNavigate();
   const fileInputRef = useRef(null);
@@ -124,36 +131,96 @@ const DigitalSignatureManagement = () => {
     }
   };
 
+  // const fetchDesignations = async () => {
+  //   try {
+  //     const res    = await fetch(`${API_BASE}/settings/designations?per_page=100`, { headers: authHeaders() });
+  //     const result = await res.json();
+  //     const data   = result.data?.data ?? result.data ?? [];
+  //     setDesignations(Array.isArray(data) ? data.filter((d) => !d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase())) : []);
+  //   } catch {
+  //     setDesignations([]);
+  //   }
+  // };
+
   const fetchDesignations = async () => {
     try {
-      const res    = await fetch(`${API_BASE}/settings/designations?per_page=100`, { headers: authHeaders() });
+      const res = await fetch(`${API_BASE}/settings/designations?per_page=100`, {
+        headers: authHeaders(),
+      });
+
       const result = await res.json();
-      const data   = result.data?.data ?? result.data ?? [];
-      setDesignations(Array.isArray(data) ? data.filter((d) => !d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase())) : []);
+      const data = result.data?.data ?? result.data ?? [];
+
+      setDesignations(
+        Array.isArray(data)
+          ? data.filter(
+              (d) =>
+                !d.wings &&
+                !["chairman", "secretary"].includes(d.name?.toLowerCase())
+            )
+          : []
+      );
     } catch {
       setDesignations([]);
     }
   };
 
-  const fetchActiveEmployees = async (designation) => {
-    if (!designation) { setEmployees([]); return; }
-    setLoadingEmployees(true);
-    try {
-      const res    = await fetch(`${API_BASE}/employees/active`, { headers: authHeaders() });
-      const result = await res.json();
-      const data   = result.data?.data ?? result.data ?? [];
-      const list   = Array.isArray(data) ? data : [];
-      const filtered = list.filter(
-        (emp) => emp.designation?.toLowerCase().trim() === designation.toLowerCase().trim()
-      );
-      setEmployees(filtered);
-    } catch {
-      setEmployees([]);
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
+  // const fetchActiveEmployees = async (designation) => {
+  //   if (!designation) { setEmployees([]); return; }
+  //   setLoadingEmployees(true);
+  //   try {
+  //     const res    = await fetch(`${API_BASE}/employees/active`, { headers: authHeaders() });
+  //     const result = await res.json();
+  //     const data   = result.data?.data ?? result.data ?? [];
+  //     const list   = Array.isArray(data) ? data : [];
+  //     const filtered = list.filter(
+  //       (emp) => emp.designation?.toLowerCase().trim() === designation.toLowerCase().trim()
+  //     );
+  //     setEmployees(filtered);
+  //   } catch {
+  //     setEmployees([]);
+  //   } finally {
+  //     setLoadingEmployees(false);
+  //   }
+  // };
 
+  const fetchActiveEmployees = async (designationHashId) => {
+  if (!designationHashId) {
+    setEmployees([]);
+    return;
+  }
+
+  setLoadingEmployees(true);
+
+  try {
+    const res = await fetch(`${API_BASE}/employees/active`, {
+      headers: authHeaders(),
+    });
+
+    const result = await res.json();
+    const data = result.data?.data ?? result.data ?? [];
+    const list = Array.isArray(data) ? data : [];
+
+    // designation dropdown me hash_id hai,
+    // designation list me numeric id bhi aa rahi hai
+    const selectedDesignation = designations.find(
+      (d) => String(d.hash_id) === String(designationHashId)
+    );
+
+    const selectedDesignationId = selectedDesignation?.id;
+
+    const filtered = list.filter((emp) => {
+      return Number(emp.designation_id) === Number(selectedDesignationId);
+    });
+
+    setEmployees(filtered);
+  } catch (error) {
+    console.log("Employees fetch error:", error);
+    setEmployees([]);
+  } finally {
+    setLoadingEmployees(false);
+  }
+};
   useEffect(() => { fetchAll(); fetchDesignations(); }, []); // eslint-disable-line
 
   /* ── FILE INPUT ── */
@@ -212,73 +279,186 @@ const DigitalSignatureManagement = () => {
     setOpenModal(true);
   };
 
+  // const handleEdit = () => {
+  //   setEditingRow(selectedRow);
+  //   setFormData({
+  //     name:         selectedRow.name,
+  //     designation:  selectedRow.designation,
+  //     imageFile:    null,
+  //     imagePreview: selectedRow.image ?? "",
+  //     status:       selectedRow.status ?? "active",
+  //   });
+  //   setFormErrors({});
+  //   fetchActiveEmployees(selectedRow.designation);
+  //   setOpenModal(true);
+  //   handleMenuClose();
+  // };
+
   const handleEdit = () => {
-    setEditingRow(selectedRow);
-    setFormData({
-      name:         selectedRow.name,
-      designation:  selectedRow.designation,
-      imageFile:    null,
-      imagePreview: selectedRow.image ?? "",
-      status:       selectedRow.status ?? "active",
-    });
-    setFormErrors({});
-    fetchActiveEmployees(selectedRow.designation);
-    setOpenModal(true);
-    handleMenuClose();
-  };
+  const matchedDesignation = designations.find(
+    (d) =>
+      String(d.name).toLowerCase().trim() ===
+      String(selectedRow.designation).toLowerCase().trim()
+  );
+
+  const designationHashId = matchedDesignation?.hash_id ?? "";
+
+  setEditingRow(selectedRow);
+  setFormData({
+    name: selectedRow.name,
+    designation: designationHashId,
+    designationName: selectedRow.designation,
+    imageFile: null,
+    imagePreview: selectedRow.image ?? "",
+    status: selectedRow.status ?? "active",
+  });
+
+  setFormErrors({});
+
+  if (designationHashId) {
+    fetchActiveEmployees(designationHashId);
+  } else {
+    setEmployees([]);
+  }
+
+  setOpenModal(true);
+  handleMenuClose();
+};
 
   /* ── VALIDATION ── */
+  // const validate = () => {
+  //   const errs = {};
+  //   if (!formData.name.trim())        errs.name        = "Name is required";
+  //   if (!formData.designation.trim()) errs.designation = "Designation is required";
+  //   if (!editingRow && !formData.imageFile) errs.image = "Signature image is required";
+  //   setFormErrors(errs);
+  //   return Object.keys(errs).length === 0;
+  // };
+
   const validate = () => {
-    const errs = {};
-    if (!formData.name.trim())        errs.name        = "Name is required";
-    if (!formData.designation.trim()) errs.designation = "Designation is required";
-    if (!editingRow && !formData.imageFile) errs.image = "Signature image is required";
-    setFormErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
+  const errs = {};
+
+  if (!formData.name.trim()) {
+    errs.name = "Name is required";
+  }
+
+  if (!formData.designation) {
+    errs.designation = "Designation is required";
+  }
+
+  if (!editingRow && !formData.imageFile) {
+    errs.image = "Signature image is required";
+  }
+
+  setFormErrors(errs);
+
+  return Object.keys(errs).length === 0;
+};
 
   /* ── SAVE ── */
-  const handleSubmit = async () => {
-    if (!validate()) return;
-    setSaving(true);
-    try {
-      const fd = new FormData();
-      fd.append("name",        formData.name.trim());
-      fd.append("designation", formData.designation.trim());
-      fd.append("status",      formData.status);
-      if (formData.imageFile) fd.append("image", formData.imageFile);
+  // const handleSubmit = async () => {
+  //   if (!validate()) return;
+  //   setSaving(true);
+  //   try {
+  //     const fd = new FormData();
+  //     fd.append("name",        formData.name.trim());
+  //     fd.append("designation", formData.designation.trim());
+  //     fd.append("status",      formData.status);
+  //     if (formData.imageFile) fd.append("image", formData.imageFile);
 
-      let res;
-      if (editingRow) {
-        res = await fetch(`${API_BASE}/settings/digital-signature/update/${editingRow.hash_id}`, {
-          method: "PUT",
-          headers: authHeaders(),
-          body: fd,
-        });
-      } else {
-        res = await fetch(`${API_BASE}/settings/digital-signature/store`, {
+  //     let res;
+  //     if (editingRow) {
+  //       res = await fetch(`${API_BASE}/settings/digital-signature/update/${editingRow.hash_id}`, {
+  //         method: "PUT",
+  //         headers: authHeaders(),
+  //         body: fd,
+  //       });
+  //     } else {
+  //       res = await fetch(`${API_BASE}/settings/digital-signature/store`, {
+  //         method: "POST",
+  //         headers: authHeaders(),
+  //         body: fd,
+  //       });
+  //     }
+
+  //     const result = await res.json();
+
+  //     if (res.ok || result.success || result.status === 200 || result.status === 201) {
+  //       toast.success(editingRow ? "Signature updated successfully" : "Signature added successfully");
+  //       setOpenModal(false);
+  //       fetchAll();
+  //     } else {
+  //       toast.error(result.message || "Operation failed");
+  //     }
+  //   } catch {
+  //     toast.error("Operation failed");
+  //   } finally {
+  //     setSaving(false);
+  //   }
+  // };
+
+  const handleSubmit = async () => {
+  if (!validate()) return;
+  setSaving(true);
+
+  try {
+    const fd = new FormData();
+
+    fd.append("name", formData.name.trim());
+    fd.append("designation", formData.designationName.trim());
+    fd.append("status", formData.status);
+
+    if (formData.imageFile) {
+      fd.append("image", formData.imageFile);
+    }
+
+    let res;
+
+    if (editingRow) {
+      fd.append("_method", "PUT");
+
+      res = await fetch(
+        `${API_BASE}/settings/digital-signature/update/${editingRow.hash_id}`,
+        {
           method: "POST",
           headers: authHeaders(),
           body: fd,
-        });
-      }
-
-      const result = await res.json();
-
-      if (res.ok || result.success || result.status === 200 || result.status === 201) {
-        toast.success(editingRow ? "Signature updated successfully" : "Signature added successfully");
-        setOpenModal(false);
-        fetchAll();
-      } else {
-        toast.error(result.message || "Operation failed");
-      }
-    } catch {
-      toast.error("Operation failed");
-    } finally {
-      setSaving(false);
+        }
+      );
+    } else {
+      res = await fetch(`${API_BASE}/settings/digital-signature/store`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: fd,
+      });
     }
-  };
 
+    const result = await res.json();
+
+    if (
+      res.ok ||
+      result.success ||
+      result.status === 200 ||
+      result.status === 201
+    ) {
+      toast.success(
+        editingRow
+          ? "Signature updated successfully"
+          : "Signature added successfully"
+      );
+
+      setOpenModal(false);
+      fetchAll();
+    } else {
+      toast.error(result.message || "Operation failed");
+    }
+  } catch (error) {
+    console.log("Submit error:", error);
+    toast.error("Operation failed");
+  } finally {
+    setSaving(false);
+  }
+};
   /* ── SINGLE DELETE ── */
   const handleDelete = async () => {
     if (!selectedRow) return;
@@ -553,7 +733,7 @@ const DigitalSignatureManagement = () => {
           <DialogContent>
 
             {/* Designation — first */}
-            <TextField
+            {/* <TextField
               select
               fullWidth
               label="Designation"
@@ -578,10 +758,56 @@ const DigitalSignatureManagement = () => {
                   {d.name}
                 </option>
               ))}
+            </TextField> */}
+
+            <TextField
+              select
+              fullWidth
+              label="Designation"
+              margin="normal"
+              size="small"
+              autoFocus
+              value={formData.designation}
+              onChange={(e) => {
+                const designationHashId = e.target.value;
+
+                const selectedDesignation = designations.find(
+                  (d) => String(d.hash_id) === String(designationHashId)
+                );
+
+                setFormData((f) => ({
+                  ...f,
+                  designation: designationHashId,
+                  designationName: selectedDesignation?.name ?? "",
+                  name: "",
+                }));
+
+                if (designationHashId) {
+                  setFormErrors((errs) => ({
+                    ...errs,
+                    designation: undefined,
+                    name: undefined,
+                  }));
+                }
+
+                fetchActiveEmployees(designationHashId);
+              }}
+              error={!!formErrors.designation}
+              helperText={formErrors.designation}
+              SelectProps={{ native: true }}
+              InputLabelProps={{ shrink: true }}
+            >
+              <option value="">— Select Designation —</option>
+
+              {designations.map((d) => (
+                <option key={d.hash_id ?? d.id} value={d.hash_id}>
+                  {d.name}
+                </option>
+              ))}
             </TextField>
 
             {/* Name — populated from employees matching the selected designation */}
-            <TextField
+            {/* <TextField
               select
               fullWidth
               label="Name"
@@ -618,8 +844,51 @@ const DigitalSignatureManagement = () => {
                   </option>
                 );
               })}
-            </TextField>
+            </TextField> */}
 
+            <TextField
+              select
+              fullWidth
+              label="Name"
+              margin="normal"
+              size="small"
+              value={formData.name}
+              onChange={(e) => {
+                setFormData((f) => ({ ...f, name: e.target.value }));
+
+                if (e.target.value) {
+                  setFormErrors((errs) => ({ ...errs, name: undefined }));
+                }
+              }}
+              error={!!formErrors.name}
+              helperText={formErrors.name}
+              disabled={!formData.designation || loadingEmployees}
+              SelectProps={{ native: true }}
+              InputLabelProps={{ shrink: true }}
+            >
+              <option value="">
+                {loadingEmployees
+                  ? "Loading employees…"
+                  : !formData.designation
+                  ? "Select designation first"
+                  : employees.length === 0
+                  ? "No employees found"
+                  : "— Select Name —"}
+              </option>
+
+              {employees.map((emp) => {
+                const empName =
+                  emp.first_name && emp.last_name
+                    ? `${emp.first_name} ${emp.last_name}`
+                    : emp.username || emp.name || emp.full_name || emp.employee_name || "-";
+
+                return (
+                  <option key={emp.hash_id ?? emp.id} value={empName}>
+                    {empName}
+                  </option>
+                );
+              })}
+            </TextField>
             {/* Signature Image Upload */}
             <div className="mt-3 mb-1">
               <p className="text-xs text-slate-500 mb-1">
