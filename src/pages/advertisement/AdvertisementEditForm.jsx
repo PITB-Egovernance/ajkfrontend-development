@@ -8,8 +8,11 @@ import Config from "../../config/baseUrl";
 import AuthService from "../../services/authService";
 import "../job-creation/JobCreationForm.css";
 
-const TEST_TYPE_CODE_TO_NAME = { '1': 'MCQs', '2': 'Written Exam' };
-const FALLBACK_EXAM_FEES = { 'MCQs': 505, 'Written Exam': 1010 };
+// Fallback test-fee records used until the live /settings/tests endpoint responds.
+const FALLBACK_TESTS = [
+  { id: '1', test_type_id: '1', test_name: 'MCQs',         test_fees: 505  },
+  { id: '2', test_type_id: '2', test_name: 'Written Exam', test_fees: 1010 },
+];
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -34,16 +37,18 @@ const AdvertisementEditForm = () => {
   const [importantNotes, setImportantNotes] = useState("");
   const [termsConditions, setTermsConditions] = useState([""]);
   const [jobConfigs, setJobConfigs] = useState({});
-  const [examFees, setExamFees] = useState(FALLBACK_EXAM_FEES);
+  const [examTests, setExamTests] = useState(FALLBACK_TESTS);
+  const [testTypes, setTestTypes] = useState([]);
   const [status, setStatus] = useState("active");
   const [extendDate, setExtendDate] = useState("");
   const [isPublished, setIsPublished] = useState(false);
 
+  // Fetch the active test types for the dropdown
   useEffect(() => {
     let aborted = false;
     (async () => {
       try {
-        const res = await fetch(`${Config.apiUrl}/settings/exam-fees`, {
+        const res = await fetch(`${Config.apiUrl}/settings/test-types/dropdown`, {
           headers: {
             Authorization: `Bearer ${AuthService.getToken()}`,
             Accept:        'application/json',
@@ -54,22 +59,60 @@ const AdvertisementEditForm = () => {
         if (aborted) return;
         if (res.ok && (result.success || result.status === 200)) {
           const list = result.data?.data ?? result.data ?? [];
-          const byType = {};
-          list
-            .filter((f) => (f.status ?? 'active') === 'active')
-            .forEach((f) => {
-              if (f.test_type && byType[f.test_type] === undefined) {
-                byType[f.test_type] = Number(f.amount);
-              }
+          setTestTypes(list.map((t) => ({
+            hash_id: t.hash_id || String(t.id),
+            name:    t.name || t.label || '',
+          })));
+        }
+      } catch { /* dropdown falls back to the test-fee records below */ }
+    })();
+    return () => { aborted = true; };
+  }, []);
+
+  // Fetch the test-fee records used to auto-fill the application fee
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/settings/tests`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
+          },
+        });
+        const result = await res.json();
+        if (aborted) return;
+        if (res.ok && (result.success || result.status === 200)) {
+          const list = result.data?.data ?? result.data ?? [];
+          const active = list
+            .filter((t) => (t.status ?? 'active') === 'active')
+            .map((t) => {
+              const ttObj = t.test_type && typeof t.test_type === 'object' ? t.test_type : null;
+              return {
+                id:           t.hash_id || String(t.id),
+                test_type_id: ttObj?.hash_id || t.test_type_id || '',
+                test_name:    ttObj?.name || t.test_type_name || t.test_name,
+                test_fees:    Number(t.test_fees ?? t.fees ?? 0),
+              };
             });
-          if (Object.keys(byType).length) {
-            setExamFees((prev) => ({ ...prev, ...byType }));
-          }
+          if (active.length) setExamTests(active);
         }
       } catch { /* keep fallback */ }
     })();
     return () => { aborted = true; };
   }, []);
+
+  // Dropdown options — prefer the test-types endpoint, fall back to the test-fee records
+  const testTypeOptions = testTypes.length
+    ? testTypes
+    : examTests.map((t) => ({ hash_id: t.test_type_id || t.id, name: t.test_name }));
+
+  // The fee for a selected test type comes from its matching test-fee record
+  const feeForTestType = (typeId) => {
+    const rec = examTests.find((t) => (t.test_type_id || t.id) === typeId);
+    return rec ? String(rec.test_fees) : "";
+  };
   const [jobTitles, setJobTitles] = useState({});
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -110,7 +153,12 @@ const AdvertisementEditForm = () => {
               jTitles[jobId] = job.designation || `Job ${jobId}`;
               jConfigs[jobId] = {
                 fee: job.pivot?.fee || "",
-                testType: job.pivot?.test_type || ""
+                // The saved test type may come back as a hash id, a *_id field, or a nested object
+                testType: job.pivot?.test_type_id
+                  || (job.pivot?.test_type && typeof job.pivot.test_type === 'object'
+                        ? (job.pivot.test_type.hash_id || job.pivot.test_type.id)
+                        : job.pivot?.test_type)
+                  || ""
               };
             });
             setSelectedIds(jIds);
@@ -413,10 +461,7 @@ const AdvertisementEditForm = () => {
                             value={jobConfigs[jobId]?.testType || ""}
                             onChange={(e) => {
                               const newType = e.target.value;
-                              const typeName = TEST_TYPE_CODE_TO_NAME[newType];
-                              const newFee = typeName && examFees[typeName] !== undefined
-                                ? String(examFees[typeName])
-                                : "";
+                              const newFee = feeForTestType(newType);
 
                               setJobConfigs((prev) => ({
                                 ...prev,
@@ -430,8 +475,12 @@ const AdvertisementEditForm = () => {
                             sx={fieldSx}
                             helperText="Choose the test type — fee auto-fills"
                           >
-                            <MenuItem value="1">MCQs</MenuItem>
-                            <MenuItem value="2">Written Exam</MenuItem>
+                            <MenuItem value=""><em>— Select Test Type —</em></MenuItem>
+                            {testTypeOptions.map((t) => (
+                              <MenuItem key={t.hash_id} value={t.hash_id}>
+                                {t.name}
+                              </MenuItem>
+                            ))}
                           </TextField>
                         </div>
                         <div className="col-md-6 form-group">

@@ -42,6 +42,33 @@ const AdvertisementCreateForm = () => {
   const [jobConfigs, setJobConfigs] = useState({});
   const [jobTitles, setJobTitles] = useState({});
   const [examTests, setExamTests] = useState(FALLBACK_TESTS);
+  const [testTypes, setTestTypes] = useState([]);
+
+  // Fetch the active test types for the dropdown
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/settings/test-types/dropdown`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept:        'application/json',
+            'X-API-KEY':   Config.apiKey,
+          },
+        });
+        const result = await res.json();
+        if (aborted) return;
+        if (res.ok && (result.success || result.status === 200)) {
+          const list = result.data?.data ?? result.data ?? [];
+          setTestTypes(list.map((t) => ({
+            hash_id: t.hash_id || String(t.id),
+            name:    t.name || t.label || '',
+          })));
+        }
+      } catch { /* dropdown falls back to the test-fee records below */ }
+    })();
+    return () => { aborted = true; };
+  }, []);
 
   useEffect(() => {
     let aborted = false;
@@ -60,17 +87,33 @@ const AdvertisementCreateForm = () => {
           const list = result.data?.data ?? result.data ?? [];
           const active = list
             .filter((t) => (t.status ?? 'active') === 'active')
-            .map((t) => ({
-              id:        t.hash_id || String(t.id),
-              test_name: t.test_name,
-              test_fees: Number(t.test_fees ?? t.fees ?? 0),
-            }));
+            .map((t) => {
+              // The test-type relation may arrive nested, as a flat hash, or just a name
+              const ttObj = t.test_type && typeof t.test_type === 'object' ? t.test_type : null;
+              return {
+                id:           t.hash_id || String(t.id),
+                test_type_id: ttObj?.hash_id || t.test_type_id || '',
+                test_name:    ttObj?.name || t.test_type_name || t.test_name,
+                test_fees:    Number(t.test_fees ?? t.fees ?? 0),
+              };
+            });
           if (active.length) setExamTests(active);
         }
       } catch { /* keep fallback */ }
     })();
     return () => { aborted = true; };
   }, []);
+
+  // Dropdown options — prefer the test-types endpoint, fall back to the test-fee records
+  const testTypeOptions = testTypes.length
+    ? testTypes
+    : examTests.map((t) => ({ hash_id: t.test_type_id || t.id, name: t.test_name }));
+
+  // The fee for a selected test type comes from its matching test-fee record
+  const feeForTestType = (typeId) => {
+    const rec = examTests.find((t) => (t.test_type_id || t.id) === typeId);
+    return rec ? String(rec.test_fees) : "";
+  };
 
   const selectedIds = useMemo(() => {
     const raw = searchParams.get("ids");
@@ -489,13 +532,14 @@ const AdvertisementCreateForm = () => {
                         value={jobConfigs[jobId]?.testType || ""}
                         onChange={(e) => {
                           const newType = e.target.value;
-                          const matched = examTests.find((t) => t.id === newType);
+                          // Look up the fee for the chosen test type and auto-fill it
+                          const matchedFee = feeForTestType(newType);
                           setJobConfigs((prev) => {
                             const prevFee = prev[jobId]?.fee;
                             const prevType = prev[jobId]?.testType;
                             const nextFee = (prevFee && prevType === newType)
                               ? prevFee
-                              : (matched ? String(matched.test_fees) : "");
+                              : matchedFee;
                             return {
                               ...prev,
                               [jobId]: {
@@ -517,9 +561,9 @@ const AdvertisementCreateForm = () => {
                         }
                       >
                         <MenuItem value=""><em>— Select Test Type —</em></MenuItem>
-                        {examTests.map((t) => (
-                          <MenuItem key={t.id} value={t.id}>
-                            {t.test_name}
+                        {testTypeOptions.map((t) => (
+                          <MenuItem key={t.hash_id} value={t.hash_id}>
+                            {t.name}
                           </MenuItem>
                         ))}
                       </TextField>
