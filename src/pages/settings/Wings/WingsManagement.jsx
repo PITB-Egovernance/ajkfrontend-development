@@ -242,7 +242,6 @@ const WingsManagement = () => {
   /* ───────────────────────── COLUMNS ───────────────────────── */
   const columns = [
     { field: "name",        headerName: "Name",   flex: 1, minWidth: 180 },
-    { field: "parent_name", headerName: "Parent", width: 180 },
     {
       field: "status",
       headerName: "Status",

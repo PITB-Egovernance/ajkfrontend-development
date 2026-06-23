@@ -23,7 +23,7 @@ import { hasPermission } from "utils/permissions";
 import SubjectApi from "api/subjectApi";
 const PERM = "settings.subjects";
 
-const GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E", "Group F", "Group G"];
+const GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E", "Group F", "Group G","Compulsory"];
 
 const gridSx = {
   border: "none",
