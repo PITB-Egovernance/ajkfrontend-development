@@ -39,10 +39,11 @@ const LEGACY_KEY_BY_PATH = {
   '/dashboard/approved-requisitions': ['requisitions', 'job_pool'],
   '/dashboard/advertisement-records': ['advertisement', 'advertisement'],
   '/dashboard/my-requisitions':       ['myrequisitions', 'requisition_approval'],
-  '/dashboard/approval-flow':         ['requisitions', 'admin_requisition'],
   '/dashboard/results':               ['result', 'final_result'],
-  '/dashboard/workflow-tracking':     ['requisitions', 'admin_requisition'],
   '/dashboard/settings/roles':        ['roles_permissions', 'roles'],
+  // approval-flow & workflow-tracking intentionally omitted → they auto-derive to
+  // their OWN keys (approval_flow.approval_flow, workflow_tracking.workflow_tracking)
+  // so each is independently grantable instead of piggy-backing on Requisitions.
 };
 
 // Friendly group labels for the module tab headers.
@@ -54,6 +55,8 @@ const MODULE_LABELS = {
   requisitions: 'Requisitions',
   advertisement: 'Advertisement',
   myrequisitions: 'My Requisitions',
+  approval_flow: 'Approval Flow',
+  workflow_tracking: 'Workflow Tracking',
   result: 'Result',
   roll_number: 'Roll Number',
   settings: 'Settings',

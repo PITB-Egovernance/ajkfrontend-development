@@ -138,6 +138,9 @@ export const canAccessPath = (pathname = '') => {
   if (!user) return true;            // not loaded yet — don't block
   if (isAdminUser(user)) return true;
 
+  // Dashboard root is the neutral landing page — always accessible.
+  if (pathname === '/dashboard' || pathname === '/dashboard/') return true;
+
   // Settings sub-pages: /dashboard/settings/<segment>
   const settingsMatch = pathname.match(/^\/dashboard\/settings\/([^/]+)/);
   if (settingsMatch) {

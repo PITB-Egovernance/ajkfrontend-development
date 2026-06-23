@@ -5,60 +5,15 @@ import { MENU_ITEMS } from "config/sidebarMenu";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
 import { useAuth } from "context/AuthContext";
-import { isAdminUser, hasAnyModuleAccess, hasSubModuleAccess } from "utils/permissions";
+import { isAdminUser, hasSubModuleAccess } from "utils/permissions";
+import { getRoutePermissionMap } from "config/permissionRegistry";
 
-// Maps a submenu item path → [permissionModule, subModule] so each sub-tab is
-// shown only when the role has access to that specific sub-module.
-// Same technique as the Settings sub-tabs: each leaf maps to its closest existing
-// permission sub-module (no new keys invented — mirrors the backend catalog).
-const SUBMENU_PERMISSION_MAP = {
-  // Candidates
-  "/dashboard/applications":                ["candidates", "job_applications"],
-  "/dashboard/roll-numbers":                ["roll_number", "roll_number_generation"],
-  "/dashboard/award-lists":                 ["candidates", "award_lists"],
-  // Employees
-  "/dashboard/employees/list":              ["employee_management", "employees"],
-  // Requisitions
-  "/dashboard/requisitions":                ["requisitions", "admin_requisition"],
-  "/dashboard/psc-table":                   ["requisitions", "department_requisition"],
-  "/dashboard/approved-requisitions":       ["requisitions", "job_pool"],
-  "/dashboard/advertisement-records":       ["advertisement", "advertisement"],
-  // Settings
-  "/dashboard/settings/districts":          ["settings", "districts"],
-  "/dashboard/settings/designations":       ["settings", "designations"],
-  "/dashboard/settings/grades":             ["settings", "grades"],
-  "/dashboard/settings/departments":        ["settings", "departments"],
-  "/dashboard/settings/department-users":   ["settings", "department_users"],
-  "/dashboard/settings/nationalities":      ["settings", "nationalities"],
-  "/dashboard/settings/tests":              ["settings", "tests"],
-  "/dashboard/settings/cities":             ["settings", "cities"],
-  "/dashboard/settings/exam-centers":       ["settings", "exam_centers"],
-  "/dashboard/settings/qualifications":     ["settings", "qualifications"],
-  "/dashboard/settings/degrees":            ["settings", "degrees"],
-  "/dashboard/settings/companies":          ["settings", "companies"],
-  "/dashboard/settings/subjects":           ["settings", "subjects"],
-  "/dashboard/settings/certificates":       ["settings", "certificates"],
-  "/dashboard/settings/digital-signatures": ["settings", "digital_signatures"],
-  "/dashboard/settings/system-settings":    ["settings", "system_settings"],
-  "/dashboard/settings/wings":              ["settings", "wings"],
-  "/dashboard/settings/roles":              ["roles_permissions", "roles"],
-  "/dashboard/settings/terms-conditions/":  ["settings", "terms-conditions"],
-};
+// Each route path → [permissionModule, subModule], derived from the sidebar so it
+// stays in sync automatically (a new page is gated by its own permission key).
+const ROUTE_PERMISSION_MAP = getRoutePermissionMap();
 
-// Maps each top-level sidebar item to the permission module(s) that grant access.
-// `null` = always visible (e.g. Dashboard). Items not listed are hidden for
-// non-admin users who lack the mapped module permission.
-const MENU_MODULE_MAP = {
-  dashboard: null,
-  candidates: ['candidates', 'roll_number', 'review_appeal'],
-  employees: ['employee_management'],
-  requisitions: ['requisitions', 'advertisement'],
-  'my-requisitions': null, // always visible; backend scopes the queue per logged-in employee
-  'approval-flow': ['requisitions'],
-  results: ['result'],
-  'workflow-tracking': ['requisitions', 'result'],
-  settings: ['settings', 'roles_permissions'],
-};
+// Items that are always visible regardless of permission (neutral landing page).
+const ALWAYS_VISIBLE_IDS = new Set(['dashboard']);
 
 const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   // Use context if available, fallback to props for backward compatibility
@@ -104,25 +59,28 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   const menuItems = MENU_ITEMS;
   const admin = isAdminUser(user);
 
-  const allowedMenuItems = menuItems.filter((item) => {
-    // Admin / super admin sees everything.
+  // A page is visible only when the role has at least one granted action on the
+  // page's own permission key. Unmapped paths stay visible (don't hide unknowns).
+  const canSeePath = (path) => {
     if (admin) return true;
-    // Dashboard is always visible.
-    const mods = MENU_MODULE_MAP[item.id];
-    if (mods === null) return true;
-    // Non-admin: show only modules the role has permission for.
-    if (!mods) return false;
-    return hasAnyModuleAccess(mods);
+    if (!path) return false;
+    const key = ROUTE_PERMISSION_MAP[String(path).replace(/\/$/, '')];
+    if (!key) return true;
+    return hasSubModuleAccess(key[0], key[1]);
+  };
+
+  const allowedMenuItems = menuItems.filter((item) => {
+    if (admin) return true;
+    if (ALWAYS_VISIBLE_IDS.has(item.id)) return true;
+    // Parent with sub-tabs → visible if any child is visible.
+    if (Array.isArray(item.submenu)) return item.submenu.some((s) => canSeePath(s.path));
+    // Standalone page → gated by its own permission key.
+    return canSeePath(item.path);
   });
 
   const NavItem = ({ item }) => {
     // Show only the sub-tabs the role can access (admin sees all; unmapped items stay visible).
-    const submenu = (item.submenu || []).filter((sub) => {
-      if (admin) return true;
-      const map = SUBMENU_PERMISSION_MAP[sub.path];
-      if (!map) return true;
-      return hasSubModuleAccess(map[0], map[1]);
-    });
+    const submenu = (item.submenu || []).filter((sub) => canSeePath(sub.path));
     const hasSubmenu = submenu.length > 0;
     // A submenu is open if explicitly toggled OR one of its children is the
     // active route (so the parent auto-expands and the item shows nested).
