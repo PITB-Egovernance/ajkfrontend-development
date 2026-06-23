@@ -373,10 +373,10 @@ const TestTypesManagement = () => {
                 value={formData.total_marks}
                 onChange={(e) => { setFormData((f) => ({ ...f, total_marks: e.target.value })); setFormError(''); }}
                 inputProps={{ min: 0, step: '0.01' }} placeholder="e.g. 200" />
-              <TextField fullWidth type="number" label="Interview Marks" margin="normal" size="small"
+              {/*<TextField fullWidth type="number" label="Interview Marks" margin="normal" size="small"
                 value={formData.interview_marks}
                 onChange={(e) => setFormData((f) => ({ ...f, interview_marks: e.target.value }))}
-                inputProps={{ min: 0, step: '0.01' }} placeholder="e.g. 40" />
+                inputProps={{ min: 0, step: '0.01' }} placeholder="e.g. 40" />*/}
               <TextField fullWidth type="number" label="Paper Weightage (%)" margin="normal" size="small"
                 value={formData.paper_weightage_percentage}
                 onChange={(e) => setFormData((f) => ({ ...f, paper_weightage_percentage: e.target.value }))}
