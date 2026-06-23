@@ -122,7 +122,7 @@ const ActionCell = ({ user, onEdit, onDelete }) => {
           sx={{ '&.MuiMenuItem-root': { color: '#dc2626' } }}
         >
           <Trash2 className="w-4 h-4" /> Delete
-        </MenuItem>}
+        </MenuItem>
       </Menu>
     </div>
   );

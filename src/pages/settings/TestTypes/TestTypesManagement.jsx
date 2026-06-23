@@ -251,8 +251,7 @@ const TestTypesManagement = () => {
   const columns = [
     { field: 'sr_no',         headerName: '#',          width: 60 },
     { field: 'name',          headerName: 'Name',       flex: 1, minWidth: 200 },
-    { field: 'exam_category', headerName: 'Exam Category', width: 200,
-      renderCell: (p) => categoryLabel(p.value) },
+    
     { field: 'total_marks',   headerName: 'Total Marks', width: 130,
       renderCell: (p) => Number(p.value || 0).toLocaleString('en-PK') },
     { field: 'status',        headerName: 'Status',     width: 110,
