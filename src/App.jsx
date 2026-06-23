@@ -52,6 +52,7 @@ import DepartmentsManagement from 'pages/settings/Departments/DepartmentsManagem
 import NationalitiesManagement from 'pages/settings/Nationality/NationalitiesManagement';
 import TestsManagement from 'pages/settings/Tests/TestsManagement';
 import ExamFeesManagement from 'pages/settings/ExamFees/ExamFeesManagement';
+import TestTypesManagement from 'pages/settings/TestTypes/TestTypesManagement';
 import RequisitionApprovalFlow from 'pages/settings/ApprovalFlow/RequisitionApprovalFlow';
 import RequisitionApprovalTrackPage from 'pages/requisition/RequisitionApprovalTrackPage';
 import MyRequisitionsQueue from 'pages/requisition/MyRequisitionsQueue';
@@ -198,6 +199,7 @@ function App() {
           <Route path="settings/nationalities" element={<NationalitiesManagement />} />
           <Route path="settings/tests" element={<TestsManagement />} />
           <Route path="settings/exam-fees" element={<ExamFeesManagement />} />
+          <Route path="settings/test-types" element={<TestTypesManagement />} />
           <Route path="approval-flow" element={<RequisitionApprovalFlow />} />
           <Route path="settings/subjects" element={<SubjectManagement />} />
           <Route path="settings/certificates" element={<CertificatesManagement />} />
