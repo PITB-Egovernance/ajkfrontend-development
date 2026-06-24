@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField, IconButton, Menu, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions,
+  Dialog, DialogTitle, DialogContent, DialogActions, Switch,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, MoreVertical, Building } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
+import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
@@ -39,6 +40,7 @@ const emptyForm = {
   contact_person:  '',
   phone_number:    '',
   mobile_number:   '',
+  status:          'active',
 };
 
 const DepartmentsManagement = () => {
@@ -79,7 +81,7 @@ const DepartmentsManagement = () => {
           contact_person:  item.contact_person  || '',
           phone_number:    item.phone_number    || '',
           mobile_number:   item.mobile_number   || '',
-          status:          item.status          ?? 'active',
+          status:          String(item.status || 'active').toLowerCase(),
         })));
       } else {
         toast.error(result.message || 'Failed to load departments');
@@ -114,6 +116,7 @@ const DepartmentsManagement = () => {
       contact_person:  row.contact_person  || '',
       phone_number:    row.phone_number    || '',
       mobile_number:   row.mobile_number   || '',
+      status:          String(row.status || 'active').toLowerCase(),
     });
     setFormError('');
     setOpenModal(true);
@@ -139,6 +142,7 @@ const DepartmentsManagement = () => {
           contact_person:  formData.contact_person.trim(),
           phone_number:    formData.phone_number.trim(),
           mobile_number:   formData.mobile_number.trim(),
+          status:          formData.status,
         }),
       });
       const result   = await res.json();
@@ -172,6 +176,39 @@ const DepartmentsManagement = () => {
     } catch { toast.error('Server error while deleting department'); }
   };
 
+  const handleToggleStatus = async (row) => {
+    const currentStatus = String(row.status || 'active').toLowerCase();
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    if (!await confirmStatus({ newStatus })) return;
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/settings/departments/${row.hash_id || row.id}/update`,
+        {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            department_name: row.department_name,
+            contact_person: row.contact_person || '',
+            phone_number: row.phone_number || '',
+            mobile_number: row.mobile_number || '',
+            status: newStatus,
+          }),
+        }
+      );
+      const result = await res.json();
+
+      if (res.ok || result.success || result.status === 200) {
+        toast.success(`Department marked as ${newStatus}`);
+        fetchAll();
+      } else {
+        toast.error(result.message || 'Status update failed');
+      }
+    } catch {
+      toast.error('Server error while updating department status');
+    }
+  };
+
   const columns = [
     { field: 'sr_no',           headerName: '#',               width: 60 },
     { field: 'department_name', headerName: 'Department Name', flex: 1, minWidth: 200 },
@@ -181,6 +218,21 @@ const DepartmentsManagement = () => {
       renderCell: (p) => p.value || <span className="text-slate-400 text-xs">N/A</span> },
     { field: 'phone_number',    headerName: 'Phone',           width: 140,
       renderCell: (p) => p.value || <span className="text-slate-400 text-xs">N/A</span> },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: (p) => (
+        <Switch
+          checked={String(p.value || '').toLowerCase() === 'active'}
+          onChange={() => handleToggleStatus(p.row)}
+          inputProps={{ 'aria-label': 'toggle department status' }}
+          size="small"
+          disabled={!canEdit}
+          color={String(p.value || '').toLowerCase() === 'active' ? 'success' : 'error'}
+        />
+      ),
+    },
     ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
@@ -277,6 +329,20 @@ const DepartmentsManagement = () => {
               }}
               inputProps={{ inputMode: 'numeric', maxLength: 11 }}
               placeholder="03XXXXXXXXX" />
+            <TextField
+              select
+              fullWidth
+              label="Status"
+              margin="normal"
+              size="small"
+              value={formData.status}
+              onChange={(e) =>
+                setFormData((f) => ({ ...f, status: e.target.value }))
+              }
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
             <button onClick={() => setOpenModal(false)} disabled={saving}
