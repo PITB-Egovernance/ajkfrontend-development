@@ -136,8 +136,11 @@ const DesignationsManagement = () => {
       if (result.success === true || result.status === 200) {
         const dataArray = result.data?.data || result.data || [];
 
-          const formatted = dataArray.map((item) => {
-          return {
+        const formatted = dataArray
+          .filter(
+            (item) => String(item.type || "").toLowerCase() === "internal"
+          )
+          .map((item) => ({
             id: item.hash_id,
             hash_id: item.hash_id,
             name: item.name,
@@ -145,8 +148,7 @@ const DesignationsManagement = () => {
             grade_name: item.grade?.name || item.grade_name || "",
             type: item.type,
             status: item.status ?? "active",
-          };
-        });
+          }));
 
         setRows(formatted);
         setTotal(result.data?.total || formatted.length);
@@ -248,8 +250,14 @@ const DesignationsManagement = () => {
     return;
   }
 
+  if (!formData.type) {
+    toast.error("Designation type is required");
+    return;
+  }
+
   setLoading(true);
 
+  console.log("Designation payload", formData)
   try {
     const isUpdate = !!editingDesignation;
 
@@ -283,7 +291,7 @@ const DesignationsManagement = () => {
       body: JSON.stringify({
         name: formData.name,
         grade_id: formData.grade_id,
-        type: "Internal",
+        type: formData.type,
         status: formData.status,
       }),
     });
@@ -347,7 +355,12 @@ const DesignationsManagement = () => {
       const res    = await fetch(`${API_BASE}/settings/designations/${row.hash_id || row.id}/update`, {
         method: "POST",
         headers: getHeaders(),
-        body: JSON.stringify({ name: row.name, grade_id: row.grade_id, type: "Internal", status: newStatus }),
+        body: JSON.stringify({
+          name: row.name,
+          grade_id: row.grade_id,
+          type: row.type || "Internal",
+          status: newStatus,
+        }),
       });
       const result = await res.json();
       if (res.ok || result.status === 200 || result.success) {
@@ -526,7 +539,7 @@ const DesignationsManagement = () => {
                 setFormData({
                   name: selectedRow.name || "",
                   grade_id: String(selectedRow.grade_id ?? selectedRow.grade?.id ?? ""),
-                  type: selectedRow.type || "",
+                  type: selectedRow.type || "Internal",
                   status: selectedRow.status || "active",
                 });
 
@@ -592,7 +605,21 @@ const DesignationsManagement = () => {
               ))}
             </TextField>
 
-            {/* Type Field */}
+            {/* Designation Type Dropdown */}
+            <TextField
+              select
+              required
+              fullWidth
+              label="Designation Type"
+              margin="normal"
+              value={formData.type}
+              onChange={(e) =>
+                setFormData({ ...formData, type: e.target.value })
+              }
+            >
+              <MenuItem value="Internal">Internal</MenuItem>
+              <MenuItem value="External">External</MenuItem>
+            </TextField>
 
 
             {/* Status is now managed only via the row Switch toggle in the

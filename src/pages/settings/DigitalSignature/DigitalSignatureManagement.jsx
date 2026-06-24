@@ -155,7 +155,8 @@ const DigitalSignatureManagement = () => {
         Array.isArray(data)
           ? data.filter(
               (d) =>
-                !d.wings &&
+                String(d.type || "").toLowerCase() === "internal" &&
+                String(d.status || "active").toLowerCase() === "active" &&
                 !["chairman", "secretary"].includes(d.name?.toLowerCase())
             )
           : []

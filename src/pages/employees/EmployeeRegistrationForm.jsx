@@ -132,6 +132,9 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
         if (desigResult.success) {
           setDesignationOptions(
             (desigResult.data?.data ?? desigResult.data ?? [])
+              .filter(
+                (d) => String(d.type || '').toLowerCase() === 'internal'
+              )
               .filter((d) => !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
               .map((d) => {
                 let wingName = '';

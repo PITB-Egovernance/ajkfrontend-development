@@ -151,11 +151,17 @@ const ExamCentersManagement = () => {
       const result = await res.json();
       if (result.status === 200 || result.success) {
         const data = result.data?.data ?? result.data ?? [];
-        setCities(data.map((c) => ({
-          hash_id:     c.hash_id || c.id,
-          city:        c.city || c.name,
-          district_id: c.district_id || null,
-        })));
+        setCities(
+          data
+            .filter(
+              (c) => String(c.status || "active").toLowerCase() === "active"
+            )
+            .map((c) => ({
+              hash_id:     c.hash_id || c.id,
+              city:        c.city || c.name,
+              district_id: c.district_id || null,
+            }))
+        );
       }
     } catch {}
   };
