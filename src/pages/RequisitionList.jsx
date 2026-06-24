@@ -43,6 +43,23 @@ const hasDraftIdentity = (row) => {
   return Boolean(row?.temp_id) || Boolean(row?.current_step);
 };
 
+const getRequisitionSource = (status) => {
+  const normalized = String(status || "").trim().toLowerCase();
+
+  if (
+    normalized.includes("department") ||
+    normalized.includes("received from")
+  ) {
+    return "department";
+  }
+
+  if (normalized.includes("admin") || normalized.includes("created by")) {
+    return "admin";
+  }
+
+  return "";
+};
+
 const RequisitionList = () => {
   // Action-level permissions for the current role.
   const canAdd = hasPermission(`${PERM}.add`);
@@ -59,6 +76,7 @@ const RequisitionList = () => {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [localDraftMeta, setLocalDraftMeta] = useState(null);
+  const [requisitionSourceTab, setRequisitionSourceTab] = useState("admin");
   // Grades list — fetched once on mount from /settings/grades so the
   // "Scale" column can display the actual grade name (e.g. "BPS-17")
   // rather than the raw hash_id stored in the requisition record.
@@ -275,6 +293,10 @@ const RequisitionList = () => {
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
+      if (getRequisitionSource(row.requisition_status) !== requisitionSourceTab) {
+        return false;
+      }
+
       if (
         filters.id &&
         !String(row.id).toLowerCase().includes(filters.id.toLowerCase())
@@ -313,7 +335,24 @@ const RequisitionList = () => {
       }
       return true;
     });
-  }, [rows, filters]);
+  }, [rows, filters, requisitionSourceTab]);
+
+  const sourceCounts = useMemo(
+    () => ({
+      admin: rows.filter(
+        (row) => getRequisitionSource(row.requisition_status) === "admin",
+      ).length,
+      department: rows.filter(
+        (row) => getRequisitionSource(row.requisition_status) === "department",
+      ).length,
+    }),
+    [rows],
+  );
+
+  const handleSourceTabChange = (tab) => {
+    setRequisitionSourceTab(tab);
+    setPaginationModel((current) => ({ ...current, page: 0 }));
+  };
 
   const handleMenuOpen = (event, row) => {
     setAnchorEl(event.currentTarget);
@@ -699,7 +738,225 @@ const RequisitionList = () => {
           filterConfig={filterConfig}
         />
 
+        {/* <div className="bg-white rounded-lg shadow-sm mt-4">
+          <div className="grid w-full grid-cols-2 overflow-hidden rounded-t-lg bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950">
+            {[
+              {
+                value: "admin",
+                label: "Admin",
+                count: sourceCounts.admin,
+              },
+              {
+                value: "department",
+                label: "Department",
+                count: sourceCounts.department,
+              },
+            ].map((tab) => {
+              const isActive = requisitionSourceTab === tab.value;
+
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => handleSourceTabChange(tab.value)}
+                  className={`flex w-full items-center justify-center px-5 py-3 text-sm font-semibold transition-all ${
+                    isActive
+                      ? "text-white"
+                      : ""
+                  }`}
+                >
+                  {tab.label}
+                  <span
+                    className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
+                      isActive
+                        ? "text-white"
+                        : ""
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ width: "100%", height: "auto" }}>
+            {loading ? (
+              <InlineLoader
+                text="Loading requisitions..."
+                variant="ring"
+                size="lg"
+              />
+            ) : error ? (
+              <div className="text-red-600 text-center py-8">
+                Error: {error}
+              </div>
+            ) : (
+              <TooltipDataGrid
+                rows={filteredRows}
+                columns={columns}
+                getRowId={(row) => row.id}
+                paginationModel={paginationModel}
+                onPaginationModelChange={setPaginationModel}
+                pageSizeOptions={[10, 25, 50]}
+                paginationMode="server"
+                rowCount={total}
+                loading={loading}
+                disableRowSelectionOnClick
+                autoHeight
+                sx={{
+                  border: "none",
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "#f8fafc",
+                    borderBottom: "1px solid #e2e8f0",
+                  },
+                  "& .MuiDataGrid-cell": {
+                    borderBottom: "1px solid #f1f5f9",
+                  },
+                  "& .MuiDataGrid-row:hover": {
+                    backgroundColor: "#f8fafc",
+                  },
+                  "& .MuiDataGrid-columnHeaderTitle": {
+                    fontWeight: "bold",
+                    color: "#475569",
+                  },
+                }}
+              />
+            )}
+          </div>
+        </div> */}
+        {/* <div className="bg-white rounded-lg shadow-sm mt-4">
+          <div className="grid w-full grid-cols-2 overflow-hidden rounded-t-lg bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 p-1">
+            {[
+              {
+                value: "admin",
+                label: "Admin",
+                count: sourceCounts.admin,
+              },
+              {
+                value: "department",
+                label: "Department",
+                count: sourceCounts.department,
+              },
+            ].map((tab) => {
+              const isActive = requisitionSourceTab === tab.value;
+
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => handleSourceTabChange(tab.value)}
+                  className={`flex w-full items-center justify-center rounded-md px-5 py-3 text-sm font-semibold transition-all duration-200 ${
+                    isActive
+                      ? "bg-white text-emerald-900 shadow-sm"
+                      : "text-white hover:bg-white/10"
+                  }`}
+                >
+                  {tab.label}
+
+                  <span
+                    className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
+                      isActive
+                        ? "bg-emerald-100 text-emerald-900"
+                        : "bg-white/20 text-white"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ width: "100%", height: "auto" }}>
+            {loading ? (
+              <InlineLoader
+                text="Loading requisitions..."
+                variant="ring"
+                size="lg"
+              />
+            ) : error ? (
+              <div className="text-red-600 text-center py-8">
+                Error: {error}
+              </div>
+            ) : (
+              <TooltipDataGrid
+                rows={filteredRows}
+                columns={columns}
+                getRowId={(row) => row.id}
+                paginationModel={paginationModel}
+                onPaginationModelChange={setPaginationModel}
+                pageSizeOptions={[10, 25, 50]}
+                paginationMode="server"
+                rowCount={total}
+                loading={loading}
+                disableRowSelectionOnClick
+                autoHeight
+                sx={{
+                  border: "none",
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "#f8fafc",
+                    borderBottom: "1px solid #e2e8f0",
+                  },
+                  "& .MuiDataGrid-cell": {
+                    borderBottom: "1px solid #f1f5f9",
+                  },
+                  "& .MuiDataGrid-row:hover": {
+                    backgroundColor: "#f8fafc",
+                  },
+                  "& .MuiDataGrid-columnHeaderTitle": {
+                    fontWeight: "bold",
+                    color: "#475569",
+                  },
+                }}
+              />
+            )}
+          </div>
+        </div> */}
+
         <div className="bg-white rounded-lg shadow-sm mt-4">
+          <div className="grid w-full grid-cols-2 overflow-hidden rounded-t-lg bg-white p-1">
+            {[
+              {
+                value: "admin",
+                label: "Admin",
+                count: sourceCounts.admin,
+              },
+              {
+                value: "department",
+                label: "Department",
+                count: sourceCounts.department,
+              },
+            ].map((tab) => {
+              const isActive = requisitionSourceTab === tab.value;
+
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => handleSourceTabChange(tab.value)}
+                  className={`flex w-full items-center justify-center rounded-md px-5 py-3 text-sm font-semibold transition-all duration-200 ${
+                    isActive
+                      ? "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-sm"
+                      : "bg-white text-emerald-900 hover:bg-emerald-50"
+                  }`}
+                >
+                  {tab.label}
+
+                  <span
+                    className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
+                      isActive
+                        ? "bg-white/20 text-white"
+                        : "bg-emerald-100 text-emerald-900"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           <div style={{ width: "100%", height: "auto" }}>
             {loading ? (
               <InlineLoader

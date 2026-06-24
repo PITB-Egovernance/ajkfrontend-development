@@ -93,7 +93,7 @@ const AdvertisementDetail = () => {
 
   const fetchTestTypes = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/tests`, {
+      const response = await fetch(`${API_BASE}/settings/test-types?per_page=200`, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
           Accept: "application/json",
@@ -107,7 +107,7 @@ const AdvertisementDetail = () => {
           id: String(t.hash_id || t.id),
           numeric_id: t.id ? String(t.id) : '',
           hash_id: t.hash_id ? String(t.hash_id) : '',
-          name: t.test_name || t.name || t.title || 'N/A',
+          name: t.name || t.test_name || t.title || 'N/A',
         })));
       }
     } catch (error) {
@@ -460,10 +460,11 @@ const AdvertisementDetail = () => {
           object-fit: contain;
         }
         .adv-gov {
-          font-size: 11px;
+          font-size: 14px;
           letter-spacing: .18em;
           text-transform: uppercase;
-          color: #555;
+          color: #14532d;
+          font-weight: 800;
         }
         .adv-org {
           font-family: Georgia, "Times New Roman", serif;
@@ -474,8 +475,9 @@ const AdvertisementDetail = () => {
           letter-spacing: .01em;
         }
         .adv-seat {
-          font-size: 11.5px;
-          color: #555;
+          font-size: 13px;
+          color: #14532d;
+          font-weight: 800;
         }
         .adv-web {
           font-size: 11.5px;
@@ -907,7 +909,7 @@ const AdvertisementDetail = () => {
             />
 
             <div className="adv-gov">
-              Azad Government of the State &amp; of Jammu & Kashmir
+              Azad Government of the State of Jammu &amp; Kashmir
             </div>
 
             <div className="adv-seat">Jalalabad, Muzaffarabad</div>
@@ -963,6 +965,9 @@ const AdvertisementDetail = () => {
                     job.exam_test_type ||
                     job.exam_type
                   );
+                  const isCceExamType = /cce|combined|competitive/i.test(
+                    examTypeName
+                  );
 
                   const cceStageName = getCceStageName(
                     job.pivot?.cce_stage ||
@@ -994,7 +999,9 @@ const AdvertisementDetail = () => {
                           <tr>
                             <td>
                               <span className="adv-m-lbl">Case No.</span>
-                              <span className="adv-m-val">{job.hash_id || 'N/A'}</span>
+                              <span className="adv-m-val">
+                                {job.hash_id || 'N/A'}
+                              </span>
                             </td>
 
                             <td>
@@ -1043,21 +1050,18 @@ const AdvertisementDetail = () => {
                           </tr>
 
                           <tr>
-                            <td>
-                              <span className="adv-m-lbl">CCE Stage</span>
-                              <span className="adv-m-val">{cceStageName}</span>
-                            </td>
+                            {isCceExamType && (
+                              <td>
+                                <span className="adv-m-lbl">CCE Stage</span>
+                                <span className="adv-m-val">{cceStageName}</span>
+                              </td>
+                            )}
 
-                            <td>
+                            <td colSpan={isCceExamType ? 2 : 3}>
                               <span className="adv-m-lbl">Total Marks</span>
                               <span className="adv-m-val">
                                 {job.pivot?.total_marks || job.total_marks || 'N/A'}
                               </span>
-                            </td>
-
-                            <td>
-                              <span className="adv-m-lbl">Exam Category</span>
-                              <span className="adv-m-val">{examTypeName}</span>
                             </td>
                           </tr>
 
@@ -1077,7 +1081,7 @@ const AdvertisementDetail = () => {
                       </table>
 
                       {/* Subjects Section */}
-                      {jobSubjects && jobSubjects.length > 0 && (
+                      {/* {jobSubjects && jobSubjects.length > 0 && (
                         <div
                           className="adv-qual"
                           style={{
@@ -1147,7 +1151,7 @@ const AdvertisementDetail = () => {
                             </tfoot>
                           </table>
                         </div>
-                      )}
+                      )} */}
 
                       <div className="adv-qual">
                         <span className="adv-q-lbl">Qualification</span>
