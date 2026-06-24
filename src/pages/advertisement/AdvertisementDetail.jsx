@@ -128,6 +128,22 @@ const AdvertisementDetail = () => {
   };
 
   /* ── HELPERS & MEMO ── */
+  // Build a map of job_id → subjects from the advertisement's jobSubjects
+  const subjectsByJob = useMemo(() => {
+    if (!advertisement?.job_subjects) return {};
+    const map = {};
+    advertisement.job_subjects.forEach((js) => {
+      const jId = js.job_id;
+      if (!map[jId]) map[jId] = [];
+      map[jId].push({
+        hash_id: js.subject?.hash_id,
+        subject_name: js.subject?.subject_name,
+        marks: js.marks,
+      });
+    });
+    return map;
+  }, [advertisement]);
+
   const getDistrictName = (hashId) => {
     if (!hashId || districtOptions.length === 0) return hashId || "N/A";
     const district = districtOptions.find((d) => d.id === hashId);
@@ -838,6 +854,28 @@ const AdvertisementDetail = () => {
                             <span className="adv-m-lbl">Gender</span>
                             <span className="adv-m-val">{job.eligibility?.gender_basis || 'Male/Female'}</span>
                           </td>
+                          <td>
+                            <span className="adv-m-lbl">CCE Stage</span>
+                            <span className="adv-m-val">
+                              {job.pivot?.cce_stage
+                                ? job.pivot.cce_stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                : 'N/A'}
+                            </span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <span className="adv-m-lbl">Total Marks</span>
+                            <span className="adv-m-val">
+                              {job.pivot?.total_marks ? `${job.pivot.total_marks}` : 'N/A'}
+                            </span>
+                          </td>
+                          <td colSpan={2}>
+                            <span className="adv-m-lbl">Test Type</span>
+                            <span className="adv-m-val">
+                              {job.pivot?.test_type ? testTypeOptions.find(t => t.id === job.pivot.test_type)?.name || job.pivot.test_type : 'N/A'}
+                            </span>
+                          </td>
                         </tr>
                         {(() => {
                           const mt = job.eligibility?.merit_type || '';
@@ -857,6 +895,44 @@ const AdvertisementDetail = () => {
                         })()}
                       </tbody>
                     </table>
+                    {/* Subjects Section */}
+                    {(() => {
+                      const jobSubjects = subjectsByJob[job.id];
+                      if (!jobSubjects || jobSubjects.length === 0) return null;
+                      return (
+                        <div className="adv-qual" style={{ borderTop: '1px solid #8a958a', padding: '8px 12px', background: '#f8faf8' }}>
+                          <span className="adv-q-lbl" style={{ display: 'block', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: '#14532d', fontWeight: 700, marginBottom: '4px' }}>
+                            Subjects & Marks
+                          </span>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                            <thead>
+                              <tr style={{ background: '#e8f0ea' }}>
+                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>#</th>
+                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>Subject</th>
+                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'right', fontWeight: 600 }}>Marks</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {jobSubjects.map((subj, sIdx) => (
+                                <tr key={sIdx}>
+                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'center', color: '#555' }}>{sIdx + 1}</td>
+                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px' }}>{subj.subject_name || subj.hash_id || 'N/A'}</td>
+                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'right', fontWeight: 600 }}>{subj.marks}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr style={{ background: '#e8f0ea' }}>
+                                <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'center', fontWeight: 700 }} colSpan={2}>Total</td>
+                                <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'right', fontWeight: 700 }}>
+                                  {jobSubjects.reduce((sum, s) => sum + (s.marks || 0), 0)}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      );
+                    })()}
                     <div className="adv-qual">
                       <span className="adv-q-lbl">Qualification</span>
                       <p>{getQualificationText(job)}</p>
