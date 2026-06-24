@@ -218,7 +218,7 @@ function App() {
           <Route path="settings/roles/:hashId/edit" element={<RoleForm />} />
           <Route path="settings/department-users" element={<DepartmentUserList />} />
           <Route path="settings/department-users/create" element={<DepartmentUserForm />} />
-          <Route path="settings/terms-conditions/" element={<TermsAndConditionsManagement />} />
+          <Route path="settings/terms-conditions/" element={<AddNotes />} />
 
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />
