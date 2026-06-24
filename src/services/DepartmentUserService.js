@@ -119,6 +119,30 @@ class DepartmentUserService {
     return result;
   }
 
+  /**
+   * Update department user profile (name, mobile, password).
+   * This hits the department-specific endpoint under /department/dept-users/update-profile/{hashId}.
+   */
+  static async updateProfile(hashId, payload) {
+    const response = await fetch(`${API_BASE}/department/dept-users/update-profile/${hashId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${AuthService.getToken()}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-KEY': Config.apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.success === false) {
+      throw result;
+    }
+
+    return result;
+  }
 
   static async delete(id) {
     const response = await fetch(`${API_BASE}/department-users/${id}/delete`, {
