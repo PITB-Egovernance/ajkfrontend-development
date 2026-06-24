@@ -311,7 +311,7 @@ const TestsManagement = () => {
           {canAdd && (
             <button onClick={openAdd}
               className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
-              <Plus size={15} /> Add Test Fee
+              <Plus size={15} /> Add Exam Fee
             </button>
           )}
         </div>
@@ -380,7 +380,7 @@ const TestsManagement = () => {
         </Menu>
 
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
-          <DialogTitle className="font-bold">{editing ? 'Update Test Fee' : 'Add Test Fee'}</DialogTitle>
+          <DialogTitle className="font-bold">{editing ? 'Update Exam Fee' : 'Add Exam Fee'}</DialogTitle>
           <DialogContent>
             {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
             <TextField fullWidth select required autoFocus label="Test Type" margin="normal" size="small"
@@ -404,7 +404,7 @@ const TestsManagement = () => {
             </button>
             <button onClick={handleSubmit} disabled={saving}
               className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white font-medium rounded-lg text-sm disabled:opacity-60">
-              {saving ? 'Saving…' : editing ? 'Update Test Fee' : 'Add Test Fee'}
+              {saving ? 'Saving…' : editing ? 'Update Exam Fee' : 'Add Exam Fee'}
             </button>
           </DialogActions>
         </Dialog>
