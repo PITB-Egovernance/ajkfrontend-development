@@ -30,6 +30,7 @@ const AdvertisementDetail = () => {
   const [districtOptions, setDistrictOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
   const [testTypeOptions, setTestTypeOptions] = useState([]);
+  const [subjectOptions, setSubjectOptions] = useState([]);
 
   const API_ROOT = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
   const API_BASE = Config.apiUrl;
@@ -42,6 +43,7 @@ const AdvertisementDetail = () => {
     fetchDistricts();
     fetchGrades();
     fetchTestTypes();
+    fetchSubjects();
   }, [id]);
 
   const fetchGrades = async () => {
@@ -59,10 +61,11 @@ const AdvertisementDetail = () => {
         setGradeOptions(
           list
             .filter((g) => (g.status ?? 'active') === 'active')
-            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+            .map((g) => ({ id: String(g.hash_id || g.id), name: g.name }))
         );
       }
     } catch (error) {
+      console.error("Error fetching grades:", error);
     }
   };
 
@@ -77,8 +80,9 @@ const AdvertisementDetail = () => {
       });
       const result = await response.json();
       if (result.success) {
-        setDistrictOptions(result.data.data.map((d) => ({
-          id: d.hash_id,
+        const list = result.data?.data ?? result.data ?? [];
+        setDistrictOptions(list.map((d) => ({
+          id: String(d.hash_id || d.id),
           name: d.name,
         })));
       }
@@ -97,15 +101,42 @@ const AdvertisementDetail = () => {
         },
       });
       const result = await response.json();
-      if (result.success) {
+      if (result.success || result.status === 200) {
         const list = result.data?.data ?? result.data ?? [];
         setTestTypeOptions(list.map((t) => ({
-          id: t.hash_id || String(t.id),
-          name: t.test_name,
+          id: String(t.hash_id || t.id),
+          numeric_id: t.id ? String(t.id) : '',
+          hash_id: t.hash_id ? String(t.hash_id) : '',
+          name: t.test_name || t.name || t.title || 'N/A',
         })));
       }
     } catch (error) {
       console.error("Error fetching test types:", error);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/subjects?per_page=500`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: "application/json",
+          "X-API-KEY": API_KEY,
+        },
+      });
+      const result = await response.json();
+      if (result.success || result.status === 200) {
+        const list = result.data?.data ?? result.data ?? [];
+        setSubjectOptions(
+          list.map((s) => ({
+            id: String(s.id),
+            hash_id: s.hash_id ? String(s.hash_id) : '',
+            name: s.subject_name || s.name || s.title || 'N/A',
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
     }
   };
 
@@ -128,25 +159,138 @@ const AdvertisementDetail = () => {
   };
 
   /* ── HELPERS & MEMO ── */
-  // Build a map of job_id → subjects from the advertisement's jobSubjects
+
+  const toTitleCase = (value) => {
+    if (value === null || value === undefined || value === '') return 'N/A';
+    return String(value)
+      .replace(/_/g, ' ')
+      .replace(/-/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  const getTestTypeName = (rawTestType) => {
+    if (!rawTestType) return 'N/A';
+
+    if (typeof rawTestType === 'object') {
+      return (
+        rawTestType.test_name ||
+        rawTestType.name ||
+        rawTestType.title ||
+        rawTestType.hash_id ||
+        rawTestType.id ||
+        'N/A'
+      );
+    }
+
+    const str = String(rawTestType).trim();
+
+    const matched = testTypeOptions.find((t) =>
+      String(t.id) === str ||
+      String(t.numeric_id) === str ||
+      String(t.hash_id) === str ||
+      String(t.name).toLowerCase() === str.toLowerCase()
+    );
+
+    return matched ? matched.name : toTitleCase(str);
+  };
+
+  const getCceStageName = (rawStage) => {
+    if (!rawStage) return 'N/A';
+
+    const stageMap = {
+      screening: 'Screening',
+      screening_test: 'Screening',
+      written: 'Written Test',
+      written_test: 'Written Test',
+      written_exam: 'Written Test',
+    };
+
+    const key = String(rawStage).trim().toLowerCase();
+    return stageMap[key] || toTitleCase(rawStage);
+  };
+
+  const getSubjectName = (subject) => {
+    if (!subject) return 'N/A';
+
+    if (subject.subject_name) return subject.subject_name;
+    if (subject.name) return subject.name;
+
+    const subjectId = subject.id ? String(subject.id) : '';
+    const subjectHashId = subject.hash_id ? String(subject.hash_id) : '';
+    const subjectIdFromApi = subject.subject_id ? String(subject.subject_id) : '';
+
+    const matched = subjectOptions.find((s) =>
+      (subjectId && String(s.id) === subjectId) ||
+      (subjectId && String(s.hash_id) === subjectId) ||
+      (subjectHashId && String(s.hash_id) === subjectHashId) ||
+      (subjectHashId && String(s.id) === subjectHashId) ||
+      (subjectIdFromApi && String(s.id) === subjectIdFromApi) ||
+      (subjectIdFromApi && String(s.hash_id) === subjectIdFromApi)
+    );
+
+    return matched?.name || subjectHashId || subjectIdFromApi || subjectId || 'N/A';
+  };
+
+  // Build a map of job_id → subjects from advertisement job_subjects.
+  // Subject name is resolved from relation first, then /settings/subjects API fallback.
   const subjectsByJob = useMemo(() => {
-    if (!advertisement?.job_subjects) return {};
+    const rows = advertisement?.job_subjects || advertisement?.jobSubjects || [];
+    if (!Array.isArray(rows) || rows.length === 0) return {};
+
     const map = {};
-    advertisement.job_subjects.forEach((js) => {
-      const jId = js.job_id;
-      if (!map[jId]) map[jId] = [];
-      map[jId].push({
-        hash_id: js.subject?.hash_id,
-        subject_name: js.subject?.subject_name,
-        marks: js.marks,
+
+    rows.forEach((js) => {
+      const possibleJobKeys = [
+        js.job_id,
+        js.job?.id,
+        js.job?.hash_id,
+        js.job_hash_id,
+      ].filter((v) => v !== null && v !== undefined && v !== '');
+
+      possibleJobKeys.forEach((key) => {
+        const jId = String(key);
+
+        if (!map[jId]) map[jId] = [];
+
+        map[jId].push({
+          id: js.subject_id ? String(js.subject_id) : '',
+          subject_id: js.subject_id ? String(js.subject_id) : '',
+          hash_id: js.subject?.hash_id
+            ? String(js.subject.hash_id)
+            : (js.subject_hash_id ? String(js.subject_hash_id) : ''),
+          subject_name: js.subject?.subject_name || js.subject?.name || '',
+          name: js.subject?.subject_name || js.subject?.name || '',
+          marks: js.marks ?? js.total_marks ?? '',
+        });
       });
     });
+
     return map;
   }, [advertisement]);
 
+  const getJobSubjects = (job) => {
+    const possibleKeys = [
+      job.id,
+      job.job_id,
+      job.hash_id,
+      job.pivot?.job_id,
+      job.pivot?.id,
+    ]
+      .filter((v) => v !== null && v !== undefined && v !== '')
+      .map((v) => String(v));
+
+    for (const key of possibleKeys) {
+      if (subjectsByJob[key]?.length) return subjectsByJob[key];
+    }
+
+    return [];
+  };
+
   const getDistrictName = (hashId) => {
     if (!hashId || districtOptions.length === 0) return hashId || "N/A";
-    const district = districtOptions.find((d) => d.id === hashId);
+    const district = districtOptions.find((d) => String(d.id) === String(hashId));
     return district ? district.name : hashId;
   };
 
@@ -156,7 +300,7 @@ const AdvertisementDetail = () => {
       return rawScale.name || rawScale.hash_id || rawScale.id || 'N/A';
     }
     const str = String(rawScale).trim();
-    const matched = gradeOptions.find((g) => g.id === str || g.name === str);
+    const matched = gradeOptions.find((g) => String(g.id) === str || String(g.name) === str);
     return matched ? matched.name : str;
   };
 
@@ -183,43 +327,37 @@ const AdvertisementDetail = () => {
   const getQualificationText = (job) => {
     const q = job.qualification;
     if (!q) return 'N/A';
+
     const parts = [];
+
     if (q.academic_qualification) {
       parts.push(q.academic_qualification);
     }
+
     if (q.degree_equivalence) {
       parts.push(`Degree Equivalence: ${q.degree_equivalence}`);
     }
+
     if (q.experience_length) {
       const expType = q.experience_type === "4" ? "Professional" : "General";
       parts.push(`Experience: ${q.experience_length} Years (${expType})`);
     }
+
     if (q.training_institute) {
       parts.push(`Training Institute: ${q.training_institute}`);
     }
+
     return parts.join(' | ');
-  };
-
-  const getAttachmentLinks = (job) => {
-    const links = [];
-    if (job.service_rules) links.push({ label: 'Service Rules', url: getFileUrl(job.service_rules) });
-    if (job.syllabus) links.push({ label: 'Syllabus', url: getFileUrl(job.syllabus) });
-    if (job.requisition_form) links.push({ label: 'Requisition Form', url: getFileUrl(job.requisition_form) });
-    if (job.annex_a_form) links.push({ label: 'Annex-A Form', url: getFileUrl(job.annex_a_form) });
-    if (job.other_attachment) links.push({ label: 'Other Attachment', url: getFileUrl(job.other_attachment) });
-    return links;
-  };
-
-  const hasAttachments = (job) => {
-    return !!(job.service_rules || job.syllabus || job.requisition_form || job.annex_a_form || job.other_attachment);
   };
 
   const groupedJobs = useMemo(() => {
     if (!advertisement?.job_details) return [];
+
     const map = {};
+
     advertisement.job_details.forEach((job) => {
-      // Prioritize string check to prevent any optional chaining issues on primitive types
       let deptName = 'Other Department';
+
       if (typeof job.department === 'string' && job.department.trim() !== '') {
         deptName = job.department;
       } else if (job.department && typeof job.department === 'object') {
@@ -236,19 +374,20 @@ const AdvertisementDetail = () => {
         map[deptId] = {
           name: deptName,
           jobs: [],
-          totalPosts: 0
+          totalPosts: 0,
         };
       }
+
       map[deptId].jobs.push(job);
       map[deptId].totalPosts += Number(job.num_posts || 0);
     });
 
     const sortedGroups = Object.values(map);
 
-    // Sort departments alphabetically (case-insensitive) by department name
-    sortedGroups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    sortedGroups.sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    );
 
-    // Sort jobs within each department alphabetically (case-insensitive) by designation
     sortedGroups.forEach((group) => {
       group.jobs.sort((a, b) => {
         const desA = a.designation || '';
@@ -551,7 +690,8 @@ const AdvertisementDetail = () => {
           border-top: 1px solid #8a958a;
           background: #fff;
         }
-        .adv-qual .q-lbl {
+        .adv-qual .q-lbl,
+        .adv-qual .adv-q-lbl {
           display: block;
           font-size: 9px;
           letter-spacing: .1em;
@@ -699,7 +839,10 @@ const AdvertisementDetail = () => {
 
       <div className="mx-auto" style={{ maxWidth: '210mm' }}>
         {/* ── TOOLBAR SECTION (no-print) ── */}
-        <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-6" style={{ position: 'sticky', top: '72px', zIndex: 20 }}>
+        <div
+          className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-6"
+          style={{ position: 'sticky', top: '72px', zIndex: 20 }}
+        >
           <div className="flex items-center gap-4">
             <button 
               onClick={() => navigate('/dashboard/advertisement-records')}
@@ -708,30 +851,39 @@ const AdvertisementDetail = () => {
             >
               <ArrowLeft size={18} />
             </button>
+
             <div>
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
                   ID: {advertisement.hash_id}
                 </span>
+
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                   advertisement.publish_date
                     ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
                     : (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).className
                 }`}>
-                  {advertisement.publish_date ? 'Published' : (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).label}
+                  {advertisement.publish_date
+                    ? 'Published'
+                    : (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).label}
                 </span>
+
                 {advertisement.secretary_name && (
                   <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                     Secretary: {advertisement.secretary_name}
                   </span>
                 )}
+
                 {advertisement.publish_date && (
                   <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
                     Published: {formatDate(advertisement.publish_date)}
                   </span>
                 )}
               </div>
-              <h1 className="text-lg font-black text-slate-800">{advertisement.adv_number}</h1>
+
+              <h1 className="text-lg font-black text-slate-800">
+                {advertisement.adv_number}
+              </h1>
             </div>
           </div>
 
@@ -753,13 +905,17 @@ const AdvertisementDetail = () => {
               alt="Azad Jammu & Kashmir Crest" 
               className="adv-crest-img" 
             />
-            <div className="adv-gov">Azad Government of the State &amp; of Jammu & Kashmir</div>
-            <div className="adv-gov"></div>
-            {/* <div className="adv-org">Azad Jammu &amp; Kashmir Public Service Commission</div> */}
+
+            <div className="adv-gov">
+              Azad Government of the State &amp; of Jammu & Kashmir
+            </div>
+
             <div className="adv-seat">Jalalabad, Muzaffarabad</div>
             <div className="adv-web">https://ajkpsc.punjab.gov.pk/</div>
+
             <div className="adv-bar">
               <div className="adv-no">{advertisement.adv_number}</div>
+
               <div className="deadline">
                 Last date for receipt of applications
                 <b>{formatDate(advertisement.closing_date)}</b>
@@ -768,9 +924,12 @@ const AdvertisementDetail = () => {
           </div>
 
           <h3 className="adv-block-title">Important Note</h3>
+
           <ol className="adv-notes">
             {advertisement.important_notes ? (
-              <li style={{ whiteSpace: 'pre-line' }}>{advertisement.important_notes}</li>
+              <li style={{ whiteSpace: 'pre-line' }}>
+                {advertisement.important_notes}
+              </li>
             ) : (
               <li>
                 Applicants must apply <strong>online only</strong> through the Commission’s official website{' '}
@@ -788,169 +947,228 @@ const AdvertisementDetail = () => {
               <div className="adv-dept-lead">
                 <h2 className="adv-dept-head">
                   <span className="adv-dept-no">{deptIdx + 1}</span>
+
                   {dept.name}
+
                   <span className="adv-dept-total">
                     {dept.totalPosts} {dept.totalPosts === 1 ? 'post' : 'posts'}
                   </span>
                 </h2>
 
-                {dept.jobs.map((job, jobIdx) => (
-                  <article key={jobIdx} className="adv-post">
-                    <header className="adv-post-head">
-                      <div className="adv-post-title">
-                        <span className="sn">({getRomanNumeral(jobIdx + 1)})</span>
-                        <span className="ptitle">{job.designation}</span>
-                        <span className="bps">{getScaleName(job.scale)}</span>
-                      </div>
-                      <div className="adv-post-vacancies">
-                        <span className="vac-num">{String(job.num_posts).padStart(2, '0')}</span>
-                        <span className="vac-lbl">{job.num_posts === 1 ? 'Post' : 'Posts'}</span>
-                      </div>
-                    </header>
-                    <table className="adv-meta">
-                      <tbody>
-                        <tr>
-                          <td>
-                            <span className="adv-m-lbl">Case No.</span>
-                            <span className="adv-m-val">{job.hash_id || 'N/A'}</span>
-                          </td>
-                          <td>
-                            <span className="adv-m-lbl">Quota</span>
-                            <span className="adv-m-val">
-                              {(() => {
-                                const mt = job.eligibility?.merit_type || '';
-                                if (mt === 'open_merit') return 'Open Merit';
-                                if (mt === 'quota_wise') return 'Quota Base';
-                                return job.multiple_posts?.length > 0 ? 'Quota Base' : 'Open Merit';
-                              })()}
-                            </span>
-                          </td>
-                          <td>
-                            <span className="adv-m-lbl">Age Limit</span>
-                            <span className="adv-m-val">
-                              {job.eligibility?.min_age && job.eligibility?.max_age
-                                ? `${job.eligibility.min_age} \u2013 ${job.eligibility.max_age} years`
-                                : 'N/A'}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <span className="adv-m-lbl">Exam category</span>
-                            <span className="adv-m-val">
-                              {/* {job.pivot?.fee ? `Rs. ${Number(job.pivot.fee).toLocaleString()}/-` : 'Rs. 505/-'} */}
-                            </span>
-                          </td>
-                          <td>
-                            <span className="adv-m-lbl">Fee</span>
-                            <span className="adv-m-val">
-                              {job.pivot?.fee ? `Rs. ${Number(job.pivot.fee).toLocaleString()}/-` : 'Rs. 505/-'}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          
-                          <td>
-                            <span className="adv-m-lbl">Gender</span>
-                            <span className="adv-m-val">{job.eligibility?.gender_basis || 'Male/Female'}</span>
-                          </td>
-                          <td>
-                            <span className="adv-m-lbl">CCE Stage</span>
-                            <span className="adv-m-val">
-                              {job.pivot?.cce_stage
-                                ? job.pivot.cce_stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                : 'N/A'}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <span className="adv-m-lbl">Total Marks</span>
-                            <span className="adv-m-val">
-                              {job.pivot?.total_marks ? `${job.pivot.total_marks}` : 'N/A'}
-                            </span>
-                          </td>
-                          <td colSpan={2}>
-                            <span className="adv-m-lbl">Test Type</span>
-                            <span className="adv-m-val">
-                              {job.pivot?.test_type ? testTypeOptions.find(t => t.id === job.pivot.test_type)?.name || job.pivot.test_type : 'N/A'}
-                            </span>
-                          </td>
-                        </tr>
-                        {(() => {
-                          const mt = job.eligibility?.merit_type || '';
-                          const isMerit = mt === 'open_merit' || (!mt && !(job.multiple_posts?.length > 0));
-                          return (
-                            <tr>
-                              <td colSpan={3}>
-                                <span className="adv-m-lbl">District/Unit</span>
-                                <span className="adv-m-val">
-                                  {job.multiple_posts?.length > 0
-                                    ? job.multiple_posts.map(mp => `${getDistrictName(mp.district)} ${mp.post || ''}`).join(', ')
-                                    : districtOptions.map(d => d.name).join(', ') || 'All AJK Districts'}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })()}
-                      </tbody>
-                    </table>
-                    {/* Subjects Section */}
-                    {(() => {
-                      const jobSubjects = subjectsByJob[job.id];
-                      if (!jobSubjects || jobSubjects.length === 0) return null;
-                      return (
-                        <div className="adv-qual" style={{ borderTop: '1px solid #8a958a', padding: '8px 12px', background: '#f8faf8' }}>
-                          <span className="adv-q-lbl" style={{ display: 'block', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: '#14532d', fontWeight: 700, marginBottom: '4px' }}>
+                {dept.jobs.map((job, jobIdx) => {
+                  const jobSubjects = getJobSubjects(job);
+                  const examTypeName = getTestTypeName(
+                    job.pivot?.test_type ||
+                    job.test_type ||
+                    job.exam_test_type ||
+                    job.exam_type
+                  );
+
+                  const cceStageName = getCceStageName(
+                    job.pivot?.cce_stage ||
+                    job.cce_stage ||
+                    job.exam_stage
+                  );
+
+                  return (
+                    <article key={jobIdx} className="adv-post">
+                      <header className="adv-post-head">
+                        <div className="adv-post-title">
+                          <span className="sn">({getRomanNumeral(jobIdx + 1)})</span>
+                          <span className="ptitle">{job.designation}</span>
+                          <span className="bps">{getScaleName(job.scale)}</span>
+                        </div>
+
+                        <div className="adv-post-vacancies">
+                          <span className="vac-num">
+                            {String(job.num_posts || 0).padStart(2, '0')}
+                          </span>
+                          <span className="vac-lbl">
+                            {Number(job.num_posts) === 1 ? 'Post' : 'Posts'}
+                          </span>
+                        </div>
+                      </header>
+
+                      <table className="adv-meta">
+                        <tbody>
+                          <tr>
+                            <td>
+                              <span className="adv-m-lbl">Case No.</span>
+                              <span className="adv-m-val">{job.hash_id || 'N/A'}</span>
+                            </td>
+
+                            <td>
+                              <span className="adv-m-lbl">Quota</span>
+                              <span className="adv-m-val">
+                                {(() => {
+                                  const mt = job.eligibility?.merit_type || '';
+                                  if (mt === 'open_merit') return 'Open Merit';
+                                  if (mt === 'quota_wise') return 'Quota Base';
+                                  return job.multiple_posts?.length > 0 ? 'Quota Base' : 'Open Merit';
+                                })()}
+                              </span>
+                            </td>
+
+                            <td>
+                              <span className="adv-m-lbl">Age Limit</span>
+                              <span className="adv-m-val">
+                                {job.eligibility?.min_age && job.eligibility?.max_age
+                                  ? `${job.eligibility.min_age} \u2013 ${job.eligibility.max_age} years`
+                                  : 'N/A'}
+                              </span>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>
+                              <span className="adv-m-lbl">Exam Test Type</span>
+                              <span className="adv-m-val">{examTypeName}</span>
+                            </td>
+
+                            <td>
+                              <span className="adv-m-lbl">Fee</span>
+                              <span className="adv-m-val">
+                                {job.pivot?.fee
+                                  ? `Rs. ${Number(job.pivot.fee).toLocaleString()}/-`
+                                  : 'Rs. 505/-'}
+                              </span>
+                            </td>
+
+                            <td>
+                              <span className="adv-m-lbl">Gender</span>
+                              <span className="adv-m-val">
+                                {job.eligibility?.gender_basis || 'Male/Female'}
+                              </span>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>
+                              <span className="adv-m-lbl">CCE Stage</span>
+                              <span className="adv-m-val">{cceStageName}</span>
+                            </td>
+
+                            <td>
+                              <span className="adv-m-lbl">Total Marks</span>
+                              <span className="adv-m-val">
+                                {job.pivot?.total_marks || job.total_marks || 'N/A'}
+                              </span>
+                            </td>
+
+                            <td>
+                              <span className="adv-m-lbl">Exam Category</span>
+                              <span className="adv-m-val">{examTypeName}</span>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td colSpan={3}>
+                              <span className="adv-m-lbl">District/Unit</span>
+                              <span className="adv-m-val">
+                                {job.multiple_posts?.length > 0
+                                  ? job.multiple_posts
+                                      .map((mp) => `${getDistrictName(mp.district)} ${mp.post || ''}`)
+                                      .join(', ')
+                                  : districtOptions.map((d) => d.name).join(', ') || 'All AJK Districts'}
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      {/* Subjects Section */}
+                      {jobSubjects && jobSubjects.length > 0 && (
+                        <div
+                          className="adv-qual"
+                          style={{
+                            borderTop: '1px solid #8a958a',
+                            padding: '8px 12px',
+                            background: '#f8faf8',
+                          }}
+                        >
+                          <span
+                            className="adv-q-lbl"
+                            style={{
+                              display: 'block',
+                              fontSize: '9px',
+                              letterSpacing: '.1em',
+                              textTransform: 'uppercase',
+                              color: '#14532d',
+                              fontWeight: 700,
+                              marginBottom: '4px',
+                            }}
+                          >
                             Subjects & Marks
                           </span>
+
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                             <thead>
                               <tr style={{ background: '#e8f0ea' }}>
-                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>#</th>
-                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>Subject</th>
-                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'right', fontWeight: 600 }}>Marks</th>
+                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'center', fontWeight: 600 }}>
+                                  #
+                                </th>
+                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>
+                                  Subject
+                                </th>
+                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'right', fontWeight: 600 }}>
+                                  Marks
+                                </th>
                               </tr>
                             </thead>
+
                             <tbody>
                               {jobSubjects.map((subj, sIdx) => (
                                 <tr key={sIdx}>
-                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'center', color: '#555' }}>{sIdx + 1}</td>
-                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px' }}>{subj.subject_name || subj.hash_id || 'N/A'}</td>
-                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'right', fontWeight: 600 }}>{subj.marks}</td>
+                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'center', color: '#555' }}>
+                                    {sIdx + 1}
+                                  </td>
+                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px' }}>
+                                    {getSubjectName(subj)}
+                                  </td>
+                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'right', fontWeight: 600 }}>
+                                    {subj.marks || 0}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
+
                             <tfoot>
                               <tr style={{ background: '#e8f0ea' }}>
-                                <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'center', fontWeight: 700 }} colSpan={2}>Total</td>
+                                <td
+                                  style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'center', fontWeight: 700 }}
+                                  colSpan={2}
+                                >
+                                  Total
+                                </td>
                                 <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'right', fontWeight: 700 }}>
-                                  {jobSubjects.reduce((sum, s) => sum + (s.marks || 0), 0)}
+                                  {jobSubjects.reduce((sum, s) => sum + Number(s.marks || 0), 0)}
                                 </td>
                               </tr>
                             </tfoot>
                           </table>
                         </div>
-                      );
-                    })()}
-                    <div className="adv-qual">
-                      <span className="adv-q-lbl">Qualification</span>
-                      <p>{getQualificationText(job)}</p>
-                    </div>
+                      )}
 
-                    {job.remarks && (
-                      <div className="adv-post-note">
-                        <span>Note</span>
-                        {job.remarks}
+                      <div className="adv-qual">
+                        <span className="adv-q-lbl">Qualification</span>
+                        <p>{getQualificationText(job)}</p>
                       </div>
-                    )}
-                  </article>
-                ))}
+
+                      {job.remarks && (
+                        <div className="adv-post-note">
+                          <span>Note</span>
+                          {job.remarks}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             </section>
           ))}
 
           <h3 className="adv-block-title">Terms &amp; Conditions</h3>
+
           <ol className="adv-terms">
             {termsList.length > 0 ? (
               termsList.map((term, i) => (
@@ -964,9 +1182,21 @@ const AdvertisementDetail = () => {
           <div className="adv-signoff">
             <div className="sig">
               <div className="line"></div>
-              <div className="role">{advertisement.secretary_name ? `${advertisement.secretary_name}` : 'Secretary'}</div>
-              <div className="org2">Secretary, AJ&K Public Service Commission</div>
-              <div className="date">Dated: {advertisement.publish_date ? formatDate(advertisement.publish_date) : formatDate(advertisement.adv_date)}</div>
+
+              <div className="role">
+                {advertisement.secretary_name ? `${advertisement.secretary_name}` : 'Secretary'}
+              </div>
+
+              <div className="org2">
+                Secretary, AJ&K Public Service Commission
+              </div>
+
+              <div className="date">
+                Dated:{' '}
+                {advertisement.publish_date
+                  ? formatDate(advertisement.publish_date)
+                  : formatDate(advertisement.adv_date)}
+              </div>
             </div>
           </div>
 
@@ -984,4 +1214,3 @@ const AdvertisementDetail = () => {
 };
 
 export default AdvertisementDetail;
-

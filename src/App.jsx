@@ -6,14 +6,8 @@ import ProtectedRoute from 'middlewares/ProtectedRoute';
 import PublicRoute from 'middlewares/PublicRoute';
 import Register from 'pages/auth/Register/Register';
 import DashboardLayout from 'components/layouts/DashboardLayout';
-import DeptDashboardLayout from 'components/layouts/DeptDashboardLayout';
 import Profile from 'pages/profile/Profile';
-import DeptDashboard from 'pages/department/DeptDashboard';
-import DeptRequisitionList from 'pages/department/DeptRequisitionList';
-import DeptRequisitionForm from 'pages/department/DeptRequisitionForm';
-import DeptRequisitionEdit from 'pages/department/DeptRequisitionEdit';
-import DeptRequisitionPreview from 'pages/department/DeptRequisitionPreview';
-import DeptRequisitionDetail from 'pages/department/DeptRequisitionDetail';
+
 import RequisitionList from 'pages/RequisitionList';
 import RequisitionForm from 'pages/requisition/RequisitionForm';
 import RequisitionEdit from 'pages/requisition/RequisitionEdit';
@@ -304,23 +298,7 @@ function App() {
           />
         </Route>
 
-        {/* Department Portal Routes */}
-        <Route
-          path="/department"
-          element={
-            <ProtectedRoute>
-              <DeptDashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<DeptDashboard />} />
-          <Route path="requisitions" element={<DeptRequisitionList />} />
-          <Route path="requisitions/create" element={<DeptRequisitionForm />} />
-          <Route path="requisitions/edit/:id" element={<DeptRequisitionEdit />} />
-          <Route path="requisitions/preview/:tempId" element={<DeptRequisitionPreview />} />
-          <Route path="requisitions/:id" element={<DeptRequisitionDetail />} />
-          <Route path="profile" element={<Profile />} />
-        </Route>
+        
       </Routes>
     </Router>
   );
