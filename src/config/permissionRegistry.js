@@ -56,7 +56,7 @@ const MODULE_LABELS = {
   advertisement: 'Advertisement',
   myrequisitions: 'My Requisitions',
   approval_flow: 'Approval Flow',
-  workflow_tracking: 'Workflow Tracking',
+  // workflow_tracking: 'Workflow Tracking',
   result: 'Result',
   roll_number: 'Roll Number',
   settings: 'Settings',

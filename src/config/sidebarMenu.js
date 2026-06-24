@@ -59,13 +59,13 @@ export const MENU_ITEMS = [
     icon: Award,
     path: "/dashboard/results",
   },
-  {
-    id: "workflow-tracking",
-    label: "Workflow Tracking",
-    icon: CheckCircle,
-    path: "/dashboard/workflow-tracking",
-    roles: ["admin"],
-  },
+  // {
+  //   id: "workflow-tracking",
+  //   label: "Workflow Tracking",
+  //   icon: CheckCircle,
+  //   path: "/dashboard/workflow-tracking",
+  //   roles: ["admin"],
+  // },
   {
     id: "settings",
     label: "Settings",

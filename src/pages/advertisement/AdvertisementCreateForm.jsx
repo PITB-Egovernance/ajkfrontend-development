@@ -85,6 +85,10 @@ const AdvertisementCreateForm = () => {
 
         setSubjects(
           list
+            .filter(
+              (subject) =>
+                String(subject.status || "active").toLowerCase() === "active"
+            )
             .filter((subject) => subject.hash_id)
             .map((subject) => ({
               hash_id: String(subject.hash_id),
