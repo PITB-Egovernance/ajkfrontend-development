@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { TextField, MenuItem } from "@mui/material";
+import { Autocomplete, Checkbox, TextField, MenuItem } from "@mui/material";
 import { FileEdit, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
@@ -12,6 +12,11 @@ import "../job-creation/JobCreationForm.css";
 const FALLBACK_TESTS = [
   { id: '1', test_type_id: '1', test_name: 'MCQs',         test_fees: 505  },
   { id: '2', test_type_id: '2', test_name: 'Written Exam', test_fees: 1010 },
+];
+
+const CCE_STAGES = [
+  { value: 'screening', label: 'Screening' },
+  { value: 'written_test', label: 'Written Test' },
 ];
 
 const STATUS_OPTIONS = [
@@ -39,9 +44,72 @@ const AdvertisementEditForm = () => {
   const [jobConfigs, setJobConfigs] = useState({});
   const [examTests, setExamTests] = useState(FALLBACK_TESTS);
   const [testTypes, setTestTypes] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [status, setStatus] = useState("active");
   const [extendDate, setExtendDate] = useState("");
   const [isPublished, setIsPublished] = useState(false);
+
+
+  // Fetch subjects for Written Exam dropdown
+  useEffect(() => {
+    let aborted = false;
+
+    (async () => {
+      try {
+        const headers = {
+          Authorization: `Bearer ${AuthService.getToken()}`,
+          Accept: "application/json",
+          "X-API-KEY": Config.apiKey,
+        };
+
+        const fetchPage = async (page) => {
+          const res = await fetch(
+            `${Config.apiUrl}/settings/subjects?page=${page}&per_page=100`,
+            { method: "GET", headers }
+          );
+          const result = await res.json();
+
+          if (!res.ok) {
+            throw new Error(result.message || "Failed to load subjects");
+          }
+
+          return result.data ?? {};
+        };
+
+        const firstPage = await fetchPage(1);
+        const lastPage = Number(firstPage.last_page) || 1;
+        const remainingPages = await Promise.all(
+          Array.from({ length: Math.max(lastPage - 1, 0) }, (_, index) =>
+            fetchPage(index + 2)
+          )
+        );
+
+        if (aborted) return;
+
+        const list = [firstPage, ...remainingPages].flatMap((page) =>
+          Array.isArray(page.data) ? page.data : []
+        );
+
+        setSubjects(
+          list
+            .filter((subject) => subject.hash_id)
+            .map((subject) => ({
+              hash_id: String(subject.hash_id),
+              id: subject.id ? String(subject.id) : "",
+              name: subject.name || subject.subject_name || subject.title || "",
+              total_marks: Number(subject.total_marks) || 0,
+            }))
+            .filter((subject) => subject.hash_id && subject.name)
+        );
+      } catch {
+        setSubjects([]);
+      }
+    })();
+
+    return () => {
+      aborted = true;
+    };
+  }, []);
 
   // Fetch the active test types for the dropdown
   useEffect(() => {
@@ -113,6 +181,110 @@ const AdvertisementEditForm = () => {
     const rec = examTests.find((t) => (t.test_type_id || t.id) === typeId);
     return rec ? String(rec.test_fees) : "";
   };
+
+
+  const getTestTypeName = (typeId) => {
+    const option = testTypeOptions.find(
+      (t) => String(t.hash_id) === String(typeId)
+    );
+    return (option?.name || "").toLowerCase().trim();
+  };
+
+  const isWrittenTestType = (typeId) => {
+    const name = getTestTypeName(typeId);
+    return name.includes("written") && !name.includes("combined");
+  };
+
+  const isCombinedCompetitiveExam = (typeId) => {
+    const name = getTestTypeName(typeId);
+    return (
+      name.includes("combined") ||
+      name.includes("competitive") ||
+      name.includes("cce")
+    );
+  };
+
+  const normalizeSubjectIds = (subjectIds = []) =>
+    (Array.isArray(subjectIds) ? subjectIds : [])
+      .filter((value) => value !== null && value !== undefined && value !== "")
+      .map(String);
+
+  const subjectMatchesSelectedIds = (subject, subjectIds = []) => {
+    const selected = normalizeSubjectIds(subjectIds);
+
+    return selected.some(
+      (selectedId) =>
+        String(subject.hash_id || "") === selectedId ||
+        String(subject.id || "") === selectedId
+    );
+  };
+
+  const getSelectedSubjectMarks = (subjectIds = []) =>
+    subjects.reduce(
+      (total, subject) =>
+        subjectMatchesSelectedIds(subject, subjectIds)
+          ? total + subject.total_marks
+          : total,
+      0
+    );
+
+  const getJobSubjectRows = (data, job) => {
+    const rows = Array.isArray(data.job_subjects) ? data.job_subjects : [];
+    const jobs = Array.isArray(data.job_details) ? data.job_details : [];
+
+    /*
+      Important:
+      API response currently gives job_subjects with numeric job_id/subject_id,
+      but job_details id is hidden because of HasHashId model hidden id.
+      For a single-job advertisement, all job_subjects belong to that one job,
+      so return all rows as fallback.
+    */
+    if (jobs.length === 1 && rows.length > 0) {
+      return rows;
+    }
+
+    const jobHash = String(job.hash_id || "");
+    const jobNumericId = String(
+      job.id ||
+        job.real_id ||
+        job.numeric_id ||
+        job.job_detail_id ||
+        job.pivot?.job_detail_id ||
+        ""
+    );
+
+    return rows.filter((row) => {
+      const rowJobHash = String(
+        row.job_detail?.hash_id ||
+          row.job?.hash_id ||
+          row.job_detail_hash_id ||
+          row.job_hash_id ||
+          ""
+      );
+
+      const rowJobId = String(
+        row.job_detail_id ||
+          row.job_id ||
+          row.job?.id ||
+          row.job_detail?.id ||
+          ""
+      );
+
+      return (
+        (jobHash && rowJobHash && rowJobHash === jobHash) ||
+        (jobNumericId && rowJobId && rowJobId === jobNumericId)
+      );
+    });
+  };
+
+  const getSubjectIdFromRow = (row) =>
+    row.subject?.hash_id ||
+    row.subject_hash_id ||
+    row.subjectHashId ||
+    row.subject?.id ||
+    row.subject_id ||
+    row.hash_id ||
+    "";
   const [jobTitles, setJobTitles] = useState({});
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -147,18 +319,32 @@ const AdvertisementEditForm = () => {
             const jIds = [];
             const jTitles = {};
             const jConfigs = {};
-            data.job_details.forEach(job => {
-              const jobId = job.hash_id || job.id;
+            data.job_details.forEach((job) => {
+              const jobId = String(job.hash_id || job.id);
+              const subjectRows = getJobSubjectRows(data, job);
+              const subjectIds = subjectRows
+                .map(getSubjectIdFromRow)
+                .filter(Boolean)
+                .map(String);
+
+              const savedCceStage =
+                job.pivot?.cce_stage ||
+                subjectRows.find((row) => row.cce_stage)?.cce_stage ||
+                "";
+
               jIds.push(jobId);
               jTitles[jobId] = job.designation || `Job ${jobId}`;
               jConfigs[jobId] = {
                 fee: job.pivot?.fee || "",
                 // The saved test type may come back as a hash id, a *_id field, or a nested object
-                testType: job.pivot?.test_type_id
-                  || (job.pivot?.test_type && typeof job.pivot.test_type === 'object'
-                        ? (job.pivot.test_type.hash_id || job.pivot.test_type.id)
-                        : job.pivot?.test_type)
-                  || ""
+                testType:
+                  job.pivot?.test_type_id ||
+                  (job.pivot?.test_type && typeof job.pivot.test_type === "object"
+                    ? job.pivot.test_type.hash_id || job.pivot.test_type.id
+                    : job.pivot?.test_type) ||
+                  "",
+                subjectIds,
+                cceStage: savedCceStage,
               };
             });
             setSelectedIds(jIds);
@@ -204,15 +390,68 @@ const AdvertisementEditForm = () => {
 
     const filteredTerms = termsConditions.filter((t) => t.trim().length > 0);
 
+    if (filteredTerms.length === 0) {
+      toast.error("Please add at least one term & condition");
+      return;
+    }
+
+    for (const jobId of selectedIds) {
+      const config = jobConfigs[jobId] || {};
+
+      if (
+        isWrittenTestType(config.testType) &&
+        (!Array.isArray(config.subjectIds) || config.subjectIds.length === 0)
+      ) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          [`subject_${jobId}`]: [
+            "Please select at least one subject for Written Exam",
+          ],
+        }));
+        toast.error("Please select at least one subject for Written Exam");
+        return;
+      }
+
+      if (isCombinedCompetitiveExam(config.testType) && !config.cceStage) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          [`cce_stage_${jobId}`]: ["Please select CCE stage"],
+        }));
+        toast.error("Please select CCE stage");
+        return;
+      }
+    }
+
     setLoading(true);
     const loadingToast = toast.loading("Saving updates...");
 
     try {
       const feesPayload = {};
       const testTypesPayload = {};
+      const subjectsPayload = {};
+      const cceStagesPayload = {};
+      const validSubjectHashIds = new Set(
+        subjects.map((subject) => String(subject.hash_id))
+      );
+
       Object.keys(jobConfigs).forEach((jobId) => {
-        feesPayload[jobId] = jobConfigs[jobId].fee || "";
-        testTypesPayload[jobId] = jobConfigs[jobId].testType || "";
+        const config = jobConfigs[jobId] || {};
+
+        feesPayload[jobId] = config.fee || "";
+        testTypesPayload[jobId] = config.testType || "";
+
+        subjectsPayload[jobId] = isWrittenTestType(config.testType)
+          ? subjects
+              .filter((subject) =>
+                subjectMatchesSelectedIds(subject, config.subjectIds || [])
+              )
+              .map((subject) => String(subject.hash_id))
+              .filter((hashId) => validSubjectHashIds.has(hashId))
+          : [];
+
+        cceStagesPayload[jobId] = isCombinedCompetitiveExam(config.testType)
+          ? config.cceStage || ""
+          : "";
       });
 
       const payload = {
@@ -224,7 +463,9 @@ const AdvertisementEditForm = () => {
         status: isPublished ? status : "active",
         extend_date: status === "extend_date" ? (extendDate || null) : null,
         job_fees: JSON.stringify(feesPayload),
-        job_test_types: JSON.stringify(testTypesPayload)
+        job_test_types: JSON.stringify(testTypesPayload),
+        job_subjects: JSON.stringify(subjectsPayload),
+        job_cce_stages: JSON.stringify(cceStagesPayload),
       };
 
       const result = await AdvertisementApi.update(id, payload);
@@ -257,6 +498,44 @@ const AdvertisementEditForm = () => {
     },
     "& .MuiOutlinedInput-inputMultiline": {
       padding: "14px",
+    },
+  };
+
+  const subjectFieldSx = {
+    ...fieldSx,
+    width: "100%",
+    minWidth: 0,
+    "& .MuiOutlinedInput-root": {
+      minHeight: 56,
+      height: "auto",
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      padding: "8px 40px 8px 8px !important",
+    },
+    "& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)": {
+      height: "auto",
+    },
+    "& .MuiAutocomplete-tag": {
+      maxWidth: "calc(100% - 8px)",
+      margin: "3px",
+    },
+    "& .MuiChip-label": {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+    "& .MuiAutocomplete-input": {
+      minWidth: "140px !important",
+      padding: "7px 4px !important",
+    },
+    "@media (max-width: 600px)": {
+      "& .MuiAutocomplete-tag": {
+        maxWidth: "100%",
+      },
+      "& .MuiAutocomplete-input": {
+        width: "100% !important",
+        minWidth: "100% !important",
+      },
     },
   };
 
@@ -468,9 +747,23 @@ const AdvertisementEditForm = () => {
                                 [jobId]: {
                                   ...prev[jobId],
                                   testType: newType,
-                                  fee: newFee
+                                  fee: newFee,
+                                  subjectIds: isWrittenTestType(newType)
+                                    ? prev[jobId]?.subjectIds || []
+                                    : [],
+                                  cceStage: isCombinedCompetitiveExam(newType)
+                                    ? prev[jobId]?.cceStage || ""
+                                    : "",
                                 },
                               }));
+
+                              setFieldErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[`test_type_${jobId}`];
+                                delete next[`subject_${jobId}`];
+                                delete next[`cce_stage_${jobId}`];
+                                return next;
+                              });
                             }}
                             sx={fieldSx}
                             helperText="Choose the test type — fee auto-fills"
@@ -489,19 +782,181 @@ const AdvertisementEditForm = () => {
                             label="Application Fee (PKR)"
                             type="number"
                             value={jobConfigs[jobId]?.fee || ""}
-                            InputProps={{
-                              readOnly: true,
+                            onChange={(e) => {
+                              const value = e.target.value;
+
+                              setJobConfigs((prev) => ({
+                                ...prev,
+                                [jobId]: {
+                                  ...prev[jobId],
+                                  fee: value,
+                                },
+                              }));
                             }}
                             placeholder="Auto-filled from Test Type"
+                            inputProps={{ min: 0, step: "0.01" }}
                             sx={{
                               ...fieldSx,
                               "& .MuiInputBase-input": {
                                 backgroundColor: "#f8fafc",
-                              }
+                              },
                             }}
-                            helperText="Auto-filled from the chosen Test Type"
+                            error={!!fieldErrors?.[`fee_${jobId}`]}
+                            helperText={
+                              fieldErrors?.[`fee_${jobId}`]
+                                ? Array.isArray(fieldErrors[`fee_${jobId}`])
+                                  ? fieldErrors[`fee_${jobId}`].join(", ")
+                                  : fieldErrors[`fee_${jobId}`]
+                                : "Auto-filled from the chosen Test Type; editable if you need a different amount"
+                            }
                           />
                         </div>
+
+                        {isWrittenTestType(jobConfigs[jobId]?.testType) && (
+                          <>
+                            <div className="col-md-6 form-group">
+                              <Autocomplete
+                                multiple
+                                disableCloseOnSelect
+                                limitTags={2}
+                                options={subjects}
+                                sx={{ width: "100%", minWidth: 0 }}
+                                value={subjects.filter((subject) =>
+                                  subjectMatchesSelectedIds(
+                                    subject,
+                                    jobConfigs[jobId]?.subjectIds || []
+                                  )
+                                )}
+                                getOptionLabel={(option) => option.name}
+                                isOptionEqualToValue={(option, value) =>
+                                  option.hash_id === value.hash_id
+                                }
+                                onChange={(_, selectedSubjects) => {
+                                  setJobConfigs((prev) => ({
+                                    ...prev,
+                                    [jobId]: {
+                                      ...prev[jobId],
+                                      subjectIds: selectedSubjects.map(
+                                        (subject) => subject.hash_id
+                                      ),
+                                    },
+                                  }));
+
+                                  setFieldErrors((prev) => {
+                                    const next = { ...prev };
+                                    delete next[`subject_${jobId}`];
+                                    return next;
+                                  });
+                                }}
+                                renderOption={(props, option, { selected }) => (
+                                  <li {...props}>
+                                    <Checkbox
+                                      checked={selected}
+                                      size="small"
+                                      sx={{ mr: 1 }}
+                                    />
+                                    {option.name}
+                                    <span className="ml-auto pl-3 text-sm text-slate-500">
+                                      {option.total_marks} marks
+                                    </span>
+                                  </li>
+                                )}
+                                renderInput={(params) => (
+                                  <TextField
+                                    {...params}
+                                    label="Subjects"
+                                    placeholder="Search subjects..."
+                                    sx={subjectFieldSx}
+                                    error={!!fieldErrors?.[`subject_${jobId}`]}
+                                    helperText={
+                                      fieldErrors?.[`subject_${jobId}`]
+                                        ? Array.isArray(
+                                            fieldErrors[`subject_${jobId}`]
+                                          )
+                                          ? fieldErrors[`subject_${jobId}`].join(
+                                              ", "
+                                            )
+                                          : fieldErrors[`subject_${jobId}`]
+                                        : "Search and select subjects for Written Exam"
+                                    }
+                                  />
+                                )}
+                              />
+                            </div>
+
+                            <div className="col-md-6 form-group">
+                              <TextField
+                                fullWidth
+                                label="Total Marks"
+                                value={getSelectedSubjectMarks(
+                                  jobConfigs[jobId]?.subjectIds
+                                )}
+                                InputProps={{ readOnly: true }}
+                                sx={{
+                                  ...fieldSx,
+                                  "& .MuiOutlinedInput-input": {
+                                    backgroundColor: "#f8fafc",
+                                    fontWeight: 700,
+                                  },
+                                }}
+                                helperText="Total marks of selected subjects"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {isCombinedCompetitiveExam(
+                          jobConfigs[jobId]?.testType
+                        ) && (
+                          <div className="col-md-6 form-group">
+                            <TextField
+                              select
+                              fullWidth
+                              label="CCE Stage"
+                              value={jobConfigs[jobId]?.cceStage || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+
+                                setJobConfigs((prev) => ({
+                                  ...prev,
+                                  [jobId]: {
+                                    ...prev[jobId],
+                                    cceStage: value,
+                                  },
+                                }));
+
+                                setFieldErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next[`cce_stage_${jobId}`];
+                                  return next;
+                                });
+                              }}
+                              sx={fieldSx}
+                              error={!!fieldErrors?.[`cce_stage_${jobId}`]}
+                              helperText={
+                                fieldErrors?.[`cce_stage_${jobId}`]
+                                  ? Array.isArray(
+                                      fieldErrors[`cce_stage_${jobId}`]
+                                    )
+                                    ? fieldErrors[`cce_stage_${jobId}`].join(
+                                        ", "
+                                      )
+                                    : fieldErrors[`cce_stage_${jobId}`]
+                                  : "Select CCE stage"
+                              }
+                            >
+                              <MenuItem value="">
+                                <em>— Select CCE Stage —</em>
+                              </MenuItem>
+
+                              {CCE_STAGES.map((stage) => (
+                                <MenuItem key={stage.value} value={stage.value}>
+                                  {stage.label}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

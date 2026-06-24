@@ -85,8 +85,9 @@ const AdvertisementCreateForm = () => {
 
         setSubjects(
           list
+            .filter((subject) => subject.hash_id)
             .map((subject) => ({
-              hash_id: subject.hash_id || String(subject.id),
+              hash_id: String(subject.hash_id),
               name:
                 subject.name ||
                 subject.subject_name ||
@@ -479,6 +480,9 @@ const AdvertisementCreateForm = () => {
       const testTypesPayload = {};
       const subjectsPayload = {};
       const cceStagesPayload = {};
+      const validSubjectHashIds = new Set(
+        subjects.map((subject) => String(subject.hash_id))
+      );
 
       Object.keys(jobConfigs).forEach((jobId) => {
         const config = jobConfigs[jobId] || {};
@@ -487,7 +491,9 @@ const AdvertisementCreateForm = () => {
         testTypesPayload[jobId] = config.testType || "";
 
         subjectsPayload[jobId] = isWrittenTestType(config.testType)
-          ? config.subjectIds || []
+          ? (config.subjectIds || [])
+              .map(String)
+              .filter((hashId) => validSubjectHashIds.has(hashId))
           : [];
 
         cceStagesPayload[jobId] = isCombinedCompetitiveExam(
