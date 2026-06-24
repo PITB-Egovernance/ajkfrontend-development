@@ -303,7 +303,7 @@ const TestsManagement = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg"><ClipboardCheck size={22} className="text-emerald-700" /></div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Tests</h1>
+                <h1 className="text-2xl font-bold text-slate-900">Exam Fee</h1>
                 <p className="text-sm text-slate-500">Manage eligible tests and their fees for requisitions</p>
               </div>
             </div>

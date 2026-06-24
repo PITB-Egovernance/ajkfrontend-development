@@ -294,7 +294,7 @@ const TestTypesManagement = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg"><FileText size={22} className="text-emerald-700" /></div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Exam Test Types</h1>
+                <h1 className="text-2xl font-bold text-slate-900">Exam/Test Type</h1>
                 <p className="text-sm text-slate-500">Manage exam categories, marks and passing criteria</p>
               </div>
             </div>
@@ -302,7 +302,7 @@ const TestTypesManagement = () => {
           {canAdd && (
             <button onClick={openAdd}
               className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
-              <Plus size={15} /> Add Exam Test Type
+              <Plus size={15} /> Add Exam/Test Type
             </button>
           )}
         </div>
@@ -310,7 +310,7 @@ const TestTypesManagement = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-5">
-              <p className="text-sm text-blue-700 font-medium">Total Exam Test Types</p>
+              <p className="text-sm text-blue-700 font-medium">Total Exam/Test Types</p>
               <h2 className="text-3xl font-bold text-blue-900 mt-1">{total}</h2>
             </CardContent>
           </Card>
@@ -355,7 +355,7 @@ const TestTypesManagement = () => {
         </Menu>
 
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-          <DialogTitle className="font-bold">{editing ? 'Edit Exam Test Type' : 'Add Exam Test Type'}</DialogTitle>
+          <DialogTitle className="font-bold">{editing ? 'Edit Exam/Test Type' : 'Add Exam/Test Type'}</DialogTitle>
           <DialogContent>
             {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
             <TextField fullWidth autoFocus required label="Name" margin="normal" size="small"

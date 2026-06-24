@@ -16,7 +16,7 @@ import { hasPermission } from 'utils/permissions';
 const PERM = 'settings.department_users';
 
 const FILTER_CONFIG = [
-  { name: 'dept_user_name', label: 'Departmen Employee Name', type: 'text', placeholder: 'Filter by name' },
+  { name: 'dept_user_name', label: 'Focal Person', type: 'text', placeholder: 'Filter by name' },
   // { name: 'cnic', label: 'CNIC', type: 'text', placeholder: 'Filter by CNIC' },
   { name: 'email', label: 'Email', type: 'text', placeholder: 'Filter by email' },
   { name: 'mobile', label: 'Mobile', type: 'text', placeholder: 'Filter by mobile' },
@@ -206,7 +206,7 @@ const DepartmentUserList = () => {
   const inactiveCount = rows.filter((r) => r.status !== 'active').length;
 
   const columns = [
-    { field: 'dept_user_name', headerName: 'Department Employee Name', flex: 1, minWidth: 160 },
+    { field: 'dept_user_name', headerName: 'Focal Person', flex: 1, minWidth: 160 },
     { field: 'department', headerName: 'Department', flex: 0.8, minWidth: 150 },
     // { field: 'cnic', headerName: 'CNIC', flex: 0.8, minWidth: 150 },
     { field: 'email', headerName: 'Email', flex: 1, minWidth: 200 },

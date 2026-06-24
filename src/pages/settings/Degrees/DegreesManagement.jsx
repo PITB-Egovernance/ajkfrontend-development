@@ -162,7 +162,7 @@ const DegreesManagement = () => {
     { field: 'sr_no',        headerName: '#',          width: 60 },
     { field: 'degree_name',  headerName: 'Degree',     flex: 1 },
     { field: 'degree_group', headerName: 'Group',      width: 200,
-      renderCell: (p) => p.value || <span className="text-slate-400 text-xs">—</span> },
+      renderCell: (p) => p.value || <span className="text-slate-400 text-xs">N/A</span> },
     ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
@@ -247,11 +247,11 @@ const DegreesManagement = () => {
               value={form.degree_name}
               onChange={(e) => setForm((f) => ({ ...f, degree_name: e.target.value }))}
               placeholder="e.g. BSCS" />
-            <TextField fullWidth label="Degree Group" margin="normal" size="small"
+            <TextField fullWidth label="Degree Group (optional)" margin="normal" size="small"
               value={form.degree_group}
               onChange={(e) => setForm((f) => ({ ...f, degree_group: e.target.value }))}
               placeholder="e.g. Computer Science"
-              helperText="Group name for categorizing this degree" />
+              helperText="Optional group name for categorizing this degree" />
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button onClick={() => setOpen(false)} disabled={saving}

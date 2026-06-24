@@ -175,7 +175,7 @@ const DepartmentUserForm = () => {
                     )} />
                 </div>
                 <div className="col-md-6 form-group">
-                  <TextField fullWidth label="Department Employee Name" value={username}
+                  <TextField fullWidth label="Focal Person" value={username}
                     onChange={(e) => setUsername(e.target.value)} required sx={fieldSx}
                     error={!!fieldErrors?.username} helperText={fieldErrors?.username?.join(', ')} />
                 </div>

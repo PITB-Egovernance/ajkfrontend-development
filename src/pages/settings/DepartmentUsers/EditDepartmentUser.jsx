@@ -280,7 +280,7 @@ const CreateDepartmentUser = () => {
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
-                    label="Department Employee Name"
+                    label="Focal Person"
                     value={username}
                     onChange={(e) => {
                       setUsername(e.target.value);

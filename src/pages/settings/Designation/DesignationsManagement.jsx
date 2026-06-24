@@ -580,7 +580,9 @@ const DesignationsManagement = () => {
               }
             >
               {Array.isArray(grades) &&
-                grades.map((grade) => (
+                grades
+                  .filter((grade) => (grade.status ?? "active").toLowerCase() === "active")
+                  .map((grade) => (
                   <MenuItem
                     key={grade.id}
                     value={String(grade.id)}

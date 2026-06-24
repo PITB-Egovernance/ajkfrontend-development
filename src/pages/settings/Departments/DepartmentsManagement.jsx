@@ -123,6 +123,7 @@ const DepartmentsManagement = () => {
 
   const handleSubmit = async () => {
     if (!formData.department_name.trim()) { setFormError('Department name is required.'); return; }
+    if (!formData.phone_number.trim())    { setFormError('Phone number is required.'); return; }
     setSaving(true);
     setFormError('');
     try {
@@ -175,11 +176,11 @@ const DepartmentsManagement = () => {
     { field: 'sr_no',           headerName: '#',               width: 60 },
     { field: 'department_name', headerName: 'Department Name', flex: 1, minWidth: 200 },
     { field: 'contact_person',  headerName: 'Contact Person',  width: 180,
-      renderCell: (p) => p.value || <span className="text-slate-400 text-xs">—</span> },
+      renderCell: (p) => p.value || <span className="text-slate-400 text-xs">N/A</span> },
     { field: 'mobile_number',   headerName: 'Mobile',          width: 140,
-      renderCell: (p) => p.value || <span className="text-slate-400 text-xs">—</span> },
+      renderCell: (p) => p.value || <span className="text-slate-400 text-xs">N/A</span> },
     { field: 'phone_number',    headerName: 'Phone',           width: 140,
-      renderCell: (p) => p.value || <span className="text-slate-400 text-xs">—</span> },
+      renderCell: (p) => p.value || <span className="text-slate-400 text-xs">N/A</span> },
     ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
@@ -256,19 +257,19 @@ const DepartmentsManagement = () => {
           <DialogTitle className="font-bold">{editing ? 'Edit Department' : 'Add Department'}</DialogTitle>
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
-            <TextField fullWidth autoFocus label="Department Name" margin="normal" size="small"
+            <TextField fullWidth autoFocus required label="Department Name" margin="normal" size="small"
               value={formData.department_name}
               onChange={(e) => { setFormData((f) => ({ ...f, department_name: e.target.value })); setFormError(''); }}
               placeholder="e.g. Finance Department" />
-            <TextField fullWidth label="Contact Person" margin="normal" size="small"
+            <TextField fullWidth label="Contact Person (optional)" margin="normal" size="small"
               value={formData.contact_person}
               onChange={(e) => setFormData((f) => ({ ...f, contact_person: e.target.value }))}
               placeholder="e.g. Ali Khan" />
-            <TextField fullWidth label="Phone Number" margin="normal" size="small"
+            <TextField fullWidth required label="Phone Number" margin="normal" size="small"
               value={formData.phone_number}
-              onChange={(e) => setFormData((f) => ({ ...f, phone_number: e.target.value }))}
+              onChange={(e) => { setFormData((f) => ({ ...f, phone_number: e.target.value })); setFormError(''); }}
               placeholder="e.g. 05822-123456" />
-            <TextField fullWidth label="Mobile Number" margin="normal" size="small"
+            <TextField fullWidth label="Mobile Number (optional)" margin="normal" size="small"
               value={formData.mobile_number}
               onChange={(e) => {
                 const val = e.target.value.replace(/\D/g, '');
