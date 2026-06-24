@@ -52,7 +52,14 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         const result = await response.json();
         if (result.success || result.status === 200) {
           const degrees = Array.isArray(result.data?.data) ? result.data.data : result.data || [];
-          setAllDegrees(degrees);
+          setAllDegrees(
+            (Array.isArray(degrees) ? degrees : [])
+              .filter(Boolean)
+              .filter(
+                (degree) =>
+                  String(degree.status || 'active').toLowerCase() === 'active'
+              )
+          );
         }
       } catch (error) {
       } finally {

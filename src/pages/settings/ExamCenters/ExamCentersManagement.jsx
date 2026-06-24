@@ -115,7 +115,14 @@ const ExamCentersManagement = () => {
   const [selectedRow, setSelectedRow] = useState(null);
   const [openModal,   setOpenModal]   = useState(false);
   const [editingCenter, setEditingCenter] = useState(null);
-  const [formData, setFormData] = useState({ name: "", city: "", capacity: "", district_id: "", district_name: "" });
+  const [formData, setFormData] = useState({
+    name: "",
+    city: "",
+    capacity: "",
+    district_id: "",
+    district_name: "",
+    status: "active",
+  });
 
   /* ── FETCH ALL (client-side search needs full dataset) ── */
   const fetchCenters = async () => {
@@ -134,7 +141,7 @@ const ExamCentersManagement = () => {
           district_id: item.district_id || null,
           capacity:    item.capacity,
           created_at:  item.created_at,
-          status:      item.status ?? "active",
+          status:      String(item.status || "active").toLowerCase(),
         })));
       } else {
         toast.error(result.message || "Failed to load exam centers");
@@ -231,7 +238,14 @@ const ExamCentersManagement = () => {
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
   const openAdd = () => {
     setEditingCenter(null);
-    setFormData({ name: "", city: "", capacity: "", district_id: "", district_name: "" });
+    setFormData({
+      name: "",
+      city: "",
+      capacity: "",
+      district_id: "",
+      district_name: "",
+      status: "active",
+    });
     setOpenModal(true);
   };
 
@@ -245,6 +259,7 @@ const ExamCentersManagement = () => {
       capacity:      String(selectedRow.capacity ?? ""),
       district_id:   distId,
       district_name: distName,
+      status:        String(selectedRow.status || "active").toLowerCase(),
     });
     setOpenModal(true);
     handleMenuClose();
@@ -291,7 +306,16 @@ const ExamCentersManagement = () => {
     try {
       const isUpdate = !!editingCenter;
       const url = isUpdate ? `${API_BASE}/settings/exam-centers/${editingCenter.hash_id}/update` : `${API_BASE}/settings/exam-centers/store`;
-      const res = await fetch(url, { method: isUpdate ? "PUT" : "POST", headers: getHeaders(), body: JSON.stringify({ name: formData.name.trim(), city: formData.city.trim(), capacity: Number(formData.capacity) }) });
+      const res = await fetch(url, {
+        method: isUpdate ? "PUT" : "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          city: formData.city.trim(),
+          capacity: Number(formData.capacity),
+          status: formData.status,
+        }),
+      });
       const r   = await res.json();
       if (r.status === 200 || r.status === 201 || r.success) { toast.success(isUpdate ? "Updated" : "Created"); setOpenModal(false); fetchCenters(); }
       else toast.error(r.message || "Operation failed");
@@ -314,7 +338,8 @@ const ExamCentersManagement = () => {
   };
 
   const handleToggleStatus = async (row, currentStatus) => {
-    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    const normalizedStatus = String(currentStatus || "active").toLowerCase();
+    const newStatus = normalizedStatus === "active" ? "inactive" : "active";
     if (!await confirmStatus({ newStatus })) return;
     try {
       const res = await fetch(`${API_BASE}/settings/exam-centers/${row.hash_id || row.id}/update`, {
@@ -355,6 +380,21 @@ const ExamCentersManagement = () => {
       },
     },
     { field: "capacity",  headerName: "Capacity",    width: 100, renderCell: (p) => <span className="font-semibold text-slate-700">{Number(p.value).toLocaleString()}</span> },
+    {
+      field: "status",
+      headerName: "Status",
+      width: 130,
+      renderCell: (p) => (
+        <Switch
+          checked={String(p.value || "").toLowerCase() === "active"}
+          onChange={() => handleToggleStatus(p.row, p.value)}
+          inputProps={{ "aria-label": "toggle exam center status" }}
+          size="small"
+          disabled={!canEdit}
+          color={String(p.value || "").toLowerCase() === "active" ? "success" : "error"}
+        />
+      ),
+    },
     ...(canRowActions ? [{ field: "actions",   headerName: "Actions",     width: 75, sortable: false,
       renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> }] : []),
   ];
@@ -483,6 +523,20 @@ const ExamCentersManagement = () => {
               onChange={(e) => setFormData((p) => ({ ...p, capacity: e.target.value }))}
               placeholder="e.g. 500"
             />
+            <TextField
+              fullWidth
+              select
+              label="Status"
+              margin="normal"
+              size="small"
+              value={formData.status}
+              onChange={(e) =>
+                setFormData((p) => ({ ...p, status: e.target.value }))
+              }
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button type="button" onClick={() => setOpenModal(false)} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">Cancel</button>

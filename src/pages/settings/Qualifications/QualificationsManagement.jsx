@@ -9,6 +9,7 @@ import { Plus, ArrowLeft, MoreVertical, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
+import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
@@ -41,7 +42,10 @@ const QualificationsManagement = () => {
 
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
-  const [formName, setFormName] = useState('');
+  const [form, setForm] = useState({
+    qualification_name: '',
+    status: 'active',
+  });
   const [saving,   setSaving]   = useState(false);
   const [search,   setSearch]   = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
@@ -58,7 +62,7 @@ const QualificationsManagement = () => {
           sr_no:    i + 1,
           hash_id:  item.hash_id,
           name:     item.qualification_name || item.name,
-          status:   item.status ?? 'active',
+          status:   String(item.status || 'active').toLowerCase(),
         })));
       } else {
         toast.error(result.message || 'Failed to load qualifications');
@@ -74,11 +78,23 @@ const QualificationsManagement = () => {
     !search.trim() || r.name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const openAdd  = () => { setEditing(null); setFormName(''); setOpen(true); };
-  const openEdit = (row) => { setEditing(row); setFormName(row.name); setOpen(true); };
+  const openAdd = () => {
+    setEditing(null);
+    setForm({ qualification_name: '', status: 'active' });
+    setOpen(true);
+  };
+
+  const openEdit = (row) => {
+    setEditing(row);
+    setForm({
+      qualification_name: row.name || '',
+      status: String(row.status || 'active').toLowerCase(),
+    });
+    setOpen(true);
+  };
 
   const handleSubmit = async () => {
-    if (!formName.trim()) { toast.error('Qualification name is required'); return; }
+    if (!form.qualification_name.trim()) { toast.error('Qualification name is required'); return; }
     setSaving(true);
     try {
       const isUpdate = !!editing;
@@ -88,7 +104,10 @@ const QualificationsManagement = () => {
       const res    = await fetch(url, {
         method: isUpdate ? 'PUT' : 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ qualification_name: formName.trim() }),
+        body: JSON.stringify({
+          qualification_name: form.qualification_name.trim(),
+          status: form.status,
+        }),
       });
       const result = await res.json();
       if (result.success || result.status === 200 || result.status === 201) {
@@ -119,7 +138,10 @@ const QualificationsManagement = () => {
   };
 
   const handleToggle = async (row) => {
-    const newStatus = row.status === 'active' ? 'inactive' : 'active';
+    const currentStatus = String(row.status || 'active').toLowerCase();
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    if (!await confirmStatus({ newStatus })) return;
+
     try {
       const res    = await fetch(`${API_BASE}/settings/qualifications/${row.hash_id || row.id}/update`, {
         method: 'PUT',
@@ -139,6 +161,21 @@ const QualificationsManagement = () => {
   const columns = [
     { field: 'sr_no', headerName: '#',             width: 60 },
     { field: 'name',  headerName: 'Qualification',  flex: 1 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: (p) => (
+        <Switch
+          checked={String(p.value || '').toLowerCase() === 'active'}
+          onChange={() => handleToggle(p.row)}
+          inputProps={{ 'aria-label': 'toggle qualification status' }}
+          size="small"
+          disabled={!canEdit}
+          color={String(p.value || '').toLowerCase() === 'active' ? 'success' : 'error'}
+        />
+      ),
+    },
     ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
@@ -205,9 +242,28 @@ const QualificationsManagement = () => {
           <DialogTitle className="font-bold">{editing ? 'Edit Qualification' : 'Add Qualification'}</DialogTitle>
           <DialogContent>
             <TextField fullWidth autoFocus label="Qualification Name" margin="normal" size="small"
-              value={formName} onChange={(e) => setFormName(e.target.value)}
+              value={form.qualification_name}
+              onChange={(e) => setForm((current) => ({
+                ...current,
+                qualification_name: e.target.value,
+              }))}
               placeholder="e.g. Bachelor's Degree"
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} />
+            <TextField
+              select
+              fullWidth
+              label="Status"
+              margin="normal"
+              size="small"
+              value={form.status}
+              onChange={(e) => setForm((current) => ({
+                ...current,
+                status: e.target.value,
+              }))}
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button onClick={() => setOpen(false)} disabled={saving}

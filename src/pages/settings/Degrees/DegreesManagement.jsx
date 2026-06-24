@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField, IconButton, MenuItem, Dialog, DialogTitle,
-  DialogContent, DialogActions, Menu,
+  DialogContent, DialogActions, Menu, Switch,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, MoreVertical, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
+import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
@@ -26,7 +27,14 @@ const getHeaders = () => ({
   'X-API-KEY': Config.apiKey,
 });
 
-const emptyForm = { degree_name: '', degree_group: '' };
+const emptyForm = { degree_name: '', degree_group: '', status: 'active' };
+
+const getGroupName = (group) => {
+  if (typeof group === 'string') return group.trim();
+  if (!group || typeof group !== 'object') return '';
+
+  return String(group.degree_group || group.name || '').trim();
+};
 
 const DegreesManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);
@@ -47,6 +55,7 @@ const DegreesManagement = () => {
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
   const [form,    setForm]    = useState(emptyForm);
   const [saving,  setSaving]  = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
   const [search,  setSearch]  = useState('');
   const [filterGroup, setFilterGroup] = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
@@ -62,21 +71,29 @@ const DegreesManagement = () => {
 
       if (degData.success || degData.status === 200) {
         const data = degData.data?.data ?? degData.data ?? [];
-        setRows(data.map((item, i) => ({
-          id:          item.hash_id || item.id,
-          sr_no:       i + 1,
-          hash_id:     item.hash_id,
-          degree_name: item.degree_name || item.name,
-          degree_group: item.degree_group || '',
-          status:      item.status ?? 'active',
-        })));
+        setRows(
+          (Array.isArray(data) ? data : [])
+            .filter(Boolean)
+            .map((item, i) => ({
+              id:           item.hash_id || item.id,
+              sr_no:        i + 1,
+              hash_id:      item.hash_id,
+              degree_name:  item.degree_name || item.name || '',
+              degree_group: item.degree_group || '',
+              status:       String(item.status || 'active').toLowerCase(),
+            }))
+        );
       } else {
         toast.error(degData.message || 'Failed to load degrees');
       }
 
       if (grpData.success || grpData.status === 200) {
         const grpList = grpData.data?.data ?? grpData.data ?? [];
-        setGroups(Array.isArray(grpList) ? grpList : []);
+        setGroups(
+          (Array.isArray(grpList) ? grpList : [])
+            .map(getGroupName)
+            .filter(Boolean)
+        );
       }
     } catch { toast.error('Server error'); }
     finally { setLoading(false); }
@@ -94,7 +111,11 @@ const DegreesManagement = () => {
   const openAdd  = () => { setEditing(null); setForm(emptyForm); setOpen(true); };
   const openEdit = (row) => {
     setEditing(row);
-    setForm({ degree_name: row.degree_name, degree_group: row.degree_group || '' });
+    setForm({
+      degree_name: row.degree_name,
+      degree_group: row.degree_group || '',
+      status: String(row.status || 'active').toLowerCase(),
+    });
     setOpen(true);
   };
 
@@ -109,7 +130,11 @@ const DegreesManagement = () => {
       const res      = await fetch(url, {
         method: isUpdate ? 'PUT' : 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ degree_name: form.degree_name.trim(), degree_group: form.degree_group.trim() }),
+        body: JSON.stringify({
+          degree_name: form.degree_name.trim(),
+          degree_group: form.degree_group.trim(),
+          status: form.status,
+        }),
       });
       const result   = await res.json();
       if (result.success || result.status === 200 || result.status === 201) {
@@ -139,23 +164,43 @@ const DegreesManagement = () => {
     } catch { toast.error('Server error'); }
   };
 
-  /* eslint-disable-next-line no-unused-vars */ // kept for future status-toggle column
   const handleToggle = async (row) => {
-    const newStatus = row.status === 'active' ? 'inactive' : 'active';
+    const currentStatus = String(row.status || 'active').toLowerCase();
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    if (!await confirmStatus({ newStatus })) return;
+
+    const rowId = row.hash_id || row.id;
+    setTogglingId(rowId);
+
     try {
-      const res    = await fetch(`${API_BASE}/settings/degrees/${row.hash_id || row.id}/update`, {
+      const res = await fetch(`${API_BASE}/settings/degrees/${rowId}/update`, {
         method: 'PUT',
         headers: getHeaders(),
-        body: JSON.stringify({ degree_name: row.degree_name, degree_group: row.degree_group || '', status: newStatus }),
+        body: JSON.stringify({
+          degree_name: row.degree_name,
+          degree_group: row.degree_group || '',
+          status: newStatus,
+        }),
       });
       const result = await res.json();
+
       if (res.ok || result.success || result.status === 200) {
+        setRows((currentRows) =>
+          currentRows.map((degree) =>
+            (degree.hash_id || degree.id) === rowId
+              ? { ...degree, status: newStatus }
+              : degree
+          )
+        );
         toast.success(`Marked as ${newStatus}`);
-        fetchAll();
       } else {
         toast.error(result.message || 'Status update failed');
       }
-    } catch { toast.error('Server error'); }
+    } catch {
+      toast.error('Server error');
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const columns = [
@@ -163,6 +208,21 @@ const DegreesManagement = () => {
     { field: 'degree_name',  headerName: 'Degree',     flex: 1 },
     { field: 'degree_group', headerName: 'Group',      width: 200,
       renderCell: (p) => p.value || <span className="text-slate-400 text-xs">N/A</span> },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: (p) => (
+        <Switch
+          checked={String(p.value || '').toLowerCase() === 'active'}
+          onChange={() => handleToggle(p.row)}
+          inputProps={{ 'aria-label': 'toggle degree status' }}
+          size="small"
+          disabled={!canEdit || togglingId === (p.row.hash_id || p.row.id)}
+          color={String(p.value || '').toLowerCase() === 'active' ? 'success' : 'error'}
+        />
+      ),
+    },
     ...(canRowActions ? [{
       field: 'actions',
       headerName: 'Actions',
@@ -217,8 +277,8 @@ const DegreesManagement = () => {
             value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} sx={{ minWidth: 200 }}>
             <MenuItem value="">All Groups</MenuItem>
             {groups.map((g, i) => (
-              <MenuItem key={i} value={typeof g === 'string' ? g : g.degree_group || g.name}>
-                {typeof g === 'string' ? g : g.degree_group || g.name}
+              <MenuItem key={`${g}-${i}`} value={g}>
+                {g}
               </MenuItem>
             ))}
           </TextField>
@@ -252,6 +312,18 @@ const DegreesManagement = () => {
               onChange={(e) => setForm((f) => ({ ...f, degree_group: e.target.value }))}
               placeholder="e.g. Computer Science"
               helperText="Optional group name for categorizing this degree" />
+            <TextField
+              select
+              fullWidth
+              label="Status"
+              margin="normal"
+              size="small"
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button onClick={() => setOpen(false)} disabled={saving}
