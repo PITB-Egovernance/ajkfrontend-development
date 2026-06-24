@@ -33,6 +33,12 @@ const RequisitionPreview = () => {
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
   const API_KEY = Config.apiKey;
+  const getDocumentUrl = (path) => {
+    if (!path) return "";
+    if (/^https?:\/\//i.test(path)) return path;
+
+    return `https://api-admin-ajkpsc.punjab.gov.pk/${String(path).replace(/^\/+/, "")}`;
+  };
 
   useEffect(() => {
       fetchDistricts();
@@ -383,8 +389,8 @@ const RequisitionPreview = () => {
                   <TableCell sx={{ fontWeight: 'bold' }}>Service Rules</TableCell>
                   <TableCell>
                     {serviceRule ? (
-                      <a href={`https://api-admin-ajkpsc.punjab.gov.pk/${serviceRule}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">
-                        {`https://api-admin-ajkpsc.punjab.gov.pk/${serviceRule}`}
+                      <a href={getDocumentUrl(serviceRule)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        View Service Rules
                       </a>
                     ) : 'No service rule file uploaded yet'}
                   </TableCell>
@@ -397,8 +403,8 @@ const RequisitionPreview = () => {
                   <TableCell sx={{ fontWeight: 'bold' }}>Syllabus</TableCell>
                   <TableCell>
                     {syllabus ? (
-                      <a href={`https://api-admin-ajkpsc.punjab.gov.pk/${syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">
-                        {`https://api-admin-ajkpsc.punjab.gov.pk/${syllabus}`}
+                      <a href={getDocumentUrl(syllabus)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        View Syllabus
                       </a>
                     ) : 'No syllabus file uploaded yet'}
                   </TableCell>
