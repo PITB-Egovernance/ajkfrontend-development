@@ -9,8 +9,24 @@ import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
+import RequisitionStatementApi from 'api/requisitionStatementApi';
 import { extractFilePath, getPersistedDraftFilePath } from 'utils';
 import { isAdminUser } from 'utils/permissions';
+
+// Convert a 1-based index to a lowercase roman numeral (1 -> i, 2 -> ii, ...)
+const toRoman = (num) => {
+  const map = [
+    [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'],
+    [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'],
+    [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
+  ];
+  let n = num;
+  let result = '';
+  for (const [value, symbol] of map) {
+    while (n >= value) { result += symbol; n -= value; }
+  }
+  return result;
+};
 
 const RequisitionDetail = () => {
   const { id } = useParams();
@@ -23,6 +39,7 @@ const RequisitionDetail = () => {
   const [loading, setLoading] = useState(true);
   const [districtOptions, setDistrictOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
+  const [statements, setStatements] = useState([]);
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -32,8 +49,31 @@ const RequisitionDetail = () => {
     fetchRequisition();
     fetchDistricts();
     fetchGrades();
+    fetchStatements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const fetchStatements = async () => {
+    try {
+      const result = await RequisitionStatementApi.getAll();
+      const data = result.data?.data ?? result.data ?? [];
+      const active = (Array.isArray(data) ? data : [])
+        .filter((item) => (item.status ?? 'active') === 'active')
+        // ascending order (oldest first) so roman indexing reads i, ii, iii…
+        .sort((a, b) => {
+          const aKey = a.created_at ?? a.id ?? 0;
+          const bKey = b.created_at ?? b.id ?? 0;
+          if (aKey < bKey) return -1;
+          if (aKey > bKey) return 1;
+          return 0;
+        })
+        .map((item) => item.statement)
+        .filter(Boolean);
+      setStatements(active);
+    } catch {
+      setStatements([]);
+    }
+  };
 
   const fetchDistricts = async () => {
   try {
@@ -525,12 +565,8 @@ const RequisitionDetail = () => {
       
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      const certifications = [
-        '(i) The data given as mentioned above along with Annex "A" is correct in accordance with the official record and no vacant post is left un-mentioned till today in this requisition form.',
-        '(ii) That no vacant post under above mentioned category is left behind, which is still not filled on permanent basis through PSC and that all vacant posts fall vacant till today are incorporated in this requisition.',
-        '(iii) That the department is strictly following the Rule (3) of AJ&K Public Service Commission (Procedure) Rules, 1994 & decision of Supreme Court of Azad Jammu and Kashmir.'
-      ];
-      
+      const certifications = statements.map((statement, index) => `(${toRoman(index + 1)}) ${statement}`);
+
       certifications.forEach(cert => {
         const split = doc.splitTextToSize(cert, contentWidth);
         doc.text(split, marginLeft, yPosition);
@@ -829,9 +865,9 @@ const RequisitionDetail = () => {
 
         <div style={styles.certified}>
           <p style={{ marginBottom: '10px' }}><b>It is certified that:-</b></p>
-          <p style={{ marginBottom: '8px' }}>(i) The data given as mentioned above along with Annex "A" is correct in accordance with the official record and no vacant post is left un-mentioned till today in this requisition form.</p>
-          <p style={{ marginBottom: '8px' }}>(ii) That no vacant post under above mentioned category is left behind, which is still not filled on permanent basis through PSC and that all vacant posts fall vacant till today are incorporated in this requisition.</p>
-          <p style={{ marginBottom: '8px' }}>(iii) That the department is strictly following the Rule (3) of AJ&K Public Service Commission (Procedure) Rules, 1994 & decision of Supreme Court of Azad Jammu and Kashmir in "Raja Muhammad Waseem & others VS Azad Govt. & others" dated 03/04/2017 in this regard.</p>
+          {statements.map((statement, index) => (
+            <p key={index} style={{ marginBottom: '8px' }}>({toRoman(index + 1)}) {statement}</p>
+          ))}
         </div>
 
         <div style={styles.signature}>
