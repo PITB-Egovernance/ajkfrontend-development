@@ -87,6 +87,7 @@ export const MENU_ITEMS = [
       { label: "Companies",          path: "/dashboard/settings/companies",          icon: Package },
       { label: "Subjects",           path: "/dashboard/settings/subjects",           icon: BookOpen },
       { label: "Certificates",       path: "/dashboard/settings/certificates",       icon: Award },
+      { label: "Requisition Statements", path: "/dashboard/settings/requisition-statements", icon: ScrollText },
       { label: "Digital Signatures", path: "/dashboard/settings/digital-signatures", icon: PenTool },
       { label: "System Settings",    path: "/dashboard/settings/system-settings",    icon: UserCog },
       { label: "Wings / Sections",        path: "/dashboard/settings/wings",        icon: LayoutList },

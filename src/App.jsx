@@ -60,6 +60,7 @@ import MyRequisitionsQueue from 'pages/requisition/MyRequisitionsQueue';
 import SubjectManagement from 'pages/settings/Subject/SubjectManagement';
 import SubjectsSyllabus from 'pages/settings/Subject/SubjectsSyllabus';
 import CertificatesManagement from 'pages/settings/Certificates/CertificatesManagement';
+import RequisitionStatementsManagement from 'pages/settings/RequisitionStatements/RequisitionStatementsManagement';
 import DigitalSignatureManagement from 'pages/settings/DigitalSignature/DigitalSignatureManagement';
 import SystemSettings from 'pages/settings/SystemSettings/SystemSettings';
 import WingsManagement from 'pages/settings/Wings/WingsManagement';
@@ -207,6 +208,7 @@ function App() {
           {/* Public syllabus view (not in sidebar) — open directly via URL */}
           <Route path="settings/subjects-syllabus" element={<SubjectsSyllabus />} />
           <Route path="settings/certificates" element={<CertificatesManagement />} />
+          <Route path="settings/requisition-statements" element={<RequisitionStatementsManagement />} />
           <Route path="settings/digital-signatures" element={<DigitalSignatureManagement />} />
           <Route path="settings/system-settings" element={<SystemSettings />} />
           <Route path="settings/wings" element={<WingsManagement />} />
