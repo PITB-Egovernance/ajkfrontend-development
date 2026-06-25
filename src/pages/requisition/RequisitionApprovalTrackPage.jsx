@@ -91,7 +91,11 @@ const HeaderSection = ({ requisition, onBack, onDownload, onTrackApproval }) => 
         <div>
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-slate-900">{requisition.designation}</h1>
-            <StatusBadge status={requisition.overall_status} label={requisition.overall_status} />
+            {requisition.overall_status == "approved" ? 
+           (<StatusBadge status={requisition.status} label="Approved" />)
+          : requisition.overall_status == "rejected" ? (<StatusBadge status={requisition.status} label="Rejected" />)
+          : null
+          }
           </div>
           <div className="flex items-center gap-2 mt-2 text-sm text-slate-500 flex-wrap">
             <span>Request ID: {requisition.id_display}</span>
@@ -534,7 +538,12 @@ const RequestSummary = ({ requisition, gradeOptions }) => {
         ))}
         <div className="flex justify-between items-center gap-2 pt-1 border-t border-slate-100">
           <span className="text-sm text-slate-500">Current Status</span>
-          <StatusBadge status={requisition.status} label={requisition.status_label} />
+         
+          {requisition.status == "approved" ? 
+           (<StatusBadge status={requisition.status} label="Approved" />)
+          : requisition.status == "rejected" ? (<StatusBadge status={requisition.status} label="Rejected" />)
+          : null
+          }
         </div>
       </div>
     </div>

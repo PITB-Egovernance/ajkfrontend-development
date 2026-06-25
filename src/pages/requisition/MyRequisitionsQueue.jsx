@@ -22,6 +22,16 @@ const statusBadge = (status) => {
   return 'bg-slate-100 text-slate-600';
 };
 
+const getWorkflowStatusLabel = (workflowStatus, requisitionStatus) => {
+  const status = String(workflowStatus || '').trim().toLowerCase();
+
+  if (status === 'in_progress') return 'In Progress';
+  if (status === 'approved') return 'Approved';
+  if (status === 'rejected') return 'Rejected';
+
+  return requisitionStatus || '—';
+};
+
 const MyRequisitionsQueue = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState('assigned');
@@ -53,7 +63,7 @@ const MyRequisitionsQueue = () => {
         })(),
         case_number: r.case_number || r.hash_id || '—',
         current_step: r.current_step ?? '—',
-        status: r.workflow_status || r.requisition_status || '—',
+        status: getWorkflowStatusLabel(r.workflow_status, r.requisition_status),
         created_at: r.created_at ? new Date(r.created_at).toLocaleDateString() : '—',
       }));
       setRows(mapped);
