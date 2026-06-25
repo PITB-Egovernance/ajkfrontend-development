@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Autocomplete, Checkbox, TextField, MenuItem } from "@mui/material";
+import { Checkbox, TextField, MenuItem } from "@mui/material";
 import { FileEdit, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
@@ -231,6 +231,31 @@ const AdvertisementEditForm = () => {
           : total,
       0
     );
+
+  const toggleSubject = (jobId, subject) => {
+    setJobConfigs((prev) => {
+      const currentIds = normalizeSubjectIds(prev[jobId]?.subjectIds);
+      const aliases = [subject.hash_id, subject.id].filter(Boolean).map(String);
+      const isSelected = aliases.some((id) => currentIds.includes(id));
+      const withoutSubject = currentIds.filter((id) => !aliases.includes(id));
+
+      return {
+        ...prev,
+        [jobId]: {
+          ...prev[jobId],
+          subjectIds: isSelected
+            ? withoutSubject
+            : [...withoutSubject, subject.hash_id],
+        },
+      };
+    });
+
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[`subject_${jobId}`];
+      return next;
+    });
+  };
 
   const getJobSubjectRows = (data, job) => {
     const rows = Array.isArray(data.job_subjects) ? data.job_subjects : [];
@@ -502,44 +527,6 @@ const AdvertisementEditForm = () => {
     },
     "& .MuiOutlinedInput-inputMultiline": {
       padding: "14px",
-    },
-  };
-
-  const subjectFieldSx = {
-    ...fieldSx,
-    width: "100%",
-    minWidth: 0,
-    "& .MuiOutlinedInput-root": {
-      minHeight: 56,
-      height: "auto",
-      alignItems: "flex-start",
-      flexWrap: "wrap",
-      padding: "8px 40px 8px 8px !important",
-    },
-    "& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)": {
-      height: "auto",
-    },
-    "& .MuiAutocomplete-tag": {
-      maxWidth: "calc(100% - 8px)",
-      margin: "3px",
-    },
-    "& .MuiChip-label": {
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-    },
-    "& .MuiAutocomplete-input": {
-      minWidth: "140px !important",
-      padding: "7px 4px !important",
-    },
-    "@media (max-width: 600px)": {
-      "& .MuiAutocomplete-tag": {
-        maxWidth: "100%",
-      },
-      "& .MuiAutocomplete-input": {
-        width: "100% !important",
-        minWidth: "100% !important",
-      },
     },
   };
 
@@ -817,148 +804,137 @@ const AdvertisementEditForm = () => {
                         </div>
 
                         {isWrittenTestType(jobConfigs[jobId]?.testType) && (
-                          <>
-                            <div className="col-md-6 form-group">
-                              <Autocomplete
-                                multiple
-                                disableCloseOnSelect
-                                limitTags={2}
-                                options={subjects}
-                                sx={{ width: "100%", minWidth: 0 }}
-                                value={subjects.filter((subject) =>
-                                  subjectMatchesSelectedIds(
-                                    subject,
-                                    jobConfigs[jobId]?.subjectIds || []
-                                  )
-                                )}
-                                getOptionLabel={(option) => option.name}
-                                isOptionEqualToValue={(option, value) =>
-                                  option.hash_id === value.hash_id
-                                }
-                                onChange={(_, selectedSubjects) => {
-                                  setJobConfigs((prev) => ({
-                                    ...prev,
-                                    [jobId]: {
-                                      ...prev[jobId],
-                                      subjectIds: selectedSubjects.map(
-                                        (subject) => subject.hash_id
-                                      ),
-                                    },
-                                  }));
+                          <div className="col-md-12 form-group">
+                            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px] gap-4 items-stretch">
+                              <div className={`rounded-xl border bg-white overflow-hidden ${
+                                fieldErrors?.[`subject_${jobId}`] ? "border-red-400" : "border-slate-200"
+                              }`}>
+                                <div className="flex items-center justify-between gap-4 px-5 py-4 bg-slate-50 border-b border-slate-200">
+                                  <div>
+                                    <p className="text-sm font-semibold text-slate-800">Select Subjects</p>
+                                    <p className="mt-1 text-xs text-slate-500">Choose one or more subjects for the written exam</p>
+                                  </div>
+                                  <span className="shrink-0 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                                    {subjects.filter((subject) =>
+                                      subjectMatchesSelectedIds(subject, jobConfigs[jobId]?.subjectIds || [])
+                                    ).length} selected
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 max-h-80 overflow-y-auto">
+                                  {subjects.map((subject) => {
+                                    const checked = subjectMatchesSelectedIds(
+                                      subject,
+                                      jobConfigs[jobId]?.subjectIds || []
+                                    );
+                                    return (
+                                      <label
+                                        key={subject.hash_id}
+                                        className={`flex items-center gap-3 min-h-12 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                                          checked
+                                            ? "border-emerald-400 bg-emerald-50"
+                                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                        }`}
+                                      >
+                                        <Checkbox
+                                          checked={checked}
+                                          onChange={() => toggleSubject(jobId, subject)}
+                                          size="small"
+                                          sx={{ p: 0, color: "#10b981", "&.Mui-checked": { color: "#059669" } }}
+                                        />
+                                        <span className="min-w-0 flex-1 text-sm font-medium text-slate-700 leading-5">
+                                          {subject.name}
+                                        </span>
+                                        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 whitespace-nowrap">
+                                          {subject.total_marks} marks
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
 
-                                  setFieldErrors((prev) => {
-                                    const next = { ...prev };
-                                    delete next[`subject_${jobId}`];
-                                    return next;
-                                  });
-                                }}
-                                renderOption={(props, option, { selected }) => (
-                                  <li {...props}>
-                                    <Checkbox
-                                      checked={selected}
-                                      size="small"
-                                      sx={{ mr: 1 }}
-                                    />
-                                    {option.name}
-                                    <span className="ml-auto pl-3 text-sm text-slate-500">
-                                      {option.total_marks} marks
-                                    </span>
-                                  </li>
-                                )}
-                                renderInput={(params) => (
-                                  <TextField
-                                    {...params}
-                                    label="Subjects"
-                                    placeholder="Search subjects..."
-                                    sx={subjectFieldSx}
-                                    error={!!fieldErrors?.[`subject_${jobId}`]}
-                                    helperText={
-                                      fieldErrors?.[`subject_${jobId}`]
-                                        ? Array.isArray(
-                                            fieldErrors[`subject_${jobId}`]
-                                          )
-                                          ? fieldErrors[`subject_${jobId}`].join(
-                                              ", "
-                                            )
-                                          : fieldErrors[`subject_${jobId}`]
-                                        : "Search and select subjects for Written Exam"
-                                    }
-                                  />
-                                )}
-                              />
+                              <div className="flex min-h-[152px] flex-col justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-6">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Total Marks</p>
+                                <p className="mt-2 text-4xl font-bold text-emerald-900">
+                                  {getSelectedSubjectMarks(jobConfigs[jobId]?.subjectIds)}
+                                </p>
+                                <p className="mt-2 text-xs leading-5 text-emerald-700">
+                                  Sum of all selected subject marks
+                                </p>
+                              </div>
                             </div>
 
-                            <div className="col-md-6 form-group">
-                              <TextField
-                                fullWidth
-                                label="Total Marks"
-                                value={getSelectedSubjectMarks(
-                                  jobConfigs[jobId]?.subjectIds
-                                )}
-                                InputProps={{ readOnly: true }}
-                                sx={{
-                                  ...fieldSx,
-                                  "& .MuiOutlinedInput-input": {
-                                    backgroundColor: "#f8fafc",
-                                    fontWeight: 700,
-                                  },
-                                }}
-                                helperText="Total marks of selected subjects"
-                              />
-                            </div>
-                          </>
+                            <p className={`mt-2 text-xs ${
+                              fieldErrors?.[`subject_${jobId}`] ? "text-red-600" : "text-slate-500"
+                            }`}>
+                              {fieldErrors?.[`subject_${jobId}`]
+                                ? Array.isArray(fieldErrors[`subject_${jobId}`])
+                                  ? fieldErrors[`subject_${jobId}`].join(", ")
+                                  : fieldErrors[`subject_${jobId}`]
+                                : "Selected subject marks are added automatically."}
+                            </p>
+                          </div>
                         )}
 
                         {isCombinedCompetitiveExam(
                           jobConfigs[jobId]?.testType
                         ) && (
-                          <div className="col-md-6 form-group">
-                            <TextField
-                              select
-                              fullWidth
-                              label="CCE Stage"
-                              value={jobConfigs[jobId]?.cceStage || ""}
-                              onChange={(e) => {
-                                const value = e.target.value;
-
-                                setJobConfigs((prev) => ({
-                                  ...prev,
-                                  [jobId]: {
-                                    ...prev[jobId],
-                                    cceStage: value,
-                                  },
-                                }));
-
-                                setFieldErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next[`cce_stage_${jobId}`];
-                                  return next;
-                                });
-                              }}
-                              sx={fieldSx}
-                              error={!!fieldErrors?.[`cce_stage_${jobId}`]}
-                              helperText={
-                                fieldErrors?.[`cce_stage_${jobId}`]
-                                  ? Array.isArray(
-                                      fieldErrors[`cce_stage_${jobId}`]
-                                    )
-                                    ? fieldErrors[`cce_stage_${jobId}`].join(
-                                        ", "
-                                      )
-                                    : fieldErrors[`cce_stage_${jobId}`]
-                                  : "Select CCE stage"
-                              }
-                            >
-                              <MenuItem value="">
-                                <em>— Select CCE Stage —</em>
-                              </MenuItem>
-
-                              {CCE_STAGES.map((stage) => (
-                                <MenuItem key={stage.value} value={stage.value}>
-                                  {stage.label}
-                                </MenuItem>
-                              ))}
-                            </TextField>
+                          <div className="col-md-12 form-group">
+                            <div className={`rounded-xl border bg-white overflow-hidden ${
+                              fieldErrors?.[`cce_stage_${jobId}`] ? "border-red-400" : "border-slate-200"
+                            }`}>
+                              <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
+                                <p className="text-sm font-semibold text-slate-800">Select CCE Stage</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Choose one stage for the Combined Competitive Examination
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
+                                {CCE_STAGES.map((stage) => {
+                                  const checked = jobConfigs[jobId]?.cceStage === stage.value;
+                                  return (
+                                    <label
+                                      key={stage.value}
+                                      className={`flex items-center gap-3 min-h-12 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                                        checked
+                                          ? "border-emerald-400 bg-emerald-50"
+                                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                      }`}
+                                    >
+                                      <Checkbox
+                                        checked={checked}
+                                        onChange={() => {
+                                          setJobConfigs((prev) => ({
+                                            ...prev,
+                                            [jobId]: {
+                                              ...prev[jobId],
+                                              cceStage: checked ? "" : stage.value,
+                                            },
+                                          }));
+                                          setFieldErrors((prev) => {
+                                            const next = { ...prev };
+                                            delete next[`cce_stage_${jobId}`];
+                                            return next;
+                                          });
+                                        }}
+                                        size="small"
+                                        sx={{ p: 0, color: "#10b981", "&.Mui-checked": { color: "#059669" } }}
+                                      />
+                                      <span className="text-sm font-medium text-slate-700">{stage.label}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <p className={`mt-2 text-xs ${
+                              fieldErrors?.[`cce_stage_${jobId}`] ? "text-red-600" : "text-slate-500"
+                            }`}>
+                              {fieldErrors?.[`cce_stage_${jobId}`]
+                                ? Array.isArray(fieldErrors[`cce_stage_${jobId}`])
+                                  ? fieldErrors[`cce_stage_${jobId}`].join(", ")
+                                  : fieldErrors[`cce_stage_${jobId}`]
+                                : "Only one CCE stage can be selected."}
+                            </p>
                           </div>
                         )}
                       </div>

@@ -157,8 +157,7 @@ const DigitalSignatureManagement = () => {
           ? data.filter(
               (d) =>
                 String(d.type || "").toLowerCase() === "internal" &&
-                String(d.status || "active").toLowerCase() === "active" &&
-                !["chairman", "secretary"].includes(d.name?.toLowerCase())
+                String(d.status || "active").toLowerCase() === "active"
             )
           : []
       );

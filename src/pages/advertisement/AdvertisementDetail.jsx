@@ -31,6 +31,7 @@ const AdvertisementDetail = () => {
   const [gradeOptions, setGradeOptions] = useState([]);
   const [testTypeOptions, setTestTypeOptions] = useState([]);
   const [subjectOptions, setSubjectOptions] = useState([]);
+  const [secretarySignature, setSecretarySignature] = useState(null);
 
   const API_ROOT = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
   const API_BASE = Config.apiUrl;
@@ -44,7 +45,56 @@ const AdvertisementDetail = () => {
     fetchGrades();
     fetchTestTypes();
     fetchSubjects();
+    fetchSecretarySignature();
   }, [id]);
+
+  const resolveSignatureImage = (path) => {
+    if (!path) return null;
+    const imagePath = String(path).trim();
+    if (!imagePath) return null;
+    if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('data:')) return imagePath;
+    return `${API_ROOT}/${imagePath.replace(/^\/+/, '')}`;
+  };
+
+  const getDesignationName = (designation) => {
+    if (!designation) return '';
+    if (typeof designation === 'object') {
+      return designation.name || designation.designation_name || designation.title || '';
+    }
+    return String(designation);
+  };
+
+  const fetchSecretarySignature = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/digital-signature?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      const records = result.data?.data ?? result.data ?? [];
+      const secretary = (Array.isArray(records) ? records : []).find((record) => {
+        const designation = getDesignationName(
+          record.designation ?? record.designation_name
+        ).trim().toLowerCase();
+        const status = String(record.status ?? 'active').trim().toLowerCase();
+        return designation === 'secretary' && status === 'active';
+      });
+
+      setSecretarySignature(
+        secretary
+          ? {
+              name: secretary.name || '',
+              image: resolveSignatureImage(secretary.image ?? secretary.image_url),
+            }
+          : null
+      );
+    } catch {
+      setSecretarySignature(null);
+    }
+  };
 
   const fetchGrades = async () => {
     try {
@@ -730,11 +780,22 @@ const AdvertisementDetail = () => {
         }
         .adv-signoff .sig {
           text-align: center;
+          width: 220px;
+        }
+        .adv-signoff .sig .signature-image {
+          display: block;
+          width: 180px;
+          height: 72px;
+          object-fit: contain;
+          margin: 0 auto 4px;
         }
         .adv-signoff .sig .line {
           border-top: 1px solid #1a1a1a;
           width: 200px;
-          margin: 34px 0 4px;
+          margin: 4px auto;
+        }
+        .adv-signoff .sig .line.no-signature {
+          margin-top: 76px;
         }
         .adv-signoff .sig .role {
           font-weight: 700;
@@ -1185,10 +1246,17 @@ const AdvertisementDetail = () => {
 
           <div className="adv-signoff">
             <div className="sig">
-              <div className="line"></div>
+              {secretarySignature?.image && (
+                <img
+                  src={secretarySignature.image}
+                  alt="Secretary digital signature"
+                  className="signature-image"
+                />
+              )}
+              <div className={`line ${secretarySignature?.image ? '' : 'no-signature'}`}></div>
 
               <div className="role">
-                {advertisement.secretary_name ? `${advertisement.secretary_name}` : 'Secretary'}
+                {advertisement.secretary_name || secretarySignature?.name || 'Secretary'}
               </div>
 
               <div className="org2">
