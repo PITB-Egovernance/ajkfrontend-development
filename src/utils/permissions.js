@@ -16,11 +16,29 @@ const SUPER_ADMIN_NAMES = [
 ];
 
 // Locates the permissions object regardless of how the backend nests it.
-const getUserPermissions = (user) =>
-  user?.permissions ||
-  user?.role_permission?.permissions ||
-  user?.role?.permissions ||
-  {};
+const getUserPermissions = (user) => {
+  if (!user) return {};
+
+  // Resolved permissions from login / profile (Priority 1 & 2 merged by backend).
+  if (user.permissions && typeof user.permissions === 'object' && !Array.isArray(user.permissions)) {
+    return user.permissions;
+  }
+
+  // Flat resolved role_permission object (module → sub_module → actions).
+  if (user.role_permission && typeof user.role_permission === 'object' && !Array.isArray(user.role_permission)) {
+    if (user.role_permission.permissions && typeof user.role_permission.permissions === 'object') {
+      return user.role_permission.permissions;
+    }
+    // Heuristic: permission trees have nested objects, not role metadata keys.
+    const metaKeys = new Set(['role_name', 'role_id', 'hash_id', 'id', 'permissions', 'is_super_admin']);
+    const keys = Object.keys(user.role_permission);
+    if (keys.some((k) => !metaKeys.has(k))) {
+      return user.role_permission;
+    }
+  }
+
+  return user.role?.permissions || {};
+};
 
 /**
  * True if the user is an admin / super admin (full access, no restrictions).

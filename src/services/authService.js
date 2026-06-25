@@ -199,52 +199,36 @@ class AuthService {
     return user ? JSON.parse(user) : null;
   }
 
-  // Fetches the full authenticated user (incl. role_permission.permissions)
-  // and refreshes local storage. GET /user returns the raw record (role_permission
-  // not expanded), so we enrich it from /employee/list which returns the expanded
-  // { role_name, permissions } object.
+  // Fetches the authenticated user with resolved permissions from the backend.
   static async fetchCurrentUser() {
     const token = this.getToken();
     if (!token) return null;
+
     const headers = {
       Accept: "application/json",
       "X-API-KEY": API_KEY,
       Authorization: `Bearer ${token}`,
     };
 
-    let user = null;
-    try {
-      const res = await fetch(`${API_URL}/user`, { headers });
-      const result = await res.json().catch(() => null);
-      if (res.ok && result) user = result?.data?.user ?? result?.data ?? result;
-    } catch {
-      /* ignore */
-    }
-    if (!user || typeof user !== "object") return null;
+    const endpoints = [`${API_URL}/user`, `${API_URL}/profile`];
 
-    // If permissions aren't already expanded, enrich from the employee list.
-    const expanded =
-      user.role_permission && typeof user.role_permission === "object" && user.role_permission.permissions;
-    if (!expanded) {
+    for (const url of endpoints) {
       try {
-        const res = await fetch(`${API_URL}/employee/list?per_page=1000`, { headers });
+        const res = await fetch(url, { headers });
         const result = await res.json().catch(() => null);
-        const list = result?.data?.data ?? result?.data ?? [];
-        const match = Array.isArray(list)
-          ? list.find(
-              (e) =>
-                (user.hash_id && e.hash_id === user.hash_id) ||
-                (user.cnic && e.cnic === user.cnic)
-            )
-          : null;
-        if (match) user = { ...user, ...match };
+        if (!res.ok || !result) continue;
+
+        const user = result?.data?.user ?? result?.data ?? result?.user ?? null;
+        if (user && typeof user === "object" && (user.permissions || user.role_permission)) {
+          localStorage.setItem("user", JSON.stringify(user));
+          return user;
+        }
       } catch {
-        /* ignore — fall back to whatever /user returned */
+        /* try next endpoint */
       }
     }
 
-    localStorage.setItem("user", JSON.stringify(user));
-    return user;
+    return this.getUser();
   }
 
   static isAuthenticated() {
