@@ -6,10 +6,25 @@ import toast from 'react-hot-toast';
 import Config from '../../config/baseUrl';
 import AuthService from '../../services/authService';
 import EmployeeService from '../../services/EmployeeService';
-import { permissionsToLabels } from 'config/permissionModules';
+import PermissionMatrix from 'components/permissions/PermissionMatrix';
+import { PERMISSION_MODULES, buildEmptyPermissionsFrom } from 'config/permissionModules';
 import '../job-creation/JobCreationForm.css';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+
+// Merge a saved permissions object onto an empty matrix built from PERMISSION_MODULES.
+const buildPerms = (saved) => {
+  const base = buildEmptyPermissionsFrom(PERMISSION_MODULES);
+  const src = saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  Object.entries(src).forEach(([m, subs]) => {
+    if (!base[m]) return;
+    Object.entries(subs || {}).forEach(([s, acts]) => {
+      if (!base[m][s]) return;
+      Object.entries(acts || {}).forEach(([a, v]) => { if (a in base[m][s]) base[m][s][a] = v === true; });
+    });
+  });
+  return base;
+};
 
 // Date helpers — UI shows dd mm yyyy, API uses yyyy-mm-dd.
 const isoToDmy = (iso) => {
@@ -23,34 +38,6 @@ const dmyToIso = (dmy) => {
   const [, d, m, y] = match;
   return `${y}-${m}-${d}`;
 };
-
-// Custom input component that renders permission chips inside an MUI
-// OutlinedInput — gives the proper notched-outline + floating label look.
-const ChipsInput = React.forwardRef(function ChipsInput(props, ref) {
-  // Strip out native input-only props MUI forwards so they don't hit the div.
-  const { ownerState, permissions, ...rest } = props;
-  return (
-    <div
-      ref={ref}
-      {...rest}
-      style={{
-        display: 'flex', flexWrap: 'wrap', gap: 6,
-        minHeight: 36,
-        alignContent: 'flex-start', width: '100%',
-      }}
-    >
-      {permissions?.length > 0 ? (
-        permissions.map((p, i) => (
-          <Chip key={i} label={p} size="small"
-            sx={{ backgroundColor: '#ecfdf5', color: '#065f46', fontWeight: 500, fontSize: '12px' }} />
-        ))
-      ) : (
-        <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 14 }}>Select a role to see permissions</span>
-      )}
-    </div>
-  );
-});
-
 
 const mapApiErrors = (apiErrors = {}) => {
   const mapped = { ...apiErrors };
@@ -80,7 +67,11 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
   const [district, setDistrict] = useState(null);
   const [designation, setDesignation] = useState(null);
   const [selectedRole, setSelectedRole] = useState(null);
+  const [permissions, setPermissions] = useState(() => buildEmptyPermissionsFrom(PERMISSION_MODULES));
   const [selectedWings, setSelectedWings] = useState([]);
+  // Roles & Permissions section: "roles" to pick a role, "permissions" to view/edit
+  // the role's assigned permissions.
+  const [rolePermTab, setRolePermTab] = useState('roles');
 
   const [districtOptions, setDistrictOptions] = useState([]);
   const [designationOptions, setDesignationOptions] = useState([]);
@@ -172,7 +163,7 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
               .map((r) => ({
                 id: r.hash_id,
                 name: r.role_name,
-                permissions: permissionsToLabels(r.permissions),
+                rawPermissions: r.permissions,
               }))
           );
         }
@@ -240,17 +231,19 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
     // role: stored as role_permission { role_name, permissions } (no hash_id) — match by role_name.
     if (roleOptions.length) {
       const roleRaw = Array.isArray(e.role_permission) ? e.role_permission[0] : e.role_permission;
+      let foundRole = null;
       if (roleRaw && typeof roleRaw === 'object') {
         const hid = roleRaw.hash_id || roleRaw.id;
         const nm = String(roleRaw.role_name || roleRaw.name || '').toLowerCase();
-        setSelectedRole(
-          roleOptions.find((r) => (hid && r.id === hid) || (nm && r.name.toLowerCase() === nm)) || null
-        );
+        foundRole = roleOptions.find((r) => (hid && r.id === hid) || (nm && r.name.toLowerCase() === nm)) || null;
       } else if (roleRaw) {
-        setSelectedRole(
-          roleOptions.find((r) => r.id === roleRaw || r.name.toLowerCase() === String(roleRaw).toLowerCase()) || null
-        );
+        foundRole = roleOptions.find((r) => r.id === roleRaw || r.name.toLowerCase() === String(roleRaw).toLowerCase()) || null;
       }
+      setSelectedRole(foundRole);
+      // Pre-check the matrix from the employee's saved permissions if present,
+      // otherwise fall back to the role's default permissions.
+      const savedPerms = (roleRaw && typeof roleRaw === 'object' && roleRaw.permissions) || foundRole?.rawPermissions;
+      if (foundRole) setPermissions(buildPerms(savedPerms));
     }
 
     // wings: stored as `wings` array of { name, hash_id } — match by hash_id, fallback name.
@@ -322,6 +315,8 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
         designation: designation.id,
         grade: designation.gradeId || '',
         role_permission:selectedRole.id,
+        // Final permission matrix (role defaults + any manual check/uncheck).
+        permissions,
         wings: selectedWings,
       };
 
@@ -576,7 +571,7 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
                 </div>
               </div>
 
-              {/* Row 6: Wing + Role */}
+              {/* Row 6: Wing */}
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField fullWidth required select label="Wing" value={selectedWings}
@@ -622,42 +617,92 @@ const EmployeeRegistrationForm = ({ mode = 'create', employeeHashId = null, onSu
                     ))}
                   </TextField>
                 </div>
-                <div className="col-md-6 form-group">
-                  <Autocomplete
-                    options={roleOptions}
-                    getOptionLabel={(o) => o.name || ''}
-                    isOptionEqualToValue={(o, v) => o.id === v.id}
-                    value={selectedRole}
-                    onChange={(_, v) => setSelectedRole(v)}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Role" required sx={fieldSx}
-                        error={!!fieldErrors?.role} helperText={fieldErrors?.role?.join(', ')} />
+              </div>
+
+            </div>
+
+            {/* ─────────── Roles and Permissions ─────────── */}
+            <div className="row" style={{ margin: 0 }}>
+              <div className="col-md-12">
+                <h6 className="section-title">Roles and Permissions</h6>
+              </div>
+            </div>
+
+            <div className="mb-8 p-8 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full space-y-2">
+              {/* Tabs: Roles | Permissions */}
+              <div className="flex gap-1 mb-5 border-b border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setRolePermTab('roles')}
+                  className={`px-5 py-2.5 -mb-px text-sm font-semibold border-b-2 transition-colors ${
+                    rolePermTab === 'roles'
+                      ? 'border-emerald-700 text-emerald-800'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Roles
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRolePermTab('permissions')}
+                  className={`px-5 py-2.5 -mb-px text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+                    rolePermTab === 'permissions'
+                      ? 'border-emerald-700 text-emerald-800'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Permissions
+                  {selectedRole && (
+                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[11px] font-bold rounded">
+                      {selectedRole.name}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Roles tab — select a role */}
+              {rolePermTab === 'roles' && (
+                <div className="row">
+                  <div className="col-md-6 form-group">
+                    <Autocomplete
+                      options={roleOptions}
+                      getOptionLabel={(o) => o.name || ''}
+                      isOptionEqualToValue={(o, v) => o.id === v.id}
+                      value={selectedRole}
+                      onChange={(_, v) => {
+                        setSelectedRole(v);
+                        // Pre-check the matrix with the selected role's permissions.
+                        setPermissions(v ? buildPerms(v.rawPermissions) : buildEmptyPermissionsFrom(PERMISSION_MODULES));
+                        // Jump to the Permissions tab so the role's permissions are visible.
+                        if (v) setRolePermTab('permissions');
+                      }}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Role" required sx={fieldSx}
+                          error={!!fieldErrors?.role} helperText={fieldErrors?.role?.join(', ')} />
+                      )}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Permissions tab — the selected role's permissions, pre-checked and editable */}
+              {rolePermTab === 'permissions' && (
+                <div className="row">
+                  <div className="col-md-12 form-group" style={{ width: '-webkit-fill-available' }}>
+                    {selectedRole ? (
+                      <PermissionMatrix
+                        modules={PERMISSION_MODULES}
+                        permissions={permissions}
+                        setPermissions={setPermissions}
+                      />
+                    ) : (
+                      <div className="border border-dashed border-slate-300 rounded-lg p-6 text-center text-sm text-slate-400 italic">
+                        Select a role in the <span className="font-semibold">Roles</span> tab to view and edit its permissions
+                      </div>
                     )}
-                  />
+                  </div>
                 </div>
-              </div>
-
-              {/* Row 7: Permissions (full width, outlined MUI style) */}
-              <div className="row">
-                <div className="col-md-12 form-group" style={{ width: '-webkit-fill-available' }}>
-                  <TextField
-                    fullWidth
-                    label="Permissions"
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      readOnly: true,
-                      inputComponent: ChipsInput,
-                      inputProps: { permissions: selectedRole?.permissions || [] },
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': { minHeight: 64, height: 'auto', alignItems: 'flex-start', padding: '14px' },
-                      '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 'auto' },
-                      '& .MuiOutlinedInput-input': { padding: 0, height: 'auto' },
-                    }}
-                  />
-                </div>
-              </div>
-
+              )}
             </div>
 
             <div className="navigation-buttons">
