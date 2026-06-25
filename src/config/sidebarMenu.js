@@ -2,7 +2,8 @@ import {
   Home, Users, ClipboardList, FileText, Table, CheckCircle,
   Award, Settings, Package, Briefcase, MapPin, Map, Hash,
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
-  Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch,ScrollText
+  Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText,
+  Stamp, Boxes
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -91,6 +92,8 @@ export const MENU_ITEMS = [
       { label: "Digital Signatures", path: "/dashboard/settings/digital-signatures", icon: PenTool },
       { label: "System Settings",    path: "/dashboard/settings/system-settings",    icon: UserCog },
       { label: "Wings / Sections",        path: "/dashboard/settings/wings",        icon: LayoutList },
+      { label: "Stamps",             path: "/dashboard/settings/stamps",             icon: Stamp },
+      { label: "Groups",             path: "/dashboard/settings/groups",             icon: Boxes },
       { label: "Terms & Condition",        path: "/dashboard/settings/terms-conditions",     icon: ScrollText },
       { label: "Roles & Permissions", path: "/dashboard/settings/roles",              icon: ShieldCheck },
     ],

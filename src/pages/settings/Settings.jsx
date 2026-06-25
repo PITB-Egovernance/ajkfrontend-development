@@ -16,7 +16,9 @@ import {
   PenTool,
   UserCog,
   LayoutList,
-  ShieldCheck
+  ShieldCheck,
+  Stamp,
+  Boxes
 } from 'lucide-react';
 import { hasSubModuleAccess, isAdminUser } from 'utils/permissions';
 
@@ -104,6 +106,22 @@ const Settings = () => {
       iconBg: 'bg-indigo-600',
       link: '/dashboard/settings/wings',
       permModule: 'settings', permSub: 'wings',
+    },
+    {
+      icon: Stamp,
+      title: 'Stamps',
+      description: 'Manage stamp images used across documents',
+      iconBg: 'bg-orange-500',
+      link: '/dashboard/settings/stamps',
+      permModule: 'settings', permSub: 'stamps',
+    },
+    {
+      icon: Boxes,
+      title: 'Groups',
+      description: 'Group grades together for reuse across the system',
+      iconBg: 'bg-lime-600',
+      link: '/dashboard/settings/groups',
+      permModule: 'settings', permSub: 'groups',
     },
     {
       icon: ShieldCheck,

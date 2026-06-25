@@ -211,8 +211,11 @@ const StampManagement = () => {
       if (editingRow) {
         // Update: image is optional, status is editable.
         fd.append("status", formData.status);
+        // Method spoofing: send a real POST so PHP parses the multipart body, but
+        // tell Laravel to dispatch to the PUT route via _method.
+        fd.append("_method", "PUT");
         res = await fetch(`${API_BASE}/settings/stamp/update/${editingRow.hash_id}`, {
-          method: "PUT",
+          method: "POST",
           headers: authHeaders(),
           body: fd,
         });
@@ -271,8 +274,11 @@ const StampManagement = () => {
     try {
       const fd = new FormData();
       fd.append("status", newStatus);
+      // Method spoofing: PHP only parses a multipart body on POST, not PUT, so a
+      // real PUT drops the FormData fields. Send POST + _method=PUT instead.
+      fd.append("_method", "PUT");
       const res    = await fetch(`${API_BASE}/settings/stamp/update/${row.hash_id}`, {
-        method: "PUT",
+        method: "POST",
         headers: authHeaders(),
         body: fd,
       });
