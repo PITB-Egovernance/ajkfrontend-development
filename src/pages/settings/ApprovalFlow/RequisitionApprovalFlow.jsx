@@ -24,6 +24,38 @@ const PROCESS_TYPES = [
   { value: 'requisition', label: 'Requisition' },
 ];
 
+const FLOW_TYPES = [
+  { value: 'online', label: 'Online' },
+  { value: 'hardcopy', label: 'Hardcopy' },
+];
+
+const normalizeFlowTypes = (value) => {
+  let values = [];
+
+  if (Array.isArray(value)) {
+    values = value;
+  } else if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) values = parsed;
+      } catch {
+        values = trimmed.split(',');
+      }
+    } else {
+      values = trimmed.split(',');
+    }
+  }
+
+  const allowed = new Set(FLOW_TYPES.map(({ value: flowType }) => flowType));
+  return [...new Set(
+    values
+      .map((flowType) => String(flowType).trim().toLowerCase())
+      .filter((flowType) => allowed.has(flowType))
+  )];
+};
+
 // Designations are hardcoded (same under every wing), in descending hierarchy.
 const HARDCODED_DESIGNATIONS = [
   { hash_id: 'assistant_director', name: 'Assistant Director' },
@@ -225,13 +257,14 @@ const RequisitionApprovalFlow = () => {
         try {
           const flowRes = await fetch(`${API_BASE}/settings/approval-flow?process_type=requisition`, { headers });
           const flowResult = await flowRes.json();
+          const savedFlow = flowResult.data?.data ?? flowResult.data ?? null;
 
           // The API returns the saved flow either as a mapped `assignments` array
           // or as the raw `steps` relation. Normalise both into a uniform shape:
           //   { step, wing, designation: '<string>', employee: '<names>' }
           // designation may arrive as a plain string, an array, or a JSON-encoded
           // array string ("[\"Director\"]"); employee may be `employee` or `employee_name`.
-          const rawList = flowResult.data?.assignments ?? flowResult.data?.steps ?? [];
+          const rawList = savedFlow?.assignments ?? savedFlow?.steps ?? [];
           const assignments = (Array.isArray(rawList) ? rawList : []).map((a) => {
             let designation = a.designation;
             if (typeof designation === 'string' && designation.trim().startsWith('[')) {
@@ -251,29 +284,13 @@ const RequisitionApprovalFlow = () => {
 
           // Remember the saved flow's id so Save updates it (instead of creating a
           // duplicate) and Reset can delete it.
-          if (flowResult.success && flowResult.data) {
-            setFlowId(flowResult.data.hash_id || flowResult.data.id || null);
+          if (flowResult.success && savedFlow) {
+            setFlowId(savedFlow.hash_id || savedFlow.id || null);
 
-            // Restore the saved flow type(s) for the checkboxes. The column may
-            // come back as an array, a JSON-encoded array string, or a CSV string.
-            const rawFlowType = flowResult.data.flow_type;
-            let restoredFlowType = [];
-            if (Array.isArray(rawFlowType)) {
-              restoredFlowType = rawFlowType;
-            } else if (typeof rawFlowType === 'string' && rawFlowType.trim()) {
-              const s = rawFlowType.trim();
-              if (s.startsWith('[')) {
-                try {
-                  const parsed = JSON.parse(s);
-                  if (Array.isArray(parsed)) restoredFlowType = parsed;
-                } catch { /* leave empty, fall back to CSV below */ }
-              }
-              if (restoredFlowType.length === 0) restoredFlowType = s.split(',');
-            }
-            restoredFlowType = restoredFlowType
-              .map((t) => String(t).trim().toLowerCase())
-              .filter(Boolean);
-            if (restoredFlowType.length > 0) setFlowType(restoredFlowType);
+            // A JSON database column should return an array. String/CSV support
+            // remains for backward compatibility with older API responses.
+            const restoredFlowType = normalizeFlowTypes(savedFlow.flow_type);
+            setFlowType(restoredFlowType.length > 0 ? restoredFlowType : ['online']);
           }
 
           if (flowResult.success && assignments.length > 0) {
@@ -437,6 +454,7 @@ const RequisitionApprovalFlow = () => {
     setFlowOrder(null);
     setSaved(false);
     setProcessType('requisition');
+    setFlowType(['online']);
   };
 
   // Reset removes the saved flow: if one exists in the DB it is deleted via the
@@ -549,6 +567,12 @@ const RequisitionApprovalFlow = () => {
   };
 
   const handleSave = async () => {
+    const normalizedFlowType = normalizeFlowTypes(flowType);
+    if (normalizedFlowType.length === 0) {
+      toast.error('Select at least one flow type before saving');
+      return;
+    }
+
     if (!isValid) {
       toast.error('Select at least one wing with a designation and an employee before saving');
       return;
@@ -576,8 +600,14 @@ const RequisitionApprovalFlow = () => {
 
     // Send both flow-type checks as an array so the backend can store them in a
     // single column (JSON / array cast).
-    const payload = { process_type: processType, flow_type: flowType, assignments };
+    const payload = {
+      process_type: processType,
+      flow_type: normalizedFlowType,
+      assignments,
+    };
 
+
+    console.log("Flow Type:", payload)
     // Existing flow → PUT update/{id}; first save → POST save.
     const isUpdate = Boolean(flowId);
     const url = isUpdate
@@ -671,25 +701,25 @@ const RequisitionApprovalFlow = () => {
           {/* Flow Type — Online / Hardcopy (multi-select: one or both) */}
           <div className="flex items-center gap-6 mb-3">
             <span className="text-sm font-semibold text-slate-700">Flow Type:</span>
-            {['online', 'hardcopy'].map((type) => {
-              const checked = flowType.includes(type);
+            {FLOW_TYPES.map(({ value, label }) => {
+              const checked = flowType.includes(value);
               return (
-                <label key={type} className="flex items-center gap-2 cursor-pointer">
+                <label key={value} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     name="flow_type"
-                    value={type}
+                    value={value}
                     checked={checked}
                     onChange={() => {
                       setFlowType((prev) =>
-                        prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+                        prev.includes(value) ? prev.filter((type) => type !== value) : [...prev, value]
                       );
                       setSaved(false);
                     }}
                     className="w-4 h-4 accent-emerald-700 cursor-pointer"
                   />
                   <span className={`text-sm ${checked ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
-                    {type === 'online' ? 'Online' : 'Hardcopy'}
+                    {label}
                   </span>
                 </label>
               );
@@ -1011,7 +1041,7 @@ const RequisitionApprovalFlow = () => {
             <RotateCcw size={15} /> {flowId ? 'Delete Flow' : 'Reset'}
           </button>
           {canEdit && (
-            <button onClick={handleSave} disabled={!isValid || saving}
+            <button onClick={handleSave} disabled={!isValid || flowType.length === 0 || saving}
               className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
               {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
               {saving ? 'Saving...' : (flowId ? 'Update Flow' : 'Save Flow')}
@@ -1034,6 +1064,13 @@ const RequisitionApprovalFlow = () => {
                   <span className="text-sm text-slate-600 font-medium">Process Type:</span>
                   <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">
                     {PROCESS_TYPES.find((p) => p.value === processType)?.label}
+                  </span>
+                  <span className="ml-3 text-sm text-slate-600 font-medium">Flow Type:</span>
+                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm font-semibold">
+                    {FLOW_TYPES
+                      .filter(({ value }) => flowType.includes(value))
+                      .map(({ label }) => label)
+                      .join(', ')}
                   </span>
                 </div>
 

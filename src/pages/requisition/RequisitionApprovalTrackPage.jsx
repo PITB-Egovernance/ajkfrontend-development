@@ -31,9 +31,16 @@ const STATUS_STYLES = {
 };
 
 const StatusBadge = ({ status, label, className = '' }) => {
-  const key = (status || '').toLowerCase();
+  const normalizedStatus = String(status || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+  const normalizedLabel = String(label || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+  const isDepartmentReceived =
+    normalizedStatus === 'requisition received by department' ||
+    normalizedLabel === 'requisition received by department';
+  const key = isDepartmentReceived ? 'pending' : normalizedStatus;
   const style = STATUS_STYLES[key] || 'bg-slate-100 text-slate-600 border border-slate-200';
-  const display = label || key.charAt(0).toUpperCase() + key.slice(1);
+  const display = isDepartmentReceived
+    ? 'Pending'
+    : label || key.charAt(0).toUpperCase() + key.slice(1);
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${style} ${className}`}>
       {display}
@@ -89,7 +96,7 @@ const HeaderSection = ({ requisition, onBack, onDownload, onTrackApproval }) => 
           <div className="flex items-center gap-2 mt-2 text-sm text-slate-500 flex-wrap">
             <span>Request ID: {requisition.id_display}</span>
             <span className="text-slate-300">•</span>
-            <span>Department: {requisition.department}</span>
+            {/* <span>Department: {requisition.department}</span> */}
             <span className="text-slate-300">•</span>
             <span>Requested by: {requisition.requested_by}</span>
             <span className="text-slate-300">•</span>
@@ -98,7 +105,7 @@ const HeaderSection = ({ requisition, onBack, onDownload, onTrackApproval }) => 
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
+          {/* <button
             onClick={onDownload}
             className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-sm"
           >
@@ -111,7 +118,7 @@ const HeaderSection = ({ requisition, onBack, onDownload, onTrackApproval }) => 
           >
             <GitBranch className="w-4 h-4" />
             Track Approval
-          </button>
+          </button> */}
         </div>
       </div>
     </div>
@@ -265,7 +272,7 @@ const ApprovalStepsTable = ({ steps }) => (
           <tr className="bg-slate-50 border-b border-slate-200">
             <th className="text-left px-6 py-3 font-semibold text-slate-600 w-16">Step</th>
             <th className="text-left px-6 py-3 font-semibold text-slate-600">Approver</th>
-            <th className="text-left px-6 py-3 font-semibold text-slate-600">Role</th>
+            <th className="text-left px-6 py-3 font-semibold text-slate-600">Wing/Section</th>
             <th className="text-left px-6 py-3 font-semibold text-slate-600">Status</th>
             <th className="text-left px-6 py-3 font-semibold text-slate-600">Action Date</th>
             <th className="text-left px-6 py-3 font-semibold text-slate-600">Remarks</th>
@@ -492,12 +499,25 @@ const StatusOverview = ({ steps }) => (
 // ─── Sidebar: RequestSummary ─────────────────────────────────────────────────
 // Feeds from: API 11 → data.requisition
 
-const RequestSummary = ({ requisition }) => {
+const getScaleName = (rawScale, gradeOptions) => {
+  if (rawScale === null || rawScale === undefined || rawScale === '') return '—';
+  if (typeof rawScale === 'object') {
+    return rawScale.name || rawScale.grade_name || rawScale.hash_id || rawScale.id || '—';
+  }
+
+  const scale = String(rawScale).trim();
+  const matchedGrade = gradeOptions.find(
+    (grade) => String(grade.id) === scale || String(grade.name) === scale
+  );
+  return matchedGrade?.name || scale;
+};
+
+const RequestSummary = ({ requisition, gradeOptions }) => {
   const fields = [
     { label: 'Request ID', value: requisition.id_display },
     { label: 'Designation', value: requisition.designation },
     { label: 'Department', value: requisition.department },
-    { label: 'Scale', value: requisition.scale ? `BPS-${requisition.scale}` : '—' },
+    { label: 'Scale', value: getScaleName(requisition.scale, gradeOptions) },
     { label: 'Posts', value: requisition.num_posts },
     { label: 'Requested by', value: requisition.requested_by },
     { label: 'Request Date', value: requisition.request_date },
@@ -807,7 +827,13 @@ const RequestDetailsTab = ({ requisition }) => {
         <h3 className="text-base font-semibold text-slate-900 mb-2">Eligibility</h3>
         <DetailRow label="Age Range" value={e.min_age && e.max_age ? `${e.min_age} – ${e.max_age} years` : null} />
         <DetailRow label="Nationality" value={e.nationality} />
-        <DetailRow label="Domicile" value={e.domicile} />
+
+        {e.merit_type === 'open_merit' ? (
+          <DetailRow label="Merit Type" value="Open Merit" />
+        ) : e.merit_type === 'quota_wise' ? (
+          <DetailRow label="Merit Type" value="Quota Based" />
+        ) : null}
+
         <DetailRow label="Gender" value={e.gender_basis} />
         <DetailRow label="Other Conditions" value={e.other_conditions} />
       </div>
@@ -825,6 +851,7 @@ const RequisitionApprovalTrackPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState(null); // API 11 full response data
+  const [gradeOptions, setGradeOptions] = useState([]);
 
   const loadDetail = useCallback(() => {
     setLoading(true);
@@ -836,6 +863,22 @@ const RequisitionApprovalTrackPage = () => {
   }, [hashId]);
 
   useEffect(() => { loadDetail(); }, [loadDetail]);
+
+  useEffect(() => {
+    RequisitionApprovalApi.getGrades()
+      .then((res) => {
+        const grades = res.data?.data ?? res.data ?? [];
+        setGradeOptions(
+          (Array.isArray(grades) ? grades : [])
+            .filter((grade) => String(grade.status ?? 'active').toLowerCase() === 'active')
+            .map((grade) => ({
+              id: grade.hash_id || grade.id,
+              name: grade.name,
+            }))
+        );
+      })
+      .catch(() => setGradeOptions([]));
+  }, []);
 
   if (loading) return <PageSpinner />;
   if (error || !detail) return <PageError message={error || 'No data found.'} onRetry={loadDetail} />;
@@ -871,7 +914,7 @@ const RequisitionApprovalTrackPage = () => {
             </div>
             <div className="space-y-6">
               <StatusOverview steps={workflow_steps} />
-              <RequestSummary requisition={requisition} />
+              <RequestSummary requisition={requisition} gradeOptions={gradeOptions} />
               <AboutWorkflow steps={workflow_steps} workflowInfo={workflow_info} />
             </div>
           </div>

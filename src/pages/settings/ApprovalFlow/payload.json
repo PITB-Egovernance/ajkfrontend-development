@@ -1,5 +1,6 @@
 {
   "process_type": "requisition",
+  "flow_type": ["online", "hardcopy"],
   "assignments": [
     {
       "step": 1,

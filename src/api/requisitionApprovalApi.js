@@ -26,6 +26,12 @@ const handleResponse = async (response) => {
 };
 
 const RequisitionApprovalApi = {
+  getGrades: () =>
+    fetch(`${API_BASE}/settings/grades?per_page=200`, {
+      method: 'GET',
+      headers: getHeaders(false),
+    }).then(handleResponse),
+
   // API 10 — employee personal work queue (tab: assigned | pending | returned | completed)
   myQueue: (tab = 'assigned') =>
     fetch(`${API_BASE}/requisition-approvals/my-queue?tab=${encodeURIComponent(tab)}`, {
