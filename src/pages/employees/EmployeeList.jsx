@@ -277,7 +277,12 @@ const EmployeeList = () => {
       setEmployees((prev) =>
         prev.map((emp) => (emp.id === employee.id ? { ...emp, status: newStatus } : emp))
       );
-      toast.success(`${employee.username} marked as ${newStatus}`);
+      const employeeName =
+        employee.full_name ||
+        employee.username ||
+        employee.name ||
+        'Employee';
+      toast.success(`${employeeName} marked as ${newStatus}`);
     } catch (error) {
       toast.error(error.message || 'Failed to update employee status');
     }

@@ -23,6 +23,32 @@ import AuthService from 'services/authService';
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const STATUS_OPTIONS = ['active', 'inactive'];
 
+const normalizePermissionTree = (permissions) => {
+  let parsed = permissions;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return '';
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return '';
+
+  const enabled = [];
+  Object.keys(parsed).sort().forEach((moduleKey) => {
+    const subModules = parsed[moduleKey];
+    if (!subModules || typeof subModules !== 'object') return;
+    Object.keys(subModules).sort().forEach((subModuleKey) => {
+      const actions = subModules[subModuleKey];
+      if (!actions || typeof actions !== 'object') return;
+      Object.keys(actions).sort().forEach((actionKey) => {
+        if (actions[actionKey] === true) enabled.push(`${moduleKey}.${subModuleKey}.${actionKey}`);
+      });
+    });
+  });
+  return enabled.join('|');
+};
+
 const FIELD_LABELS = {
   full_name:           'Full Name',
   cnic:                'CNIC',
@@ -145,7 +171,12 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
       setRoleOptions(
         (rData.data?.data ?? rData.data ?? [])
           .filter((r) => !r.deleted_at)
-          .map((r) => ({ id: r.hash_id, name: r.role_name }))
+          .map((r) => ({
+            id: r.hash_id,
+            numericId: r.id,
+            name: r.role_name,
+            permissions: r.permissions,
+          }))
       );
     } catch {
       toast.error('Failed to load dropdown options');
@@ -177,24 +208,61 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
       setSelectedGrade(found || null);
     }
     if (roleOptions.length) {
-      const roleData = form.role_permission || form.role;
+      const roleData = user?.role_id || user?.role_hash_id || user?.role || user?.role_permission;
+      let resolvedRoleIds = [];
       if (Array.isArray(roleData)) {
-        const ids = roleData.map((r) => {
-          if (typeof r === 'object') return r.hash_id || r.id;
-          const found = roleOptions.find((opt) => opt.id === r || opt.name.toLowerCase() === String(r).toLowerCase());
+        resolvedRoleIds = roleData.map((r) => {
+          if (typeof r === 'object') {
+            const roleId = r.hash_id || r.role_id || r.id;
+            const roleName = r.role_name || r.name;
+            const found = roleOptions.find((opt) =>
+              String(opt.id) === String(roleId) ||
+              String(opt.numericId) === String(roleId) ||
+              (roleName && opt.name.toLowerCase() === String(roleName).toLowerCase())
+            );
+            return found?.id;
+          }
+          const found = roleOptions.find((opt) =>
+            String(opt.id) === String(r) ||
+            String(opt.numericId) === String(r) ||
+            opt.name.toLowerCase() === String(r).toLowerCase()
+          );
           return found?.id || r;
-        });
-        setSelectedRoles(ids);
+        }).filter((roleId) => roleOptions.some((option) => option.id === roleId));
+      } else if (roleData && typeof roleData === 'object') {
+        const roleId = roleData.hash_id || roleData.role_id || roleData.id;
+        const roleName = roleData.role_name || roleData.name;
+        const found = roleOptions.find((option) =>
+          String(option.id) === String(roleId) ||
+          String(option.numericId) === String(roleId) ||
+          (roleName && option.name.toLowerCase() === String(roleName).toLowerCase())
+        );
+        resolvedRoleIds = found ? [found.id] : [];
       } else if (roleData) {
-        const names = roleData.split(',').map((r) => r.trim()).filter(Boolean);
+        const names = String(roleData).split(',').map((r) => r.trim()).filter(Boolean);
         const ids = names.map((n) => {
-          const found = roleOptions.find((opt) => opt.name.toLowerCase() === n.toLowerCase());
+          const found = roleOptions.find((opt) =>
+            String(opt.id) === n ||
+            String(opt.numericId) === n ||
+            opt.name.toLowerCase() === n.toLowerCase()
+          );
           return found?.id || n;
-        });
-        setSelectedRoles(ids);
+        }).filter((roleId) => roleOptions.some((option) => option.id === roleId));
+        resolvedRoleIds = ids;
       }
+
+      if (resolvedRoleIds.length === 0) {
+        const savedPermissions = normalizePermissionTree(user?.role_permission);
+        const permissionRole = savedPermissions
+          ? roleOptions.find(
+              (option) => normalizePermissionTree(option.permissions) === savedPermissions
+            )
+          : null;
+        resolvedRoleIds = permissionRole ? [permissionRole.id] : [];
+      }
+      setSelectedRoles(resolvedRoleIds);
     }
-  }, [editing, districtOptions, designationOptions, gradeOptions, roleOptions]); // eslint-disable-line
+  }, [editing, user, form.domicile, form.designation, form.scale, districtOptions, designationOptions, gradeOptions, roleOptions]);
 
   const startEditing = async () => {
     await loadOptions();
