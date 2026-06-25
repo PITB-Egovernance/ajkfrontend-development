@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
@@ -8,6 +8,7 @@ import AuthService from 'services/authService';
 import { useAuth } from 'context/AuthContext';
 import { Button, Input } from 'components/ui';
 import { validateSignup } from 'schemas';
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -16,10 +17,9 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [captcha, setCaptcha] = useState({ token: null, image: null });
-  const [loadingCaptcha, setLoadingCaptcha] = useState(false);
-  const [loginData, setLoginData] = useState({ cnic: '', password: '', captcha: '' });
+  const [loginData, setLoginData] = useState({ cnic: '', password: '' });
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const captchaRef = useRef(null);
   const [signupData, setSignupData] = useState({
     username: '',
     cnic: '',
@@ -28,32 +28,14 @@ export default function Auth() {
   });
   const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    loadCaptcha();
-  }, []);
+  const RECAPTCHA_SITE_KEY = process.env.REACT_APP_RECAPTCHA_SITE_KEY || '6LehhjQtAAAAADI8Y4tk8N9eY782JREy-Wj0c2Kz';
 
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => setMessage(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
-
-  const loadCaptcha = async () => {
-    setLoadingCaptcha(true);
-    try {
-      const response = await AuthService.generateCaptcha();
-
-      setCaptcha({ token: response.data.captcha_token, image: response.data.captcha_image });
-
-      setLoginData((s) => ({ ...s, captcha: '' }));
-    } catch (err) {
-      toast.error('Failed to load CAPTCHA');
-    } finally {
-      setLoadingCaptcha(false);
+  const handleCaptchaChange = (token) => {
+    setCaptchaToken(token);
+    if (token && errors.recaptcha) {
+      setErrors((currentErrors) => ({ ...currentErrors, recaptcha: null }));
     }
   };
-
   const handleLoginChange = (e) => {
     const { name, value } = e.target;
     setLoginData((s) => ({ ...s, [name]: name === 'cnic' ? value.replace(/\D/g, '').slice(0, 13) : value }));
@@ -83,51 +65,14 @@ export default function Auth() {
       errors.password = 'Password is required';
     }
 
-    if (!loginData.captcha) {
-      errors.captcha = 'CAPTCHA is required';
+    if (!captchaToken) {
+      errors.recaptcha = RECAPTCHA_SITE_KEY
+        ? 'Please complete the CAPTCHA'
+        : 'Google reCAPTCHA is not configured';
     }
 
     return errors;
   };
-
-  // const handleLogin = async (e) => {
-  //   e.preventDefault();
-  //   const e_ = validateLoginForm();
-  //   if (Object.keys(e_).length) {
-  //     setErrors(e_);
-  //     return;
-  //   }
-
-  //   setLoading(true);
-  //   const loadingToast = toast.loading('Loading...');
-
-  //     const captchaRes = await AuthService.validateCaptcha({ captcha_token: captcha.token, captcha: loginData.captcha });
-  //     if (!captchaRes.success) throw new Error(captchaRes.message || 'CAPTCHA failed');
-
-  //     const result = await login({ cnic: loginData.cnic, password: loginData.password, mobile: '03349394636'});
-
-  //     console.log('Resppnse Login', result)
-  //     // if (result.success) {
-  //     //   if (result.data.otp_required == true) {
-  //     //     toast.success("OTP sent to your registered contact");
-          
-  //     //     navigate("/two-factor", {
-  //     //       state: { userId: result.data.user_id }
-  //     //     });
-  //     //   }
-  //     // }else{
-  //     //   toast.error(result.message || 'Login failed', { id: loadingToast });
-  //     //   loadCaptcha();
-  //     //   setLoading(false);
-  //     // }
-  //     // if (result.success) {
-  //     //   toast.success('Login successful! Redirecting...', { id: loadingToast });
-  //     //   setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
-  //     // } else {
-  //     //   throw new Error(result.error || 'Login failed');
-  //     // }
-   
-  // };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -146,8 +91,8 @@ export default function Auth() {
       const result = await AuthService.login({
         cnic: loginData.cnic,
         password: loginData.password,
-        captcha_token: captcha.token,
-        captcha: loginData.captcha,
+        recaptcha_token: captchaToken,
+        'g-recaptcha-response': captchaToken,
       });
 
       if (!result.success) {
@@ -164,7 +109,8 @@ export default function Auth() {
 
     } catch (err) {
       toast.error(err.message || "Login failed", { id: loadingToast });
-      loadCaptcha();
+      captchaRef.current?.reset();
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -192,7 +138,6 @@ export default function Auth() {
         toast.success('Registration successful! Redirecting to login...', { id: loadingToast });
         setTimeout(() => {
           setIsLogin(true);
-          loadCaptcha();
         }, 1200);
       } else {
         throw new Error(result.error || 'Registration failed');
@@ -288,42 +233,31 @@ export default function Auth() {
                           {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password}</p>}
                         </div>
 
-                        {/* CAPTCHA */}
+                        {/* Google reCAPTCHA */}
                         <div>
-                            <label className="block text-xs font-medium text-slate-700 mb-1.5">Security Verification</label>
-                            <div className="flex gap-2 mb-2">
-                              {captcha.image ? (
-                                <img src={captcha.image} alt="captcha" className="h-11 border-2 border-slate-200 rounded-lg flex-shrink-0" />
-                              ) : (
-                                <div className="h-11 w-28 border-2 border-slate-200 rounded-lg flex items-center justify-center bg-slate-50">
-                                  <div className="animate-spin h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full" />
-                                </div>
-                              )}
-                              <button
-                                type="button"
-                                onClick={loadCaptcha}
-                                disabled={loadingCaptcha || loading}
-                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                              </button>
-                            </div>
-                            <Input
-                              id="login-captcha"
-                              name="captcha"
-                              placeholder="Enter CAPTCHA code"
-                              value={loginData.captcha}
-                              onChange={handleLoginChange}
-                              disabled={loading}
-                              error={errors.captcha}
-                              maxLength={4}
-                              className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                            />
-                            {errors.captcha && <p className="text-red-600 text-xs mt-1">{errors.captcha}</p>}
+                          <label className="form-label mb-2 block">
+                            Security Verification{" "}
+                            <span className="text-danger text-sm">*</span>
+                          </label>
+                          <div className="recaptcha-container">
+                            {"6LehhjQtAAAAADI8Y4tk8N9eY782JREy-Wj0c2Kz" ? (
+                              <ReCAPTCHA
+                                ref={captchaRef}
+                                sitekey={"6LehhjQtAAAAADI8Y4tk8N9eY782JREy-Wj0c2Kz"}
+                                onChange={handleCaptchaChange}
+                                onExpired={() => setCaptchaToken(null)}
+                                onErrored={() => setCaptchaToken(null)}
+                              />
+                            ) : (
+                              <p className="text-sm text-red-600">
+                                Google reCAPTCHA site key is missing. Restart the development server after updating .env.
+                              </p>
+                            )}
                           </div>
-
+                          {errors.recaptcha && (
+                            <p className="text-xs text-red-600 mt-1 text-center">{errors.recaptcha}</p>
+                          )}
+                        </div>
                         {/* Submit Button */}
                         <Button
                           type="submit"
