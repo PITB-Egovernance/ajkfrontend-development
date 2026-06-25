@@ -8,7 +8,7 @@ import {
   ArrowLeft, ChevronDown, ChevronRight, CheckCircle2,
   AlertCircle, RotateCcw, Save, GitBranch, User,
   ArrowRight, Info, Layers, GripVertical, Loader2,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, ShieldCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -90,7 +90,8 @@ const RequisitionApprovalFlow = () => {
   // hash_id of the currently saved flow. Null = nothing saved yet (Save creates),
   // set = a flow exists (Save updates, Reset deletes).
   const [flowId, setFlowId] = useState(null);
-  const [flowType, setFlowType] = useState('online');
+  // Flow type supports multiple selections — Online, Hardcopy, or both.
+  const [flowType, setFlowType] = useState(['online']);
   const [secretarySelected, setSecretarySelected] = useState(false);
   const [secretaryEmployees, setSecretaryEmployees] = useState({});
   const [sortDir, setSortDir] = useState('asc');
@@ -252,6 +253,27 @@ const RequisitionApprovalFlow = () => {
           // duplicate) and Reset can delete it.
           if (flowResult.success && flowResult.data) {
             setFlowId(flowResult.data.hash_id || flowResult.data.id || null);
+
+            // Restore the saved flow type(s) for the checkboxes. The column may
+            // come back as an array, a JSON-encoded array string, or a CSV string.
+            const rawFlowType = flowResult.data.flow_type;
+            let restoredFlowType = [];
+            if (Array.isArray(rawFlowType)) {
+              restoredFlowType = rawFlowType;
+            } else if (typeof rawFlowType === 'string' && rawFlowType.trim()) {
+              const s = rawFlowType.trim();
+              if (s.startsWith('[')) {
+                try {
+                  const parsed = JSON.parse(s);
+                  if (Array.isArray(parsed)) restoredFlowType = parsed;
+                } catch { /* leave empty, fall back to CSV below */ }
+              }
+              if (restoredFlowType.length === 0) restoredFlowType = s.split(',');
+            }
+            restoredFlowType = restoredFlowType
+              .map((t) => String(t).trim().toLowerCase())
+              .filter(Boolean);
+            if (restoredFlowType.length > 0) setFlowType(restoredFlowType);
           }
 
           if (flowResult.success && assignments.length > 0) {
@@ -552,6 +574,8 @@ const RequisitionApprovalFlow = () => {
       employee: (item.employees || []).map((e) => e.name).join(', ') || null,
     }));
 
+    // Send both flow-type checks as an array so the backend can store them in a
+    // single column (JSON / array cast).
     const payload = { process_type: processType, flow_type: flowType, assignments };
 
     // Existing flow → PUT update/{id}; first save → POST save.
@@ -644,24 +668,32 @@ const RequisitionApprovalFlow = () => {
             )}
           </p>
 
-          {/* Flow Type — Online / Hardcopy */}
+          {/* Flow Type — Online / Hardcopy (multi-select: one or both) */}
           <div className="flex items-center gap-6 mb-3">
             <span className="text-sm font-semibold text-slate-700">Flow Type:</span>
-            {['online', 'hardcopy'].map((type) => (
-              <label key={type} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="flow_type"
-                  value={type}
-                  checked={flowType === type}
-                  onChange={(e) => setFlowType(e.target.value)}
-                  className="w-4 h-4 accent-emerald-700 cursor-pointer"
-                />
-                <span className={`text-sm ${flowType === type ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
-                  {type === 'online' ? 'Online' : 'Hardcopy'}
-                </span>
-              </label>
-            ))}
+            {['online', 'hardcopy'].map((type) => {
+              const checked = flowType.includes(type);
+              return (
+                <label key={type} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="flow_type"
+                    value={type}
+                    checked={checked}
+                    onChange={() => {
+                      setFlowType((prev) =>
+                        prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+                      );
+                      setSaved(false);
+                    }}
+                    className="w-4 h-4 accent-emerald-700 cursor-pointer"
+                  />
+                  <span className={`text-sm ${checked ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}>
+                    {type === 'online' ? 'Online' : 'Hardcopy'}
+                  </span>
+                </label>
+              );
+            })}
           </div>
 
           {/* Designation Order — Ascending / Descending */}
@@ -803,19 +835,20 @@ const RequisitionApprovalFlow = () => {
                   const secEmps = employeesMap[secretaryDesignation.hash_id] || [];
                   return (
                     <div>
-                      <div className={`flex items-center gap-0 border-b border-slate-100 transition-colors duration-100 ${secretarySelected ? 'bg-emerald-50/60' : 'hover:bg-slate-50'}`}>
-                        <div className="w-8 flex-shrink-0 flex justify-center relative h-10">
-                          <div className="absolute left-1/2 w-px bg-slate-300 top-0 h-1/2" />
-                          <div className="absolute top-1/2 left-1/2 w-3 h-px bg-slate-300" />
+                      <div className={`flex items-center gap-0 border-t-2 transition-colors duration-100 ${secretarySelected ? 'bg-emerald-100 border-emerald-500' : 'bg-emerald-50/70 border-emerald-200 hover:bg-emerald-50'}`}>
+                        <div className="w-8 flex-shrink-0 flex justify-center relative h-14">
+                          <div className="absolute left-1/2 w-px bg-emerald-300 top-0 h-1/2" />
+                          <div className="absolute top-1/2 left-1/2 w-3 h-px bg-emerald-300" />
                         </div>
                         <span className="w-5 h-5 flex-shrink-0" />
-                        <Checkbox checked={secretarySelected} onChange={() => { setSecretarySelected((v) => !v); setSaved(false); }} size="small"
-                          sx={{ p: '4px', color: '#94a3b8', '&.Mui-checked': { color: '#064e3b' } }} />
-                        <Layers size={17} className={`flex-shrink-0 mr-1.5 ${secretarySelected ? 'text-emerald-700' : 'text-slate-400'}`} />
-                        <span className={`text-base py-2 cursor-pointer flex-1 ${secretarySelected ? 'font-semibold text-emerald-800' : 'text-slate-600'}`}
+                        <Checkbox checked={secretarySelected} onChange={() => { setSecretarySelected((v) => !v); setSaved(false); }} size="medium"
+                          sx={{ p: '6px', color: '#059669', '& .MuiSvgIcon-root': { fontSize: 26 }, '&.Mui-checked': { color: '#064e3b' } }} />
+                        <ShieldCheck size={22} className={`flex-shrink-0 mr-2 ${secretarySelected ? 'text-emerald-800' : 'text-emerald-600'}`} />
+                        <span className={`text-xl font-extrabold py-3 cursor-pointer ${secretarySelected ? 'text-emerald-900' : 'text-emerald-800'}`}
                           onClick={() => { setSecretarySelected((v) => !v); setSaved(false); }}>
-                          Secretary <span className="text-xs text-slate-400 font-normal">(optional — final approval)</span>
+                          Secretary
                         </span>
+                        
                       </div>
 
                       {secretarySelected && secEmps.map((emp, empIdx) => {

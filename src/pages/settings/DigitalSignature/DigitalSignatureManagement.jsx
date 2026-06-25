@@ -98,6 +98,7 @@ const DigitalSignatureManagement = () => {
   const [editingRow,  setEditingRow]  = useState(null);
   const [formData,    setFormData]    = useState(EMPTY_FORM);
   const [formErrors,  setFormErrors]  = useState({});
+  const [previewImage, setPreviewImage] = useState(null);
 
   /* ── FETCH ── */
   const fetchAll = async () => {
@@ -571,7 +572,8 @@ const DigitalSignatureManagement = () => {
           <img
             src={p.value}
             alt="signature"
-            className="h-10 w-28 object-contain rounded border border-slate-200 bg-slate-50"
+            onClick={() => setPreviewImage(p.value)}
+            className="h-10 w-28 object-contain rounded border border-slate-200 bg-slate-50 cursor-pointer hover:opacity-80 transition-opacity"
           />
         ) : (
           <span className="text-xs text-slate-400 italic">No image</span>
@@ -977,6 +979,25 @@ const DigitalSignatureManagement = () => {
               {saving ? "Saving…" : editingRow ? "Update" : "Create"}
             </button>
           </DialogActions>
+        </Dialog>
+
+        {/* IMAGE PREVIEW MODAL */}
+        <Dialog open={Boolean(previewImage)} onClose={() => setPreviewImage(null)} maxWidth="md">
+          <DialogTitle className="font-bold flex items-center justify-between">
+            Signature Preview
+            <IconButton size="small" onClick={() => setPreviewImage(null)}>
+              <X size={18} />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent className="flex items-center justify-center bg-slate-50 p-6">
+            {previewImage && (
+              <img
+                src={previewImage}
+                alt="Signature preview"
+                className="max-h-[70vh] max-w-full object-contain"
+              />
+            )}
+          </DialogContent>
         </Dialog>
 
       </div>

@@ -33,7 +33,7 @@ const getGroupName = (group) => {
   if (typeof group === 'string') return group.trim();
   if (!group || typeof group !== 'object') return '';
 
-  return String(group.degree_group || group.name || '').trim();
+  return String(group.group_name || group.degree_group || group.name || '').trim();
 };
 
 const DegreesManagement = () => {
@@ -65,7 +65,7 @@ const DegreesManagement = () => {
     try {
       const [degRes, grpRes] = await Promise.all([
         fetch(`${API_BASE}/settings/degrees`, { headers: getHeaders() }),
-        fetch(`${API_BASE}/settings/degrees/groups/list`, { headers: getHeaders() }),
+        fetch(`${API_BASE}/settings/group`, { headers: getHeaders() }),
       ]);
       const [degData, grpData] = await Promise.all([degRes.json(), grpRes.json()]);
 
@@ -91,6 +91,8 @@ const DegreesManagement = () => {
         const grpList = grpData.data?.data ?? grpData.data ?? [];
         setGroups(
           (Array.isArray(grpList) ? grpList : [])
+            // Only active groups can be assigned to a degree.
+            .filter((g) => String(g?.status ?? 'active').toLowerCase() === 'active')
             .map(getGroupName)
             .filter(Boolean)
         );
@@ -307,11 +309,27 @@ const DegreesManagement = () => {
               value={form.degree_name}
               onChange={(e) => setForm((f) => ({ ...f, degree_name: e.target.value }))}
               placeholder="e.g. BSCS" />
-            <TextField fullWidth label="Degree Group (optional)" margin="normal" size="small"
+            <TextField
+              select
+              fullWidth
+              label="Degree Group (optional)"
+              margin="normal"
+              size="small"
               value={form.degree_group}
               onChange={(e) => setForm((f) => ({ ...f, degree_group: e.target.value }))}
-              placeholder="e.g. Computer Science"
-              helperText="Optional group name for categorizing this degree" />
+              helperText="Optional group name for categorizing this degree"
+            >
+              <MenuItem value="">None</MenuItem>
+              {/* Preserve a previously-saved group that is no longer active. */}
+              {form.degree_group && !groups.includes(form.degree_group) && (
+                <MenuItem value={form.degree_group}>{form.degree_group}</MenuItem>
+              )}
+              {groups.map((g, i) => (
+                <MenuItem key={`${g}-${i}`} value={g}>
+                  {g}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               select
               fullWidth
