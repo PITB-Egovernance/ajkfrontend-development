@@ -502,6 +502,9 @@ const AdvertisementCreateForm = () => {
       fd.append("advertisement_fee", advertisementFee || "");
       fd.append("note", note || "");
       fd.append("important_notes", importantNotes || "");
+      // New advertisements are created inactive by default; they are
+      // activated later from the records list.
+      fd.append("status", "inactive");
 
       const feesPayload = {};
       const testTypesPayload = {};
