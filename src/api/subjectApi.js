@@ -58,6 +58,15 @@ const SubjectApi = {
     });
     return handleResponse(response);
   },
+
+  // Groups (from the Groups settings module) used to populate the subject group dropdown.
+  getGroups: async () => {
+    const response = await fetch(`${API_BASE}/settings/group`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
 };
 
 export default SubjectApi;

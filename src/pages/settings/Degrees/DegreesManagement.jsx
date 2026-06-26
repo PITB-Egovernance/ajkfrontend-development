@@ -29,13 +29,6 @@ const getHeaders = () => ({
 
 const emptyForm = { degree_name: '', degree_group: '', status: 'active' };
 
-const getGroupName = (group) => {
-  if (typeof group === 'string') return group.trim();
-  if (!group || typeof group !== 'object') return '';
-
-  return String(group.group_name || group.degree_group || group.name || '').trim();
-};
-
 const DegreesManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);
   const canEdit = hasPermission(`${PERM}.edit`);
@@ -63,39 +56,26 @@ const DegreesManagement = () => {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [degRes, grpRes] = await Promise.all([
-        fetch(`${API_BASE}/settings/degrees`, { headers: getHeaders() }),
-        fetch(`${API_BASE}/settings/group`, { headers: getHeaders() }),
-      ]);
-      const [degData, grpData] = await Promise.all([degRes.json(), grpRes.json()]);
+      const degRes  = await fetch(`${API_BASE}/settings/degrees`, { headers: getHeaders() });
+      const degData = await degRes.json();
 
       if (degData.success || degData.status === 200) {
         const data = degData.data?.data ?? degData.data ?? [];
-        setRows(
-          (Array.isArray(data) ? data : [])
-            .filter(Boolean)
-            .map((item, i) => ({
-              id:           item.hash_id || item.id,
-              sr_no:        i + 1,
-              hash_id:      item.hash_id,
-              degree_name:  item.degree_name || item.name || '',
-              degree_group: item.degree_group || '',
-              status:       String(item.status || 'active').toLowerCase(),
-            }))
-        );
+        const mapped = (Array.isArray(data) ? data : [])
+          .filter(Boolean)
+          .map((item, i) => ({
+            id:           item.hash_id || item.id,
+            sr_no:        i + 1,
+            hash_id:      item.hash_id,
+            degree_name:  item.degree_name || item.name || '',
+            degree_group: item.degree_group || '',
+            status:       String(item.status || 'active').toLowerCase(),
+          }));
+        setRows(mapped);
+        // Distinct group names from existing degrees — used only for the filter dropdown.
+        setGroups([...new Set(mapped.map((r) => r.degree_group).filter(Boolean))]);
       } else {
         toast.error(degData.message || 'Failed to load degrees');
-      }
-
-      if (grpData.success || grpData.status === 200) {
-        const grpList = grpData.data?.data ?? grpData.data ?? [];
-        setGroups(
-          (Array.isArray(grpList) ? grpList : [])
-            // Only active groups can be assigned to a degree.
-            .filter((g) => String(g?.status ?? 'active').toLowerCase() === 'active')
-            .map(getGroupName)
-            .filter(Boolean)
-        );
       }
     } catch { toast.error('Server error'); }
     finally { setLoading(false); }
@@ -309,27 +289,11 @@ const DegreesManagement = () => {
               value={form.degree_name}
               onChange={(e) => setForm((f) => ({ ...f, degree_name: e.target.value }))}
               placeholder="e.g. BSCS" />
-            <TextField
-              select
-              fullWidth
-              label="Degree Group (optional)"
-              margin="normal"
-              size="small"
+            <TextField fullWidth label="Degree Group (optional)" margin="normal" size="small"
               value={form.degree_group}
               onChange={(e) => setForm((f) => ({ ...f, degree_group: e.target.value }))}
-              helperText="Optional group name for categorizing this degree"
-            >
-              <MenuItem value="">None</MenuItem>
-              {/* Preserve a previously-saved group that is no longer active. */}
-              {form.degree_group && !groups.includes(form.degree_group) && (
-                <MenuItem value={form.degree_group}>{form.degree_group}</MenuItem>
-              )}
-              {groups.map((g, i) => (
-                <MenuItem key={`${g}-${i}`} value={g}>
-                  {g}
-                </MenuItem>
-              ))}
-            </TextField>
+              placeholder="e.g. Computer Science"
+              helperText="Optional group name for categorizing this degree" />
             <TextField
               select
               fullWidth

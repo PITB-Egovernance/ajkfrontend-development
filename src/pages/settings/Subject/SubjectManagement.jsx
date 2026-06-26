@@ -23,8 +23,6 @@ import { hasPermission } from "utils/permissions";
 import SubjectApi from "api/subjectApi";
 const PERM = "settings.subjects";
 
-const GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E", "Group F", "Group G","Compulsory"];
-
 const gridSx = {
   border: "none",
   "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc" },
@@ -59,6 +57,7 @@ const SubjectManagement = () => {
   const canRowActions = canEdit || canDelete;
 
   const [allRows,    setAllRows]    = useState([]);
+  const [groups,     setGroups]     = useState([]);   // active group names from the Groups module
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [totalRows,  setTotalRows]  = useState(0);
@@ -104,15 +103,33 @@ const SubjectManagement = () => {
     }
   };
 
+  /* ── FETCH ACTIVE GROUPS ── */
+  const fetchGroups = async () => {
+    try {
+      const result = await SubjectApi.getGroups();
+      const data = result.data?.data ?? result.data ?? [];
+      setGroups(
+        (Array.isArray(data) ? data : [])
+          .filter((g) => String(g?.status ?? "active").toLowerCase() === "active")
+          .map((g) => g.group_name ?? g.name ?? "")
+          .filter(Boolean)
+      );
+    } catch {
+      setGroups([]);
+    }
+  };
+
   useEffect(() => {
     fetchAll(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paginationModel.page, paginationModel.pageSize]);
 
+  useEffect(() => { fetchGroups(); }, []);
+
   /* ── FILTER CONFIG ── */
   const filterConfig = [
     { name: "subject_name",  label: "Subject Name", type: "text",   placeholder: "Filter by name" },
-    { name: "subject_group", label: "Group",        type: "select", options: GROUPS.map((g) => ({ value: g, label: g })) },
+    { name: "subject_group", label: "Group",        type: "select", options: groups.map((g) => ({ value: g, label: g })) },
     { name: "status",        label: "Status",       type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
   ];
 
@@ -479,7 +496,11 @@ const SubjectManagement = () => {
               helperText={formErrors.subject_group || "Select the subject group"}
             >
               <MenuItem value="">— Select Group —</MenuItem>
-              {GROUPS.map((g) => (
+              {/* Preserve a previously-saved group that is no longer active. */}
+              {formData.subject_group && !groups.includes(formData.subject_group) && (
+                <MenuItem value={formData.subject_group}>{formData.subject_group}</MenuItem>
+              )}
+              {groups.map((g) => (
                 <MenuItem key={g} value={g}>{g}</MenuItem>
               ))}
             </TextField>

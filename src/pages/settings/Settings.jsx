@@ -18,7 +18,8 @@ import {
   LayoutList,
   ShieldCheck,
   Stamp,
-  Boxes
+  Boxes,
+  Newspaper
 } from 'lucide-react';
 import { hasSubModuleAccess, isAdminUser } from 'utils/permissions';
 
@@ -122,6 +123,14 @@ const Settings = () => {
       iconBg: 'bg-lime-600',
       link: '/dashboard/settings/groups',
       permModule: 'settings', permSub: 'groups',
+    },
+    {
+      icon: Newspaper,
+      title: 'News & Notices',
+      description: 'Manage news, notices and announcements',
+      iconBg: 'bg-emerald-700',
+      link: '/dashboard/settings/news',
+      permModule: 'settings', permSub: 'news',
     },
     {
       icon: ShieldCheck,
