@@ -30,8 +30,12 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { Link } from 'react-router-dom';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 const PERM = 'advertisement.advertisement'; // permission scope for this module
+const API_BASE = Config.apiUrl;
+const API_KEY = Config.apiKey;
 
 const STATUS_BADGES = {
   pending:             { label: 'Pending',            className: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
@@ -41,6 +45,49 @@ const STATUS_BADGES = {
   reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-200 text-blue-700' },
   extend_date:         { label: 'Extended',           className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
   published:           { label: 'Published',          className: 'bg-green-50 border-green-200 text-green-700' },
+};
+
+const authHeaders = () => ({
+  Authorization: `Bearer ${AuthService.getToken()}`,
+  Accept: 'application/json',
+  'X-API-KEY': API_KEY,
+});
+
+const getDesignationName = (designation) => {
+  if (!designation) return '';
+  if (typeof designation === 'object') {
+    return designation.name || designation.designation_name || designation.title || '';
+  }
+  return String(designation);
+};
+
+const getSecretaryName = async () => {
+  const response = await fetch(`${API_BASE}/settings/digital-signature?per_page=200`, {
+    headers: authHeaders(),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || 'Failed to load secretary');
+  }
+
+  const records = result.data?.data ?? result.data ?? [];
+  const secretary = (Array.isArray(records) ? records : []).find((record) => {
+    const designation = getDesignationName(
+      record.designation ?? record.designation_name
+    ).trim().toLowerCase();
+    const status = String(record.status ?? 'active').trim().toLowerCase();
+
+    return designation === 'secretary' && status === 'active';
+  });
+
+  return (
+    secretary?.name ||
+    secretary?.employee_name ||
+    secretary?.employee?.name ||
+    secretary?.user?.name ||
+    ''
+  );
 };
 
 const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelete }) => {
@@ -141,6 +188,8 @@ const AdvertisementRecords = () => {
     secretary_name: '',
     publish_date: '',
     loading: false,
+    secretaryLoading: false,
+    secretaryError: '',
   });
 
   const filterConfig = [
@@ -191,14 +240,47 @@ const AdvertisementRecords = () => {
     });
   };
 
-  const openPublishModal = (ad) => {
+  const openPublishModal = async (ad) => {
     setPublishModal({
       open: true,
       ad,
       secretary_name: '',
       publish_date: new Date().toISOString().split('T')[0],
       loading: false,
+      secretaryLoading: true,
+      secretaryError: '',
     });
+
+    try {
+      const secretaryName = await getSecretaryName();
+
+      if (!secretaryName) {
+        throw new Error('Active secretary not found');
+      }
+
+      setPublishModal(prev =>
+        prev.open && prev.ad?.id === ad.id
+          ? {
+              ...prev,
+              secretary_name: secretaryName,
+              secretaryLoading: false,
+              secretaryError: '',
+            }
+          : prev
+      );
+    } catch (error) {
+      setPublishModal(prev =>
+        prev.open && prev.ad?.id === ad.id
+          ? {
+              ...prev,
+              secretary_name: '',
+              secretaryLoading: false,
+              secretaryError: error.message || 'Failed to load secretary',
+            }
+          : prev
+      );
+      toast.error(error.message || 'Failed to load secretary');
+    }
   };
 
   const closePublishModal = () => {
@@ -206,8 +288,12 @@ const AdvertisementRecords = () => {
   };
 
   const handlePublish = async () => {
+    if (publishModal.secretaryLoading) {
+      toast.error('Please wait while secretary name is loading');
+      return;
+    }
     if (!publishModal.secretary_name.trim()) {
-      toast.error('Please enter the secretary name');
+      toast.error('Secretary name is required');
       return;
     }
     if (!publishModal.publish_date) {
@@ -648,11 +734,13 @@ const AdvertisementRecords = () => {
                 <input
                   type="text"
                   value={publishModal.secretary_name}
-                  onChange={(e) => setPublishModal(prev => ({ ...prev, secretary_name: e.target.value }))}
-                  placeholder="Enter secretary name"
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                  autoFocus
+                  readOnly
+                  placeholder={publishModal.secretaryLoading ? 'Loading secretary name...' : 'Secretary name'}
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-sm cursor-not-allowed"
                 />
+                {publishModal.secretaryError && (
+                  <p className="mt-1.5 text-xs text-red-600">{publishModal.secretaryError}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -678,7 +766,7 @@ const AdvertisementRecords = () => {
               </button>
               <button
                 onClick={handlePublish}
-                disabled={publishModal.loading}
+                disabled={publishModal.loading || publishModal.secretaryLoading || !publishModal.secretary_name}
                 className="px-5 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white rounded-lg font-medium text-sm shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
               >
                 {publishModal.loading ? (

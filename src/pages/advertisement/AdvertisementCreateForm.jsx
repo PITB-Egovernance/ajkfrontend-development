@@ -502,9 +502,8 @@ const AdvertisementCreateForm = () => {
       fd.append("advertisement_fee", advertisementFee || "");
       fd.append("note", note || "");
       fd.append("important_notes", importantNotes || "");
-      // New advertisements are created inactive by default; they are
-      // activated later from the records list.
-      fd.append("status", "inactive");
+      // New advertisements enter the approval flow as pending by default.
+      fd.append("status", "pending");
 
       const feesPayload = {};
       const testTypesPayload = {};
@@ -587,7 +586,7 @@ const AdvertisementCreateForm = () => {
         <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white py-4 px-6 rounded-t-xl text-center text-2xl font-bold shadow-lg mb-6">
           <div className="flex items-center justify-center gap-3">
             <FileText className="w-8 h-8" />
-            <span>Create New Advertisement</span>
+            <span>Create Advertisement</span>
           </div>
         </div>
 

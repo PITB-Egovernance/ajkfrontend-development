@@ -20,7 +20,7 @@ const CCE_STAGES = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active' },
+  { value: 'published', label: 'Published' },
   { value: 'temporary_closed', label: 'Temporary Closed' },
   { value: 'permanently_closed', label: 'Permanently Closed' },
   { value: 'reopen', label: 'Reopen' },
@@ -45,7 +45,7 @@ const AdvertisementEditForm = () => {
   const [examTests, setExamTests] = useState(FALLBACK_TESTS);
   const [testTypes, setTestTypes] = useState([]);
   const [subjects, setSubjects] = useState([]);
-  const [status, setStatus] = useState("active");
+  const [status, setStatus] = useState("published");
   const [extendDate, setExtendDate] = useState("");
   const [isPublished, setIsPublished] = useState(false);
 
@@ -329,7 +329,7 @@ const AdvertisementEditForm = () => {
           setAdvertisementFee(data.advertisement_fee || "");
           setNote(data.note || data.notes || data.ad_note || "");
           setImportantNotes(data.important_notes || "");
-          setStatus(data.status || "active");
+          setStatus(data.status || (data.publish_date ? "published" : "pending"));
           setExtendDate(data.extend_date?.split("T")[0] || "");
           setIsPublished(!!data.publish_date);
 
@@ -489,7 +489,7 @@ const AdvertisementEditForm = () => {
         note: note || "",
         important_notes: importantNotes || "",
         terms_conditions: filteredTerms,
-        status: isPublished ? status : "active",
+        status: isPublished ? status : "pending",
         extend_date: status === "extend_date" ? (extendDate || null) : null,
         job_fees: JSON.stringify(feesPayload),
         job_test_types: JSON.stringify(testTypesPayload),
