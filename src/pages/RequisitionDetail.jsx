@@ -13,6 +13,21 @@ import RequisitionStatementApi from 'api/requisitionStatementApi';
 import { extractFilePath, getPersistedDraftFilePath } from 'utils';
 import { isAdminUser } from 'utils/permissions';
 
+// Derive the origin of a requisition from its status string — mirrors the
+// same logic used in the admin Requisition list (RequisitionList.jsx) so the
+// detail view classifies a requisition identically. "department"/"received
+// from" → department-created; "admin"/"created by" → admin-created.
+const getRequisitionSource = (status) => {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized.includes('department') || normalized.includes('received from')) {
+    return 'department';
+  }
+  if (normalized.includes('admin') || normalized.includes('created by')) {
+    return 'admin';
+  }
+  return '';
+};
+
 // Convert a 1-based index to a lowercase roman numeral (1 -> i, 2 -> ii, ...)
 const toRoman = (num) => {
   const map = [
@@ -58,6 +73,7 @@ const RequisitionDetail = () => {
   const [gradeOptions, setGradeOptions] = useState([]);
   const [statements, setStatements] = useState([]);
   const [secretarySignature, setSecretarySignature] = useState(null);
+  const [secretaryStamp, setSecretaryStamp] = useState(null);
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -69,6 +85,7 @@ const RequisitionDetail = () => {
     fetchGrades();
     fetchStatements();
     fetchSecretarySignature();
+    fetchSecretaryStamp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -120,6 +137,33 @@ const RequisitionDetail = () => {
       );
     } catch {
       setSecretarySignature(null);
+    }
+  };
+
+  // Fetch the active official stamp shown beside the secretary's
+  // signature at the bottom of the requisition. The stamp list lives
+  // under settings; we pick the first record whose status is active.
+  const fetchSecretaryStamp = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/settings/stamp?per_page=200`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          Accept: 'application/json',
+          'X-API-KEY': API_KEY,
+        },
+      });
+      const result = await response.json();
+      const records = result.data?.data ?? result.data ?? [];
+
+      const active = (Array.isArray(records) ? records : []).find(
+        (record) => String(record.status ?? 'active').trim().toLowerCase() === 'active'
+      );
+
+      setSecretaryStamp(
+        active ? resolveSignatureImage(active.image ?? active.image_url) : null
+      );
+    } catch {
+      setSecretaryStamp(null);
     }
   };
 
@@ -256,6 +300,12 @@ const RequisitionDetail = () => {
     ? ((requisition.eligibility?.merit_type ?? requisition.merit_type) === 'open_merit')
     : false;
 
+  // The official stamp is only printed on admin-created requisitions.
+  // Department-created requisitions leave a blank line for a physical stamp.
+  const isAdminRequisition = requisition
+    ? getRequisitionSource(requisition.requisition_status) === 'admin'
+    : false;
+
   const fetchRequisition = async () => {
     setLoading(true);
     try {
@@ -277,9 +327,9 @@ const RequisitionDetail = () => {
         const normalized = {
           // Preserve the hash_id from the URL params and/or API response
           hash_id: data.hash_id ?? data.id ?? id,
-          requisition_status: data.requisition_status
-            ?? responseData.requisition_status
-            ?? step1.requisition_status,
+          // Origin status (e.g. "Created by Admin" / "Received from Department")
+          // — used to decide whether the official stamp is shown.
+          requisition_status: data.requisition_status ?? responseData.requisition_status ?? null,
           // Step 1 — Job Details
           designation:     data.designation     ?? step1.designation,
           scale:           data.scale           ?? step1.scale,
@@ -961,7 +1011,18 @@ const RequisitionDetail = () => {
               <><b>{secretarySignature.name}</b><br /></>
             )}
             Date: ______________________<br />
-            Stamp: ______________________
+            {secretaryStamp && isAdminRequisition ? (
+              <span style={styles.stampLine}>
+                Stamp:&nbsp;
+                <img
+                  src={secretaryStamp}
+                  alt="Official stamp"
+                  style={styles.stampImage}
+                />
+              </span>
+            ) : (
+              <>Stamp: ______________________</>
+            )}
           </div>
         </div>
       </div>
@@ -1091,6 +1152,16 @@ const styles = {
     objectFit: 'contain',
     objectPosition: 'right center',
     marginBottom: '6px',
+  },
+  stampLine: {
+    display: 'inline-flex',
+    alignItems: 'center',
+  },
+  stampImage: {
+    width: '120px',
+    height: '120px',
+    objectFit: 'contain',
+    objectPosition: 'right center',
   },
 };
 

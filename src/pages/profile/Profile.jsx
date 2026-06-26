@@ -1,13 +1,25 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TextField } from '@mui/material';
 import { useAuth } from 'context/AuthContext';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from 'components/ui/Card';
-import { User, Mail, Phone, MapPin, Save, Lock, ArrowLeft, KeyRound, PenTool, Upload, Eraser, X } from 'lucide-react';
+import { User, Mail, Phone, Save, Lock, ArrowLeft, KeyRound, PenTool, Upload, Eraser, X } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+
+// Resolve a stored signature value to something an <img> can render: pass
+// through data-URLs and absolute URLs as-is, and prefix server-relative paths
+// with the API origin. Mirrors the resolver used on the requisition detail page.
+const resolveSignatureUrl = (path) => {
+  if (!path) return '';
+  const imagePath = String(path).trim();
+  if (!imagePath) return '';
+  if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('data:')) return imagePath;
+  const baseUrl = Config.apiUrl.replace(/\/api\/v1\/?$/, '');
+  return `${baseUrl}/${imagePath.replace(/^\/+/, '')}`;
+};
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -46,7 +58,6 @@ const Profile = () => {
     name: user?.name || user?.username || '',
     email: user?.email || '',
     phone: user?.phone || '',
-    address: user?.address || '',
     username: user?.username || '',
   });
 
@@ -63,11 +74,54 @@ const Profile = () => {
   /* ── Signature: user chooses ONE of draw or upload ── */
   const [sigMode, setSigMode] = useState('draw'); // 'draw' | 'upload'
   const [sigHasDrawn, setSigHasDrawn] = useState(false);
-  const [sigUploadPreview, setSigUploadPreview] = useState(user?.signature || '');
+  const [sigUploadPreview, setSigUploadPreview] = useState(resolveSignatureUrl(user?.signature));
+  // Previously-saved signature (drawn or uploaded) — shown as a reference so the
+  // user can see their current signature regardless of how it was originally set.
+  const [existingSignature, setExistingSignature] = useState(resolveSignatureUrl(user?.signature));
   const sigCanvasRef = useRef(null);
   const sigFileInputRef = useRef(null);
   const sigDrawing = useRef(false);
   const sigLastPos = useRef({ x: 0, y: 0 });
+
+  // Pull the latest profile from the API so the edit form always reflects the
+  // server's saved values (name, email, phone, username) and the stored
+  // signature, rather than the possibly-stale cached user.
+  useEffect(() => {
+    let active = true;
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/user`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept: 'application/json',
+            'X-API-KEY': Config.apiKey,
+          },
+        });
+        const result = await res.json().catch(() => null);
+        const data = result?.data?.user ?? result?.data ?? result?.user ?? null;
+        if (!active || !data || typeof data !== 'object') return;
+
+        setForm({
+          name: data.name || data.username || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          username: data.username || '',
+        });
+
+        const savedSignature = resolveSignatureUrl(
+          data.signature ?? data.signature_url ?? data.signature_image ?? data.signature_path
+        );
+        if (savedSignature) {
+          setExistingSignature(savedSignature);
+          setSigUploadPreview(savedSignature);
+        }
+      } catch {
+        /* keep the context-provided values on failure */
+      }
+    };
+    fetchProfile();
+    return () => { active = false; };
+  }, []);
 
   const switchSigMode = (mode) => {
     setSigMode(mode);
@@ -199,7 +253,6 @@ const Profile = () => {
       name: form.name,
       email: form.email,
       phone: form.phone,
-      address: form.address,
       username: form.username,
     };
 
@@ -304,10 +357,6 @@ const Profile = () => {
                   <Phone size={16} className="text-emerald-700" />
                   <span>{user?.phone || 'No phone set'}</span>
                 </div>
-                <div className="flex items-center gap-3 text-slate-700">
-                  <MapPin size={16} className="text-emerald-700" />
-                  <span className="truncate">{user?.address || 'No address set'}</span>
-                </div>
               </div>
             </div>
           </CardContent>
@@ -328,7 +377,6 @@ const Profile = () => {
                 <TextField type="email" label="Email" name="email" value={form.email} onChange={onChange} fullWidth />
                 <TextField label="Phone" name="phone" value={form.phone} onChange={onChange} fullWidth />
               </div>
-              <TextField label="Address" name="address" value={form.address} onChange={onChange} fullWidth multiline rows={3} />
 
               {/* Signature — choose ONE: draw or upload. Employees only. */}
               {isEmployee && (
@@ -358,6 +406,19 @@ const Profile = () => {
                     </button>
                   </div>
                 </div>
+
+                {/* Previously-saved signature (drawn or uploaded). Shown for
+                    reference; drawing or uploading a new one replaces it. */}
+                {existingSignature && (
+                  <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs font-medium text-slate-500 mb-2">Current signature</p>
+                    <img
+                      src={existingSignature}
+                      alt="Current signature"
+                      className="max-h-24 object-contain"
+                    />
+                  </div>
+                )}
 
                 {sigMode === 'draw' ? (
                   <div>
