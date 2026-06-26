@@ -28,6 +28,23 @@ const toRoman = (num) => {
   return result;
 };
 
+const getRequisitionSource = (status) => {
+  const normalized = String(status || '').trim().toLowerCase();
+
+  if (
+    normalized.includes('department') ||
+    normalized.includes('received from')
+  ) {
+    return 'department';
+  }
+
+  if (normalized.includes('admin') || normalized.includes('created by')) {
+    return 'admin';
+  }
+
+  return '';
+};
+
 const RequisitionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -260,6 +277,9 @@ const RequisitionDetail = () => {
         const normalized = {
           // Preserve the hash_id from the URL params and/or API response
           hash_id: data.hash_id ?? data.id ?? id,
+          requisition_status: data.requisition_status
+            ?? responseData.requisition_status
+            ?? step1.requisition_status,
           // Step 1 — Job Details
           designation:     data.designation     ?? step1.designation,
           scale:           data.scale           ?? step1.scale,
@@ -655,6 +675,9 @@ const RequisitionDetail = () => {
     return <div className="text-center py-8 text-slate-600">No requisition found.</div>;
   }
 
+  const canShowSecretarySignature =
+    getRequisitionSource(requisition.requisition_status) === 'admin';
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -924,7 +947,7 @@ const RequisitionDetail = () => {
         </div>
 
         <div style={styles.signature}>
-          {secretarySignature?.image && (
+          {canShowSecretarySignature && secretarySignature?.image && (
             <img
               src={secretarySignature.image}
               alt="Secretary digital signature"
@@ -934,7 +957,7 @@ const RequisitionDetail = () => {
           <div>
             Signature of Administrative Secretary<br />
             of the Department<br />
-            {secretarySignature?.name && (
+            {canShowSecretarySignature && secretarySignature?.name && (
               <><b>{secretarySignature.name}</b><br /></>
             )}
             Date: ______________________<br />

@@ -512,16 +512,12 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
         </div>
 
         {/* 7. Approved Syllabus (optional) */}
-        <div className="col-md-6 form-group">
+        {/*<div className="col-md-6 form-group">
           <TextField
             fullWidth
             label="Approved Syllabus (PDF File Less than 2 MB)"
             value={data.syllabus && typeof data.syllabus === 'string' ? data.syllabus.split('/').pop() : ''}
-            // Render the native file input inside the TextField's outlined
-            // container so it picks up the same 56px height + label + border
-            // style as the Department field above. We use a custom render
-            // via InputProps so the file input is overlaid (clicking the
-            // outlined region opens the file picker).
+            
             InputProps={{
               readOnly: true,
               startAdornment: (
@@ -544,7 +540,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
                 </InputAdornment>
               ),
             }}
-            // Show the actual file name below the field once selected
+            
             helperText={
               (formData.syllabus && formData.syllabus instanceof File)
                 ? `Selected: ${formData.syllabus.name}`
@@ -554,7 +550,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
             }
             inputProps={{ readOnly: true }}
           />
-        </div>
+        </div>*/}
 
         {/* 8. Service Rule */}
         <div className="col-md-6 form-group">

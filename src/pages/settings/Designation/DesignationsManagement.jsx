@@ -29,6 +29,24 @@ const PERM = "settings.designations";
 
 const API_BASE = Config.apiUrl;
 
+const DESIGNATION_TYPE_OPTIONS = [
+  { value: "Internal", label: "Internal" },
+  { value: "External", label: "External" },
+];
+
+const normalizeDesignationType = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (normalized === "internal") return "Internal";
+  if (normalized === "external") return "External";
+
+  return value ? String(value).trim() : "";
+};
+
+const getDesignationType = (item) => {
+  return item?.type ?? item?.designation_type ?? item?.designationType ?? "";
+};
+
 const getHeaders = (json = true) => {
   const h = {
     Authorization: `Bearer ${AuthService.getToken()}`,
@@ -137,18 +155,19 @@ const DesignationsManagement = () => {
         const dataArray = result.data?.data || result.data || [];
 
         const formatted = dataArray
-          .filter(
-            (item) => String(item.type || "").toLowerCase() === "internal"
-          )
-          .map((item) => ({
-            id: item.hash_id,
-            hash_id: item.hash_id,
-            name: item.name,
-            grade_id: item.grade_id,
-            grade_name: item.grade?.name || item.grade_name || "",
-            type: item.type,
-            status: item.status ?? "active",
-          }));
+          .map((item) => {
+            const type = normalizeDesignationType(getDesignationType(item));
+
+            return {
+              id: item.hash_id,
+              hash_id: item.hash_id,
+              name: item.name,
+              grade_id: item.grade_id,
+              grade_name: item.grade?.name || item.grade_name || "",
+              type,
+              status: item.status ?? "active",
+            };
+          });
 
         setRows(formatted);
         setTotal(result.data?.total || formatted.length);
@@ -539,7 +558,7 @@ const DesignationsManagement = () => {
                 setFormData({
                   name: selectedRow.name || "",
                   grade_id: String(selectedRow.grade_id ?? selectedRow.grade?.id ?? ""),
-                  type: selectedRow.type || "Internal",
+                  type: normalizeDesignationType(selectedRow.type) || "Internal",
                   status: selectedRow.status || "active",
                 });
 
@@ -617,8 +636,11 @@ const DesignationsManagement = () => {
                 setFormData({ ...formData, type: e.target.value })
               }
             >
-              <MenuItem value="Internal">Internal</MenuItem>
-              <MenuItem value="External">External</MenuItem>
+              {DESIGNATION_TYPE_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
             </TextField>
 
 

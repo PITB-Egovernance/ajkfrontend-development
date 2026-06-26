@@ -712,7 +712,7 @@ const RequisitionList = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {localDraftMeta?.temp_id && (
+            {requisitionSourceTab === "admin" && localDraftMeta?.temp_id && (
               <Link
                 to={`/dashboard/requisitions/create?temp_id=${encodeURIComponent(localDraftMeta.temp_id)}&step=${localDraftMeta.step || 1}`}
                 className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium flex items-center gap-2 transition-all duration-200"
@@ -1026,6 +1026,7 @@ const RequisitionList = () => {
           Upload
         </MenuItem>
         {selectedRow &&
+          getRequisitionSource(selectedRow.requisition_status) === "admin" &&
           (isDraftStatusValue(selectedRow.status) ||
             hasDraftIdentity(selectedRow)) && (
             <MenuItem
@@ -1052,10 +1053,13 @@ const RequisitionList = () => {
           </MenuItem>
         )}
 
-        <MenuItem onClick={handleTrack}>
-          <Pencil size={18} style={{ marginRight: "8px" }} />
-          Track Approval
-        </MenuItem>
+        {selectedRow &&
+          getRequisitionSource(selectedRow.requisition_status) !== "admin" && (
+            <MenuItem onClick={handleTrack}>
+              <Pencil size={18} style={{ marginRight: "8px" }} />
+              Track Approval
+            </MenuItem>
+          )}
 
         {canDelete && (
           <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
