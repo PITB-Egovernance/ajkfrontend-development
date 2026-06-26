@@ -17,16 +17,16 @@ import { isAdminUser } from 'utils/permissions';
 // same logic used in the admin Requisition list (RequisitionList.jsx) so the
 // detail view classifies a requisition identically. "department"/"received
 // from" → department-created; "admin"/"created by" → admin-created.
-const getRequisitionSource = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (normalized.includes('department') || normalized.includes('received from')) {
-    return 'department';
-  }
-  if (normalized.includes('admin') || normalized.includes('created by')) {
-    return 'admin';
-  }
-  return '';
-};
+// const getRequisitionSource = (status) => {
+//   const normalized = String(status || '').trim().toLowerCase();
+//   if (normalized.includes('department') || normalized.includes('received from')) {
+//     return 'department';
+//   }
+//   if (normalized.includes('admin') || normalized.includes('created by')) {
+//     return 'admin';
+//   }
+//   return '';
+// };
 
 // Convert a 1-based index to a lowercase roman numeral (1 -> i, 2 -> ii, ...)
 const toRoman = (num) => {
