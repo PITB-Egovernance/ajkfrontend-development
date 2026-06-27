@@ -9,6 +9,7 @@ import { Plus, ArrowLeft, MoreVertical, ScrollText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from "components/ui/ConfirmDelete";
+import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import { GRID_SX } from "utils/gridStyles";
 import { hasPermission } from "utils/permissions";
@@ -201,6 +202,8 @@ const RollNumberSlipInstructions = () => {
   const toggleStatus = async (row) => {
     const next = row.status === "active" ? "inactive" : "active";
 
+    if (!await confirmStatus({ newStatus: next })) return;
+
     // Optimistic UI: flip immediately, revert on failure.
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: next } : r)));
 
@@ -250,18 +253,13 @@ const RollNumberSlipInstructions = () => {
     {
       field: "status", headerName: "Status", width: 130,
       renderCell: (p) => (
-        <div className="flex items-center gap-1">
-          <Switch
-            size="small"
-            checked={p.value === "active"}
-            onChange={() => canEdit && toggleStatus(p.row)}
-            disabled={!canEdit}
-            color="success"
-          />
-          <span className={`text-xs font-medium ${p.value === "active" ? "text-emerald-700" : "text-slate-400"}`}>
-            {p.value === "active" ? "Active" : "Inactive"}
-          </span>
-        </div>
+        <Switch
+          size="small"
+          checked={p.value === "active"}
+          onChange={() => canEdit && toggleStatus(p.row)}
+          disabled={!canEdit}
+          color="success"
+        />
       ),
     },
     ...(canRowActions ? [{
