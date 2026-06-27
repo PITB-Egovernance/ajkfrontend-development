@@ -44,8 +44,7 @@ const stripHtml      = (html) => String(html || "").replace(/<[^>]*>/g, " ").rep
 
 const EMPTY_FORM = {
   slip_text_type: "",
-  slip_text:        "",
-  status:         "active",
+  slip_text:      "",
 };
 
 const RollNumberSlipInstructions = () => {
@@ -129,7 +128,6 @@ const RollNumberSlipInstructions = () => {
     setForm({
       slip_text_type: r.slip_text_type || "note",
       slip_text:      r.slip_text || r.slip_text || r.text || "",
-      status:         r.status || "active",
     });
     setOpen(true);
   };
@@ -146,8 +144,8 @@ const RollNumberSlipInstructions = () => {
       const isUpdate = !!editing;
       const payload = {
         slip_text_type: form.slip_text_type,
-        slip_text:        form.slip_text,
-        status:         form.status,
+        slip_text:      form.slip_text,
+        status:         isUpdate ? (editing.status || "active") : "active",
       };
 
       const url = isUpdate
@@ -155,8 +153,7 @@ const RollNumberSlipInstructions = () => {
         : `${API_BASE}/settings/roll-number-slip-instructions/store`;
 
       const res    = await fetch(url, {
-        // The update route only accepts PUT; create (store) uses POST.
-        method: isUpdate ? "PUT" : "POST",
+        method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify(payload),
       });
@@ -252,10 +249,20 @@ const RollNumberSlipInstructions = () => {
     },
     {
       field: "status", headerName: "Status", width: 130,
-      renderCell: (p) => {
-        const s = STATUSES.find((x) => x.value === p.value);
-        return <Chip size="small" label={s?.label || p.value} color={s?.color || "default"} variant="outlined" />;
-      },
+      renderCell: (p) => (
+        <div className="flex items-center gap-1">
+          <Switch
+            size="small"
+            checked={p.value === "active"}
+            onChange={() => canEdit && toggleStatus(p.row)}
+            disabled={!canEdit}
+            color="success"
+          />
+          <span className={`text-xs font-medium ${p.value === "active" ? "text-emerald-700" : "text-slate-400"}`}>
+            {p.value === "active" ? "Active" : "Inactive"}
+          </span>
+        </div>
+      ),
     },
     ...(canRowActions ? [{
       field: "actions", headerName: "Actions", width: 75, sortable: false,
@@ -351,17 +358,11 @@ const RollNumberSlipInstructions = () => {
           </DialogTitle>
 
           <DialogContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
-              {/* Slip text type */}
+            <div className="mt-1">
               <TextField select fullWidth label="Slip Text Type" margin="dense" size="small"
                 value={form.slip_text_type} onChange={(e) => setField("slip_text_type", e.target.value)}>
+                <MenuItem value="" disabled>Select Slip Text Type</MenuItem>
                 {SLIP_TEXT_TYPES.map((t) => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
-              </TextField>
-
-              {/* Status — Active / Inactive */}
-              <TextField select fullWidth label="Status" margin="dense" size="small"
-                value={form.status} onChange={(e) => setField("status", e.target.value)}>
-                {STATUSES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
               </TextField>
             </div>
 
