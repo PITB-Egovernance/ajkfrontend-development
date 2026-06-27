@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Download, 
+import {
+  Download,
   AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -11,15 +10,6 @@ import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
-
-const STATUS_BADGES = {
-  active:              { label: 'Active',             className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
-  published:           { label: 'Published',          className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
-  temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-100 text-amber-700' },
-  permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-100 text-red-700' },
-  reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-100 text-blue-700' },
-  extend_date:         { label: 'Extended',           className: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
-};
 
 const AdvertisementDetail = () => {
   /* ── HOOKS & STATE ── */
@@ -369,11 +359,6 @@ const AdvertisementDetail = () => {
     }
   };
 
-  const getRomanNumeral = (num) => {
-    const roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', 'xi', 'xii', 'xiii', 'xiv', 'xv', 'xvi', 'xvii', 'xviii', 'xix', 'xx'];
-    return roman[num - 1] || String(num);
-  };
-
   const getQualificationText = (job) => {
     const q = job.qualification;
     if (!q) return 'N/A';
@@ -475,6 +460,10 @@ const AdvertisementDetail = () => {
 
   const termsList = parseTerms(advertisement.terms_conditions);
 
+  // Running serial number across ALL departments/posts (1, 2, 3 ...).
+  // Reset on every render; the JSX maps execute top-to-bottom in order.
+  let serialNo = 0;
+
   return (
     <div className="p-6 min-h-screen adv-sheet-container">
       <style>{`
@@ -482,94 +471,248 @@ const AdvertisementDetail = () => {
           background: #e9ebe9;
           color: #1a1a1a;
           font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-          font-size: 12.5px;
-          line-height: 1.5;
+          font-size: 12px;
+          line-height: 1.32;
         }
         .adv-sheet {
           background: #ffffff;
           width: 210mm;
-          min-height: 297mm;
-          margin: 14px auto;
-          padding: 18mm 16mm;
+          margin: 8px auto;
+          border-collapse: collapse;
           box-shadow: 0 1px 8px rgba(0,0,0,.15);
+        }
+        .adv-print-cell {
+          padding: 0;
+        }
+        .adv-print-inner {
+          display: flex;
+          flex-direction: column;
+          min-height: 297mm;
+          padding: 4mm 11mm 9mm;
           box-sizing: border-box;
+        }
+        .adv-footer {
+          margin-top: auto;
+        }
+        /* Top/bottom margin spacers are print-only. */
+        .adv-print-pad,
+        .adv-print-foot {
+          display: none;
         }
         .adv-sheet * {
           box-sizing: border-box;
         }
         .adv-masthead {
+          position: relative;
           text-align: center;
-          border-bottom: 3px double #14532d;
-          padding-bottom: 12px;
+          border-bottom: 2px solid #14532d;
+          padding-bottom: 8px;
+        }
+        .adv-mast-info {
+          position: absolute;
+          top: 0;
+          left: 0;
+          text-align: left;
+        }
+        .adv-mast-info .adv-name {
+          font-size: 12.5px;
+          font-weight: 800;
+          color: #14532d;
+          line-height: 1.2;
+          white-space: nowrap;
+        }
+        .adv-mast-info .adv-dates {
+          font-size: 9.5px;
+          color: #888;
+          margin-top: 2px;
+          line-height: 1.4;
+          white-space: nowrap;
+        }
+        .adv-mast-info .adv-dates b {
+          color: #1a1a1a;
+          font-weight: 700;
+        }
+        .adv-mast-actions {
+          position: absolute;
+          top: 0;
+          right: 0;
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 10px;
+        }
+        .adv-print-btn,
+        .adv-apply-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 12.5px;
+          padding: 4px 8px;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          color: #fff;
+          white-space: nowrap;
+          transition: background .15s ease, color .15s ease;
+        }
+        .adv-print-btn {
+          background: #047857;
+        }
+        .adv-print-btn:hover {
+          background: #065f46;
+        }
+        .adv-apply-btn {
+          background: #9a7b1e;
+        }
+        .adv-apply-btn:hover {
+          background: #7d6418;
+        }
+        .adv-mast-center {
+          text-align: center;
         }
         .adv-crest-img {
-          width: 60px;
-          height: 60px;
-          margin: 0 auto 8px;
+          width: 52px;
+          height: 52px;
+          margin: 0 auto 3px;
           display: block;
           object-fit: contain;
         }
-        .adv-gov {
-          font-size: 14px;
-          letter-spacing: .18em;
-          text-transform: uppercase;
-          color: #14532d;
-          font-weight: 800;
-        }
-        .adv-org {
+        .adv-title {
           font-family: Georgia, "Times New Roman", serif;
-          font-size: 24px;
+          font-size: 13px;
           font-weight: 700;
           color: #14532d;
-          margin: 3px 0 1px;
           letter-spacing: .01em;
+          white-space: nowrap;
         }
-        .adv-seat {
-          font-size: 13px;
+        .adv-dept-center {
+          text-align: center;
+          font-family: Georgia, serif;
+          font-size: 14px;
+          font-weight: 700;
           color: #14532d;
-          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: .04em;
+          // margin: 7px 0 0;
+          background: #cdded2;
+          padding: 5px 8px;
+          border: 1px solid #8a958a;
+          border-bottom: none;
+          border-radius: 4px 4px 0 0;
         }
-        .adv-web {
-          font-size: 11.5px;
-          color: #14532d;
+        .adv-dept-center + .adv-post {
+          border-top: none;
+          border-top-left-radius: 0;
+          border-top-right-radius: 0;
+        }
+        .adv-dept-center .adv-dept-total {
+          font-family: "Segoe UI", sans-serif;
+          font-size: 10px;
           font-weight: 600;
+          color: #555;
+          text-transform: none;
+          letter-spacing: 0;
         }
-        .adv-bar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 10px;
-          margin-top: 12px;
+        table.adv-req {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+        }
+        table.adv-req th {
           background: #14532d;
           color: #fff;
-          padding: 8px 16px;
-          border-radius: 3px;
+          font-size: 9px;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+          font-weight: 700;
+          padding: 3px 8px;
+          border: 1px solid #8a958a;
+          text-align: center;
         }
-        .adv-bar .adv-no {
+        /* table-layout: fixed takes column widths from the first (header) row. */
+        table.adv-req th:nth-child(1) { width: 7%; }
+        table.adv-req th:nth-child(2) { width: 12%; }
+        table.adv-req th:nth-child(3) { width: 39%; }
+        table.adv-req th:nth-child(4) { width: 42%; }
+        table.adv-req td {
+          border: 1px solid #cdd3cd;
+          padding: 5px 8px;
+          vertical-align: top;
+          font-size: 11px;
+        }
+        table.adv-req td.sr-col {
+          text-align: center;
+          vertical-align: middle;
           font-family: Georgia, serif;
-          font-size: 15px;
           font-weight: 700;
-          letter-spacing: .04em;
+          font-size: 11px;
+          color: #9a7b1e;
         }
-        .adv-bar .deadline {
-          font-size: 12px;
-          text-align: right;
-          color: #fff;
+        table.adv-req td.case-col {
+          text-align: center;
+          vertical-align: middle;
+          font-family: Georgia, serif;
+          font-weight: 700;
+          font-size: 10px;
+          color: #14532d;
+          word-break: break-all;
         }
-        .adv-bar .deadline b {
+        table.adv-req td.desc-col { text-align: left; }
+        table.adv-req td.qual-col { text-align: justify; }
+        table.adv-req th:first-child,
+        table.adv-req td:first-child {
+          border-left: none;
+        }
+        table.adv-req th:last-child,
+        table.adv-req td:last-child {
+          border-right: none;
+        }
+        .adv-req .kv {
           display: block;
-          font-size: 14px;
+          margin-bottom: 2px;
+        }
+        .adv-req .kv b {
+          color: #14532d;
           font-weight: 700;
+        }
+        .adv-districts {
+          padding: 5px 10px;
+          border-top: 1px solid #cdd3cd;
+          background: #f4f7f4;
+          font-size: 11px;
+          color: #1a1a1a;
+        }
+        .adv-districts .d-lbl {
+          font-weight: 700;
+          color: #14532d;
+          text-transform: uppercase;
+          font-size: 9.5px;
+          letter-spacing: .08em;
+          margin-right: 6px;
         }
         h3.adv-block-title {
           font-family: Georgia, serif;
-          font-size: 15px;
+          font-size: 14px;
           color: #14532d;
-          margin: 22px 0 8px;
-          padding-bottom: 4px;
+          margin: 12px 0 6px;
+          padding-bottom: 3px;
           border-bottom: 1.5px solid #8a958a;
           text-transform: uppercase;
           letter-spacing: .06em;
+        }
+        .adv-important-note {
+          margin: 8px 0;
+          padding: 6px 0;
+          font-size: 11px;
+          color: #1a1a1a;
+          text-align: justify;
+          white-space: pre-line;
+        }
+        .adv-important-note b {
+          color: #9a7b1e;
+          text-transform: uppercase;
+          letter-spacing: .04em;
+          font-size: 10.5px;
         }
         ol.adv-notes, ol.adv-terms {
           margin: 0;
@@ -580,7 +723,7 @@ const AdvertisementDetail = () => {
         ol.adv-notes > li, ol.adv-terms > li {
           counter-increment: item;
           position: relative;
-          padding: 6px 0 6px 30px;
+          padding: 4px 0 4px 28px;
           border-bottom: 1px dotted #cdd3cd;
         }
         ol.adv-notes > li::before, ol.adv-terms > li::before {
@@ -596,9 +739,7 @@ const AdvertisementDetail = () => {
         ol.adv-terms > li:last-child, ol.adv-notes > li:last-child {
           border-bottom: none;
         }
-        .adv-dept {
-          margin-top: 18px;
-        }
+        
         .adv-dept-head {
           font-family: Georgia, serif;
           font-size: 15px;
@@ -637,7 +778,7 @@ const AdvertisementDetail = () => {
         .adv-post {
           border: 1px solid #8a958a;
           border-radius: 4px;
-          margin: 0 0 12px;
+          margin: 0 0 8px;
           overflow: hidden;
           break-inside: avoid;
           page-break-inside: avoid;
@@ -645,14 +786,18 @@ const AdvertisementDetail = () => {
         .adv-post-head {
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 10px;
           background: #e8f0ea;
-          padding: 7px 12px;
+          padding: 5px 10px;
+          border-top: 1px solid #8a958a;
           border-bottom: 1px solid #8a958a;
+          position: relative;
         }
         .adv-post-title {
           display: flex;
           align-items: baseline;
+          justify-content: center;
           gap: 8px;
           flex-wrap: wrap;
         }
@@ -683,7 +828,10 @@ const AdvertisementDetail = () => {
           border-radius: 9px;
         }
         .adv-post-vacancies {
-          margin-left: auto;
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
           text-align: center;
           line-height: 1;
           flex: 0 0 auto;
@@ -824,6 +972,10 @@ const AdvertisementDetail = () => {
         }
 
         @media print {
+          /* margin: 0 leaves the browser NO room to draw its header/footer
+             (the localhost URL + page number), so they never print. Page
+             margins are instead recreated below with a CSS table so they
+             repeat on EVERY page (top + bottom + sides). */
           @page {
             size: A4;
             margin: 0;
@@ -835,12 +987,24 @@ const AdvertisementDetail = () => {
             width: 100% !important;
             height: auto !important;
           }
+          .adv-sheet, .adv-sheet * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
           aside, nav, header, footer, .no-print, .sticky, button, [role="navigation"], [class*="sidebar"], [class*="navbar"], .fixed.inset-0, [class*="backdrop-blur"] {
             display: none !important;
             width: 0 !important;
             height: 0 !important;
             overflow: hidden !important;
             opacity: 0 !important;
+          }
+          .adv-post-head {
+            display: flex !important;
+            width: auto !important;
+            height: auto !important;
+            overflow: visible !important;
+            opacity: 1 !important;
           }
           #root,
           .min-h-screen,
@@ -868,30 +1032,90 @@ const AdvertisementDetail = () => {
             position: static !important;
             float: none !important;
           }
+          /* Real <table>: the browser repeats <thead> at the top and <tfoot>
+             at the bottom of EVERY printed page, so the empty spacer rows
+             become consistent top + bottom margins on page 1, 2, 3 ...
+             Side margins come from the content cell's L/R padding. This is
+             reliable in Chrome where display:table-* on divs is not. */
           .adv-sheet {
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            padding: 15mm 15mm !important;
+            padding: 0 !important;
             box-shadow: none !important;
             border: none !important;
             background: #fff !important;
           }
+          .adv-print-pad,
+          .adv-print-foot {
+            display: table-header-group !important;
+          }
+          /* Top margin spacer — repeats on EVERY page. */
+          .adv-print-pad-cell {
+            height: 14mm !important;
+            line-height: 14mm !important;
+            font-size: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+          }
+          /* Bottom margin spacer — repeats on EVERY page. */
+          .adv-print-foot {
+            display: table-footer-group !important;
+          }
+          .adv-print-foot-cell {
+            height: 12mm !important;
+            line-height: 12mm !important;
+            font-size: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+          }
+          .adv-print-body {
+            display: table-row-group !important;
+          }
+          /* Side margins on every page. */
+          .adv-print-cell {
+            padding: 0 14mm !important;
+          }
+          .adv-print-inner {
+            display: block !important;
+            min-height: 0 !important;
+            padding: 0 !important;
+          }
+          /* Keep a department band glued to its first post (no orphan heading). */
           .adv-dept {
             break-inside: auto;
             page-break-inside: auto;
           }
+          .adv-dept-lead {
+            break-inside: auto;
+            page-break-inside: auto;
+          }
+          .adv-dept-center {
+            break-after: avoid;
+            page-break-after: avoid;
+          }
+          h3.adv-block-title {
+            break-after: avoid;
+            page-break-after: avoid;
+          }
+          /* A single post never splits across pages. */
           .adv-post {
             break-inside: avoid;
             page-break-inside: avoid;
           }
-          .adv-dept-head, h3.adv-block-title {
-            break-after: avoid;
-            page-break-after: avoid;
-          }
-          .adv-meta, .adv-qual, .adv-post-note {
+          .adv-req, .adv-districts, .adv-post-note {
             break-inside: avoid;
             page-break-inside: avoid;
+          }
+          /* Signature/note: stay intact, drop to the bottom of the last page,
+             and never start a fresh page on their own — pull the preceding
+             content (terms / last post) along so there is no blank page. */
+          .adv-footer {
+            margin-top: auto;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            break-before: avoid;
+            page-break-before: avoid;
           }
           .adv-signoff, .adv-disclaimer {
             break-inside: avoid;
@@ -901,124 +1125,66 @@ const AdvertisementDetail = () => {
       `}</style>
 
       <div className="mx-auto" style={{ maxWidth: '210mm' }}>
-        {/* ── TOOLBAR SECTION (no-print) ── */}
-        <div
-          className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-6"
-          style={{ position: 'sticky', top: '72px', zIndex: 20 }}
-        >
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => navigate('/dashboard/advertisement-records')}
-              className="p-2 bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-all border border-slate-200"
-              title="Back"
-            >
-              <ArrowLeft size={18} />
-            </button>
+        {/* ── MAIN A4 SHEET VIEW ──
+            A real <table> so the browser repeats <thead>/<tfoot> on every
+            printed page, producing consistent top/bottom margins without any
+            browser header/footer (URL or page number). Hidden on screen. */}
+        <table className="adv-sheet">
+          <thead className="adv-print-pad" aria-hidden="true">
+            <tr>
+              <td className="adv-print-pad-cell">&nbsp;</td>
+            </tr>
+          </thead>
+          <tfoot className="adv-print-foot" aria-hidden="true">
+            <tr>
+              <td className="adv-print-foot-cell">&nbsp;</td>
+            </tr>
+          </tfoot>
 
-            <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                  ID: {advertisement.hash_id}
-                </span>
-
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                  advertisement.publish_date
-                    ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
-                    : (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).className
-                }`}>
-                  {advertisement.publish_date
-                    ? 'Published'
-                    : (STATUS_BADGES[advertisement.status] || STATUS_BADGES.active).label}
-                </span>
-
-                {advertisement.secretary_name && (
-                  <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                    Secretary: {advertisement.secretary_name}
-                  </span>
-                )}
-
-                {advertisement.publish_date && (
-                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
-                    Published: {formatDate(advertisement.publish_date)}
-                  </span>
-                )}
+          <tbody className="adv-print-body">
+            <tr>
+            <td className="adv-print-cell">
+            <div className="adv-print-inner">
+            <div className="adv-masthead">
+            <div className="adv-mast-info">
+              <div className="adv-name">
+                {advertisement.advertisement_name || advertisement.adv_number}
               </div>
-
-              <h1 className="text-lg font-black text-slate-800">
-                {advertisement.adv_number}
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-sm shadow transition-all"
-            >
-              <Download size={16} /> Print Advertisement
-            </button>
-          </div>
-        </div>
-
-        {/* ── MAIN A4 SHEET VIEW ── */}
-        <div className="adv-sheet">
-          <div className="adv-masthead">
-            <img 
-              src="/assets/img/favicon/Logo.png" 
-              alt="Azad Jammu & Kashmir Crest" 
-              className="adv-crest-img" 
-            />
-
-            <div className="adv-gov">
-              Azad Government of the State of Jammu &amp; Kashmir
-            </div>
-
-            <div className="adv-seat">Jalalabad, Muzaffarabad</div>
-            <div className="adv-web">https://ajkpsc.punjab.gov.pk/</div>
-
-            <div className="adv-bar">
-              <div className="adv-no">{advertisement.adv_number}</div>
-
-              <div className="deadline">
-                Last date for receipt of applications
-                <b>{formatDate(advertisement.closing_date)}</b>
+              <div className="adv-dates">
+                Closing Date: <b>{formatDate(advertisement.closing_date)}</b>
               </div>
             </div>
+
+            <div className="adv-mast-center">
+              <img
+                src="/assets/img/favicon/Logo.png"
+                alt="Azad Jammu & Kashmir Crest"
+                className="adv-crest-img"
+              />
+              <div className="adv-title">
+                Azad Government of the State of Jammu &amp; Kashmir, Jalalabad, Muzaffarabad
+              </div>
+            </div>
+
+            <div className="adv-mast-actions no-print">
+              <button onClick={() => window.print()} className="adv-print-btn">
+                <Download size={14} /> Print Advertisement
+              </button>
+            </div>
           </div>
 
-          <h3 className="adv-block-title">Important Note</h3>
-
-          <ol className="adv-notes">
-            {advertisement.important_notes ? (
-              <li style={{ whiteSpace: 'pre-line' }}>
-                {advertisement.important_notes}
-              </li>
-            ) : (
-              <li>
-                Applicants must apply <strong>online only</strong> through the Commission’s official website{' '}
-                <strong>https://ajkpsc.punjab.gov.pk/</strong>. The application must be complete in all respects and the candidate
-                must possess the prescribed qualification / eligibility under the rules. Incomplete applications, or
-                those received after the last date, will not be entertained.
-              </li>
-            )}
-          </ol>
-
-          <h3 className="adv-block-title">Posts &amp; Eligibility</h3>
+          {(advertisement.important_notes ||
+            'The application must be complete in all respects and the candidate must possess the prescribed qualification / eligibility under the rules. Incomplete applications, or those received after the last date, will not be entertained.') && (
+            <p className="adv-important-note">
+              <b>Important Note:</b>{' '}
+              {advertisement.important_notes ||
+                'The application must be complete in all respects and the candidate must possess the prescribed qualification / eligibility under the rules. Incomplete applications, or those received after the last date, will not be entertained.'}
+            </p>
+          )}
 
           {groupedJobs.map((dept, deptIdx) => (
             <section key={deptIdx} className="adv-dept">
-              <div className="adv-dept-lead">
-                <h2 className="adv-dept-head">
-                  <span className="adv-dept-no">{deptIdx + 1}</span>
-
-                  {dept.name}
-
-                  <span className="adv-dept-total">
-                    {dept.totalPosts} {dept.totalPosts === 1 ? 'post' : 'posts'}
-                  </span>
-                </h2>
-
-                {dept.jobs.map((job, jobIdx) => {
+              {dept.jobs.map((job, jobIdx) => {
                   const jobSubjects = getJobSubjects(job);
                   const examTypeName = getTestTypeName(
                     job.pivot?.test_type ||
@@ -1036,11 +1202,36 @@ const AdvertisementDetail = () => {
                     job.exam_stage
                   );
 
+                  const quotaLabel = (() => {
+                    const mt = job.eligibility?.merit_type || '';
+                    if (mt === 'open_merit') return 'Open Merit';
+                    if (mt === 'quota_wise') return 'Quota Base';
+                    return job.multiple_posts?.length > 0 ? 'Quota Base' : 'Open Merit';
+                  })();
+                  const isOpenQuota = quotaLabel === 'Open Merit';
+                  const currentSerial = ++serialNo;
+
+                  const districtsNote =
+                    job.multiple_posts?.length > 0
+                      ? job.multiple_posts
+                          .map((mp) => `${getDistrictName(mp.district)} ${mp.post || ''}`.trim())
+                          .join(', ')
+                      : districtOptions.map((d) => d.name).join(', ') || 'All AJK Districts';
+
                   return (
                     <article key={jobIdx} className="adv-post">
+                      {/* Department band only on the first post of the dept,
+                          flush at the top so it reads as this card's header. */}
+                      {jobIdx === 0 && (
+                        <div className="adv-dept-center">
+                          {dept.name}{' '}
+                          <span className="adv-dept-total">
+                            ({dept.totalPosts} {dept.totalPosts === 1 ? 'post' : 'posts'})
+                          </span>
+                        </div>
+                      )}
                       <header className="adv-post-head">
                         <div className="adv-post-title">
-                          <span className="sn">({getRomanNumeral(jobIdx + 1)})</span>
                           <span className="ptitle">{job.designation}</span>
                           <span className="bps">{getScaleName(job.scale)}</span>
                         </div>
@@ -1055,169 +1246,60 @@ const AdvertisementDetail = () => {
                         </div>
                       </header>
 
-                      <table className="adv-meta">
+                      <table className="adv-req">
+                        <thead>
+                          <tr>
+                            <th>Sr No</th>
+                            <th>Case No</th>
+                            <th>Description</th>
+                            <th>Qualification</th>
+                          </tr>
+                        </thead>
                         <tbody>
                           <tr>
-                            <td>
-                              <span className="adv-m-lbl">Case No.</span>
-                              <span className="adv-m-val">
-                                {job.hash_id || 'N/A'}
-                              </span>
-                            </td>
+                            <td className="sr-col">{currentSerial}</td>
 
-                            <td>
-                              <span className="adv-m-lbl">Quota</span>
-                              <span className="adv-m-val">
-                                {(() => {
-                                  const mt = job.eligibility?.merit_type || '';
-                                  if (mt === 'open_merit') return 'Open Merit';
-                                  if (mt === 'quota_wise') return 'Quota Base';
-                                  return job.multiple_posts?.length > 0 ? 'Quota Base' : 'Open Merit';
-                                })()}
-                              </span>
-                            </td>
+                            <td className="case-col">{job.hash_id || 'N/A'}</td>
 
-                            <td>
-                              <span className="adv-m-lbl">Age Limit</span>
-                              <span className="adv-m-val">
+                            <td className="desc-col">
+                              <span className="kv">
+                                <b>Quota:</b> {quotaLabel}
+                              </span>
+                              <span className="kv">
+                                <b>Age Limit:</b>{' '}
                                 {job.eligibility?.min_age && job.eligibility?.max_age
                                   ? `${job.eligibility.min_age} \u2013 ${job.eligibility.max_age} years`
                                   : 'N/A'}
                               </span>
-                            </td>
-                          </tr>
-
-                          <tr>
-                            <td>
-                              <span className="adv-m-lbl">Exam Test Type</span>
-                              <span className="adv-m-val">{examTypeName}</span>
-                            </td>
-
-                            <td>
-                              <span className="adv-m-lbl">Fee</span>
-                              <span className="adv-m-val">
+                              <span className="kv">
+                                <b>Gender:</b>{' '}
+                                {job.eligibility?.gender_basis || 'Male/Female'}
+                              </span>
+                              <span className="kv">
+                                <b>Exam Type:</b> {examTypeName}
+                                {isCceExamType ? ` (${cceStageName})` : ''}
+                              </span>
+                              <span className="kv">
+                                <b>Fee:</b>{' '}
                                 {job.pivot?.fee
                                   ? `Rs. ${Number(job.pivot.fee).toLocaleString()}/-`
                                   : 'Rs. 505/-'}
                               </span>
                             </td>
 
-                            <td>
-                              <span className="adv-m-lbl">Gender</span>
-                              <span className="adv-m-val">
-                                {job.eligibility?.gender_basis || 'Male/Female'}
-                              </span>
-                            </td>
-                          </tr>
-
-                          <tr>
-                            {isCceExamType && (
-                              <td>
-                                <span className="adv-m-lbl">CCE Stage</span>
-                                <span className="adv-m-val">{cceStageName}</span>
-                              </td>
-                            )}
-
-                            <td colSpan={isCceExamType ? 2 : 3}>
-                              <span className="adv-m-lbl">Total Marks</span>
-                              <span className="adv-m-val">
-                                {job.pivot?.total_marks || job.total_marks || 'N/A'}
-                              </span>
-                            </td>
-                          </tr>
-
-                          <tr>
-                            <td colSpan={3}>
-                              <span className="adv-m-lbl">District/Unit</span>
-                              <span className="adv-m-val">
-                                {job.multiple_posts?.length > 0
-                                  ? job.multiple_posts
-                                      .map((mp) => `${getDistrictName(mp.district)} ${mp.post || ''}`)
-                                      .join(', ')
-                                  : districtOptions.map((d) => d.name).join(', ') || 'All AJK Districts'}
-                              </span>
+                            <td className="qual-col">
+                              {getQualificationText(job)}
                             </td>
                           </tr>
                         </tbody>
                       </table>
 
-                      {/* Subjects Section */}
-                      {/* {jobSubjects && jobSubjects.length > 0 && (
-                        <div
-                          className="adv-qual"
-                          style={{
-                            borderTop: '1px solid #8a958a',
-                            padding: '8px 12px',
-                            background: '#f8faf8',
-                          }}
-                        >
-                          <span
-                            className="adv-q-lbl"
-                            style={{
-                              display: 'block',
-                              fontSize: '9px',
-                              letterSpacing: '.1em',
-                              textTransform: 'uppercase',
-                              color: '#14532d',
-                              fontWeight: 700,
-                              marginBottom: '4px',
-                            }}
-                          >
-                            Subjects & Marks
-                          </span>
-
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                            <thead>
-                              <tr style={{ background: '#e8f0ea' }}>
-                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'center', fontWeight: 600 }}>
-                                  #
-                                </th>
-                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>
-                                  Subject
-                                </th>
-                                <th style={{ border: '1px solid #cdd3cd', padding: '4px 8px', textAlign: 'right', fontWeight: 600 }}>
-                                  Marks
-                                </th>
-                              </tr>
-                            </thead>
-
-                            <tbody>
-                              {jobSubjects.map((subj, sIdx) => (
-                                <tr key={sIdx}>
-                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'center', color: '#555' }}>
-                                    {sIdx + 1}
-                                  </td>
-                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px' }}>
-                                    {getSubjectName(subj)}
-                                  </td>
-                                  <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'right', fontWeight: 600 }}>
-                                    {subj.marks || 0}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-
-                            <tfoot>
-                              <tr style={{ background: '#e8f0ea' }}>
-                                <td
-                                  style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'center', fontWeight: 700 }}
-                                  colSpan={2}
-                                >
-                                  Total
-                                </td>
-                                <td style={{ border: '1px solid #cdd3cd', padding: '3px 8px', textAlign: 'right', fontWeight: 700 }}>
-                                  {jobSubjects.reduce((sum, s) => sum + Number(s.marks || 0), 0)}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
+                      {!isOpenQuota && (
+                        <div className="adv-districts">
+                          <span className="d-lbl">Districts/Units</span>
+                          {districtsNote}
                         </div>
-                      )} */}
-
-                      <div className="adv-qual">
-                        <span className="adv-q-lbl">Qualification</span>
-                        <p>{getQualificationText(job)}</p>
-                      </div>
+                      )}
 
                       {job.remarks && (
                         <div className="adv-post-note">
@@ -1228,7 +1310,6 @@ const AdvertisementDetail = () => {
                     </article>
                   );
                 })}
-              </div>
             </section>
           ))}
 
@@ -1244,42 +1325,45 @@ const AdvertisementDetail = () => {
             )}
           </ol>
 
-          <div className="adv-signoff">
-            <div className="sig">
-              {secretarySignature?.image && (
-                <img
-                  src={secretarySignature.image}
-                  alt="Secretary digital signature"
-                  className="signature-image"
-                />
-              )}
-              <div className={`line ${secretarySignature?.image ? '' : 'no-signature'}`}></div>
+          <div className="adv-footer">
+            <div className="adv-signoff">
+              <div className="sig">
+                {secretarySignature?.image && (
+                  <img
+                    src={secretarySignature.image}
+                    alt="Secretary digital signature"
+                    className="signature-image"
+                  />
+                )}
+                <div className={`line ${secretarySignature?.image ? '' : 'no-signature'}`}></div>
 
-              <div className="role">
-                {advertisement.secretary_name || secretarySignature?.name || 'Secretary'}
-              </div>
+                <div className="role">
+                  {advertisement.secretary_name || secretarySignature?.name || 'Secretary'}
+                </div>
 
-              <div className="org2">
-                Secretary, AJ&K Public Service Commission
-              </div>
+                <div className="org2">Secretary</div>
 
-              <div className="date">
-                Dated:{' '}
-                {advertisement.publish_date
-                  ? formatDate(advertisement.publish_date)
-                  : formatDate(advertisement.adv_date)}
+                <div className="date">
+                  Dated:{' '}
+                  {advertisement.publish_date
+                    ? formatDate(advertisement.publish_date)
+                    : formatDate(advertisement.adv_date)}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="adv-disclaimer">
-            <b>Note:</b> This is an English-language, reformatted version prepared from the original bilingual
-            (Urdu/English) advertisement for ease of reading. The Terms &amp; Conditions have been translated from Urdu.
-            In case of any difference, the <b>original advertisement issued by the AJK Public Service Commission</b> shall
-            prevail. Please verify the closing date, fee, bank account details and other particulars on the official
-            website <b>https://ajkpsc.punjab.gov.pk/</b> before applying.
+            <div className="adv-disclaimer">
+              <b>Note:</b> This is an English-language, reformatted version prepared from the original bilingual
+              (Urdu/English) advertisement for ease of reading. The Terms &amp; Conditions have been translated from Urdu.
+              In case of any difference, the <b>original advertisement</b> shall prevail. Please verify the closing date,
+              fee, bank account details and other particulars before applying.
+            </div>
           </div>
-        </div>
+            </div>
+            </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );
