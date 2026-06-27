@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import TooltipDataGrid from "components/ui/TooltipDataGrid";
 import {
   TextField, MenuItem, IconButton, Menu, Dialog, DialogTitle,
-  DialogContent, DialogActions, Chip,
+  DialogContent, DialogActions, Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, ScrollText } from "lucide-react";
@@ -43,8 +43,8 @@ const labelForType   = (v) => SLIP_TEXT_TYPES.find((t) => t.value === v)?.label 
 const stripHtml      = (html) => String(html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
 const EMPTY_FORM = {
-  slip_text_type: "note",
-  content:        "",
+  slip_text_type: "",
+  slip_text:        "",
   status:         "active",
 };
 
@@ -83,7 +83,7 @@ const RollNumberSlipInstructions = () => {
             hash_id:        item.hash_id ?? item.id,
             sr_no:          i + 1,
             slip_text_type: item.slip_text_type ?? "note",
-            content:        item.content ?? item.text ?? "",
+            slip_text:      item.slip_text ?? item.slip_text ?? item.text ?? "",
             status:         item.status ?? "active",
           }))
         );
@@ -128,7 +128,7 @@ const RollNumberSlipInstructions = () => {
     setEditing(r);
     setForm({
       slip_text_type: r.slip_text_type || "note",
-      content:        r.content || "",
+      slip_text:      r.slip_text || r.slip_text || r.text || "",
       status:         r.status || "active",
     });
     setOpen(true);
@@ -138,14 +138,15 @@ const RollNumberSlipInstructions = () => {
 
   /* ── CREATE / UPDATE ── */
   const handleSubmit = async () => {
-    if (!stripHtml(form.content)) { toast.error("Please enter the slip text"); return; }
+    if (!form.slip_text_type) { toast.error("Please select the slip text type"); return; }
+    if (!stripHtml(form.slip_text)) { toast.error("Please enter the slip text"); return; }
 
     setSaving(true);
     try {
       const isUpdate = !!editing;
       const payload = {
         slip_text_type: form.slip_text_type,
-        content:        form.content,
+        slip_text:        form.slip_text,
         status:         form.status,
       };
 
@@ -154,7 +155,8 @@ const RollNumberSlipInstructions = () => {
         : `${API_BASE}/settings/roll-number-slip-instructions/store`;
 
       const res    = await fetch(url, {
-        method: "POST",
+        // The update route only accepts PUT; create (store) uses POST.
+        method: isUpdate ? "PUT" : "POST",
         headers: authHeaders(),
         body: JSON.stringify(payload),
       });
@@ -198,6 +200,40 @@ const RollNumberSlipInstructions = () => {
     }
   };
 
+  /* ── STATUS TOGGLE (inline, from the list) ── */
+  const toggleStatus = async (row) => {
+    const next = row.status === "active" ? "inactive" : "active";
+
+    // Optimistic UI: flip immediately, revert on failure.
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: next } : r)));
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/settings/roll-number-slip-instructions/${row.hash_id}/update`,
+        {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            slip_text_type: row.slip_text_type,
+            slip_text:      row.slip_text,
+            status:         next,
+          }),
+        }
+      );
+      const result = await res.json();
+
+      if (res.ok || result.success || result.status === 200) {
+        toast.success(`Status set to ${next === "active" ? "Active" : "Inactive"}`);
+      } else {
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: row.status } : r)));
+        toast.error(result.message || "Failed to update status");
+      }
+    } catch {
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: row.status } : r)));
+      toast.error("Failed to update status");
+    }
+  };
+
   /* ── COLUMNS ── */
   const columns = [
     { field: "sr_no", headerName: "#", width: 70 },
@@ -206,7 +242,7 @@ const RollNumberSlipInstructions = () => {
       renderCell: (p) => labelForType(p.value),
     },
     {
-      field: "content", headerName: "Text Preview", flex: 1, minWidth: 260,
+      field: "slip_text", headerName: "Text Preview", flex: 1, minWidth: 260,
       renderCell: (p) => {
         const text = stripHtml(p.value);
         return text
@@ -333,8 +369,8 @@ const RollNumberSlipInstructions = () => {
             <div className="mt-4">
               <p className="text-xs font-semibold text-slate-600 mb-1">Slip Text</p>
               <RichTextEditor
-                value={form.content}
-                onChange={(html) => setField("content", html)}
+                value={form.slip_text}
+                onChange={(html) => setField("slip_text", html)}
                 placeholder="Type the note / instruction text here…"
                 minHeight={240}
               />
