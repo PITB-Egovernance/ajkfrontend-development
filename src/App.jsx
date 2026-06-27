@@ -67,6 +67,7 @@ import WingsManagement from 'pages/settings/Wings/WingsManagement';
 import StampManagement from 'pages/settings/Stamp/StampManagement';
 import GroupsManagement from 'pages/settings/Groups/GroupsManagement';
 import NewsManagement from 'pages/settings/News/NewsManagement';
+import RollNumberSlipInstructions from 'pages/settings/RollNumberSlipInstructions/RollNumberSlipInstructions';
 import RolesManagement from 'pages/settings/Roles/RolesManagement';
 import RoleForm from 'pages/settings/Roles/RoleForm';
 import DepartmentUserList from 'pages/settings/DepartmentUsers/DepartmentUserList';
@@ -218,6 +219,7 @@ function App() {
           <Route path="settings/stamps" element={<StampManagement />} />
           <Route path="settings/groups" element={<GroupsManagement />} />
           <Route path="settings/news" element={<NewsManagement />} />
+          <Route path="settings/roll-number-slip-instructions" element={<RollNumberSlipInstructions />} />
           <Route path="settings/roles" element={<RolesManagement />} />
           <Route path="settings/roles/create" element={<RoleForm />} />
           <Route path="settings/roles/:hashId" element={<RoleForm />} />

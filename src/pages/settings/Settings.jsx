@@ -133,6 +133,14 @@ const Settings = () => {
       permModule: 'settings', permSub: 'news',
     },
     {
+      icon: ScrollText,
+      title: 'Roll Number Slip Instructions',
+      description: 'Manage note and instruction text for roll number slips',
+      iconBg: 'bg-fuchsia-600',
+      link: '/dashboard/settings/roll-number-slip-instructions',
+      permModule: 'settings', permSub: 'roll_number_slip_instructions',
+    },
+    {
       icon: ShieldCheck,
       title: 'Roles & Permissions',
       description: 'Manage roles and module access permissions',

@@ -30,6 +30,7 @@ const PERMISSION_MODULES_BASE = {
       digital_signatures: { label: 'Digital Signatures', actions: ['add', 'edit', 'delete', 'view'] },
       system_settings:    { label: 'System Settings',    actions: ['add', 'edit', 'delete', 'view'] },
       wings:              { label: 'Wings / Sections',   actions: ['add', 'edit', 'delete', 'view'] },
+      roll_number_slip_instructions: { label: 'Roll Number Slip Instructions', actions: ['add', 'edit', 'delete', 'view'] },
     },
   },
   requisitions: {
