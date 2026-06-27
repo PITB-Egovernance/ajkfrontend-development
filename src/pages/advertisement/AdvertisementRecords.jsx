@@ -39,12 +39,18 @@ const API_KEY = Config.apiKey;
 
 const STATUS_BADGES = {
   pending:             { label: 'Pending',            className: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
-  active:              { label: 'Active',             className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+  active:              { label: 'Published',          className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
   temporary_closed:    { label: 'Temporary Closed',   className: 'bg-amber-50 border-amber-200 text-amber-700' },
   permanently_closed:  { label: 'Permanently Closed', className: 'bg-red-50 border-red-200 text-red-700' },
-  reopen:              { label: 'Reopen',             className: 'bg-blue-50 border-blue-200 text-blue-700' },
-  extend_date:         { label: 'Extended',           className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+  reopen:              { label: 'Re Open',            className: 'bg-blue-50 border-blue-200 text-blue-700' },
+  extend_date:         { label: 'Extend Date',        className: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
   published:           { label: 'Published',          className: 'bg-green-50 border-green-200 text-green-700' },
+};
+
+const normalizeAdvertisementStatus = (status) => {
+  if (!status) return 'pending';
+  if (status === 'published') return 'active';
+  return status;
 };
 
 const authHeaders = () => ({
@@ -214,11 +220,12 @@ const AdvertisementRecords = () => {
       label: 'Status',
       type: 'select',
       options: [
-        { value: 'active', label: 'Active' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'active', label: 'Published' },
         { value: 'temporary_closed', label: 'Temporary Closed' },
         { value: 'permanently_closed', label: 'Permanently Closed' },
-        { value: 'reopen', label: 'Reopen' },
-        { value: 'extend_date', label: 'Extended' }
+        { value: 'reopen', label: 'Re Open' },
+        { value: 'extend_date', label: 'Extend Date' }
       ]
     }
   ];
@@ -447,7 +454,7 @@ const AdvertisementRecords = () => {
     }
 
     if (filters.status) {
-      const adStatus = ad.publish_date ? (ad.status || 'published') : 'pending';
+      const adStatus = normalizeAdvertisementStatus(ad.status);
       if (adStatus !== filters.status) return false;
     }
 
@@ -521,8 +528,7 @@ const AdvertisementRecords = () => {
       headerName: 'Status',
       width: 150,
       renderCell: (params) => {
-        const isPublished = !!params.row.publish_date;
-        const statusKey = isPublished ? (params.row.status || 'published') : 'pending';
+        const statusKey = normalizeAdvertisementStatus(params.row.status);
         const badge = STATUS_BADGES[statusKey] || STATUS_BADGES.pending;
         return (
           <div className="flex items-center h-full">

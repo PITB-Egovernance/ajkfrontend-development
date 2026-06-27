@@ -20,12 +20,19 @@ const CCE_STAGES = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'published', label: 'Published' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'active', label: 'Published' },
   { value: 'temporary_closed', label: 'Temporary Closed' },
   { value: 'permanently_closed', label: 'Permanently Closed' },
   { value: 'reopen', label: 'Reopen' },
   { value: 'extend_date', label: 'Extend Date' },
 ];
+
+const normalizeAdvertisementStatus = (value) => {
+  if (value === "published") return "active";
+  if (STATUS_OPTIONS.some((option) => option.value === value)) return value;
+  return "pending";
+};
 
 const AdvertisementEditForm = () => {
   const { id } = useParams();
@@ -45,9 +52,8 @@ const AdvertisementEditForm = () => {
   const [examTests, setExamTests] = useState(FALLBACK_TESTS);
   const [testTypes, setTestTypes] = useState([]);
   const [subjects, setSubjects] = useState([]);
-  const [status, setStatus] = useState("published");
+  const [status, setStatus] = useState("pending");
   const [extendDate, setExtendDate] = useState("");
-  const [isPublished, setIsPublished] = useState(false);
 
 
   // Fetch subjects for Written Exam dropdown
@@ -329,9 +335,8 @@ const AdvertisementEditForm = () => {
           setAdvertisementFee(data.advertisement_fee || "");
           setNote(data.note || data.notes || data.ad_note || "");
           setImportantNotes(data.important_notes || "");
-          setStatus(data.status || (data.publish_date ? "published" : "pending"));
+          setStatus(normalizeAdvertisementStatus(data.status));
           setExtendDate(data.extend_date?.split("T")[0] || "");
-          setIsPublished(!!data.publish_date);
 
           let terms = [""];
           if (data.terms_conditions) {
@@ -489,7 +494,7 @@ const AdvertisementEditForm = () => {
         note: note || "",
         important_notes: importantNotes || "",
         terms_conditions: filteredTerms,
-        status: isPublished ? status : "pending",
+        status,
         extend_date: status === "extend_date" ? (extendDate || null) : null,
         job_fees: JSON.stringify(feesPayload),
         job_test_types: JSON.stringify(testTypesPayload),
@@ -643,7 +648,6 @@ const AdvertisementEditForm = () => {
                 </div>
               </div>
 
-              {isPublished && (
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField
@@ -694,7 +698,6 @@ const AdvertisementEditForm = () => {
                   </div>
                 )}
               </div>
-              )}
             </div>
 
             {selectedIds.length > 0 && (

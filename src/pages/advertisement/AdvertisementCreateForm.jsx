@@ -536,7 +536,7 @@ const AdvertisementCreateForm = () => {
       fd.append("job_test_types", JSON.stringify(testTypesPayload));
       fd.append("job_subjects", JSON.stringify(subjectsPayload));
       fd.append("job_cce_stages", JSON.stringify(cceStagesPayload));
-
+    fd.append("status", "pending");
       filteredTerms.forEach((t) => fd.append("terms_conditions[]", t));
 
       const result = await AdvertisementApi.create(fd);
