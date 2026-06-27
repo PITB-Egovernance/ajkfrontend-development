@@ -1341,7 +1341,7 @@ const AdvertisementDetail = () => {
                   {advertisement.secretary_name || secretarySignature?.name || 'Secretary'}
                 </div>
 
-                <div className="org2">Secretary</div>
+                <div className="org2">Secretary, AJ&amp;K Public Service Commission</div>
 
                 <div className="date">
                   Dated:{' '}

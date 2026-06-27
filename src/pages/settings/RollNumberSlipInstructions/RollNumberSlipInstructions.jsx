@@ -153,7 +153,7 @@ const RollNumberSlipInstructions = () => {
         : `${API_BASE}/settings/roll-number-slip-instructions/store`;
 
       const res    = await fetch(url, {
-        method: "PUT",
+        method: isUpdate ? "PUT" : "POST",
         headers: authHeaders(),
         body: JSON.stringify(payload),
       });
