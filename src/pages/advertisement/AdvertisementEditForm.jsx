@@ -926,12 +926,16 @@ const AdvertisementEditForm = () => {
                     <TextField
                       fullWidth
                       label="Extend Date"
-                      type="text"
-                      value={extendDateInput}
-                      onChange={(e) => updateDateFieldValue(e.target.value, setExtendDate, setExtendDateInput)}
+                      type="date"
+                      value={extendDate}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setExtendDate(nextValue);
+                        setExtendDateInput(formatDateForDisplay(nextValue));
+                      }}
                       InputLabelProps={{ shrink: true }}
                       sx={fieldSx}
-                      inputProps={{ style: { height: 28 }, placeholder: "DD-MM-YYYY" }}
+                      inputProps={{ style: { height: 28 } }}
                       error={!!fieldErrors?.extend_date}
                       helperText={
                         Array.isArray(fieldErrors?.extend_date)
