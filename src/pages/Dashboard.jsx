@@ -58,8 +58,9 @@ const AD_STATUS_COLORS = {
 const isAdActive = (ad) => {
   const status = (ad?.status?.name ?? ad?.status ?? '').toString().toLowerCase().trim();
   if (status === 'closed' || status === 'expired' || status === 'draft') return false;
-  if (ad?.closing_date) {
-    const d = new Date(ad.closing_date);
+  const effectiveClosingDate = ad?.extend_date || ad?.closing_date;
+  if (effectiveClosingDate) {
+    const d = new Date(effectiveClosingDate);
     if (!isNaN(d.getTime())) return d > new Date();
   }
   return status === 'published' || status === 'active' || status === '';

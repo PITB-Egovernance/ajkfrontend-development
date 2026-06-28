@@ -47,6 +47,8 @@ const STATUS_BADGES = {
   published:           { label: 'Published',          className: 'bg-green-50 border-green-200 text-green-700' },
 };
 
+const EXTENDED_BADGE_CLASS = 'bg-yellow-50 border-yellow-200 text-yellow-700';
+
 const normalizeAdvertisementStatus = (status) => {
   if (!status) return 'pending';
   if (status === 'published') return 'active';
@@ -110,6 +112,9 @@ const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelet
     setAnchorEl(null);
   };
 
+  const normalizedStatus = normalizeAdvertisementStatus(ad?.status);
+  const isAlreadyPublished = normalizedStatus === 'active' || normalizedStatus === 'published';
+
   return (
     <div className="flex justify-center items-center h-full w-full">
       <IconButton 
@@ -152,7 +157,7 @@ const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelet
             <Pencil className="w-4 h-4" /> Edit
           </MenuItem>
         )}
-        {canEdit && (
+        {canEdit && !isAlreadyPublished && (
           <MenuItem onClick={(e) => { handleClose(e); onPublish(ad); }}>
             <Send className="w-4 h-4" /> Publish
           </MenuItem>
@@ -313,6 +318,7 @@ const AdvertisementRecords = () => {
         closing_date: publishModal.ad.closing_date,
         secretary_name: publishModal.secretary_name,
         publish_date: publishModal.publish_date,
+        published_date: publishModal.publish_date,
       });
       if (result.success) {
         toast.success(result.message || 'Advertisement published successfully');
@@ -526,15 +532,22 @@ const AdvertisementRecords = () => {
     {
       field: 'status',
       headerName: 'Status',
-      width: 150,
+      width: 190,
       renderCell: (params) => {
         const statusKey = normalizeAdvertisementStatus(params.row.status);
         const badge = STATUS_BADGES[statusKey] || STATUS_BADGES.pending;
+        const hasExtendedDate = Boolean(params.row.extend_date || params.row.extendDate);
+
         return (
-          <div className="flex items-center h-full">
-            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${badge.className}`}>
+          <div className="flex items-center gap-1.5 h-full flex-wrap">
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${badge.className}`}>
               {badge.label}
             </span>
+            {hasExtendedDate && (
+              <span className={`px-0.2 py-0.2 rounded-full text-[11px] font-bold border ${EXTENDED_BADGE_CLASS}`}>
+                Ext.
+              </span>
+            )}
           </div>
         );
       }
@@ -582,7 +595,7 @@ const AdvertisementRecords = () => {
     adv_number: ad.adv_number,
     adv_date: ad.adv_date,
     closing_date: ad.closing_date,
-    publish_date: ad.publish_date,
+    publish_date: ad.publish_date || ad.published_date,
     secretary_name: ad.secretary_name,
     advertisement_fee: ad.advertisement_fee,
     note: ad.note || ad.notes || ad.ad_note,

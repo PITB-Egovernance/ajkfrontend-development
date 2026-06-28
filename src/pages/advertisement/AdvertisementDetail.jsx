@@ -1352,8 +1352,8 @@ const AdvertisementDetail = () => {
 
                 <div className="date">
                   Dated:{' '}
-                  {advertisement.publish_date
-                    ? formatDate(advertisement.publish_date)
+                  {advertisement.publish_date || advertisement.published_date
+                    ? formatDate(advertisement.publish_date || advertisement.published_date)
                     : formatDate(advertisement.adv_date)}
                 </div>
               </div>

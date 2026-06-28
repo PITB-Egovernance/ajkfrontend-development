@@ -19,22 +19,73 @@ const CCE_STAGES = [
   { value: "written_test", label: "Written Test" },
 ];
 
+const formatDateForDisplay = (value) => {
+  if (!value) return "";
+  if (/^\d{2}-\d{2}-\d{4}$/.test(value)) return value;
+
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return "";
+
+  return `${match[3]}-${match[2]}-${match[1]}`;
+};
+
+const parseDisplayDate = (value) => {
+  const digitsOnly = String(value).replace(/\D/g, "");
+  if (digitsOnly.length !== 8) return "";
+
+  const day = digitsOnly.slice(0, 2);
+  const month = digitsOnly.slice(2, 4);
+  const year = digitsOnly.slice(4, 8);
+  const parsed = new Date(`${year}-${month}-${day}`);
+
+  return Number.isNaN(parsed.getTime()) ? "" : `${year}-${month}-${day}`;
+};
+
+const updateDateFieldValue = (rawValue, setStoredValue, setDisplayValue) => {
+  const digitsOnly = String(rawValue).replace(/\D/g, "");
+  const limited = digitsOnly.slice(0, 8);
+
+  let nextDisplay = "";
+  if (limited.length <= 2) {
+    nextDisplay = limited;
+  } else if (limited.length <= 4) {
+    nextDisplay = `${limited.slice(0, 2)}-${limited.slice(2)}`;
+  } else {
+    nextDisplay = `${limited.slice(0, 2)}-${limited.slice(2, 4)}-${limited.slice(4, 8)}`;
+  }
+
+  setDisplayValue(nextDisplay);
+
+  if (limited.length === 8) {
+    const day = limited.slice(0, 2);
+    const month = limited.slice(2, 4);
+    const year = limited.slice(4, 8);
+    const parsed = new Date(`${year}-${month}-${day}`);
+    setStoredValue(Number.isNaN(parsed.getTime()) ? "" : `${year}-${month}-${day}`);
+  } else {
+    setStoredValue("");
+  }
+};
+
 const AdvertisementCreateForm = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
 
-  const [advDate, setAdvDate] = useState(() => {
+  const initialAdvDate = (() => {
     const d = new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
-  });
+  })();
 
+  const [advDate, setAdvDate] = useState(initialAdvDate);
+  const [advDateInput, setAdvDateInput] = useState(formatDateForDisplay(initialAdvDate));
   const [advNumber, setAdvNumber] = useState("");
   const [closingDate, setClosingDate] = useState("");
+  const [closingDateInput, setClosingDateInput] = useState("");
   const [advertisementFee, setAdvertisementFee] = useState("");
   const [note, setNote] = useState("");
   const [importantNotes, setImportantNotes] = useState("");
@@ -606,11 +657,11 @@ const AdvertisementCreateForm = () => {
                   <TextField
                     fullWidth
                     label="Advertisement Date"
-                    type="date"
-                    value={advDate}
+                    type="text"
+                    value={advDateInput}
                     InputLabelProps={{ shrink: true }}
-                    onChange={(e) => setAdvDate(e.target.value)}
-                    inputProps={{ style: { height: 28 } }}
+                    onChange={(e) => updateDateFieldValue(e.target.value, setAdvDate, setAdvDateInput)}
+                    inputProps={{ style: { height: 28 }, placeholder: "DD-MM-YYYY" }}
                     sx={fieldSx}
                   />
                 </div>
@@ -683,13 +734,13 @@ const AdvertisementCreateForm = () => {
                   <TextField
                     fullWidth
                     label="Closing Date"
-                    type="date"
-                    value={closingDate}
+                    type="text"
+                    value={closingDateInput}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setClosingDate(val);
+                      updateDateFieldValue(val, setClosingDate, setClosingDateInput);
 
-                      if (val && advDate && val <= advDate) {
+                      if (closingDate && advDate && closingDate <= advDate) {
                         setFieldErrors((prev) => ({
                           ...prev,
                           closing_date: [
@@ -708,14 +759,8 @@ const AdvertisementCreateForm = () => {
                     InputLabelProps={{ shrink: true }}
                     sx={fieldSx}
                     inputProps={{
-                      min: advDate
-                        ? (() => {
-                            const d = new Date(advDate);
-                            d.setDate(d.getDate() + 1);
-                            return d.toISOString().split("T")[0];
-                          })()
-                        : undefined,
                       style: { height: 28 },
+                      placeholder: "DD-MM-YYYY",
                     }}
                     error={
                       !!(

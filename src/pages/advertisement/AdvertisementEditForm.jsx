@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Checkbox, TextField, MenuItem } from "@mui/material";
-import { FileEdit, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
+import { FileEdit, CheckCircle2, Plus, Trash2, Save, Send, X } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
 import Config from "../../config/baseUrl";
@@ -20,18 +21,97 @@ const CCE_STAGES = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
+  // { value: 'pending', label: 'Pending' },
   { value: 'active', label: 'Published' },
   { value: 'temporary_closed', label: 'Temporary Closed' },
   { value: 'permanently_closed', label: 'Permanently Closed' },
   { value: 'reopen', label: 'Reopen' },
-  { value: 'extend_date', label: 'Extend Date' },
+  // { value: 'extend_date', label: 'Extend Date' },
 ];
+
+const formatDateForDisplay = (value) => {
+  if (!value) return "";
+  if (/^\d{2}-\d{2}-\d{4}$/.test(value)) return value;
+
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return "";
+
+  return `${match[3]}-${match[2]}-${match[1]}`;
+};
+
+const updateDateFieldValue = (rawValue, setStoredValue, setDisplayValue) => {
+  const digitsOnly = String(rawValue).replace(/\D/g, "");
+  const limited = digitsOnly.slice(0, 8);
+
+  let nextDisplay = "";
+  if (limited.length <= 2) {
+    nextDisplay = limited;
+  } else if (limited.length <= 4) {
+    nextDisplay = `${limited.slice(0, 2)}-${limited.slice(2)}`;
+  } else {
+    nextDisplay = `${limited.slice(0, 2)}-${limited.slice(2, 4)}-${limited.slice(4, 8)}`;
+  }
+
+  setDisplayValue(nextDisplay);
+
+  if (limited.length === 8) {
+    const day = limited.slice(0, 2);
+    const month = limited.slice(2, 4);
+    const year = limited.slice(4, 8);
+    const parsed = new Date(`${year}-${month}-${day}`);
+    setStoredValue(Number.isNaN(parsed.getTime()) ? "" : `${year}-${month}-${day}`);
+  } else {
+    setStoredValue("");
+  }
+};
 
 const normalizeAdvertisementStatus = (value) => {
   if (value === "published") return "active";
   if (STATUS_OPTIONS.some((option) => option.value === value)) return value;
   return "pending";
+};
+
+const authHeaders = () => ({
+  Authorization: `Bearer ${AuthService.getToken()}`,
+  Accept: "application/json",
+  "X-API-KEY": Config.apiKey,
+});
+
+const getDesignationName = (designation) => {
+  if (!designation) return "";
+  if (typeof designation === "object") {
+    return designation.name || designation.designation_name || designation.title || "";
+  }
+  return String(designation);
+};
+
+const getSecretaryName = async () => {
+  const response = await fetch(`${Config.apiUrl}/settings/digital-signature?per_page=200`, {
+    headers: authHeaders(),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || "Failed to load secretary");
+  }
+
+  const records = result.data?.data ?? result.data ?? [];
+  const secretary = (Array.isArray(records) ? records : []).find((record) => {
+    const designation = getDesignationName(
+      record.designation ?? record.designation_name
+    ).trim().toLowerCase();
+    const recordStatus = String(record.status ?? "active").trim().toLowerCase();
+
+    return designation === "secretary" && recordStatus === "active";
+  });
+
+  return (
+    secretary?.name ||
+    secretary?.employee_name ||
+    secretary?.employee?.name ||
+    secretary?.user?.name ||
+    ""
+  );
 };
 
 const AdvertisementEditForm = () => {
@@ -42,8 +122,10 @@ const AdvertisementEditForm = () => {
   const [fieldErrors, setFieldErrors] = useState({});
 
   const [advDate, setAdvDate] = useState("");
+  const [advDateInput, setAdvDateInput] = useState("");
   const [advNumber, setAdvNumber] = useState("");
   const [closingDate, setClosingDate] = useState("");
+  const [closingDateInput, setClosingDateInput] = useState("");
   const [advertisementFee, setAdvertisementFee] = useState("");
   const [note, setNote] = useState("");
   const [importantNotes, setImportantNotes] = useState("");
@@ -53,7 +135,22 @@ const AdvertisementEditForm = () => {
   const [testTypes, setTestTypes] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [status, setStatus] = useState("pending");
+  const [originalStatus, setOriginalStatus] = useState("pending");
   const [extendDate, setExtendDate] = useState("");
+  const [extendDateInput, setExtendDateInput] = useState("");
+  const [extendDateEnabled, setExtendDateEnabled] = useState(false);
+  const [existingSecretaryName, setExistingSecretaryName] = useState("");
+  const [existingPublishDate, setExistingPublishDate] = useState("");
+  const [publishModal, setPublishModal] = useState({
+    open: false,
+    payload: null,
+    secretary_name: "",
+    publish_date: "",
+    publish_date_input: "",
+    loading: false,
+    secretaryLoading: false,
+    secretaryError: "",
+  });
 
 
   // Fetch subjects for Written Exam dropdown
@@ -330,13 +427,23 @@ const AdvertisementEditForm = () => {
         if (result.success) {
           const data = result.data;
           setAdvDate(data.adv_date?.split("T")[0] || "");
+          setAdvDateInput(formatDateForDisplay(data.adv_date?.split("T")[0] || ""));
           setAdvNumber(data.adv_number || "");
           setClosingDate(data.closing_date?.split("T")[0] || "");
+          setClosingDateInput(formatDateForDisplay(data.closing_date?.split("T")[0] || ""));
           setAdvertisementFee(data.advertisement_fee || "");
           setNote(data.note || data.notes || data.ad_note || "");
           setImportantNotes(data.important_notes || "");
-          setStatus(normalizeAdvertisementStatus(data.status));
+          const normalizedStatus = normalizeAdvertisementStatus(data.status);
+          setStatus(normalizedStatus);
+          setOriginalStatus(normalizedStatus);
           setExtendDate(data.extend_date?.split("T")[0] || "");
+          setExtendDateInput(formatDateForDisplay(data.extend_date?.split("T")[0] || ""));
+          setExtendDateEnabled(Boolean(data.extend_date));
+          setExistingSecretaryName(data.secretary_name || "");
+          setExistingPublishDate(
+            (data.publish_date || data.published_date || "").split("T")[0]
+          );
 
           let terms = [""];
           if (data.terms_conditions) {
@@ -406,6 +513,106 @@ const AdvertisementEditForm = () => {
   const updateTerm = (idx, value) =>
     setTermsConditions((prev) => prev.map((t, i) => (i === idx ? value : t)));
 
+  const openPublishModal = async (payload) => {
+    setPublishModal({
+      open: true,
+      payload,
+      secretary_name: "",
+      publish_date: new Date().toISOString().split("T")[0],
+      publish_date_input: formatDateForDisplay(new Date().toISOString().split("T")[0]),
+      loading: false,
+      secretaryLoading: true,
+      secretaryError: "",
+    });
+
+    try {
+      const secretaryName = await getSecretaryName();
+
+      if (!secretaryName) {
+        throw new Error("Active secretary not found");
+      }
+
+      setPublishModal((prev) =>
+        prev.open
+          ? {
+              ...prev,
+              secretary_name: secretaryName,
+              secretaryLoading: false,
+              secretaryError: "",
+            }
+          : prev
+      );
+    } catch (error) {
+      setPublishModal((prev) =>
+        prev.open
+          ? {
+              ...prev,
+              secretary_name: "",
+              secretaryLoading: false,
+              secretaryError: error.message || "Failed to load secretary",
+            }
+          : prev
+      );
+      toast.error(error.message || "Failed to load secretary");
+    }
+  };
+
+  const closePublishModal = () => {
+    setPublishModal((prev) => ({ ...prev, open: false, payload: null }));
+  };
+
+  const saveAdvertisement = async (payload, loadingMessage = "Saving updates...") => {
+    setLoading(true);
+    const loadingToast = toast.loading(loadingMessage);
+
+    try {
+      const result = await AdvertisementApi.update(id, payload);
+
+      if (result.success) {
+        toast.success("Advertisement updated successfully", { id: loadingToast });
+        navigate("/dashboard/advertisement-records");
+      }
+    } catch (err) {
+      if (err.errors) {
+        setFieldErrors(err.errors);
+      }
+      toast.error(err.message || "Failed to update advertisement", {
+        id: loadingToast,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (publishModal.secretaryLoading) {
+      toast.error("Please wait while secretary name is loading");
+      return;
+    }
+    if (!publishModal.secretary_name.trim()) {
+      toast.error("Secretary name is required");
+      return;
+    }
+    if (!publishModal.publish_date) {
+      toast.error("Please select a publish date");
+      return;
+    }
+
+    setPublishModal((prev) => ({ ...prev, loading: true }));
+    const publishDate = publishModal.publish_date;
+    await saveAdvertisement(
+      {
+        ...publishModal.payload,
+        status: "published",
+        secretary_name: publishModal.secretary_name,
+        publish_date: publishDate,
+        published_date: publishDate,
+      },
+      "Publishing advertisement..."
+    );
+    setPublishModal((prev) => ({ ...prev, loading: false }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFieldErrors({});
@@ -456,68 +663,80 @@ const AdvertisementEditForm = () => {
       }
     }
 
-    setLoading(true);
-    const loadingToast = toast.loading("Saving updates...");
+    const feesPayload = {};
+    const testTypesPayload = {};
+    const subjectsPayload = {};
+    const cceStagesPayload = {};
+    const validSubjectHashIds = new Set(
+      subjects.map((subject) => String(subject.hash_id))
+    );
 
-    try {
-      const feesPayload = {};
-      const testTypesPayload = {};
-      const subjectsPayload = {};
-      const cceStagesPayload = {};
-      const validSubjectHashIds = new Set(
-        subjects.map((subject) => String(subject.hash_id))
-      );
+    Object.keys(jobConfigs).forEach((jobId) => {
+      const config = jobConfigs[jobId] || {};
 
-      Object.keys(jobConfigs).forEach((jobId) => {
-        const config = jobConfigs[jobId] || {};
+      feesPayload[jobId] = config.fee || "";
+      testTypesPayload[jobId] = config.testType || "";
 
-        feesPayload[jobId] = config.fee || "";
-        testTypesPayload[jobId] = config.testType || "";
+      subjectsPayload[jobId] = isWrittenTestType(config.testType)
+        ? subjects
+            .filter((subject) =>
+              subjectMatchesSelectedIds(subject, config.subjectIds || [])
+            )
+            .map((subject) => String(subject.hash_id))
+            .filter((hashId) => validSubjectHashIds.has(hashId))
+        : [];
 
-        subjectsPayload[jobId] = isWrittenTestType(config.testType)
-          ? subjects
-              .filter((subject) =>
-                subjectMatchesSelectedIds(subject, config.subjectIds || [])
-              )
-              .map((subject) => String(subject.hash_id))
-              .filter((hashId) => validSubjectHashIds.has(hashId))
-          : [];
+      cceStagesPayload[jobId] = isCombinedCompetitiveExam(config.testType)
+        ? config.cceStage || ""
+        : "";
+    });
 
-        cceStagesPayload[jobId] = isCombinedCompetitiveExam(config.testType)
-          ? config.cceStage || ""
-          : "";
-      });
+    const shouldUseExtendDate = extendDateEnabled && Boolean(extendDate);
 
-      const payload = {
-        closing_date: closingDate,
-        advertisement_fee: advertisementFee || "",
-        note: note || "",
-        important_notes: importantNotes || "",
-        terms_conditions: filteredTerms,
-        status,
-        extend_date: status === "extend_date" ? (extendDate || null) : null,
-        job_fees: JSON.stringify(feesPayload),
-        job_test_types: JSON.stringify(testTypesPayload),
-        job_subjects: JSON.stringify(subjectsPayload),
-        job_cce_stages: JSON.stringify(cceStagesPayload),
-      };
-
-      const result = await AdvertisementApi.update(id, payload);
-
-      if (result.success) {
-        toast.success("Advertisement updated successfully", { id: loadingToast });
-        navigate("/dashboard/advertisement-records");
-      }
-    } catch (err) {
-      if (err.errors) {
-          setFieldErrors(err.errors);
-      }
-      toast.error(err.message || "Failed to update advertisement", {
-        id: loadingToast,
-      });
-    } finally {
-      setLoading(false);
+    if (status === "active" && shouldUseExtendDate && !extendDate) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        extend_date: ["Please select an extend date"],
+      }));
+      toast.error("Please select an extend date");
+      return;
     }
+
+    if (status === "active" && shouldUseExtendDate && new Date(extendDate) <= new Date(closingDate)) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        extend_date: ["Extend date must be after the current closing date"],
+      }));
+      toast.error("Extend date must be after the current closing date");
+      return;
+    }
+
+    const payload = {
+      closing_date: closingDate,
+      advertisement_fee: advertisementFee || "",
+      note: note || "",
+      important_notes: importantNotes || "",
+      terms_conditions: filteredTerms,
+      status: status === "active" ? "published" : status,
+      extend_date: shouldUseExtendDate ? extendDate : null,
+      job_fees: JSON.stringify(feesPayload),
+      job_test_types: JSON.stringify(testTypesPayload),
+      job_subjects: JSON.stringify(subjectsPayload),
+      job_cce_stages: JSON.stringify(cceStagesPayload),
+    };
+
+    if (status === "active" && originalStatus === "active") {
+      payload.secretary_name = existingSecretaryName;
+      payload.publish_date = existingPublishDate;
+      payload.published_date = existingPublishDate;
+    }
+
+    if (status === "active" && originalStatus !== "active") {
+      openPublishModal(payload);
+      return;
+    }
+
+    await saveAdvertisement(payload);
   };
 
   const fieldSx = {
@@ -577,10 +796,10 @@ const AdvertisementEditForm = () => {
                   <TextField
                     fullWidth
                     label="Advertisement Date"
-                    type="date"
-                    value={advDate}
+                    type="text"
+                    value={advDateInput}
                     InputLabelProps={{ shrink: true }}
-                    inputProps={{ readOnly: true, style: { height: 28 } }}
+                    inputProps={{ readOnly: true, style: { height: 28 }, placeholder: "DD-MM-YYYY" }}
                     disabled
                     sx={fieldSx}
                   />
@@ -601,13 +820,13 @@ const AdvertisementEditForm = () => {
                   <TextField
                     fullWidth
                     label="Closing Date"
-                    type="date"
-                    value={closingDate}
-                    onChange={(e) => setClosingDate(e.target.value)}
+                    type="text"
+                    value={closingDateInput}
+                    onChange={(e) => updateDateFieldValue(e.target.value, setClosingDate, setClosingDateInput)}
                     required
                     InputLabelProps={{ shrink: true }}
                     sx={fieldSx}
-                    inputProps={{ min: advDate, style: { height: 28 } }}
+                    inputProps={{ style: { height: 28 }, placeholder: "DD-MM-YYYY" }}
                     error={!!fieldErrors?.closing_date}
                     helperText={
                       Array.isArray(fieldErrors?.closing_date)
@@ -658,7 +877,8 @@ const AdvertisementEditForm = () => {
                     onChange={(e) => {
                       const newStatus = e.target.value;
                       setStatus(newStatus);
-                      if (newStatus !== "extend_date") {
+                      if (newStatus !== "active") {
+                        setExtendDateEnabled(false);
                         setExtendDate("");
                       }
                     }}
@@ -677,17 +897,41 @@ const AdvertisementEditForm = () => {
                     ))}
                   </TextField>
                 </div>
-                {status === "extend_date" && (
+                {status === "active" && (
+                  <div className="col-md-6 form-group">
+                    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                      <Checkbox
+                        checked={extendDateEnabled}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setExtendDateEnabled(checked);
+                          if (!checked) {
+                            setExtendDate("");
+                          }
+                        }}
+                        color="success"
+                      />
+                      <div>
+                        <div className="text-sm font-semibold text-slate-700">Extend Date</div>
+                        <div className="text-xs text-slate-500">Keep the advertisement published and add a new closing date.</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="row">
+                {status === "active" && extendDateEnabled && (
                   <div className="col-md-6 form-group">
                     <TextField
                       fullWidth
                       label="Extend Date"
-                      type="date"
-                      value={extendDate}
-                      onChange={(e) => setExtendDate(e.target.value)}
+                      type="text"
+                      value={extendDateInput}
+                      onChange={(e) => updateDateFieldValue(e.target.value, setExtendDate, setExtendDateInput)}
                       InputLabelProps={{ shrink: true }}
                       sx={fieldSx}
-                      inputProps={{ min: closingDate, style: { height: 28 } }}
+                      inputProps={{ style: { height: 28 }, placeholder: "DD-MM-YYYY" }}
                       error={!!fieldErrors?.extend_date}
                       helperText={
                         Array.isArray(fieldErrors?.extend_date)
@@ -1081,6 +1325,113 @@ const AdvertisementEditForm = () => {
           </form>
         </div>
       </div>
+
+      {publishModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-lg">
+                  <Send className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Publish Advertisement</h2>
+                  <p className="text-xs text-emerald-200">{advNumber || ""}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closePublishModal}
+                className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Secretary Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={publishModal.secretary_name}
+                  readOnly
+                  placeholder={publishModal.secretaryLoading ? "Loading secretary name..." : "Secretary name"}
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-sm cursor-not-allowed"
+                />
+                {publishModal.secretaryError && (
+                  <p className="mt-1.5 text-xs text-red-600">{publishModal.secretaryError}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Publish Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={publishModal.publish_date_input}
+                  onChange={(e) => {
+                    const rawValue = e.target.value;
+                    const digitsOnly = String(rawValue).replace(/\D/g, "");
+                    const limited = digitsOnly.slice(0, 8);
+                    let nextDisplay = "";
+                    if (limited.length <= 2) {
+                      nextDisplay = limited;
+                    } else if (limited.length <= 4) {
+                      nextDisplay = `${limited.slice(0, 2)}-${limited.slice(2)}`;
+                    } else {
+                      nextDisplay = `${limited.slice(0, 2)}-${limited.slice(2, 4)}-${limited.slice(4, 8)}`;
+                    }
+
+                    setPublishModal((prev) => ({
+                      ...prev,
+                      publish_date: limited.length === 8 ? `${limited.slice(4, 8)}-${limited.slice(2, 4)}-${limited.slice(0, 2)}` : "",
+                      publish_date_input: nextDisplay,
+                    }));
+                  }}
+                  placeholder="DD-MM-YYYY"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <button
+                type="button"
+                onClick={closePublishModal}
+                disabled={publishModal.loading}
+                className="px-5 py-2.5 border border-slate-200 rounded-lg text-slate-700 font-medium text-sm hover:bg-slate-100 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={publishModal.loading || publishModal.secretaryLoading || !publishModal.secretary_name}
+                className="px-5 py-2.5 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white rounded-lg font-medium text-sm shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {publishModal.loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Publish
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
