@@ -60,6 +60,20 @@ const getRequisitionSource = (status) => {
   return '';
 };
 
+const parseChangeLog = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return value ? [{ message: value }] : [];
+    }
+  }
+  return [];
+};
+
 const RequisitionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -463,6 +477,7 @@ const RequisitionDetail = () => {
                     post:     step3Districts[0].posts?.[i]  || 'N/A',
                   })))
             : (data.multiple_posts || []),
+          change_log: parseChangeLog(data.change_log ?? responseData.change_log ?? null),
         };
 
         setRequisition(normalized);
@@ -758,6 +773,20 @@ const RequisitionDetail = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-lg p-8" style={styles.container}>
+        {requisition.change_log?.length > 0 && (
+          <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-2 text-sm font-semibold text-slate-700">Change History</div>
+            <ul className="space-y-2 text-sm text-slate-600">
+              {requisition.change_log.map((entry, index) => (
+                <li key={`${entry.field || 'entry'}-${index}`} className="flex gap-2">
+                  <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />
+                  <span>{entry.message || entry.label || entry.field || 'Updated'}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <h2 style={styles.h2}>
           AZAD JAMMU AND KASHMIR PUBLIC SERVICE COMMISSION, MUZAFFARABAD
         </h2>

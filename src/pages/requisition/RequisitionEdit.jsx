@@ -18,6 +18,20 @@ const steps = [
   { number: 2, icon: UserCheck, label: 'Eligibility' }
 ];
 
+const parseChangeLog = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return value ? [{ message: value }] : [];
+    }
+  }
+  return [];
+};
+
 const RequisitionEdit = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -27,6 +41,7 @@ const RequisitionEdit = () => {
   const [gradeOptions, setGradeOptions] = useState([]);
   const [designationOptions, setDesignationOptions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [changeLogEntries, setChangeLogEntries] = useState([]);
   const [formData, setFormData] = useState({
     step1: {},
     step2: {},
@@ -153,6 +168,8 @@ const RequisitionEdit = () => {
         // BACKEND_FIX_REQUISITION_FILE_DROP.md.
         const serviceRules = extractFilePath(req.service_rules) || getPersistedDraftFilePath(id, 'service_rules');
         const syllabus = extractFilePath(req.syllabus) || getPersistedDraftFilePath(id, 'syllabus');
+
+        setChangeLogEntries(parseChangeLog(req.change_log));
 
         setFormData({
           step1: {
@@ -374,6 +391,7 @@ const RequisitionEdit = () => {
           icon: <CheckCircle2 className="text-emerald-500" size={24} />,
           style: { fontWeight: '500' }
         });
+        setChangeLogEntries(parseChangeLog(result.data?.change_log ?? result.change_log ?? null));
         setFormData(prev => ({ ...prev, [`step${currentStepNumber}`]: stepData }));
         return true;
       } else {
@@ -471,6 +489,19 @@ const RequisitionEdit = () => {
           <InlineLoader text="Loading form data..." variant="ring" size="lg" />
         ) : (
           <div className="form-step active">
+            {changeLogEntries.length > 0 && (
+              <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-2 text-sm font-semibold text-slate-700">Change History</div>
+                <ul className="space-y-2 text-sm text-slate-600">
+                  {changeLogEntries.map((entry, index) => (
+                    <li key={`${entry.field || 'entry'}-${index}`} className="flex gap-2">
+                      <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />
+                      <span>{entry.message || entry.label || entry.field || 'Updated'}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {renderStepContent()}
           </div>
         )}
