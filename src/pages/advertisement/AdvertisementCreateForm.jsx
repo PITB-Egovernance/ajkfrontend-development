@@ -734,13 +734,14 @@ const AdvertisementCreateForm = () => {
                   <TextField
                     fullWidth
                     label="Closing Date"
-                    type="text"
-                    value={closingDateInput}
+                    type="date"
+                    value={closingDate}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      updateDateFieldValue(val, setClosingDate, setClosingDateInput);
+                      const nextValue = e.target.value;
+                      setClosingDate(nextValue);
+                      setClosingDateInput(formatDateForDisplay(nextValue));
 
-                      if (closingDate && advDate && closingDate <= advDate) {
+                      if (nextValue && advDate && nextValue <= advDate) {
                         setFieldErrors((prev) => ({
                           ...prev,
                           closing_date: [
@@ -760,7 +761,6 @@ const AdvertisementCreateForm = () => {
                     sx={fieldSx}
                     inputProps={{
                       style: { height: 28 },
-                      placeholder: "DD-MM-YYYY",
                     }}
                     error={
                       !!(

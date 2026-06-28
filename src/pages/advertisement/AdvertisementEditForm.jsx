@@ -820,13 +820,17 @@ const AdvertisementEditForm = () => {
                   <TextField
                     fullWidth
                     label="Closing Date"
-                    type="text"
-                    value={closingDateInput}
-                    onChange={(e) => updateDateFieldValue(e.target.value, setClosingDate, setClosingDateInput)}
+                    type="date"
+                    value={closingDate}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      setClosingDate(nextValue);
+                      setClosingDateInput(formatDateForDisplay(nextValue));
+                    }}
                     required
                     InputLabelProps={{ shrink: true }}
                     sx={fieldSx}
-                    inputProps={{ style: { height: 28 }, placeholder: "DD-MM-YYYY" }}
+                    inputProps={{ style: { height: 28 } }}
                     error={!!fieldErrors?.closing_date}
                     helperText={
                       Array.isArray(fieldErrors?.closing_date)
