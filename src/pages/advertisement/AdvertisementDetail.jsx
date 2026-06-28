@@ -385,6 +385,68 @@ const AdvertisementDetail = () => {
     return parts.join(' | ');
   };
 
+  const getJobChangeLogs = (job) => {
+    const logs = job.change_logs || job.change_log_details || job.change_log || [];
+
+    if (Array.isArray(logs)) {
+      return logs
+        .map((log) => {
+          if (typeof log === 'string') {
+            return { label: 'Changed Field', before: 'N/A', after: 'N/A', message: log };
+          }
+
+          return {
+            field: log?.field ? String(log.field).toLowerCase() : '',
+            label: log?.label || toTitleCase(log?.field || 'Changed Field'),
+            before: log?.before ?? 'N/A',
+            after: log?.after ?? 'N/A',
+            message: log?.message || '',
+          };
+        })
+        .filter((log) => log.message || log.before !== 'N/A' || log.after !== 'N/A');
+    }
+
+    if (typeof logs === 'string' && logs.trim()) {
+      return [{ label: 'Changed Field', before: 'N/A', after: 'N/A', message: logs }];
+    }
+
+    return [];
+  };
+
+  const getChangeByField = (changeLogs, fields = [], labels = []) => {
+    const fieldSet = fields.map((field) => String(field).toLowerCase());
+    const labelSet = labels.map((label) => String(label).toLowerCase());
+
+    const matches = changeLogs.filter((log) => {
+      const field = String(log.field || '').toLowerCase();
+      const label = String(log.label || '').toLowerCase();
+
+      return fieldSet.includes(field) || labelSet.includes(label);
+    });
+
+    if (matches.length === 0) return undefined;
+
+    const firstChange = matches[0];
+    const latestChange = matches[matches.length - 1];
+
+    return {
+      ...latestChange,
+      before: firstChange.before,
+      after: latestChange.after,
+    };
+  };
+
+  const renderChangedValue = (currentValue, change) => {
+    if (!change) return currentValue;
+
+    return (
+      <span className="adv-changed-value">
+        <span className="adv-prev-value">Before: {change.before}</span>
+        <span className="adv-new-value">After: {change.after ?? currentValue}</span>
+      </span>
+    );
+  };
+
   const groupedJobs = useMemo(() => {
     if (!advertisement?.job_details) return [];
 
@@ -850,6 +912,23 @@ const AdvertisementDetail = () => {
           text-transform: uppercase;
           color: #555;
         }
+        .adv-post-vacancies.has-change {
+          min-width: 132px;
+          right: 6px;
+        }
+        .adv-post-vacancies.has-change .adv-changed-value {
+          flex-direction: row;
+          flex-wrap: nowrap;
+          justify-content: center;
+          gap: 2px;
+          margin-left: 0;
+        }
+        .adv-post-vacancies.has-change .adv-prev-value,
+        .adv-post-vacancies.has-change .adv-new-value {
+          padding: 1px 4px;
+          font-size: 8px;
+          line-height: 1.15;
+        }
         table.adv-meta {
           width: 100%;
           border-collapse: collapse;
@@ -921,6 +1000,37 @@ const AdvertisementDetail = () => {
           text-transform: uppercase;
           font-size: 9.5px;
           letter-spacing: .08em;
+        }
+        .adv-changed-value {
+          display: inline-flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 4px;
+          margin-left: 4px;
+          vertical-align: middle;
+        }
+        .adv-prev-value,
+        .adv-new-value {
+          display: inline-flex;
+          align-items: center;
+          max-width: 100%;
+          padding: 1px 5px;
+          border-radius: 4px;
+          border: 1px solid #cdd3cd;
+          font-size: 9.5px;
+          font-weight: 700;
+          line-height: 1.25;
+          text-transform: none;
+          letter-spacing: 0;
+          word-break: break-word;
+        }
+        .adv-prev-value {
+          background: #fff1f2;
+          color: #7f1d1d;
+        }
+        .adv-new-value {
+          background: #ecfdf5;
+          color: #14532d;
         }
         .adv-signoff {
           margin-top: 26px;
@@ -1217,6 +1327,41 @@ const AdvertisementDetail = () => {
                   })();
                   const isOpenQuota = quotaLabel === 'Open Merit';
                   const currentSerial = ++serialNo;
+                  const changeLogs = getJobChangeLogs(job);
+                  const designationChange = getChangeByField(changeLogs, ['designation'], ['Designation']);
+                  const scaleChange = getChangeByField(changeLogs, ['scale'], ['Scale']);
+                  const postCountChange = getChangeByField(changeLogs, ['num_posts'], ['No. of Posts']);
+                  const quotaChange = getChangeByField(
+                    changeLogs,
+                    ['quota_percentage', 'quota_promotion'],
+                    ['Direct quota', 'Promotion quota']
+                  );
+                  const minAgeChange = getChangeByField(changeLogs, ['min_age'], ['Min age']);
+                  const maxAgeChange = getChangeByField(changeLogs, ['max_age'], ['Max age']);
+                  const ageChange = minAgeChange || maxAgeChange;
+                  const genderChange = getChangeByField(changeLogs, ['gender_basis'], ['Gender']);
+                  const examTypeChange = getChangeByField(changeLogs, ['test_type'], ['Test type']);
+                  const qualificationChange = getChangeByField(
+                    changeLogs,
+                    [
+                      'academic_qualification',
+                      'equivalent_qualification',
+                      'degree_equivalence',
+                      'any_other_qualification',
+                      'experience_length',
+                      'experience_type',
+                      'training_institute',
+                    ],
+                    [
+                      'Academic qualification',
+                      'Equivalent qualification',
+                      'Degree equivalence',
+                      'Any other qualification',
+                      'Experience length',
+                      'Experience type',
+                      'Training institute',
+                    ]
+                  );
 
                   const districtsNote =
                     job.multiple_posts?.length > 0
@@ -1239,13 +1384,20 @@ const AdvertisementDetail = () => {
                       )}
                       <header className="adv-post-head">
                         <div className="adv-post-title">
-                          <span className="ptitle">{job.designation}</span>
-                          <span className="bps">{getScaleName(job.scale)}</span>
+                          <span className="ptitle">
+                            {renderChangedValue(job.designation, designationChange)}
+                          </span>
+                          <span className="bps">
+                            {renderChangedValue(getScaleName(job.scale), scaleChange)}
+                          </span>
                         </div>
 
-                        <div className="adv-post-vacancies">
+                        <div className={`adv-post-vacancies ${postCountChange ? 'has-change' : ''}`}>
                           <span className="vac-num">
-                            {String(job.num_posts || 0).padStart(2, '0')}
+                            {renderChangedValue(
+                              String(job.num_posts || 0).padStart(2, '0'),
+                              postCountChange
+                            )}
                           </span>
                           <span className="vac-lbl">
                             {Number(job.num_posts) === 1 ? 'Post' : 'Posts'}
@@ -1270,20 +1422,26 @@ const AdvertisementDetail = () => {
 
                             <td className="desc-col">
                               <span className="kv">
-                                <b>Quota:</b> {quotaLabel}
+                                <b>Quota:</b> {renderChangedValue(quotaLabel, quotaChange)}
                               </span>
                               <span className="kv">
                                 <b>Age Limit:</b>{' '}
-                                {job.eligibility?.min_age && job.eligibility?.max_age
-                                  ? `${job.eligibility.min_age} \u2013 ${job.eligibility.max_age} years`
-                                  : 'N/A'}
+                                {renderChangedValue(
+                                  job.eligibility?.min_age && job.eligibility?.max_age
+                                    ? `${job.eligibility.min_age} \u2013 ${job.eligibility.max_age} years`
+                                    : 'N/A',
+                                  ageChange
+                                )}
                               </span>
                               <span className="kv">
                                 <b>Gender:</b>{' '}
-                                {job.eligibility?.gender_basis || 'Male/Female'}
+                                {renderChangedValue(
+                                  job.eligibility?.gender_basis || 'Male/Female',
+                                  genderChange
+                                )}
                               </span>
                               <span className="kv">
-                                <b>Exam Type:</b> {examTypeName}
+                                <b>Exam Type:</b> {renderChangedValue(examTypeName, examTypeChange)}
                                 {isCceExamType ? ` (${cceStageName})` : ''}
                               </span>
                               <span className="kv">
@@ -1295,7 +1453,7 @@ const AdvertisementDetail = () => {
                             </td>
 
                             <td className="qual-col">
-                              {getQualificationText(job)}
+                              {renderChangedValue(getQualificationText(job), qualificationChange)}
                             </td>
                           </tr>
                         </tbody>
