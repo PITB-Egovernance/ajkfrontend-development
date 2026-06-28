@@ -810,6 +810,7 @@ const AdvertisementDetail = () => {
           font-size: 14px;
           font-weight: 700;
           color: #1a1a1a;
+          text-transform: uppercase;
         }
         .adv-post-title .cadre {
           font-size: 10.5px;
