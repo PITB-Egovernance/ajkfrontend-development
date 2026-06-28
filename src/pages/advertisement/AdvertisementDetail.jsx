@@ -1152,6 +1152,12 @@ const AdvertisementDetail = () => {
               </div>
               <div className="adv-dates">
                 Closing Date: <b>{formatDate(advertisement.closing_date)}</b>
+                {advertisement.extend_date && (
+                  <>
+                    <br />
+                    Extended till: <b>{formatDate(advertisement.extend_date)}</b>
+                  </>
+                )}
               </div>
             </div>
 
