@@ -109,6 +109,44 @@ const RollNumberApi = {
     });
     return handleResponse(res);
   },
+
+  getAdvertisements: async (params = {}) => {
+    const search = new URLSearchParams();
+    if (params.per_page) search.set('per_page', String(params.per_page));
+    if (params.page) search.set('page', String(params.page));
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers?${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  getApplicationsByAdvertisement: async (advertisementId, params = {}) => {
+    const search = new URLSearchParams();
+    if (params.per_page) search.set('per_page', String(params.per_page));
+    if (params.page) search.set('page', String(params.page));
+    if (params.search) search.set('search', params.search);
+    if (params.eligibility_status) search.set('eligibility_status', params.eligibility_status);
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/${advertisementId}/applications?${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  allocateCenters: async (advertisementId, body) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/${advertisementId}/allocate`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
+  getAdvertisementsWithJobs: async (perPage = 100) => {
+    const res = await fetch(`${ADMIN_API_BASE}/advertisements?per_page=${perPage}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
 };
 
 export default RollNumberApi;

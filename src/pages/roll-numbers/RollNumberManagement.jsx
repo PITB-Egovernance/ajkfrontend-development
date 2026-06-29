@@ -188,16 +188,9 @@ const RollNumberManagement = () => {
         const payload = result.data ?? {};
         const data    = payload.data ?? [];
 
-        // Helper to resolve city hash IDs to readable names
         const resolveCityName = (cityInput) => {
-          const cityMap = {
-            'zlJB4eA4yegp': 'Muzaffarabad',
-            'JoawKZG4QNM9': 'Rawalakot',
-            'MirpurHashID': 'Mirpur',
-          };
-          
-          let cityName = typeof cityInput === 'string' ? cityInput : (cityInput?.city || cityInput?.name);
-          return cityMap[cityName] || cityName;
+          if (typeof cityInput === 'string') return cityInput;
+          return cityInput?.city || cityInput?.name || cityInput;
         };
 
         const mapped = data

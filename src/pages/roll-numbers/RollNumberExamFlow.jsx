@@ -1,50 +1,33 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Clock3, FileCheck2, Filter, Hash, MapPin, Search, Send, Users } from 'lucide-react';
 import { MenuItem, TextField } from '@mui/material';
+import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
 import { Card, CardContent } from 'components/ui/Card';
+import { InlineLoader } from 'components/ui/Loader';
+import RollNumberApi from 'api/rollNumberApi';
 
 const examTypeMeta = {
-  'one-paper-mcqs': { title: 'One Paper MCQs Roll Number Management', badge: 'One Paper MCQs', description: 'Club one or multiple posts and generate one common roll number slip per candidate.', papers: ['One Paper'] },
-  'two-paper-mcqs': { title: 'Two Paper MCQs Roll Number Management', badge: 'Two Paper MCQs', description: 'Paper 1 and Paper 2 schedules remain separate, while selected jobs can be clubbed under one roll number.', papers: ['Paper 1', 'Paper 2'] },
-  'written-exams': { title: 'Written Exams Roll Number Management', badge: 'Written Exams', description: 'Written exams flow shell is ready for the same allocation pattern.', papers: ['Written Exam'], pending: true },
-  'cce-exams': { title: 'CCE Exams Roll Number Management', badge: 'CCE Exams', description: 'CCE exams flow shell is ready for the same allocation pattern.', papers: ['CCE Exam'], pending: true },
+  'one-paper-mcqs': { title: 'One Paper MCQs Roll Number Management', badge: 'One Paper MCQs', description: 'Club one or multiple posts and generate one common roll number slip per candidate.', papers: ['One Paper'], testTypeFilter: (tt) => /mcq/i.test(tt) && !/two/i.test(tt) },
+  'two-paper-mcqs': { title: 'Two Paper MCQs Roll Number Management', badge: 'Two Paper MCQs', description: 'Paper 1 and Paper 2 schedules remain separate, while selected jobs can be clubbed under one roll number.', papers: ['Paper 1', 'Paper 2'], testTypeFilter: (tt) => /mcq/i.test(tt) && /two/i.test(tt) },
+  'written-exams': { title: 'Written Exams Roll Number Management', badge: 'Written Exams', description: 'Written exams roll number generation following the same allocation pattern.', papers: ['Written Exam'], testTypeFilter: (tt) => /written/i.test(tt) },
+  'cce-exams': { title: 'CCE Exams Roll Number Management', badge: 'CCE Exams', description: 'CCE exams roll number generation following the same allocation pattern.', papers: ['CCE Exam'], testTypeFilter: (tt) => /cce/i.test(tt) },
 };
 
-const advertisementsByType = {
-  'one-paper-mcqs': [
-    { id: 'adv-01', advertisement: 'Advertisement 01/2026', meta: 'One Paper MCQs', posts: [
-      { id: 'ad', post: 'Assistant Director', caseNo: 'Case AD-01 | BPS-17', department: 'Services & General Administration', applicants: 248 },
-      { id: 'dd', post: 'Deputy Director', caseNo: 'Case DD-02 | BPS-18', department: 'Planning & Development', applicants: 132 },
-      { id: 'sa', post: 'System Analyst', caseNo: 'Case SA-03 | BPS-17', department: 'Information Technology', applicants: 84 },
-    ] },
-    { id: 'adv-02', advertisement: 'Advertisement 02/2026', meta: 'One Paper MCQs', posts: [
-      { id: 'pr', post: 'Programmer', caseNo: 'Case PR-04 | BPS-16', department: 'Information Technology', applicants: 96 },
-      { id: 'ao', post: 'Accounts Officer', caseNo: 'Case AO-05 | BPS-17', department: 'Finance Department', applicants: 72 },
-    ] },
-  ],
-  'two-paper-mcqs': [
-    { id: 'adv-03', advertisement: 'Advertisement 03/2026', meta: 'Two Paper MCQs', posts: [
-      { id: 'da', post: 'Data Analyst', caseNo: 'Case DA-06 | BPS-17', department: 'Planning & Development', applicants: 156 },
-      { id: 'na', post: 'Network Administrator', caseNo: 'Case NA-07 | BPS-16', department: 'Information Technology', applicants: 72 },
-      { id: 'dba', post: 'Database Administrator', caseNo: 'Case DBA-08 | BPS-17', department: 'Information Technology', applicants: 118 },
-    ] },
-  ],
+const EXAM_TYPE_MAP = {
+  'one-paper-mcqs': ['MCQs', 'MCQ', 'One Paper MCQs', 'one-paper-mcqs'],
+  'two-paper-mcqs': ['Two Paper MCQs', 'two-paper-mcqs'],
+  'written-exams': ['Written Exam', 'Written', 'written-exams'],
+  'cce-exams': ['CCE', 'CCE Exam', 'cce-exams'],
 };
 
-const centers = [
-  { id: 'c-1', center: 'AJK PSC Hall Muzaffarabad', district: 'Muzaffarabad', capacity: 160 },
-  { id: 'c-2', center: 'Govt. Boys Degree College', district: 'Mirpur', capacity: 120 },
-  { id: 'c-3', center: 'Post Graduate College', district: 'Rawalakot', capacity: 110 },
-  { id: 'c-4', center: 'Girls Degree College Bagh', district: 'Bagh', capacity: 140 },
-];
-
-const assignedCandidates = [
-  { id: 1, photo: 'AK', roll: 'MCQ-01-00001', name: 'Ali Khan', cnic: '11111-1111111-1', district: 'Muzaffarabad', center: 'AJK PSC Hall Muzaffarabad' },
-  { id: 2, photo: 'SR', roll: 'MCQ-01-00002', name: 'Sara Riaz', cnic: '22222-2222222-2', district: 'Mirpur', center: 'Govt. Boys Degree College' },
-  { id: 3, photo: 'HN', roll: 'MCQ-01-00003', name: 'Hassan Noor', cnic: '33333-3333333-3', district: 'Rawalakot', center: 'Post Graduate College' },
-];
+const matchesExamType = (pivotTestType, examType) => {
+  if (!pivotTestType) return false;
+  const keywords = EXAM_TYPE_MAP[examType] || [];
+  const tt = String(pivotTestType).toLowerCase();
+  return keywords.some((k) => tt.includes(k.toLowerCase()));
+};
 
 const StepHeader = ({ number, title, subtitle }) => (
   <div className="flex items-start gap-3">
@@ -61,30 +44,208 @@ const RollNumberExamFlow = () => {
   const navigate = useNavigate();
   const { examType = 'one-paper-mcqs' } = useParams();
   const meta = examTypeMeta[examType] || examTypeMeta['one-paper-mcqs'];
-  const advertisements = advertisementsByType[examType] || advertisementsByType['one-paper-mcqs'];
-  const defaultPostIds = advertisements.flatMap((ad) => ad.posts.slice(0, 2).map((post) => post.id));
+
   const [stage, setStage] = useState(1);
   const [search, setSearch] = useState('');
-  const [selectedPostIds, setSelectedPostIds] = useState(defaultPostIds);
-  const [selectedCenterIds, setSelectedCenterIds] = useState(['c-1', 'c-2']);
+  const [selectedPostIds, setSelectedPostIds] = useState([]);
+  const [selectedCenterIds, setSelectedCenterIds] = useState([]);
   const [generated, setGenerated] = useState(false);
-  const [scheduleDates, setScheduleDates] = useState(() => meta.papers.map((_, index) => (index === 1 ? '2026-08-18' : '2026-08-16')));
+  const [generating, setGenerating] = useState(false);
+  const [scheduleDates, setScheduleDates] = useState(() => meta.papers.map(() => ''));
+  const [scheduleTimes, setScheduleTimes] = useState(() => meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
+
+  const [advertisements, setAdvertisements] = useState([]);
+  const [centers, setCenters] = useState([]);
+  const [generatedCandidates, setGeneratedCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterAdvertisement, setFilterAdvertisement] = useState('all');
+  const [filterPost, setFilterPost] = useState('all');
+  const [filterDepartment, setFilterDepartment] = useState('all');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [adsResult, centersResult] = await Promise.all([
+        RollNumberApi.getAdvertisementsWithJobs(200),
+        RollNumberApi.getExamCenters(500),
+      ]);
+
+      const allAds = adsResult?.data?.data ?? adsResult?.data ?? [];
+      const filtered = allAds
+        .map((ad) => {
+          const jobs = (ad.job_details || []).filter((job) => {
+            const testType = job.pivot?.test_type || job.test_type || '';
+            return matchesExamType(testType, examType);
+          });
+          if (jobs.length === 0) return null;
+
+          const receivedCount = ad.total_applications ?? ad.received_applications_count ?? 0;
+          const perPost = jobs.length > 0 ? Math.ceil(receivedCount / jobs.length) : 0;
+
+          return {
+            id: ad.hash_id || String(ad.id),
+            advertisement: ad.adv_number ? `Advertisement ${ad.adv_number}` : `Advertisement #${ad.id}`,
+            meta: meta.badge,
+            posts: jobs.map((job) => ({
+              id: job.hash_id || String(job.id),
+              post: job.designation || job.post_title || 'Untitled Post',
+              caseNo: job.case_number ? `Case ${job.case_number} | BPS-${job.scale || ''}` : `BPS-${job.scale || ''}`,
+              department: job.department || job.department_name || 'N/A',
+              applicants: job.applicants_count ?? perPost,
+              advertisementId: ad.hash_id || String(ad.id),
+            })),
+          };
+        })
+        .filter(Boolean);
+
+      setAdvertisements(filtered);
+
+      const centerList = centersResult?.data?.data ?? centersResult?.data ?? [];
+      setCenters(
+        (Array.isArray(centerList) ? centerList : [])
+          .filter((c) => (c.status ?? 'active') === 'active')
+          .map((c) => ({
+            id: c.id != null ? String(c.id) : c.hash_id,
+            center: c.name,
+            district: c.city || c.district || '',
+            capacity: Number(c.capacity) || 0,
+          }))
+      );
+    } catch (err) {
+      toast.error(err?.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, [examType, meta.badge]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const allPosts = useMemo(() => advertisements.flatMap((ad) => ad.posts.map((post) => ({ ...post, advertisement: ad.advertisement, advertisementMeta: ad.meta }))), [advertisements]);
   const selectedPosts = useMemo(() => allPosts.filter((post) => selectedPostIds.includes(post.id)), [allPosts, selectedPostIds]);
-  const selectedCenters = useMemo(() => centers.filter((center) => selectedCenterIds.includes(center.id)), [selectedCenterIds]);
-  const selectedApplicants = selectedPosts.reduce((sum, post) => sum + post.applicants, 0);
+  const selectedCenters = useMemo(() => centers.filter((center) => selectedCenterIds.includes(center.id)), [centers, selectedCenterIds]);
+  const selectedApplicants = selectedPosts.reduce((sum, post) => sum + (post.applicants || 0), 0);
   const selectedCapacity = selectedCenters.reduce((sum, center) => sum + center.capacity, 0);
   const capacityShortage = Math.max(0, selectedApplicants - selectedCapacity);
   const capacityPassed = selectedApplicants > 0 && selectedCapacity >= selectedApplicants;
 
+  const uniqueDepartments = useMemo(() => [...new Set(allPosts.map((p) => p.department).filter(Boolean))], [allPosts]);
+
+  const filteredPosts = useMemo(() => {
+    return advertisements.map((ad) => {
+      if (filterAdvertisement !== 'all' && ad.id !== filterAdvertisement) return null;
+      const posts = ad.posts.filter((post) => {
+        if (filterPost !== 'all' && post.id !== filterPost) return false;
+        if (filterDepartment !== 'all' && post.department !== filterDepartment) return false;
+        if (search && !`${ad.advertisement} ${post.post} ${post.department}`.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      });
+      if (posts.length === 0) return null;
+      return { ...ad, posts };
+    }).filter(Boolean);
+  }, [advertisements, filterAdvertisement, filterPost, filterDepartment, search]);
+
   const togglePost = (postId) => setSelectedPostIds((current) => current.includes(postId) ? current.filter((id) => id !== postId) : [...current, postId]);
   const toggleCenter = (centerId) => setSelectedCenterIds((current) => current.includes(centerId) ? current.filter((id) => id !== centerId) : [...current, centerId]);
-  const generateRollNumbers = () => {
+
+  const generateRollNumbers = async () => {
     if (!capacityPassed) return;
-    setGenerated(true);
-    setStage(3);
+    if (selectedCenterIds.length === 0) {
+      toast.error('Select at least one exam center');
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const advIds = [...new Set(selectedPosts.map((p) => p.advertisementId))];
+      let allApplicationNumbers = [];
+
+      for (const advId of advIds) {
+        const result = await RollNumberApi.getApplicationsByAdvertisement(advId, { per_page: 1000 });
+        const apps = result?.data?.applications?.data ?? [];
+        const shortlisted = apps
+          .filter((a) => a.status === 'Shortlisted')
+          .map((a) => a.application_number);
+        allApplicationNumbers = allApplicationNumbers.concat(shortlisted);
+      }
+
+      if (allApplicationNumbers.length === 0) {
+        toast.error('No shortlisted applications found for the selected posts');
+        setGenerating(false);
+        return;
+      }
+
+      const centerId = selectedCenterIds[0];
+      const prefix = 'AJK';
+      const body = {
+        application_numbers: allApplicationNumbers,
+        exam_center_id: Number(centerId),
+        prefix,
+        starting_number: 1,
+        format: 'sequential',
+        exam_date: scheduleDates[0] || null,
+        attendance_time: scheduleTimes[0] || null,
+      };
+
+      const result = await RollNumberApi.generateSlips(body);
+      const slips = result?.data?.slips ?? [];
+      const count = result?.data?.generated_count ?? slips.length;
+
+      setGeneratedCandidates(slips.map((s) => ({
+        id: s.application_number,
+        photo: (s.candidate_name || '').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
+        roll: s.roll_number,
+        name: s.candidate_name,
+        cnic: s.candidate_cnic || '',
+        district: '',
+        center: `${s.exam_center || ''}${s.exam_city ? ` ${s.exam_city}` : ''}`,
+      })));
+
+      toast.success(`Generated ${count} roll number${count === 1 ? '' : 's'} successfully`);
+      setGenerated(true);
+      setStage(3);
+    } catch (err) {
+      toast.error(err?.message || 'Failed to generate roll numbers');
+    } finally {
+      setGenerating(false);
+    }
   };
+
+  const downloadSlip = useCallback(async (applicationNumber) => {
+    const tid = toast.loading('Preparing slip PDF…');
+    try {
+      const res = await RollNumberApi.downloadSlip(applicationNumber);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.dismiss(tid);
+        toast.error(err.message || 'Failed to download slip');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `AdmissionSlip_${applicationNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.dismiss(tid);
+      toast.success('Slip downloaded successfully');
+    } catch {
+      toast.dismiss(tid);
+      toast.error('Could not download slip');
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <InlineLoader text="Loading exam data…" variant="ring" size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -106,16 +267,16 @@ const RollNumberExamFlow = () => {
           </div>
         </div>
 
-        {meta.pending && (
+        {advertisements.length === 0 && !loading && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-            <AlertTriangle size={16} /> This exam type is ready as a frontend shell. API integration can follow the same one/two paper endpoints.
+            <AlertTriangle size={16} /> No advertisements found with {meta.badge} test type. Create advertisements with this test type first.
           </div>
         )}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Card className="rounded-lg border-blue-200 bg-blue-50"><CardContent className="flex items-center gap-3 p-4"><Users size={24} className="text-blue-700" /><div><p className="text-xs font-semibold text-blue-700">Selected Applicants</p><p className="text-2xl font-bold text-blue-950">{selectedApplicants}</p></div></CardContent></Card>
           <Card className="rounded-lg border-emerald-200 bg-emerald-50"><CardContent className="flex items-center gap-3 p-4"><MapPin size={24} className="text-emerald-700" /><div><p className="text-xs font-semibold text-emerald-700">Selected Capacity</p><p className="text-2xl font-bold text-emerald-950">{selectedCapacity}</p></div></CardContent></Card>
-          <Card className="rounded-lg border-violet-200 bg-violet-50"><CardContent className="flex items-center gap-3 p-4"><CheckCircle2 size={24} className="text-violet-700" /><div><p className="text-xs font-semibold text-violet-700">Generated</p><p className="text-2xl font-bold text-violet-950">{generated ? selectedApplicants : 0}</p></div></CardContent></Card>
+          <Card className="rounded-lg border-violet-200 bg-violet-50"><CardContent className="flex items-center gap-3 p-4"><CheckCircle2 size={24} className="text-violet-700" /><div><p className="text-xs font-semibold text-violet-700">Generated</p><p className="text-2xl font-bold text-violet-950">{generated ? generatedCandidates.length : 0}</p></div></CardContent></Card>
         </div>
 
         {stage !== 3 && (
@@ -129,23 +290,25 @@ const RollNumberExamFlow = () => {
 
         {stage === 1 && (
           <Card className="rounded-lg"><CardContent className="space-y-5 p-5">
-            <StepHeader number="1" title="Select Advertisement, Posts, Departments & Applicants" subtitle="Advertisement alag column mein hai. Checkbox sirf post/designation ke sath hai." />
+            <StepHeader number="1" title="Select Advertisement, Posts, Departments & Applicants" subtitle="Select the posts you want to include in this roll number generation batch." />
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
               <TextField size="small" label="Search" value={search} onChange={(event) => setSearch(event.target.value)} className="lg:col-span-4" InputProps={{ startAdornment: <Search size={16} className="mr-2 text-slate-400" /> }} />
-              <TextField select size="small" label="Advertisement" defaultValue="all" className="lg:col-span-3"><MenuItem value="all">All Advertisements</MenuItem>{advertisements.map((ad) => <MenuItem key={ad.id} value={ad.id}>{ad.advertisement}</MenuItem>)}</TextField>
-              <TextField select size="small" label="Post" defaultValue="all" className="lg:col-span-2"><MenuItem value="all">All Posts</MenuItem>{allPosts.map((post) => <MenuItem key={post.id} value={post.id}>{post.post}</MenuItem>)}</TextField>
-              <TextField select size="small" label="Department" defaultValue="all" className="lg:col-span-2"><MenuItem value="all">All Departments</MenuItem><MenuItem value="it">Information Technology</MenuItem><MenuItem value="sgad">S&GAD</MenuItem></TextField>
-              <Button variant="outline" className="h-10 gap-2 bg-white lg:col-span-1"><Filter size={15} /> Filter</Button>
+              <TextField select size="small" label="Advertisement" value={filterAdvertisement} onChange={(e) => setFilterAdvertisement(e.target.value)} className="lg:col-span-3"><MenuItem value="all">All Advertisements</MenuItem>{advertisements.map((ad) => <MenuItem key={ad.id} value={ad.id}>{ad.advertisement}</MenuItem>)}</TextField>
+              <TextField select size="small" label="Post" value={filterPost} onChange={(e) => setFilterPost(e.target.value)} className="lg:col-span-2"><MenuItem value="all">All Posts</MenuItem>{allPosts.map((post) => <MenuItem key={post.id} value={post.id}>{post.post}</MenuItem>)}</TextField>
+              <TextField select size="small" label="Department" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)} className="lg:col-span-2"><MenuItem value="all">All Departments</MenuItem>{uniqueDepartments.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}</TextField>
+              <Button variant="outline" className="h-10 gap-2 bg-white lg:col-span-1" onClick={() => { setSearch(''); setFilterAdvertisement('all'); setFilterPost('all'); setFilterDepartment('all'); }}><Filter size={15} /> Filter</Button>
             </div>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr><th className="w-[260px] px-4 py-3">Advertisement</th><th className="px-4 py-3">Designation / Post</th><th className="px-4 py-3">Department</th><th className="px-4 py-3 text-right">Applicants</th></tr></thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {advertisements.map((ad) => {
-                    const rows = ad.posts.filter((post) => !search || `${ad.advertisement} ${post.post} ${post.department}`.toLowerCase().includes(search.toLowerCase()));
-                    return rows.map((post, index) => (
+                  {filteredPosts.length === 0 && (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">No posts found for this exam type</td></tr>
+                  )}
+                  {filteredPosts.map((ad) => {
+                    return ad.posts.map((post, index) => (
                       <tr key={post.id} className="hover:bg-slate-50">
-                        {index === 0 && <td rowSpan={rows.length} className="border-r border-slate-100 bg-slate-50 px-4 py-3 align-top"><div className="font-bold text-slate-900">{ad.advertisement}</div><div className="mt-1 text-xs font-medium text-slate-500">{ad.meta} | multiple posts demo</div></td>}
+                        {index === 0 && <td rowSpan={ad.posts.length} className="border-r border-slate-100 bg-slate-50 px-4 py-3 align-top"><div className="font-bold text-slate-900">{ad.advertisement}</div><div className="mt-1 text-xs font-medium text-slate-500">{ad.meta}</div></td>}
                         <td className="px-4 py-3"><label className="flex cursor-pointer items-center gap-3"><input type="checkbox" checked={selectedPostIds.includes(post.id)} onChange={() => togglePost(post.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /><span><span className="block font-semibold text-slate-900">{post.post}</span><span className="block text-xs text-slate-500">{post.caseNo}</span></span></label></td>
                         <td className="px-4 py-3 text-slate-600">{post.department}</td>
                         <td className="px-4 py-3 text-right font-bold text-slate-900">{post.applicants}</td>
@@ -166,17 +329,22 @@ const RollNumberExamFlow = () => {
 
         {stage === 2 && (
           <Card className="rounded-lg"><CardContent className="space-y-5 p-5">
-            <StepHeader number="2" title="Center Allocation & Generate Roll Numbers" subtitle="Center select karain, district/preference rule choose karain, phir roll numbers generate karain." />
+            <StepHeader number="2" title="Center Allocation & Generate Roll Numbers" subtitle="Select centers, configure schedule, then generate roll numbers." />
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{meta.papers.map((paper, index) => <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4"><div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><TextField size="small" type="date" label="Start Date" value={scheduleDates[index] || scheduleDates[0]} onChange={(event) => setScheduleDates((current) => current.map((date, dateIndex) => dateIndex === index ? event.target.value : date))} InputLabelProps={{ shrink: true }} /><TextField size="small" type="time" label="Start Time" defaultValue={index === 1 ? '14:00' : '10:00'} InputLabelProps={{ shrink: true }} /><TextField size="small" label="Duration" defaultValue={index === 1 ? '120 Minutes' : '90 Minutes'} InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }} /></div></div>)}</div>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{meta.papers.map((paper, index) => <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4"><div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><TextField size="small" type="date" label="Start Date" value={scheduleDates[index] || ''} onChange={(event) => setScheduleDates((current) => current.map((date, dateIndex) => dateIndex === index ? event.target.value : date))} InputLabelProps={{ shrink: true }} /><TextField size="small" type="time" label="Start Time" value={scheduleTimes[index] || ''} onChange={(event) => setScheduleTimes((current) => current.map((time, timeIndex) => timeIndex === index ? event.target.value : time))} InputLabelProps={{ shrink: true }} /><TextField size="small" label="Duration" defaultValue={index === 1 ? '120 Minutes' : '90 Minutes'} InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }} /></div></div>)}</div>
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
                   <table className="w-full min-w-[760px] text-left text-sm">
                     <thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-4 py-3">Center Name</th><th className="px-4 py-3">District</th><th className="px-4 py-3 text-right">Capacity</th><th className="px-4 py-3">Start Date</th><th className="px-4 py-3">Status</th></tr></thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">{centers.map((center) => <tr key={center.id} className="hover:bg-slate-50"><td className="px-4 py-3"><input type="checkbox" checked={selectedCenterIds.includes(center.id)} onChange={() => toggleCenter(center.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /></td><td className="px-4 py-3 font-medium text-slate-800">{center.center}</td><td className="px-4 py-3 text-slate-600">{center.district}</td><td className="px-4 py-3 text-right font-semibold text-slate-900">{center.capacity}</td><td className="px-4 py-3 font-medium text-slate-700">{scheduleDates[0]}</td><td className="px-4 py-3"><span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">Available</span></td></tr>)}</tbody>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {centers.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No exam centers found</td></tr>
+                      )}
+                      {centers.map((center) => <tr key={center.id} className="hover:bg-slate-50"><td className="px-4 py-3"><input type="checkbox" checked={selectedCenterIds.includes(center.id)} onChange={() => toggleCenter(center.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /></td><td className="px-4 py-3 font-medium text-slate-800">{center.center}</td><td className="px-4 py-3 text-slate-600">{center.district}</td><td className="px-4 py-3 text-right font-semibold text-slate-900">{center.capacity}</td><td className="px-4 py-3 font-medium text-slate-700">{scheduleDates[0] || '—'}</td><td className="px-4 py-3"><span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">Available</span></td></tr>)}
+                    </tbody>
                   </table>
                 </div>
-                <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${capacityPassed ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{capacityPassed ? `Capacity check passed. ${selectedCapacity} seats selected for ${selectedApplicants} applicants.` : `Selected center capacity is short by ${capacityShortage} seats. More centers select karain.`}</div>
+                <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${capacityPassed ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{capacityPassed ? `Capacity check passed. ${selectedCapacity} seats selected for ${selectedApplicants} applicants.` : `Selected center capacity is short by ${capacityShortage} seats. Select more centers.`}</div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <h3 className="mb-3 text-sm font-bold text-slate-900">Center Allocation by District or by Preference</h3>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -185,17 +353,21 @@ const RollNumberExamFlow = () => {
                   </div>
                 </div>
               </div>
-              {/* Job History and Center Allocation History are hidden for now. */}
 </div>
-            <div className="flex flex-wrap items-center justify-between gap-3"><Button variant="outline" className="gap-2 bg-white" onClick={() => setStage(1)}><ArrowLeft size={15} /> Back</Button><Button className="gap-2" disabled={!capacityPassed} onClick={generateRollNumbers}><Send size={15} /> Generate Roll Numbers</Button></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><Button variant="outline" className="gap-2 bg-white" onClick={() => setStage(1)}><ArrowLeft size={15} /> Back</Button><Button className="gap-2" disabled={!capacityPassed || generating} onClick={generateRollNumbers}><Send size={15} /> {generating ? 'Generating…' : 'Generate Roll Numbers'}</Button></div>
           </CardContent></Card>
         )}
 
         {stage === 3 && (
           <Card className="rounded-lg"><CardContent className="space-y-5 p-5">
-            <StepHeader number="3" title="Generated Candidates List" subtitle="Generate ke baad roll number slip candidate dashboard mein selected job ke against show hogi." />
+            <StepHeader number="3" title="Generated Candidates List" subtitle="Roll number slips are now available for selected candidates." />
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">Roll numbers generated. Candidate dashboard par har selected job ke against same roll number slip available hogi.</div>
-            <div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr><th className="w-20 px-4 py-3">Photo</th><th className="px-4 py-3">Roll No</th><th className="px-4 py-3">Candidate</th><th className="px-4 py-3">Selected Jobs</th><th className="px-4 py-3">Center</th><th className="px-4 py-3 text-right">Slip</th></tr></thead><tbody className="divide-y divide-slate-100 bg-white">{assignedCandidates.map((candidate) => <tr key={candidate.id} className="hover:bg-slate-50"><td className="px-4 py-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-200 text-sm font-bold text-slate-700">{candidate.photo}</div></td><td className="px-4 py-3 font-bold text-slate-900">{candidate.roll}</td><td className="px-4 py-3"><div className="font-semibold text-slate-900">{candidate.name}</div><div className="text-xs text-slate-500">{candidate.cnic} | {candidate.district}</div></td><td className="px-4 py-3 text-slate-600">{selectedPosts.map((post) => post.post).join(' + ') || 'No post selected'}</td><td className="px-4 py-3 text-slate-600">{candidate.center}</td><td className="px-4 py-3 text-right"><Button variant="outline" size="sm" className="bg-white">View Slip</Button></td></tr>)}</tbody></table></div>
+            <div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr><th className="w-20 px-4 py-3">Photo</th><th className="px-4 py-3">Roll No</th><th className="px-4 py-3">Candidate</th><th className="px-4 py-3">Selected Jobs</th><th className="px-4 py-3">Center</th><th className="px-4 py-3 text-right">Slip</th></tr></thead><tbody className="divide-y divide-slate-100 bg-white">
+              {generatedCandidates.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No candidates generated yet</td></tr>
+              )}
+              {generatedCandidates.map((candidate) => <tr key={candidate.id} className="hover:bg-slate-50"><td className="px-4 py-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-200 text-sm font-bold text-slate-700">{candidate.photo}</div></td><td className="px-4 py-3 font-bold text-slate-900">{candidate.roll}</td><td className="px-4 py-3"><div className="font-semibold text-slate-900">{candidate.name}</div><div className="text-xs text-slate-500">{candidate.cnic}{candidate.district ? ` | ${candidate.district}` : ''}</div></td><td className="px-4 py-3 text-slate-600">{selectedPosts.map((post) => post.post).join(' + ') || 'N/A'}</td><td className="px-4 py-3 text-slate-600">{candidate.center}</td><td className="px-4 py-3 text-right"><Button variant="outline" size="sm" className="bg-white" onClick={() => downloadSlip(candidate.id)}>View Slip</Button></td></tr>)}
+            </tbody></table></div>
             <div className="flex justify-start"><Button variant="outline" className="gap-2 bg-white" onClick={() => setStage(2)}><ArrowLeft size={15} /> Back to Allocation</Button></div>
           </CardContent></Card>
         )}
@@ -205,10 +377,3 @@ const RollNumberExamFlow = () => {
 };
 
 export default RollNumberExamFlow;
-
-
-
-
-
-
-
