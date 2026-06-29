@@ -231,6 +231,7 @@ const RollNumberExamFlow = () => {
   const selectedCenters = useMemo(() => centers.filter((center) => selectedCenterIds.includes(center.id)), [centers, selectedCenterIds]);
   const selectedApplicants = selectedPosts.reduce((sum, post) => sum + (post.applicants || 0), 0);
   const selectedCapacity = selectedCenters.reduce((sum, center) => sum + center.capacity, 0);
+  const commonRollNumber = ['one-paper-mcqs', 'two-paper-mcqs'].includes(examType) ? 'MCQ-01-00001' : null;
   const capacityShortage = Math.max(0, selectedApplicants - selectedCapacity);
   const capacityPassed = selectedApplicants > 0 && selectedCapacity >= selectedApplicants;
 
