@@ -39,6 +39,7 @@ const RollNumberApi = {
     if (params.page)             search.set('page',             String(params.page));
     if (params.search)           search.set('search',           params.search);
     if (params.advertisement_no) search.set('advertisement_no', params.advertisement_no);
+    if (params.status)           search.set('status',           params.status);
 
     const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/shortlisted?${search}`, {
       headers: getAdminHeaders(false),

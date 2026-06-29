@@ -279,7 +279,7 @@ const Dashboard = () => {
   ].filter((a) => canShow(a.module));
 
   const quickLinks = [
-    { label: 'Candidates', icon: Users,     link: '/dashboard/applications',          iconBg: 'bg-emerald-500', module: 'candidates'   },
+    { label: 'Candidates', icon: Users,     link: '/dashboard/roll-numbers',          iconBg: 'bg-emerald-500', module: 'candidates'   },
     { label: 'Dispatch',   icon: Send,      link: '/dashboard/dispatch/received',     iconBg: 'bg-blue-500',    module: 'requisitions' },
     { label: 'Submitted Requisitions',  icon: BarChart3, link: '/dashboard/psc-table',             iconBg: 'bg-purple-500',  module: 'requisitions' },
     { label: 'Requisitions',    icon: PieChart,  link: '/dashboard/requisitions',          iconBg: 'bg-amber-500',   module: 'requisitions' },

@@ -9,7 +9,6 @@ import {
 import {
   Hash,
   Eye,
-  Send,
   RefreshCw,
   FilterX,
   MoreVertical,
@@ -25,22 +24,23 @@ import { InlineLoader } from 'components/ui/Loader';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import RollNumberApi from 'api/rollNumberApi';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
-import {
-  getApplicationOcrBatch,
-  getApplicationOcrBatchLabel,
-  getApplicationOcrBatchPillClass,
-} from 'utils/applicationOcrUtils';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 
-const PERM = 'roll_number.roll_number_generation'; // permission scope for this module
+const PERM = 'roll_number.roll_number_generation';
 
 const DEFAULT_FILTERS = {
   search: '',
   advertisement_no: '',
   generated: '',
   preferred_exam_city: '',
+  status: '',
+};
+
+const STATUS_COLORS = {
+  Shortlisted: 'bg-green-100 text-green-700',
+  Rejected:    'bg-red-100 text-red-700',
+  Interview:   'bg-blue-100 text-blue-700',
 };
 
 const gridSx = {
@@ -61,8 +61,6 @@ const gridSx = {
 const RollNumberManagement = () => {
   const navigate = useNavigate();
 
-  // Action-level permissions for the current role.
-  const canGenerate = hasPermission(`${PERM}.generate`);
   const canEdit = hasPermission(`${PERM}.edit`);
   const canDelete = hasPermission(`${PERM}.delete`);
 
@@ -71,8 +69,6 @@ const RollNumberManagement = () => {
   const [total,           setTotal]           = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]  = useState([]);
-  // MUI X DataGrid v7+ may emit { type: 'include'|'exclude', ids: Set } instead
-  // of a plain array. Normalize to a flat array of ids so .includes / .length work.
   const selectedIds = useMemo(() => {
     if (!selectionModel) return [];
     if (Array.isArray(selectionModel)) return selectionModel;
@@ -86,174 +82,55 @@ const RollNumberManagement = () => {
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
-  // ── Advertisement hash → readable text resolution ──────────────────────
-  // "Stub" shortlisted applications (no admin-side advertisement linked yet)
-  // come back from /roll-numbers/shortlisted with advertisement_no = null.
-  // Resolve it the same way /dashboard/applications does: pull the candidate
-  // portal's advertisement_no (a hash_id) for this application_number, then
-  // map that hash → adv_number via the admin /advertisements list.
-  const [advertisementMap, setAdvertisementMap] = useState({});
-  const [candidateAdvMap,  setCandidateAdvMap]  = useState({});
-
-  const fetchAdvertisements = useCallback(async () => {
-    try {
-      const headers = {
-        Accept: 'application/json',
-        'X-API-KEY': Config.apiKey,
-        Authorization: `Bearer ${AuthService.getToken()}`,
-      };
-
-      const firstRes  = await fetch(`${Config.apiUrl}/advertisements?per_page=100`, { headers });
-      const firstJson = await firstRes.json();
-      const firstPage = firstJson?.data?.data ?? [];
-      const lastPage  = firstJson?.data?.last_page ?? 1;
-
-      let allAds = firstPage;
-      if (lastPage > 1) {
-        const pages = await Promise.all(
-          Array.from({ length: lastPage - 1 }, (_, i) =>
-            fetch(`${Config.apiUrl}/advertisements?per_page=100&page=${i + 2}`, { headers })
-              .then((r) => r.json())
-              .then((j) => j?.data?.data ?? [])
-              .catch(() => [])
-          )
-        );
-        allAds = allAds.concat(...pages);
-      }
-
-      const map = {};
-      allAds.forEach((ad) => {
-        if (ad.hash_id) map[ad.hash_id] = ad.adv_number;
-        (ad.job_details || []).forEach((job) => {
-          if (job?.hash_id) map[job.hash_id] = ad.adv_number;
-        });
-      });
-      setAdvertisementMap(map);
-    } catch (err) {
-    }
-  }, []);
-
-  const fetchCandidateAdvertisements = useCallback(async () => {
-    try {
-      const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
-      const res  = await fetch(`${Config.candidateApiUrl}/applications?per_page=100`, { headers });
-      const json = await res.json();
-      const items = json?.data?.data ?? json?.data ?? [];
-
-      const map = {};
-      items.forEach((a) => {
-        const advNo = a.job_post?.ext_adv_id ?? a.advertisement_no ?? a.job_post?.adv_number ?? null;
-        map[a.application_number] = {
-          advertisement_no: advNo,
-          job_title: a.job_post?.post_title || null,
-        };
-      });
-      setCandidateAdvMap(map);
-    } catch (err) {
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAdvertisements();
-    fetchCandidateAdvertisements();
-  }, [fetchAdvertisements, fetchCandidateAdvertisements]);
-
-  // Resolve a shortlisted item's advertisement number, falling back to the
-  // candidate-portal hash → admin advertisement map, then the portal's job title.
-  const resolveAdvertisementNo = useCallback((item) => {
-    if (item.advertisement_no) return item.advertisement_no;
-
-    const candidate = candidateAdvMap[item.application_number];
-    if (!candidate) return 'N/A';
-
-    if (candidate.advertisement_no && advertisementMap[candidate.advertisement_no]) {
-      return advertisementMap[candidate.advertisement_no];
-    }
-
-    return candidate.job_title || candidate.advertisement_no || 'N/A';
-  }, [advertisementMap, candidateAdvMap]);
-
-  // ── Data ────────────────────────────────────────────────────────────────
-  const fetchShortlisted = useCallback(async () => {
+  // ── Data (fetches from candidate portal API) ─────────────────────────
+  const fetchApplications = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await RollNumberApi.getShortlisted({
-        per_page:         paginationModel.pageSize,
-        page:             paginationModel.page + 1,
-        search:           filters.search,
-        advertisement_no: filters.advertisement_no,
+      const candidateHeaders = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
+      const params = new URLSearchParams();
+      params.set('per_page', String(paginationModel.pageSize));
+      params.set('page', String(paginationModel.page + 1));
+      if (filters.search) params.set('search', filters.search);
+      if (filters.advertisement_no) params.set('job_id', filters.advertisement_no);
+
+      const res = await fetch(`${Config.candidateApiUrl}/applications?${params}`, { headers: candidateHeaders });
+      const result = await res.json();
+
+      const payload = result.data ?? result ?? {};
+      const data = payload.data ?? [];
+
+      const mapped = (Array.isArray(data) ? data : []).map((item) => {
+        const snapshot = item.snapshot_data || {};
+        return {
+          id:                item.application_number || item.hash_id || String(item.id),
+          application_number: item.application_number,
+          applicant_name:    snapshot.name || item.candidate?.name || item.profile?.full_name || 'N/A',
+          cnic:              snapshot.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
+          job_title:         item.job_post?.post_title || item.job_post?.title || 'N/A',
+          advertisement_no:  item.job_post?.ext_adv_id || item.advertisement_no || item.job_post?.adv_number || 'N/A',
+          applied_at:        item.submitted_at || item.created_at ? formatDate(item.submitted_at || item.created_at) : 'N/A',
+          payment_status:    item.payment?.payment_status || item.payment_status || (item.payment?.paid_at ? 'paid' : 'unpaid'),
+          preferred_exam_cities: (item.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || c?.name || '')).filter(Boolean),
+          roll_number:       null,
+          published_at:      null,
+        };
       });
 
-      if (result.success || result.status === 200) {
-        const payload = result.data ?? {};
-        const data    = payload.data ?? [];
-
-        const resolveCityName = (cityInput) => {
-          if (typeof cityInput === 'string') return cityInput;
-          return cityInput?.city || cityInput?.name || cityInput;
-        };
-
-        const mapped = data
-          .map((item) => ({
-            id:                item.application_number,
-            application_number: item.application_number,
-            applicant_name:    item.candidate_name || 'N/A',
-            cnic:              item.candidate_cnic || 'N/A',
-            job_title:         item.job_title || candidateAdvMap[item.application_number]?.job_title || 'N/A',
-            advertisement_no:  resolveAdvertisementNo(item),
-            advertisement_id:  item.advertisement_id,
-            applied_at:        item.applied_at ? formatDate(item.applied_at) : 'N/A',
-            payment_status:    item.payment_status || 'N/A',
-            ocr_batch:         getApplicationOcrBatch(item.documents || []),
-            has_disability:    !!item.disability,
-            disability_type:   item.disability?.disability_type || null,
-            preferred_exam_cities: (item.preferred_exam_cities || []).map(resolveCityName),
-            roll_number:       item.roll_number,
-            exam_center:       item.exam_center,
-            exam_center_id:    item.exam_center_id,
-            exam_city:         item.exam_city,
-            exam_hall_id:      item.exam_hall_id,
-            seat_number:       item.seat_number,
-            exam_date:         item.exam_date,
-            attendance_time:   item.attendance_time,
-            published_at:      item.published_at,
-          }))
-          .filter((row) => {
-            const generatedMatch = filters.generated === 'yes' 
-              ? !!row.roll_number
-              : filters.generated === 'no' 
-                ? !row.roll_number
-                : true;
-            
-            const cityMatch = !filters.preferred_exam_city 
-              ? true 
-              : row.preferred_exam_cities.some((city) => 
-                  city.toLowerCase().includes(filters.preferred_exam_city.toLowerCase()));
-            
-            return generatedMatch && cityMatch;
-          });
-
-        setRows(mapped);
-        setTotal(filters.generated ? mapped.length : (payload.total ?? mapped.length));
-      } else {
-        toast.error(result.message || 'Failed to load shortlisted applications');
-        setRows([]);
-        setTotal(0);
-      }
+      setRows(mapped);
+      setTotal(payload.total ?? mapped.length);
     } catch (err) {
-      // handleResponse in rollNumberApi.js already wraps the 404 with an actionable hint
-      toast.error(err?.message || 'Server error while loading shortlisted applications');
+      toast.error(err?.message || 'Failed to load applications from candidate portal');
       setRows([]);
       setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [paginationModel.page, paginationModel.pageSize, filters, candidateAdvMap, resolveAdvertisementNo]);
+  }, [paginationModel.page, paginationModel.pageSize, filters]);
 
   useEffect(() => {
-    const t = setTimeout(fetchShortlisted, 300);
+    const t = setTimeout(fetchApplications, 300);
     return () => clearTimeout(t);
-  }, [fetchShortlisted]);
+  }, [fetchApplications]);
 
   // ── Filters ─────────────────────────────────────────────────────────────
   const handleFilterChange = (e) => {
@@ -265,34 +142,6 @@ const RollNumberManagement = () => {
   const handleClearFilters = () => {
     setFilters(DEFAULT_FILTERS);
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
-  };
-
-  // ── Generate slip flow (navigates to the full-page generator) ──────────
-  const openSlipGenerator = async (explicitSelection = null) => {
-    const ids = Array.isArray(explicitSelection) ? explicitSelection : selectedIds;
-    if (!ids || ids.length === 0) {
-      toast.error('Select at least one shortlisted candidate');
-      return;
-    }
-
-    // Bulk generation touches many candidates at once — confirm first, same as bulk deletion.
-    // Single-candidate generation (from the row menu) proceeds straight through.
-    if (ids.length > 1) {
-      const ok = await confirmDelete({
-        title:        'Generate Roll Number Slips',
-        message:      `Generate roll number slips for ${ids.length} selected candidates?`,
-        identifier:   `${ids.length} candidates`,
-        warning:      '',
-        confirmLabel: 'Generate',
-        confirmColor: 'bg-emerald-600 hover:bg-emerald-700',
-      });
-      if (!ok) return;
-    }
-
-    const selectedApps = rows.filter((r) => ids.includes(r.id));
-    navigate('/dashboard/roll-numbers/generate-slips', {
-      state: { applications: selectedApps },
-    });
   };
 
   // ── Slip download ───────────────────────────────────────────────────────────
@@ -341,7 +190,7 @@ const RollNumberManagement = () => {
       await RollNumberApi.deleteSlip(applicationNumber);
       toast.dismiss(tid);
       toast.success('Roll number slip deleted successfully');
-      fetchShortlisted();
+      fetchApplications();
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to delete slip');
@@ -352,7 +201,6 @@ const RollNumberManagement = () => {
   const bulkDeleteSlips = async () => {
     if (selectedIds.length === 0) return;
 
-    // Filter to only rows that actually have a roll number
     const rowsWithRoll = rows.filter(r => selectedIds.includes(r.id) && r.roll_number);
     if (rowsWithRoll.length === 0) {
       toast.error('None of the selected candidates have a roll number to delete');
@@ -374,7 +222,7 @@ const RollNumberManagement = () => {
       const count = result.data?.deleted ?? rowsWithRoll.length;
       toast.success(`${count} roll number slip${count === 1 ? '' : 's'} deleted successfully`);
       setSelectionModel([]);
-      fetchShortlisted();
+      fetchApplications();
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to delete slips');
@@ -390,28 +238,13 @@ const RollNumberManagement = () => {
     handleMenuClose();
   };
 
-  const handleGenerateOne = () => {
-    if (!selectedRow) return;
-    const appNum = selectedRow.application_number;
-    handleMenuClose();
-    // Pass selection explicitly to avoid state-flush race
-    openSlipGenerator([appNum]);
-  };
-
-  // ── Selection-aware generation state (for bulk action bar) ─────────────
-  const selectedRows = useMemo(
-    () => rows.filter((r) => selectedIds.includes(r.id)),
-    [rows, selectedIds]
-  );
-  const hasGeneratedSelected = selectedRows.some((r) => r.roll_number);
-
   // ── Stats ───────────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
-    total:        rows.length,
+    total:        total || rows.length,
+    shortlisted:  rows.filter((r) => r.status === 'Shortlisted').length,
     withRoll:     rows.filter((r) => r.roll_number).length,
-    withoutRoll:  rows.filter((r) => !r.roll_number).length,
     published:    rows.filter((r) => r.published_at).length,
-  }), [rows]);
+  }), [rows, total]);
 
   // ── Columns ─────────────────────────────
   const columns = [
@@ -420,6 +253,17 @@ const RollNumberManagement = () => {
     { field: 'advertisement_no',     headerName: 'Advertisement Number',  minWidth: 160, flex: 1.1 },
     { field: 'job_title',     headerName: 'Job Advertisement',  minWidth: 160, flex: 1.1 },
     { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      minWidth: 120,
+      flex: 0.6,
+      renderCell: (p) => {
+        if (!p.value) return <span className="text-slate-400 text-xs">—</span>;
+        const color = STATUS_COLORS[p.value] || 'bg-slate-100 text-slate-600';
+        return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>{p.value}</span>;
+      },
+    },
     {
       field: 'preferred_exam_cities',
       headerName: 'Exam City Preferences',
@@ -474,8 +318,8 @@ const RollNumberManagement = () => {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-100 rounded-lg"><Hash size={22} className="text-indigo-700" /></div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Roll Number Slip Generation</h1>
-              <p className="text-sm text-slate-500 mt-1">Generate roll number slips for shortlisted candidates with exam center allocation.</p>
+              <h1 className="text-2xl font-bold text-slate-900">Applications & Roll Number Management</h1>
+              <p className="text-sm text-slate-500 mt-1">View all received applications and manage roll number slips.</p>
             </div>
           </div>
         </div>
@@ -484,20 +328,20 @@ const RollNumberManagement = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-4">
-              <p className="text-xs text-blue-700 font-medium">Shortlisted (this page)</p>
+              <p className="text-xs text-blue-700 font-medium">Total Applications</p>
               <h2 className="text-2xl font-bold text-blue-900 mt-1">{stats.total}</h2>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200">
+            <CardContent className="p-4">
+              <p className="text-xs text-green-700 font-medium">Shortlisted</p>
+              <h2 className="text-2xl font-bold text-green-900 mt-1">{stats.shortlisted}</h2>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200">
             <CardContent className="p-4">
               <p className="text-xs text-indigo-700 font-medium">Roll Numbers Generated</p>
               <h2 className="text-2xl font-bold text-indigo-900 mt-1">{stats.withRoll}</h2>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200">
-            <CardContent className="p-4">
-              <p className="text-xs text-amber-700 font-medium">Awaiting Generation</p>
-              <h2 className="text-2xl font-bold text-amber-900 mt-1">{stats.withoutRoll}</h2>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
@@ -515,11 +359,18 @@ const RollNumberManagement = () => {
               value={filters.search} onChange={handleFilterChange} sx={{ flex: '1 1 220px', minWidth: 200 }} />
             <TextField label="Advertisement No" variant="outlined" size="small" name="advertisement_no"
               value={filters.advertisement_no} onChange={handleFilterChange} sx={{ width: 160 }} />
-            <TextField label="Roll Number" variant="outlined" size="small" name="generated"
+            <TextField label="Status" variant="outlined" size="small" name="status" select
+              value={filters.status} onChange={handleFilterChange} sx={{ width: 150 }}>
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="Shortlisted">Shortlisted</MenuItem>
+              <MenuItem value="Rejected">Rejected</MenuItem>
+              <MenuItem value="Interview">Interview</MenuItem>
+            </TextField>
+            <TextField label="Roll Number" variant="outlined" size="small" name="generated" select
               value={filters.generated} onChange={handleFilterChange} sx={{ width: 160 }}>
-              <MenuItem key="all" value="">All</MenuItem>
-              <MenuItem key="yes" value="yes">Generated</MenuItem>
-              <MenuItem key="no" value="no">Not Generated</MenuItem>
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="yes">Generated</MenuItem>
+              <MenuItem value="no">Not Generated</MenuItem>
             </TextField>
             <TextField label="Exam City Preferences" variant="outlined" size="small" name="preferred_exam_city"
               value={filters.preferred_exam_city} onChange={handleFilterChange} sx={{ width: 200 }} />
@@ -528,7 +379,7 @@ const RollNumberManagement = () => {
               title="Clear Filters" aria-label="Clear Filters">
               <FilterX size={16} />
             </Button>
-            <Button variant="outline" size="md" onClick={fetchShortlisted} disabled={loading}
+            <Button variant="outline" size="md" onClick={fetchApplications} disabled={loading}
               className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
               title="Refresh List" aria-label="Refresh List">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -544,11 +395,6 @@ const RollNumberManagement = () => {
                 {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
               </span>
               <div className="flex gap-2">
-                {canGenerate && !hasGeneratedSelected && (
-                  <Button onClick={openSlipGenerator} variant="primary" size="sm" className="flex items-center gap-2">
-                    <Send size={14} /> Generate Roll No Slip
-                  </Button>
-                )}
                 {canDelete && (
                   <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
                     className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
@@ -558,11 +404,6 @@ const RollNumberManagement = () => {
                 )}
               </div>
             </div>
-            {hasGeneratedSelected && (
-              <p className="text-amber-700 text-xs font-medium mt-2">
-                You have selected an already generated roll no slip. Please deselect it, or delete it to re-generate.
-              </p>
-            )}
           </div>
         )}
 
@@ -570,16 +411,16 @@ const RollNumberManagement = () => {
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {loading && rows.length === 0 ? (
             <div className="p-10 flex justify-center">
-              <InlineLoader text="Loading shortlisted applications..." variant="ring" size="lg" />
+              <InlineLoader text="Loading applications..." variant="ring" size="lg" />
             </div>
           ) : rows.length === 0 && !loading ? (
             <div className="p-16 flex flex-col items-center justify-center text-center">
               <div className="p-4 bg-slate-100 rounded-full mb-4">
                 <Eye size={32} className="text-slate-400" />
               </div>
-              <p className="text-base font-semibold text-slate-700">No shortlisted applications</p>
+              <p className="text-base font-semibold text-slate-700">No applications found</p>
               <p className="text-sm text-slate-400 mt-1 max-w-sm">
-                Mark candidates as <strong>Shortlisted</strong> from the Applications page — they will appear here ready for roll number generation.
+                Applications will appear here once candidates apply through the candidate portal.
               </p>
             </div>
           ) : (
@@ -612,11 +453,6 @@ const RollNumberManagement = () => {
         <MenuItem key="view" onClick={handleView}>
           <Eye size={16} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
         </MenuItem>
-        {canGenerate && !selectedRow?.roll_number && (
-          <MenuItem key="generate" onClick={handleGenerateOne}>
-            <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> Generate Roll Slip
-          </MenuItem>
-        )}
         {canEdit && (
           <MenuItem key="edit"
             onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate('/dashboard/roll-numbers/edit-slip/' + row.application_number, { state: { row } }); }}

@@ -8,6 +8,8 @@ module.exports = function (app) {
       changeOrigin: true,
       pathRewrite: { '^/candidate-api': '' },
       secure: false,
+      timeout: 30000,
+      proxyTimeout: 30000,
     })
   );
 };

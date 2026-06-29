@@ -30,8 +30,7 @@ const pretty = (s = '') => String(s).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c)
 // the existing hasPermission() calls / saved role data. Anything not listed here
 // is auto-derived (and so future pages just work).
 const LEGACY_KEY_BY_PATH = {
-  '/dashboard/applications':          ['candidates', 'job_applications'],
-  '/dashboard/roll-numbers':          ['roll_number', 'roll_number_generation'],
+  '/dashboard/roll-numbers':          ['candidates', 'roll_number', 'roll_number_generation'],
   '/dashboard/roll-numbers/exam/one-paper':   ['roll_number', 'roll_number_generation'],
   '/dashboard/roll-numbers/exam/two-paper':   ['roll_number', 'roll_number_generation'],
   '/dashboard/roll-numbers/exam/three-paper': ['roll_number', 'roll_number_generation'],

@@ -18,7 +18,6 @@ export const MENU_ITEMS = [
     label: "Candidates",
     icon: Users,
     submenu: [
-      { label: "Job Applications",       path: "/dashboard/applications",  icon: ClipboardList },
       { label: "Award Lists",            path: "/dashboard/award-lists",   icon: Award },
     ],
   },
@@ -28,10 +27,11 @@ export const MENU_ITEMS = [
     icon: Hash,
     path: "/dashboard/roll-numbers",
     submenu: [
-      { label: "One Paper MCQs", path: "/dashboard/roll-numbers/exam/one-paper-mcqs", icon: FileText },
-      { label: "Two Paper MCQs", path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
-      { label: "Written Exams",  path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },
-      { label: "CCE Exams",      path: "/dashboard/roll-numbers/exam/cce-exams",      icon: FileQuestion },
+      { label: "All Applications", path: "/dashboard/roll-numbers",                    icon: ClipboardList },
+      { label: "One Paper MCQs",   path: "/dashboard/roll-numbers/exam/one-paper-mcqs", icon: FileText },
+      { label: "Two Paper MCQs",   path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
+      { label: "Written Exams",    path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },
+      { label: "CCE Exams",        path: "/dashboard/roll-numbers/exam/cce-exams",      icon: FileQuestion },
     ],
   },
   {

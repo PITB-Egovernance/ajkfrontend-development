@@ -123,7 +123,6 @@ export const getAllowedActions = (moduleKey, subKey) => {
 // the same legacy map.
 const ROUTE_SUBMODULE_EXACT = {
   ...getRoutePermissionMap(),
-  '/dashboard/applications':          ['candidates', 'job_applications'],
   '/dashboard/roll-numbers':          ['roll_number', 'roll_number_generation'],
   '/dashboard/award-lists':           ['candidates', 'award_lists'],
   '/dashboard/employees/list':        ['employee_management', 'employees'],
@@ -143,8 +142,7 @@ const ROUTE_MODULE_PREFIXES = [
   ['/dashboard/results',                 ['result']],
   ['/dashboard/workflow-tracking',       ['requisitions', 'result']],
   ['/dashboard/employees',               ['employee_management']],
-  ['/dashboard/applications',            ['candidates', 'roll_number']],
-  ['/dashboard/roll-numbers',            ['roll_number']],
+  ['/dashboard/roll-numbers',            ['candidates', 'roll_number']],
   ['/dashboard/award-lists',             ['candidates']],
 ];
 

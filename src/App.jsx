@@ -72,12 +72,8 @@ import RolesManagement from 'pages/settings/Roles/RolesManagement';
 import RoleForm from 'pages/settings/Roles/RoleForm';
 import DepartmentUserList from 'pages/settings/DepartmentUsers/DepartmentUserList';
 import DepartmentUserForm from 'pages/settings/DepartmentUsers/DepartmentUserForm';
-import ApplicationsList from 'pages/applications/ApplicationsList';
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
-import CenterAllocation from 'pages/roll-numbers/CenterAllocation';
-import RollSlipGeneration from 'pages/roll-numbers/RollSlipGeneration';
-import RollSlipGenerator from 'pages/roll-numbers/RollSlipGenerator';
 import RollSlipEditor from 'pages/roll-numbers/RollSlipEditor';
 import RollNumberExamFlow from 'pages/roll-numbers/RollNumberExamFlow';
 import AwardList from 'pages/award-list/AwardList';
@@ -176,7 +172,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="applications" element={<ApplicationsList />} />
           <Route path="applications/:id" element={<ApplicationDetail />} />
           <Route path="annex-a" element={<AnnexAList />} />
           <Route path="annex-a/:id" element={<AnnexADetail />} />
@@ -232,10 +227,7 @@ function App() {
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />
           <Route path="roll-numbers/exam/:examType" element={<RollNumberExamFlow />} />
-          <Route path="roll-numbers/generate-slips" element={<RollSlipGenerator />} />
           <Route path="roll-numbers/edit-slip/:applicationNumber" element={<RollSlipEditor />} />
-          <Route path="roll-numbers/:advertisementId/center-allocation" element={<CenterAllocation />} />
-          <Route path="roll-numbers/:advertisementId/slip-generation" element={<RollSlipGeneration />} />
 
           {/* Award List Routes */}
           <Route path="award-lists" element={<AwardList />} />

@@ -7,6 +7,8 @@ import Button from 'components/ui/Button';
 import { Card, CardContent } from 'components/ui/Card';
 import { InlineLoader } from 'components/ui/Loader';
 import RollNumberApi from 'api/rollNumberApi';
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 const examTypeMeta = {
   'one-paper-mcqs': { title: 'One Paper MCQs Roll Number Management', badge: 'One Paper MCQs', description: 'Club one or multiple posts and generate one common roll number slip per candidate.', papers: ['One Paper'], testTypeFilter: (tt) => /mcq/i.test(tt) && !/two/i.test(tt) },
@@ -22,10 +24,11 @@ const EXAM_TYPE_MAP = {
   'cce-exams': ['CCE', 'CCE Exam', 'cce-exams'],
 };
 
-const matchesExamType = (pivotTestType, examType) => {
+const matchesExamType = (pivotTestType, examType, testTypeMap = {}) => {
   if (!pivotTestType) return false;
+  const resolved = testTypeMap[String(pivotTestType)] || String(pivotTestType);
+  const tt = resolved.toLowerCase();
   const keywords = EXAM_TYPE_MAP[examType] || [];
-  const tt = String(pivotTestType).toLowerCase();
   return keywords.some((k) => tt.includes(k.toLowerCase()));
 };
 
@@ -62,41 +65,142 @@ const RollNumberExamFlow = () => {
   const [filterPost, setFilterPost] = useState('all');
   const [filterDepartment, setFilterDepartment] = useState('all');
 
+  const fetchWithTimeout = useCallback((url, options, ms = 15000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { ...options, signal: controller.signal })
+      .finally(() => clearTimeout(timer));
+  }, []);
+
+  const fetchAllCandidateApps = useCallback(async () => {
+    try {
+      const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
+      const firstRes = await fetchWithTimeout(`${Config.candidateApiUrl}/applications?per_page=100`, { headers });
+      const firstJson = await firstRes.json();
+      const firstPage = firstJson?.data?.data ?? firstJson?.data ?? [];
+      const lastPage = firstJson?.data?.last_page ?? 1;
+
+      let allApps = [...firstPage];
+      if (lastPage > 1) {
+        const remaining = await Promise.all(
+          Array.from({ length: Math.min(lastPage - 1, 9) }, (_, i) =>
+            fetchWithTimeout(`${Config.candidateApiUrl}/applications?per_page=100&page=${i + 2}`, { headers })
+              .then(r => r.json())
+              .then(j => j?.data?.data ?? [])
+              .catch(() => [])
+          )
+        );
+        remaining.forEach(page => { allApps = allApps.concat(page); });
+      }
+      return allApps;
+    } catch (err) {
+      console.warn('Candidate API fetch failed:', err?.message);
+      return [];
+    }
+  }, [fetchWithTimeout]);
+
+  const fetchCandidateApplicationsByPost = useCallback(async (jobId) => {
+    try {
+      const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
+      const res = await fetch(`${Config.candidateApiUrl}/applications?job_id=${jobId}&per_page=100`, { headers });
+      const json = await res.json();
+      return json?.data?.data ?? json?.data ?? [];
+    } catch {
+      return [];
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [adsResult, centersResult] = await Promise.all([
+      const adminHeaders = {
+        Accept: 'application/json',
+        'X-API-KEY': Config.apiKey,
+        Authorization: `Bearer ${AuthService.getToken()}`,
+      };
+      const candidateHeaders = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
+
+      const [adsResult, centersResult, testTypesRes, gradesRes, candidateApps, rollNumbersResult] = await Promise.all([
         RollNumberApi.getAdvertisementsWithJobs(200),
         RollNumberApi.getExamCenters(500),
+        fetch(`${Config.apiUrl}/settings/test-types?per_page=200`, { headers: adminHeaders }).then(r => r.json()).catch(() => ({})),
+        fetch(`${Config.apiUrl}/settings/grades?per_page=200`, { headers: adminHeaders }).then(r => r.json()).catch(() => ({})),
+        fetchAllCandidateApps(),
+        RollNumberApi.getAdvertisements({ per_page: 200 }).catch(() => ({})),
       ]);
 
+      const testTypeMap = {};
+      const ttList = testTypesRes?.data?.data ?? testTypesRes?.data ?? [];
+      (Array.isArray(ttList) ? ttList : []).forEach(tt => {
+        if (tt.hash_id) testTypeMap[tt.hash_id] = tt.name || '';
+        if (tt.id) testTypeMap[String(tt.id)] = tt.name || '';
+      });
+
+      const gradeMap = {};
+      const gradeList = gradesRes?.data?.data ?? gradesRes?.data ?? [];
+      (Array.isArray(gradeList) ? gradeList : []).forEach(g => {
+        if (g.hash_id) gradeMap[g.hash_id] = g.name || g.grade_name || '';
+        if (g.id) gradeMap[String(g.id)] = g.name || g.grade_name || '';
+      });
+
+      const jobPostCountMap = {};
+      const candidateAppsAvailable = Array.isArray(candidateApps) && candidateApps.length > 0;
+      if (candidateAppsAvailable) {
+        candidateApps.forEach(app => {
+          const extAdvId = app.job_post?.ext_adv_id || null;
+          if (extAdvId) jobPostCountMap[extAdvId] = (jobPostCountMap[extAdvId] || 0) + 1;
+          const portalHash = app.job_post?.hash_id || null;
+          if (portalHash) jobPostCountMap[portalHash] = (jobPostCountMap[portalHash] || 0) + 1;
+        });
+      }
+
+      const adAppCountMap = {};
+      const rnAds = rollNumbersResult?.data?.data ?? rollNumbersResult?.data ?? [];
+      (Array.isArray(rnAds) ? rnAds : []).forEach((ad) => {
+        const key = ad.hash_id || String(ad.id);
+        adAppCountMap[key] = ad.total_applications ?? 0;
+      });
+
       const allAds = adsResult?.data?.data ?? adsResult?.data ?? [];
-      const filtered = allAds
+      const matchedAds = allAds
         .map((ad) => {
           const jobs = (ad.job_details || []).filter((job) => {
             const testType = job.pivot?.test_type || job.test_type || '';
-            return matchesExamType(testType, examType);
+            return matchesExamType(testType, examType, testTypeMap);
           });
           if (jobs.length === 0) return null;
-
-          const receivedCount = ad.total_applications ?? ad.received_applications_count ?? 0;
-          const perPost = jobs.length > 0 ? Math.ceil(receivedCount / jobs.length) : 0;
-
-          return {
-            id: ad.hash_id || String(ad.id),
-            advertisement: ad.adv_number ? `Advertisement ${ad.adv_number}` : `Advertisement #${ad.id}`,
-            meta: meta.badge,
-            posts: jobs.map((job) => ({
-              id: job.hash_id || String(job.id),
-              post: job.designation || job.post_title || 'Untitled Post',
-              caseNo: job.case_number ? `Case ${job.case_number} | BPS-${job.scale || ''}` : `BPS-${job.scale || ''}`,
-              department: job.department || job.department_name || 'N/A',
-              applicants: job.applicants_count ?? perPost,
-              advertisementId: ad.hash_id || String(ad.id),
-            })),
-          };
+          return { ad, jobs };
         })
         .filter(Boolean);
+
+      const filtered = matchedAds.map(({ ad, jobs }) => {
+        const adKey = ad.hash_id || String(ad.id);
+        const adTotal = ad.total_applications ?? adAppCountMap[adKey] ?? 0;
+        const perPostFallback = jobs.length > 0 ? Math.ceil(adTotal / jobs.length) : 0;
+
+        return {
+          id: adKey,
+          advertisement: ad.adv_number ? `Advertisement ${ad.adv_number}` : `Advertisement #${ad.id}`,
+          meta: meta.badge,
+          posts: jobs.map((job) => {
+            const jobId = job.hash_id || String(job.id);
+            const deptName = (typeof job.department === 'object' && job.department !== null)
+              ? (job.department.department_name || job.department.name || 'N/A')
+              : (job.department || job.department_name || 'N/A');
+            const rawScale = gradeMap[job.scale] || job.scale || '';
+            const scaleDisplay = rawScale ? (rawScale.toUpperCase().startsWith('BPS') ? rawScale : `BPS-${rawScale}`) : '';
+            const candidateCount = jobPostCountMap[jobId] ?? 0;
+            return {
+              id: jobId,
+              post: job.designation || job.post_title || 'Untitled Post',
+              caseNo: job.case_number ? `Case ${job.case_number} | ${scaleDisplay}` : scaleDisplay,
+              department: deptName,
+              applicants: candidateAppsAvailable ? candidateCount : perPostFallback,
+              advertisementId: adKey,
+            };
+          }),
+        };
+      });
 
       setAdvertisements(filtered);
 
@@ -158,28 +262,43 @@ const RollNumberExamFlow = () => {
 
     setGenerating(true);
     try {
-      const advIds = [...new Set(selectedPosts.map((p) => p.advertisementId))];
-      let allApplicationNumbers = [];
+      let allCandidateApps = [];
 
-      for (const advId of advIds) {
-        const result = await RollNumberApi.getApplicationsByAdvertisement(advId, { per_page: 1000 });
-        const apps = result?.data?.applications?.data ?? [];
-        const shortlisted = apps
-          .filter((a) => a.status === 'Shortlisted')
-          .map((a) => a.application_number);
-        allApplicationNumbers = allApplicationNumbers.concat(shortlisted);
+      for (const post of selectedPosts) {
+        const apps = await fetchCandidateApplicationsByPost(post.id);
+        allCandidateApps = allCandidateApps.concat(apps);
       }
 
-      if (allApplicationNumbers.length === 0) {
-        toast.error('No shortlisted applications found for the selected posts');
+      const seen = new Set();
+      const uniqueApps = allCandidateApps.filter(a => {
+        const num = a.application_number;
+        if (!num || seen.has(num)) return false;
+        seen.add(num);
+        return true;
+      });
+
+      if (uniqueApps.length === 0) {
+        toast.error('No applications found for the selected posts');
         setGenerating(false);
         return;
       }
 
+      const candidates = uniqueApps.map(app => ({
+        application_number: app.application_number,
+        candidate_name: app.snapshot_data?.name || app.candidate?.name || '',
+        candidate_cnic: app.snapshot_data?.cnic || app.candidate?.cnic || '',
+        candidate_email: app.snapshot_data?.email || app.candidate?.email || '',
+        candidate_mobile: app.snapshot_data?.mobile_number || app.candidate?.mobile_number || '',
+        ext_adv_id: app.job_post?.ext_adv_id || '',
+        preferred_exam_cities: (app.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
+        personal_details: app.snapshot_data || {},
+      }));
+
       const centerId = selectedCenterIds[0];
       const prefix = 'AJK';
       const body = {
-        application_numbers: allApplicationNumbers,
+        application_numbers: uniqueApps.map(a => a.application_number),
+        candidates,
         exam_center_id: Number(centerId),
         prefix,
         starting_number: 1,
