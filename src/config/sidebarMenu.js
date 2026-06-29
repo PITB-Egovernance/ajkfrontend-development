@@ -2,8 +2,8 @@ import {
   Home, Users, ClipboardList, FileText, Table, CheckCircle,
   Award, Settings, Package, Briefcase, MapPin, Map, Hash,
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
-  Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText,
-  Stamp, Boxes, Newspaper
+  Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
+  Stamp, Boxes, Newspaper, FileQuestion
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -19,8 +19,19 @@ export const MENU_ITEMS = [
     icon: Users,
     submenu: [
       { label: "Job Applications",       path: "/dashboard/applications",  icon: ClipboardList },
-      { label: "Roll Number Management", path: "/dashboard/roll-numbers",  icon: Hash },
       { label: "Award Lists",            path: "/dashboard/award-lists",   icon: Award },
+    ],
+  },
+  {
+    id: "roll-number-management",
+    label: "Roll Number Management",
+    icon: Hash,
+    path: "/dashboard/roll-numbers",
+    submenu: [
+      { label: "One Paper MCQs", path: "/dashboard/roll-numbers/exam/one-paper-mcqs", icon: FileText },
+      { label: "Two Paper MCQs", path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
+      { label: "Written Exams",  path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },
+      { label: "CCE Exams",      path: "/dashboard/roll-numbers/exam/cce-exams",      icon: FileQuestion },
     ],
   },
   {
@@ -117,3 +128,4 @@ export const getPermissionModules = () => {
   });
   return modules;
 };
+

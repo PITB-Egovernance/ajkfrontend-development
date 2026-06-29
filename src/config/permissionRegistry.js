@@ -32,6 +32,10 @@ const pretty = (s = '') => String(s).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c)
 const LEGACY_KEY_BY_PATH = {
   '/dashboard/applications':          ['candidates', 'job_applications'],
   '/dashboard/roll-numbers':          ['roll_number', 'roll_number_generation'],
+  '/dashboard/roll-numbers/exam/one-paper':   ['roll_number', 'roll_number_generation'],
+  '/dashboard/roll-numbers/exam/two-paper':   ['roll_number', 'roll_number_generation'],
+  '/dashboard/roll-numbers/exam/three-paper': ['roll_number', 'roll_number_generation'],
+  '/dashboard/roll-numbers/exam/other':       ['roll_number', 'roll_number_generation'],
   '/dashboard/award-lists':           ['candidates', 'award_lists'],
   '/dashboard/employees/list':        ['employee_management', 'employees'],
   '/dashboard/requisitions':          ['requisitions', 'admin_requisition'],

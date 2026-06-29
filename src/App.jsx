@@ -79,6 +79,7 @@ import CenterAllocation from 'pages/roll-numbers/CenterAllocation';
 import RollSlipGeneration from 'pages/roll-numbers/RollSlipGeneration';
 import RollSlipGenerator from 'pages/roll-numbers/RollSlipGenerator';
 import RollSlipEditor from 'pages/roll-numbers/RollSlipEditor';
+import RollNumberExamFlow from 'pages/roll-numbers/RollNumberExamFlow';
 import AwardList from 'pages/award-list/AwardList';
 import AwardListDetail from 'pages/award-list/AwardListDetail';
 import EmployeesLanding from 'pages/employees/EmployeesLanding';
@@ -230,6 +231,7 @@ function App() {
 
           {/* Roll Number Management Routes */}
           <Route path="roll-numbers" element={<RollNumberManagement />} />
+          <Route path="roll-numbers/exam/:examType" element={<RollNumberExamFlow />} />
           <Route path="roll-numbers/generate-slips" element={<RollSlipGenerator />} />
           <Route path="roll-numbers/edit-slip/:applicationNumber" element={<RollSlipEditor />} />
           <Route path="roll-numbers/:advertisementId/center-allocation" element={<CenterAllocation />} />
