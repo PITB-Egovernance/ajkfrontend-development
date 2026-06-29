@@ -144,13 +144,21 @@ const RollNumberExamFlow = () => {
       });
 
       const jobPostCountMap = {};
+      const jobPostDeptMap = {};
       const candidateAppsAvailable = Array.isArray(candidateApps) && candidateApps.length > 0;
       if (candidateAppsAvailable) {
         candidateApps.forEach(app => {
           const extAdvId = app.job_post?.ext_adv_id || null;
-          if (extAdvId) jobPostCountMap[extAdvId] = (jobPostCountMap[extAdvId] || 0) + 1;
           const portalHash = app.job_post?.hash_id || null;
-          if (portalHash) jobPostCountMap[portalHash] = (jobPostCountMap[portalHash] || 0) + 1;
+          const dept = app.job_post?.department || null;
+          if (extAdvId) {
+            jobPostCountMap[extAdvId] = (jobPostCountMap[extAdvId] || 0) + 1;
+            if (dept) jobPostDeptMap[extAdvId] = dept;
+          }
+          if (portalHash) {
+            jobPostCountMap[portalHash] = (jobPostCountMap[portalHash] || 0) + 1;
+            if (dept) jobPostDeptMap[portalHash] = dept;
+          }
         });
       }
 
@@ -184,9 +192,10 @@ const RollNumberExamFlow = () => {
           meta: meta.badge,
           posts: jobs.map((job) => {
             const jobId = job.hash_id || String(job.id);
-            const deptName = (typeof job.department === 'object' && job.department !== null)
-              ? (job.department.department_name || job.department.name || 'N/A')
-              : (job.department || job.department_name || 'N/A');
+            const adminDept = (typeof job.department === 'object' && job.department !== null)
+              ? (job.department.department_name || job.department.name || '')
+              : (job.department || job.department_name || '');
+            const deptName = adminDept || jobPostDeptMap[jobId] || 'N/A';
             const rawScale = gradeMap[job.scale] || job.scale || '';
             const scaleDisplay = rawScale ? (rawScale.toUpperCase().startsWith('BPS') ? rawScale : `BPS-${rawScale}`) : '';
             const candidateCount = jobPostCountMap[jobId] ?? 0;
@@ -291,6 +300,7 @@ const RollNumberExamFlow = () => {
         candidate_email: app.snapshot_data?.email || app.candidate?.email || '',
         candidate_mobile: app.snapshot_data?.mobile_number || app.candidate?.mobile_number || '',
         ext_adv_id: app.job_post?.ext_adv_id || '',
+        ext_advertisement_id: app.job_post?.ext_advertisement_id || '',
         preferred_exam_cities: (app.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
         personal_details: app.snapshot_data || {},
       }));
