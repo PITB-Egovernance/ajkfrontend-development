@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Stamp,
   Boxes,
-  Newspaper
+  Newspaper,
+  Hash
 } from 'lucide-react';
 import { hasSubModuleAccess, isAdminUser } from 'utils/permissions';
 
@@ -139,6 +140,14 @@ const Settings = () => {
       iconBg: 'bg-fuchsia-600',
       link: '/dashboard/settings/roll-number-slip-instructions',
       permModule: 'settings', permSub: 'roll_number_slip_instructions',
+    },
+    {
+      icon: Hash,
+      title: 'Roll Number Prefixes',
+      description: 'Configure the roll number prefix per exam type',
+      iconBg: 'bg-emerald-800',
+      link: '/dashboard/settings/roll-number-prefixes',
+      permModule: 'settings', permSub: 'roll_number_exam_type_configs',
     },
     {
       icon: ShieldCheck,

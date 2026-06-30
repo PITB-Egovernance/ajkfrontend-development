@@ -68,6 +68,7 @@ import StampManagement from 'pages/settings/Stamp/StampManagement';
 import GroupsManagement from 'pages/settings/Groups/GroupsManagement';
 import NewsManagement from 'pages/settings/News/NewsManagement';
 import RollNumberSlipInstructions from 'pages/settings/RollNumberSlipInstructions/RollNumberSlipInstructions';
+import RollNumberPrefixes from 'pages/settings/RollNumberPrefixes/RollNumberPrefixes';
 import RolesManagement from 'pages/settings/Roles/RolesManagement';
 import RoleForm from 'pages/settings/Roles/RoleForm';
 import DepartmentUserList from 'pages/settings/DepartmentUsers/DepartmentUserList';
@@ -217,6 +218,7 @@ function App() {
           <Route path="settings/groups" element={<GroupsManagement />} />
           <Route path="settings/news" element={<NewsManagement />} />
           <Route path="settings/roll-number-slip-instructions" element={<RollNumberSlipInstructions />} />
+          <Route path="settings/roll-number-prefixes" element={<RollNumberPrefixes />} />
           <Route path="settings/roles" element={<RolesManagement />} />
           <Route path="settings/roles/create" element={<RoleForm />} />
           <Route path="settings/roles/:hashId" element={<RoleForm />} />

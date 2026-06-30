@@ -300,7 +300,6 @@ const RollNumberExamFlow = () => {
   const selectedCenters = useMemo(() => centers.filter((center) => selectedCenterIds.includes(center.id)), [centers, selectedCenterIds]);
   const selectedApplicants = selectedPosts.reduce((sum, post) => sum + (post.applicants || 0), 0);
   const selectedCapacity = selectedCenters.reduce((sum, center) => sum + center.capacity, 0);
-  const commonRollNumber = ['one-paper-mcqs', 'two-paper-mcqs'].includes(examType) ? 'MCQ-01-00001' : null;
   const capacityShortage = Math.max(0, selectedApplicants - selectedCapacity);
   const capacityPassed = selectedApplicants > 0 && selectedCapacity >= selectedApplicants;
 
@@ -452,7 +451,6 @@ const RollNumberExamFlow = () => {
       }));
 
       const centerId = selectedCenterIds[0];
-      const prefix = 'AJK';
       // Multi-paper exam types (Two Paper MCQs etc.) schedule each paper
       // separately even though all papers share one roll number — send the
       // full per-paper schedule so the slip can show one row per paper.
@@ -467,9 +465,12 @@ const RollNumberExamFlow = () => {
         application_numbers: uniqueApps.map(a => a.application_number),
         candidates,
         exam_center_id: Number(centerId),
-        prefix,
-        starting_number: 1,
-        format: 'sequential',
+        // exam_type scopes roll number uniqueness/sequencing/prefix on the
+        // backend — one roll number per candidate per exam type, reused
+        // across every post/advertisement/generation run for that
+        // candidate. Prefix is resolved server-side from Settings, not
+        // hardcoded here.
+        exam_type: examType,
         exam_date: scheduleDates[0] || null,
         attendance_time: scheduleTimes[0] || null,
         papers: papers.length > 1 ? papers : undefined,

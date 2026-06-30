@@ -38,7 +38,7 @@ const DEFAULT_FILTERS = {
 };
 
 const FILTER_CONFIG = [
-  { name: 'search', label: 'Search (Name / CNIC / Ref ID)', type: 'text', placeholder: 'Search by name, CNIC, or Ref ID' },
+  { name: 'search', label: 'Search (Name / CNIC / Ref ID / Roll No)', type: 'text', placeholder: 'Search by name, CNIC, Ref ID, or Roll No' },
   { name: 'advertisement_no', label: 'Advertisement No', type: 'text', placeholder: 'e.g. Advertisement 50-26' },
   { name: 'preferred_exam_city', label: 'Exam City Preference', type: 'text', placeholder: 'e.g. Muzaffarabad' },
   {
@@ -241,7 +241,7 @@ const RollNumberManagement = () => {
 
     return allRows.filter((row) => {
       if (search) {
-        const haystack = `${row.applicant_name} ${row.cnic} ${row.application_number}`.toLowerCase();
+        const haystack = `${row.applicant_name} ${row.cnic} ${row.application_number} ${row.roll_number || ''}`.toLowerCase();
         if (!haystack.includes(search)) return false;
       }
       if (advNo && !row.advertisement_no.toLowerCase().includes(advNo)) return false;
