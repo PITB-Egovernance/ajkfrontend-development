@@ -98,6 +98,56 @@ const getSecretaryName = async () => {
   );
 };
 
+const parseChangeLogs = (ad) => {
+  const raw =
+    ad.advertisement_change_logs ||
+    ad.change_logs ||
+    ad.change_log ||
+    ad.change_logs_json ||
+    [];
+
+  if (Array.isArray(raw)) return raw;
+
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [{ label: 'Change Log', message: raw }];
+    }
+  }
+
+  return [];
+};
+
+const ChangeLogsCell = ({ logs = [] }) => {
+  if (!logs.length) {
+    return <span className="text-xs text-slate-400">No Changes</span>;
+  }
+
+  return (
+    <div className="flex h-full flex-col justify-center gap-1 py-1">
+      {logs.slice(0, 2).map((log, index) => (
+        <div key={index} className="max-w-full truncate text-xs text-slate-700">
+          <span className={`mr-1 rounded px-1.5 py-0.5 font-semibold ${
+            log.type === 'deleted' || log.field === 'job_deleted'
+              ? 'bg-red-50 text-red-700'
+              : 'bg-emerald-50 text-emerald-700'
+          }`}>
+            {log.type === 'deleted' || log.field === 'job_deleted' ? 'Deleted' : 'Changed'}
+          </span>
+          {log.message || `${log.designation || log.label}: ${log.before} -> ${log.after}`}
+        </div>
+      ))}
+      {logs.length > 2 && (
+        <span className="text-[11px] font-semibold text-slate-500">
+          +{logs.length - 2} more
+        </span>
+      )}
+    </div>
+  );
+};
+
 const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -553,6 +603,14 @@ const AdvertisementRecords = () => {
       }
     },
     {
+      field: 'change_logs',
+      headerName: 'Change Logs',
+      width: 300,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => <ChangeLogsCell logs={params.row.change_logs} />
+    },
+    {
       field: 'actions',
       headerName: 'Actions',
       width: 100,
@@ -603,6 +661,7 @@ const AdvertisementRecords = () => {
     hash_id: ad.hash_id,
     status: ad.status,
     extend_date: ad.extend_date,
+    change_logs: parseChangeLogs(ad),
   });
 
   return (
