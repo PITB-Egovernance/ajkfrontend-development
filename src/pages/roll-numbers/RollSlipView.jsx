@@ -97,7 +97,7 @@ const RollSlipView = () => {
           <InlineLoader text="Loading slip…" variant="ring" size="lg" />
         </div>
       ) : data ? (
-        <div className="max-w-3xl mx-auto my-6 bg-white shadow-sm border border-slate-200 rounded-lg p-8" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
+        <div className="max-w-5xl mx-auto my-6 bg-white shadow-sm border border-slate-200 rounded-lg p-10" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
 
           {/* HEADER */}
           <div className="text-center pb-2 border-b-4 border-double border-emerald-900 mb-3">
@@ -121,22 +121,22 @@ const RollSlipView = () => {
                 <InfoRow label="Roll No" value={<span className="font-mono font-bold text-lg tracking-wide">{data.rollNo}</span>} />
                 <InfoRow label="Department" value={data.department} />
               </div>
-              <div className="md:col-span-3 grid grid-cols-2 gap-px bg-emerald-100">
-                <div>
-                  <div className="h-48 border-2 border-emerald-900 bg-emerald-50 flex items-center justify-center overflow-hidden">
-                    {data.cnicDataUri
-                      ? <img src={data.cnicDataUri} alt="CNIC Front" className="w-full h-full object-cover" />
-                      : <span className="text-xs text-slate-500 text-center">CNIC<br/>Front<br/>Here</span>}
+              <div className="md:col-span-3 flex justify-end">
+                <div className="grid gap-2" style={{ gridTemplateColumns: '214px 120px' }}>
+                  <div style={{ width: '230px' }}>
+                    <div className="border-2 border-emerald-900 bg-emerald-50 flex items-center justify-center overflow-hidden" style={{ width: '218px', height: '142px' }}>
+                      {data.cnicDataUri
+                        ? <img src={data.cnicDataUri} alt="CNIC Front" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        : <span className="text-xs text-slate-500 text-center">CNIC<br/>Front<br/>Here</span>}
+                    </div>
                   </div>
-                  <p className="text-center text-[10px] text-slate-500 mt-0.5">CNIC (Front)</p>
-                </div>
-                <div>
-                  <div className="h-48 border-2 border-emerald-900 bg-emerald-50 flex items-center justify-center overflow-hidden">
-                    {data.photoDataUri
-                      ? <img src={data.photoDataUri} alt="Candidate" className="w-full h-full object-cover" />
-                      : <span className="text-xs text-slate-500 text-center">Paste<br/>Photo<br/>Here</span>}
+                  <div style={{ width: '120px' }}>
+                    <div className="border-2 border-emerald-900 bg-emerald-50 flex items-center justify-center overflow-hidden" style={{ width: '120px', height: '142px' }}>
+                      {data.photoDataUri
+                        ? <img src={data.photoDataUri} alt="Candidate" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        : <span className="text-xs text-slate-500 text-center">Paste<br/>Photo<br/>Here</span>}
+                    </div>
                   </div>
-                  <p className="text-center text-[10px] text-slate-500 mt-0.5">Candidate Photo</p>
                 </div>
               </div>
             </div>
