@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
-  TextField,
   IconButton,
   Menu,
   MenuItem,
@@ -10,7 +9,6 @@ import {
   Hash,
   Eye,
   RefreshCw,
-  FilterX,
   MoreVertical,
   Download,
   Trash2,
@@ -22,6 +20,7 @@ import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import confirmDelete from 'components/ui/ConfirmDelete';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 import RollNumberApi from 'api/rollNumberApi';
 import Config from 'config/baseUrl';
 import { formatDate } from 'utils/dateUtils';
@@ -34,14 +33,42 @@ const DEFAULT_FILTERS = {
   advertisement_no: '',
   generated: '',
   preferred_exam_city: '',
-  status: '',
+  payment_status: '',
+  slip_status: '',
 };
 
-const STATUS_COLORS = {
-  Shortlisted: 'bg-green-100 text-green-700',
-  Rejected:    'bg-red-100 text-red-700',
-  Interview:   'bg-blue-100 text-blue-700',
-};
+const FILTER_CONFIG = [
+  { name: 'search', label: 'Search (Name / CNIC / Ref ID)', type: 'text', placeholder: 'Search by name, CNIC, or Ref ID' },
+  { name: 'advertisement_no', label: 'Advertisement No', type: 'text', placeholder: 'e.g. Advertisement 50-26' },
+  { name: 'preferred_exam_city', label: 'Exam City Preference', type: 'text', placeholder: 'e.g. Muzaffarabad' },
+  {
+    name: 'generated',
+    label: 'Roll Number',
+    type: 'select',
+    options: [
+      { value: 'yes', label: 'Generated' },
+      { value: 'no', label: 'Not Generated' },
+    ],
+  },
+  {
+    name: 'payment_status',
+    label: 'Payment Status',
+    type: 'select',
+    options: [
+      { value: 'paid', label: 'Paid' },
+      { value: 'unpaid', label: 'Unpaid' },
+    ],
+  },
+  {
+    name: 'slip_status',
+    label: 'Slip Status',
+    type: 'select',
+    options: [
+      { value: 'published', label: 'Published' },
+      { value: 'pending', label: 'Pending' },
+    ],
+  },
+];
 
 const gridSx = {
   border: 'none',
@@ -64,11 +91,10 @@ const RollNumberManagement = () => {
   const canEdit = hasPermission(`${PERM}.edit`);
   const canDelete = hasPermission(`${PERM}.delete`);
 
-  const [rows,            setRows]            = useState([]);
-  const [loading,         setLoading]         = useState(true);
-  const [total,           setTotal]           = useState(0);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
-  const [selectionModel,  setSelectionModel]  = useState([]);
+  const [allRows,         setAllRows]          = useState([]);
+  const [loading,         setLoading]          = useState(true);
+  const [paginationModel, setPaginationModel]  = useState({ page: 0, pageSize: 15 });
+  const [selectionModel,  setSelectionModel]   = useState([]);
   const selectedIds = useMemo(() => {
     if (!selectionModel) return [];
     if (Array.isArray(selectionModel)) return selectionModel;
@@ -77,71 +103,175 @@ const RollNumberManagement = () => {
     if (selectionModel instanceof Set) return Array.from(selectionModel);
     return [];
   }, [selectionModel]);
-  const [filters,         setFilters]         = useState(DEFAULT_FILTERS);
+  const [filters,         setFilters]          = useState(DEFAULT_FILTERS);
 
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
-  // ── Data (fetches from candidate portal API) ─────────────────────────
+  // ── Admin advertisements (source of truth for advertisement number) ────
+  const fetchAdminAdvertisementMap = useCallback(async () => {
+    const map = {};
+    try {
+      const result = await RollNumberApi.getAdvertisementsWithJobs(200);
+      const ads = result?.data?.data ?? result?.data ?? [];
+      (Array.isArray(ads) ? ads : []).forEach((ad) => {
+        if (!ad.adv_number) return;
+        // adv_number is sometimes stored with the "Advertisement " prefix
+        // already baked in, sometimes bare — avoid double-prefixing.
+        const raw = String(ad.adv_number).trim();
+        const advNo = /^advertisement\b/i.test(raw) ? raw : `Advertisement ${raw}`;
+        if (ad.hash_id) map[ad.hash_id] = advNo;
+        (ad.job_details || []).forEach((job) => {
+          if (job?.hash_id) map[job.hash_id] = advNo;
+        });
+      });
+    } catch {
+      // silent — falls back to candidate-portal's own adv_number
+    }
+    return map;
+  }, []);
+
+  // ── Admin roll number status (per application_number) ──────────────────
+  const fetchAdminRollMap = useCallback(async () => {
+    const map = {};
+    try {
+      let page = 1;
+      const perPage = 200;
+      for (let i = 0; i < 5; i++) {
+        const result = await RollNumberApi.getShortlisted({ per_page: perPage, page });
+        const data = result?.data?.data ?? [];
+        data.forEach((item) => {
+          if (item.application_number) map[item.application_number] = item;
+        });
+        const lastPage = result?.data?.last_page ?? 1;
+        if (page >= lastPage || data.length === 0) break;
+        page += 1;
+      }
+    } catch {
+      // silent — roll number status simply won't be available
+    }
+    return map;
+  }, []);
+
+  // ── Full candidate-portal application list (paged through, all pages) ──
+  const fetchAllCandidateApplications = useCallback(async () => {
+    const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
+    let allApps = [];
+    try {
+      const firstRes = await fetch(`${Config.candidateApiUrl}/applications?per_page=100`, { headers });
+      const firstJson = await firstRes.json();
+      const firstPage = firstJson?.data?.data ?? firstJson?.data ?? [];
+      const lastPage = firstJson?.data?.last_page ?? 1;
+      allApps = [...firstPage];
+
+      if (lastPage > 1) {
+        const remaining = await Promise.all(
+          Array.from({ length: Math.min(lastPage - 1, 9) }, (_, i) =>
+            fetch(`${Config.candidateApiUrl}/applications?per_page=100&page=${i + 2}`, { headers })
+              .then((r) => r.json())
+              .then((j) => j?.data?.data ?? [])
+              .catch(() => [])
+          )
+        );
+        remaining.forEach((page) => { allApps = allApps.concat(page); });
+      }
+    } catch (err) {
+      throw err;
+    }
+    return allApps;
+  }, []);
+
+  // ── Data ─────────────────────────────────────────────────────────────
   const fetchApplications = useCallback(async () => {
     setLoading(true);
     try {
-      const candidateHeaders = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
-      const params = new URLSearchParams();
-      params.set('per_page', String(paginationModel.pageSize));
-      params.set('page', String(paginationModel.page + 1));
-      if (filters.search) params.set('search', filters.search);
-      if (filters.advertisement_no) params.set('job_id', filters.advertisement_no);
+      const [candidateApps, advMap, adminRollMap] = await Promise.all([
+        fetchAllCandidateApplications(),
+        fetchAdminAdvertisementMap(),
+        fetchAdminRollMap(),
+      ]);
 
-      const res = await fetch(`${Config.candidateApiUrl}/applications?${params}`, { headers: candidateHeaders });
-      const result = await res.json();
-
-      const payload = result.data ?? result ?? {};
-      const data = payload.data ?? [];
-
-      const mapped = (Array.isArray(data) ? data : []).map((item) => {
+      const mapped = candidateApps.map((item) => {
         const snapshot = item.snapshot_data || {};
+        const adminRoll = adminRollMap[item.application_number] || {};
+        const extAdvertisementId = item.job_post?.ext_advertisement_id || null;
+        const extAdvId = item.job_post?.ext_adv_id || null;
+        const resolvedAdvNo = (extAdvertisementId && advMap[extAdvertisementId])
+          || (extAdvId && advMap[extAdvId])
+          || item.job_post?.adv_number
+          || item.advertisement_no
+          || 'N/A';
+
         return {
           id:                item.application_number || item.hash_id || String(item.id),
           application_number: item.application_number,
           applicant_name:    snapshot.name || item.candidate?.name || item.profile?.full_name || 'N/A',
           cnic:              snapshot.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
           job_title:         item.job_post?.post_title || item.job_post?.title || 'N/A',
-          advertisement_no:  item.job_post?.ext_adv_id || item.advertisement_no || item.job_post?.adv_number || 'N/A',
+          advertisement_no:  resolvedAdvNo,
           applied_at:        item.submitted_at || item.created_at ? formatDate(item.submitted_at || item.created_at) : 'N/A',
           payment_status:    item.payment?.payment_status || item.payment_status || (item.payment?.paid_at ? 'paid' : 'unpaid'),
           preferred_exam_cities: (item.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || c?.name || '')).filter(Boolean),
-          roll_number:       null,
-          published_at:      null,
+          roll_number:       adminRoll.roll_number || null,
+          exam_center:       adminRoll.exam_center || null,
+          exam_city:         adminRoll.exam_city || null,
+          published_at:      adminRoll.published_at || null,
         };
       });
 
-      setRows(mapped);
-      setTotal(payload.total ?? mapped.length);
+      setAllRows(mapped);
     } catch (err) {
       toast.error(err?.message || 'Failed to load applications from candidate portal');
-      setRows([]);
-      setTotal(0);
+      setAllRows([]);
     } finally {
       setLoading(false);
     }
-  }, [paginationModel.page, paginationModel.pageSize, filters]);
+  }, [fetchAllCandidateApplications, fetchAdminAdvertisementMap, fetchAdminRollMap]);
 
   useEffect(() => {
-    const t = setTimeout(fetchApplications, 300);
-    return () => clearTimeout(t);
+    fetchApplications();
   }, [fetchApplications]);
+
+  // ── Filtering (client-side, since data needed for filters spans both
+  // the candidate portal and the admin roll-number table) ────────────────
+  const filteredRows = useMemo(() => {
+    const search = filters.search.trim().toLowerCase();
+    const advNo = filters.advertisement_no.trim().toLowerCase();
+    const city = filters.preferred_exam_city.trim().toLowerCase();
+
+    return allRows.filter((row) => {
+      if (search) {
+        const haystack = `${row.applicant_name} ${row.cnic} ${row.application_number}`.toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+      if (advNo && !row.advertisement_no.toLowerCase().includes(advNo)) return false;
+      if (filters.generated === 'yes' && !row.roll_number) return false;
+      if (filters.generated === 'no' && row.roll_number) return false;
+      if (city && !row.preferred_exam_cities.some((c) => c.toLowerCase().includes(city))) return false;
+      if (filters.payment_status && row.payment_status?.toLowerCase() !== filters.payment_status) return false;
+      if (filters.slip_status === 'published' && !row.published_at) return false;
+      if (filters.slip_status === 'pending' && row.published_at) return false;
+      return true;
+    });
+  }, [allRows, filters]);
+
+  const pagedRows = useMemo(() => {
+    const start = paginationModel.page * paginationModel.pageSize;
+    return filteredRows.slice(start, start + paginationModel.pageSize);
+  }, [filteredRows, paginationModel]);
+
+  useEffect(() => {
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  }, [filters]);
 
   // ── Filters ─────────────────────────────────────────────────────────────
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
-    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
     setFilters(DEFAULT_FILTERS);
-    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   // ── Slip download ───────────────────────────────────────────────────────────
@@ -201,7 +331,7 @@ const RollNumberManagement = () => {
   const bulkDeleteSlips = async () => {
     if (selectedIds.length === 0) return;
 
-    const rowsWithRoll = rows.filter(r => selectedIds.includes(r.id) && r.roll_number);
+    const rowsWithRoll = allRows.filter(r => selectedIds.includes(r.id) && r.roll_number);
     if (rowsWithRoll.length === 0) {
       toast.error('None of the selected candidates have a roll number to delete');
       return;
@@ -240,30 +370,19 @@ const RollNumberManagement = () => {
 
   // ── Stats ───────────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
-    total:        total || rows.length,
-    shortlisted:  rows.filter((r) => r.status === 'Shortlisted').length,
-    withRoll:     rows.filter((r) => r.roll_number).length,
-    published:    rows.filter((r) => r.published_at).length,
-  }), [rows, total]);
+    total:        allRows.length,
+    withRoll:     allRows.filter((r) => r.roll_number).length,
+    withoutRoll:  allRows.filter((r) => !r.roll_number).length,
+    published:    allRows.filter((r) => r.published_at).length,
+  }), [allRows]);
 
   // ── Columns ─────────────────────────────
   const columns = [
     { field: 'application_number', headerName: 'Ref ID',          minWidth: 110, flex: 0.8 },
     { field: 'applicant_name',     headerName: 'Applicant Name',  minWidth: 160, flex: 1.1 },
-    { field: 'advertisement_no',     headerName: 'Advertisement Number',  minWidth: 160, flex: 1.1 },
+    { field: 'advertisement_no',     headerName: 'Advertisement Number',  minWidth: 170, flex: 1.1 },
     { field: 'job_title',     headerName: 'Job Advertisement',  minWidth: 160, flex: 1.1 },
     { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
-    {
-      field: 'status',
-      headerName: 'Status',
-      minWidth: 120,
-      flex: 0.6,
-      renderCell: (p) => {
-        if (!p.value) return <span className="text-slate-400 text-xs">—</span>;
-        const color = STATUS_COLORS[p.value] || 'bg-slate-100 text-slate-600';
-        return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>{p.value}</span>;
-      },
-    },
     {
       field: 'preferred_exam_cities',
       headerName: 'Exam City Preferences',
@@ -293,6 +412,24 @@ const RollNumberManagement = () => {
       renderCell: (p) => p.value
         ? <span className="font-mono font-bold text-indigo-700">{p.value}</span>
         : <span className="text-slate-400 text-xs">Not generated</span>,
+    },
+    {
+      field: 'exam_center',
+      headerName: 'Exam Center',
+      minWidth: 160,
+      flex: 1.0,
+      renderCell: (p) => p.value
+        ? <span className="text-sm text-slate-700">{p.value}{p.row.exam_city ? ` (${p.row.exam_city})` : ''}</span>
+        : <span className="text-slate-400 text-xs">—</span>,
+    },
+    {
+      field: 'published_at',
+      headerName: 'Slip Status',
+      minWidth: 110,
+      flex: 0.6,
+      renderCell: (p) => p.value
+        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Published</span>
+        : <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">—</span>,
     },
     {
       field: 'actions',
@@ -332,16 +469,16 @@ const RollNumberManagement = () => {
               <h2 className="text-2xl font-bold text-blue-900 mt-1">{stats.total}</h2>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200">
-            <CardContent className="p-4">
-              <p className="text-xs text-green-700 font-medium">Shortlisted</p>
-              <h2 className="text-2xl font-bold text-green-900 mt-1">{stats.shortlisted}</h2>
-            </CardContent>
-          </Card>
           <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200">
             <CardContent className="p-4">
               <p className="text-xs text-indigo-700 font-medium">Roll Numbers Generated</p>
               <h2 className="text-2xl font-bold text-indigo-900 mt-1">{stats.withRoll}</h2>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200">
+            <CardContent className="p-4">
+              <p className="text-xs text-amber-700 font-medium">Awaiting Generation</p>
+              <h2 className="text-2xl font-bold text-amber-900 mt-1">{stats.withoutRoll}</h2>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
@@ -353,39 +490,20 @@ const RollNumberManagement = () => {
         </div>
 
         {/* FILTERS */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-          <div className="flex gap-3 items-end flex-wrap">
-            <TextField label="Search (Name / CNIC / Ref ID)" variant="outlined" size="small" name="search"
-              value={filters.search} onChange={handleFilterChange} sx={{ flex: '1 1 220px', minWidth: 200 }} />
-            <TextField label="Advertisement No" variant="outlined" size="small" name="advertisement_no"
-              value={filters.advertisement_no} onChange={handleFilterChange} sx={{ width: 160 }} />
-            <TextField label="Status" variant="outlined" size="small" name="status" select
-              value={filters.status} onChange={handleFilterChange} sx={{ width: 150 }}>
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="Shortlisted">Shortlisted</MenuItem>
-              <MenuItem value="Rejected">Rejected</MenuItem>
-              <MenuItem value="Interview">Interview</MenuItem>
-            </TextField>
-            <TextField label="Roll Number" variant="outlined" size="small" name="generated" select
-              value={filters.generated} onChange={handleFilterChange} sx={{ width: 160 }}>
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="yes">Generated</MenuItem>
-              <MenuItem value="no">Not Generated</MenuItem>
-            </TextField>
-            <TextField label="Exam City Preferences" variant="outlined" size="small" name="preferred_exam_city"
-              value={filters.preferred_exam_city} onChange={handleFilterChange} sx={{ width: 200 }} />
-            <Button variant="outline" size="md" onClick={handleClearFilters}
-              className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              title="Clear Filters" aria-label="Clear Filters">
-              <FilterX size={16} />
-            </Button>
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={FILTER_CONFIG}
+          title="Filter Applications"
+          extraFilters={
             <Button variant="outline" size="md" onClick={fetchApplications} disabled={loading}
-              className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              className="h-10 w-10 min-w-[2.5rem] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50 self-end"
               title="Refresh List" aria-label="Refresh List">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* BULK BAR */}
         {selectedIds.length > 0 && (
@@ -398,7 +516,7 @@ const RollNumberManagement = () => {
                 {canDelete && (
                   <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
                     className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
-                    disabled={rows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
+                    disabled={allRows.filter(r => selectedIds.includes(r.id) && r.roll_number).length === 0}>
                     <Trash2 size={14} /> Delete Roll No Slip
                   </Button>
                 )}
@@ -409,31 +527,32 @@ const RollNumberManagement = () => {
 
         {/* GRID */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {loading && rows.length === 0 ? (
+          {loading && allRows.length === 0 ? (
             <div className="p-10 flex justify-center">
               <InlineLoader text="Loading applications..." variant="ring" size="lg" />
             </div>
-          ) : rows.length === 0 && !loading ? (
+          ) : filteredRows.length === 0 && !loading ? (
             <div className="p-16 flex flex-col items-center justify-center text-center">
               <div className="p-4 bg-slate-100 rounded-full mb-4">
                 <Eye size={32} className="text-slate-400" />
               </div>
               <p className="text-base font-semibold text-slate-700">No applications found</p>
               <p className="text-sm text-slate-400 mt-1 max-w-sm">
-                Applications will appear here once candidates apply through the candidate portal.
+                {allRows.length === 0
+                  ? 'Applications will appear here once candidates apply through the candidate portal.'
+                  : 'No applications match the current filters.'}
               </p>
             </div>
           ) : (
             <TooltipDataGrid
-              rows={rows}
+              rows={pagedRows}
               columns={columns}
               getRowId={(r) => r.id}
               paginationMode="server"
-              rowCount={total}
+              rowCount={filteredRows.length}
               paginationModel={paginationModel}
               onPaginationModelChange={setPaginationModel}
               pageSizeOptions={[15, 25, 50, 100]}
-              initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
               checkboxSelection
               onRowSelectionModelChange={(s) => setSelectionModel(s)}
               rowSelectionModel={selectionModel}

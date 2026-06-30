@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin, RefreshCw } from 'lucide-react';
+import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
 import Button from 'components/ui/Button';
 import ApplicationApi from 'api/applicationApi';
@@ -124,30 +124,9 @@ const ApplicationDetail = () => {
       setApplication(mappedApp);
     } catch (err) {
       toast.error(err.message || 'Error loading application details');
-      navigate('/dashboard/applications');
+      navigate('/dashboard/roll-numbers');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleStatusUpdate = async (status) => {
-    try {
-      setApplication(prev => ({ ...prev, status }));
-      await ApplicationApi.updateStatus(application.application_number, status, {
-        application_number: application.application_number,
-        candidate_name:    application.profile?.full_name,
-        candidate_cnic:    application.profile?.cnic,
-        candidate_email:   application.profile?.email,
-        candidate_mobile:  application.profile?.phone,
-        advertisement_no:  application.job?.title,
-        domicile_district: application.profile?.domicile,
-        disability:        application.disability,
-        preferred_exam_cities: application.preferred_exam_cities?.map(c => c.city) || [],
-      });
-      toast.success(`Application marked as ${status}`);
-    } catch (error) {
-      toast.error('Failed to update status');
-      fetchApplication();
     }
   };
 
@@ -561,37 +540,13 @@ const ApplicationDetail = () => {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
           <Button
-            onClick={() => navigate('/dashboard/applications')}
+            onClick={() => navigate('/dashboard/roll-numbers')}
             variant="secondary"
             size="sm"
             className="gap-2"
           >
             <ArrowLeft size={18} /> Back to Applications
           </Button>
-          
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => handleStatusUpdate('Shortlisted')}
-              variant="primary"
-              size="sm"
-              className="gap-2"
-              disabled={application.status?.toLowerCase() === 'shortlisted'}
-            >
-              <CheckCircle size={18} /> Shortlist
-            </Button>
-            <Button
-              onClick={() => handleStatusUpdate('submitted')}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              disabled={application.status?.toLowerCase() !== 'shortlisted'}
-            >
-              <RefreshCw size={18} /> Unshortlist
-            </Button>
-            <Button onClick={() => handleStatusUpdate('Rejected')} variant="destructive" size="sm" className="gap-2">
-              <XCircle size={18} /> Reject
-            </Button>
-          </div>
         </div>
 
         {/* Profile Header Card */}

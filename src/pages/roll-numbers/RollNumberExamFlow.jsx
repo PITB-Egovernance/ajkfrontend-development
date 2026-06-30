@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Clock3, FileCheck2, Filter, Hash, MapPin, Search, Send, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileCheck2, Filter, Hash, MapPin, Search, Send, Users } from 'lucide-react';
 import { MenuItem, TextField } from '@mui/material';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
@@ -42,6 +42,76 @@ const StepHeader = ({ number, title, subtitle }) => (
   </div>
 );
 
+const Pagination = ({ page, totalPages, onChange }) => {
+  if (totalPages <= 1) return null;
+
+  const windowSize = 1;
+  const pageSet = new Set([0, totalPages - 1]);
+  for (let p = Math.max(0, page - windowSize); p <= Math.min(totalPages - 1, page + windowSize); p++) {
+    pageSet.add(p);
+  }
+  const uniquePages = [...pageSet].sort((a, b) => a - b);
+
+  const items = [];
+  let prev = null;
+  uniquePages.forEach((p) => {
+    if (prev !== null && p - prev > 1) items.push(`ellipsis-${p}`);
+    items.push(p);
+    prev = p;
+  });
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(0, page - 1))}
+        disabled={page === 0}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        aria-label="Previous page"
+      >
+        <ChevronLeft size={16} />
+      </button>
+      {items.map((item) =>
+        typeof item === 'number' ? (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onChange(item)}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+              item === page ? 'bg-emerald-900 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {item + 1}
+          </button>
+        ) : (
+          <span key={item} className="px-1 text-slate-400">…</span>
+        )
+      )}
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(totalPages - 1, page + 1))}
+        disabled={page >= totalPages - 1}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        aria-label="Next page"
+      >
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+};
+
+
+const computeEndTime = (startTime, durationMinutes) => {
+  if (!startTime || !durationMinutes) return '';
+  const [h, m] = startTime.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return '';
+  const totalMinutes = h * 60 + m + Number(durationMinutes);
+  const endH = Math.floor((totalMinutes / 60) % 24);
+  const endM = totalMinutes % 60;
+  const period = endH >= 12 ? 'PM' : 'AM';
+  const hour12 = endH % 12 === 0 ? 12 : endH % 12;
+  return `${hour12}:${String(endM).padStart(2, '0')} ${period}`;
+};
 
 const RollNumberExamFlow = () => {
   const navigate = useNavigate();
@@ -56,14 +126,21 @@ const RollNumberExamFlow = () => {
   const [generating, setGenerating] = useState(false);
   const [scheduleDates, setScheduleDates] = useState(() => meta.papers.map(() => ''));
   const [scheduleTimes, setScheduleTimes] = useState(() => meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
+  const [scheduleDurations, setScheduleDurations] = useState(() => meta.papers.map((_, i) => i === 1 ? 120 : 90));
 
   const [advertisements, setAdvertisements] = useState([]);
   const [centers, setCenters] = useState([]);
   const [generatedCandidates, setGeneratedCandidates] = useState([]);
+  const [allCandidateApps, setAllCandidateApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterAdvertisement, setFilterAdvertisement] = useState('all');
   const [filterPost, setFilterPost] = useState('all');
   const [filterDepartment, setFilterDepartment] = useState('all');
+
+  const [postsPage, setPostsPage] = useState(0);
+  const postsPageSize = 10;
+  const [centersPage, setCentersPage] = useState(0);
+  const centersPageSize = 10;
 
   const fetchWithTimeout = useCallback((url, options, ms = 15000) => {
     const controller = new AbortController();
@@ -98,17 +175,6 @@ const RollNumberExamFlow = () => {
       return [];
     }
   }, [fetchWithTimeout]);
-
-  const fetchCandidateApplicationsByPost = useCallback(async (jobId) => {
-    try {
-      const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
-      const res = await fetch(`${Config.candidateApiUrl}/applications?job_id=${jobId}&per_page=100`, { headers });
-      const json = await res.json();
-      return json?.data?.data ?? json?.data ?? [];
-    } catch {
-      return [];
-    }
-  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -155,6 +221,7 @@ const RollNumberExamFlow = () => {
           if (extAdvId) jobPostCountMap[extAdvId] = (jobPostCountMap[extAdvId] || 0) + 1;
         });
       }
+      setAllCandidateApps(candidateAppsAvailable ? candidateApps : []);
 
       const adAppCountMap = {};
       const rnAds = rollNumbersResult?.data?.data ?? rollNumbersResult?.data ?? [];
@@ -182,7 +249,9 @@ const RollNumberExamFlow = () => {
 
         return {
           id: adKey,
-          advertisement: ad.adv_number ? `Advertisement ${ad.adv_number}` : `Advertisement #${ad.id}`,
+          advertisement: ad.adv_number
+            ? (/^advertisement\b/i.test(String(ad.adv_number).trim()) ? String(ad.adv_number).trim() : `Advertisement ${ad.adv_number}`)
+            : `Advertisement #${ad.id}`,
           meta: meta.badge,
           posts: jobs.map((job) => {
             const jobId = job.hash_id || String(job.id);
@@ -251,6 +320,44 @@ const RollNumberExamFlow = () => {
     }).filter(Boolean);
   }, [advertisements, filterAdvertisement, filterPost, filterDepartment, search]);
 
+  // Flatten to ad+post rows for pagination, then re-group consecutive rows
+  // sharing the same advertisement so the rowSpan grouping still renders
+  // correctly within each page.
+  const flatPostRows = useMemo(() => {
+    const rows = [];
+    filteredPosts.forEach((ad) => {
+      ad.posts.forEach((post) => rows.push({ ad, post }));
+    });
+    return rows;
+  }, [filteredPosts]);
+
+  const postsTotalPages = Math.max(1, Math.ceil(flatPostRows.length / postsPageSize));
+
+  useEffect(() => { setPostsPage(0); }, [filterAdvertisement, filterPost, filterDepartment, search]);
+
+  const pagedGroupedPosts = useMemo(() => {
+    const start = postsPage * postsPageSize;
+    const pageRows = flatPostRows.slice(start, start + postsPageSize);
+    const groups = [];
+    pageRows.forEach(({ ad, post }) => {
+      const last = groups[groups.length - 1];
+      if (last && last.ad.id === ad.id) {
+        last.posts.push(post);
+      } else {
+        groups.push({ ad, posts: [post] });
+      }
+    });
+    return groups;
+  }, [flatPostRows, postsPage]);
+
+  const centersTotalPages = Math.max(1, Math.ceil(centers.length / centersPageSize));
+  const pagedCenters = useMemo(() => {
+    const start = centersPage * centersPageSize;
+    return centers.slice(start, start + centersPageSize);
+  }, [centers, centersPage]);
+
+  useEffect(() => { setCentersPage(0); }, [centers]);
+
   const togglePost = (postId) => setSelectedPostIds((current) => current.includes(postId) ? current.filter((id) => id !== postId) : [...current, postId]);
   const toggleCenter = (centerId) => setSelectedCenterIds((current) => current.includes(centerId) ? current.filter((id) => id !== centerId) : [...current, centerId]);
 
@@ -263,15 +370,19 @@ const RollNumberExamFlow = () => {
 
     setGenerating(true);
     try {
-      let allCandidateApps = [];
-
-      for (const post of selectedPosts) {
-        const apps = await fetchCandidateApplicationsByPost(post.id);
-        allCandidateApps = allCandidateApps.concat(apps);
-      }
+      // Filter strictly client-side using the cached full candidate list,
+      // matching by job_post.ext_adv_id (admin job detail hash) == selected
+      // post id. The candidate API's server-side ?job_id= query parameter
+      // does NOT reliably filter by individual post — it can return
+      // unrelated applications — so it must not be used for generation.
+      const selectedPostIdSet = new Set(selectedPosts.map(p => p.id));
+      const matchedApps = allCandidateApps.filter(app => {
+        const extAdvId = app.job_post?.ext_adv_id || null;
+        return extAdvId && selectedPostIdSet.has(extAdvId);
+      });
 
       const seen = new Set();
-      const uniqueApps = allCandidateApps.filter(a => {
+      const uniqueApps = matchedApps.filter(a => {
         const num = a.application_number;
         if (!num || seen.has(num)) return false;
         seen.add(num);
@@ -407,7 +518,7 @@ const RollNumberExamFlow = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto space-y-6" style={{ width: '-webkit-fill-available' }}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-emerald-100 p-2"><Hash size={24} className="text-emerald-800" /></div>
@@ -460,22 +571,33 @@ const RollNumberExamFlow = () => {
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr><th className="w-[260px] px-4 py-3">Advertisement</th><th className="px-4 py-3">Designation / Post</th><th className="px-4 py-3">Department</th><th className="px-4 py-3 text-right">Applicants</th></tr></thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredPosts.length === 0 && (
+                  {flatPostRows.length === 0 && (
                     <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">No posts found for this exam type</td></tr>
                   )}
-                  {filteredPosts.map((ad) => {
-                    return ad.posts.map((post, index) => (
-                      <tr key={post.id} className="hover:bg-slate-50">
-                        {index === 0 && <td rowSpan={ad.posts.length} className="border-r border-slate-100 bg-slate-50 px-4 py-3 align-top"><div className="font-bold text-slate-900">{ad.advertisement}</div><div className="mt-1 text-xs font-medium text-slate-500">{ad.meta}</div></td>}
-                        <td className="px-4 py-3"><label className="flex cursor-pointer items-center gap-3"><input type="checkbox" checked={selectedPostIds.includes(post.id)} onChange={() => togglePost(post.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /><span><span className="block font-semibold text-slate-900">{post.post}</span><span className="block text-xs text-slate-500">{post.caseNo}</span></span></label></td>
-                        <td className="px-4 py-3 text-slate-600">{post.department}</td>
-                        <td className="px-4 py-3 text-right font-bold text-slate-900">{post.applicants}</td>
-                      </tr>
-                    ));
+                  {pagedGroupedPosts.map(({ ad, posts }, groupIndex) => {
+                    const isLastGroup = groupIndex === pagedGroupedPosts.length - 1;
+                    const groupBorder = !isLastGroup ? 'border-b-2 border-b-slate-300' : '';
+                    return posts.map((post, index) => {
+                      const isLastInGroup = index === posts.length - 1;
+                      return (
+                        <tr key={post.id} className="hover:bg-slate-50">
+                          {index === 0 && <td rowSpan={posts.length} className={`border-r border-slate-100 bg-slate-50 px-4 py-3 align-top ${groupBorder}`}><div className="font-bold text-slate-900">{ad.advertisement}</div><div className="mt-1 text-xs font-medium text-slate-500">{ad.meta}</div></td>}
+                          <td className={`px-4 py-3 ${isLastInGroup ? groupBorder : ''}`}><label className="flex cursor-pointer items-center gap-3"><input type="checkbox" checked={selectedPostIds.includes(post.id)} onChange={() => togglePost(post.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /><span><span className="block font-semibold text-slate-900">{post.post}</span><span className="block text-xs text-slate-500">{post.caseNo}</span></span></label></td>
+                          <td className={`px-4 py-3 text-slate-600 ${isLastInGroup ? groupBorder : ''}`}>{post.department}</td>
+                          <td className={`px-4 py-3 text-right font-bold text-slate-900 ${isLastInGroup ? groupBorder : ''}`}>{post.applicants}</td>
+                        </tr>
+                      );
+                    });
                   })}
                 </tbody>
               </table>
             </div>
+            {flatPostRows.length > 0 && (
+              <div className="flex items-center justify-between text-sm text-slate-600">
+                <span>{flatPostRows.length} post{flatPostRows.length === 1 ? '' : 's'}</span>
+                <Pagination page={postsPage} totalPages={postsTotalPages} onChange={setPostsPage} />
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 md:grid-cols-3">
               <div><p className="text-xs font-semibold text-emerald-700">Selected Posts</p><p className="text-lg font-bold text-emerald-950">{selectedPosts.length}</p></div>
               <div><p className="text-xs font-semibold text-emerald-700">Total Applicants</p><p className="text-lg font-bold text-emerald-950">{selectedApplicants}</p></div>
@@ -490,7 +612,23 @@ const RollNumberExamFlow = () => {
             <StepHeader number="2" title="Center Allocation & Generate Roll Numbers" subtitle="Select centers, configure schedule, then generate roll numbers." />
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{meta.papers.map((paper, index) => <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4"><div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><TextField size="small" type="date" label="Start Date" value={scheduleDates[index] || ''} onChange={(event) => setScheduleDates((current) => current.map((date, dateIndex) => dateIndex === index ? event.target.value : date))} InputLabelProps={{ shrink: true }} /><TextField size="small" type="time" label="Start Time" value={scheduleTimes[index] || ''} onChange={(event) => setScheduleTimes((current) => current.map((time, timeIndex) => timeIndex === index ? event.target.value : time))} InputLabelProps={{ shrink: true }} /><TextField size="small" label="Duration" defaultValue={index === 1 ? '120 Minutes' : '90 Minutes'} InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }} /></div></div>)}</div>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{meta.papers.map((paper, index) => (
+                  <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                      <TextField size="small" type="date" label="Start Date" value={scheduleDates[index] || ''} onChange={(event) => setScheduleDates((current) => current.map((date, dateIndex) => dateIndex === index ? event.target.value : date))} InputLabelProps={{ shrink: true }} />
+                      <TextField size="small" type="time" label="Start Time" value={scheduleTimes[index] || ''} onChange={(event) => setScheduleTimes((current) => current.map((time, timeIndex) => timeIndex === index ? event.target.value : time))} InputLabelProps={{ shrink: true }} />
+                      <TextField select size="small" label="Duration" value={scheduleDurations[index] ?? 90} onChange={(event) => setScheduleDurations((current) => current.map((dur, durIndex) => durIndex === index ? Number(event.target.value) : dur))} InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
+                        <MenuItem value={60}>60 Minutes</MenuItem>
+                        <MenuItem value={90}>90 Minutes</MenuItem>
+                        <MenuItem value={120}>120 Minutes</MenuItem>
+                        <MenuItem value={150}>150 Minutes</MenuItem>
+                        <MenuItem value={180}>180 Minutes</MenuItem>
+                      </TextField>
+                      <TextField size="small" label="End Time" value={computeEndTime(scheduleTimes[index], scheduleDurations[index]) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
+                    </div>
+                  </div>
+                ))}</div>
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
                   <table className="w-full min-w-[760px] text-left text-sm">
                     <thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-4 py-3">Center Name</th><th className="px-4 py-3">District</th><th className="px-4 py-3 text-right">Capacity</th><th className="px-4 py-3">Start Date</th><th className="px-4 py-3">Status</th></tr></thead>
@@ -498,10 +636,16 @@ const RollNumberExamFlow = () => {
                       {centers.length === 0 && (
                         <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No exam centers found</td></tr>
                       )}
-                      {centers.map((center) => <tr key={center.id} className="hover:bg-slate-50"><td className="px-4 py-3"><input type="checkbox" checked={selectedCenterIds.includes(center.id)} onChange={() => toggleCenter(center.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /></td><td className="px-4 py-3 font-medium text-slate-800">{center.center}</td><td className="px-4 py-3 text-slate-600">{center.district}</td><td className="px-4 py-3 text-right font-semibold text-slate-900">{center.capacity}</td><td className="px-4 py-3 font-medium text-slate-700">{scheduleDates[0] || '—'}</td><td className="px-4 py-3"><span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">Available</span></td></tr>)}
+                      {pagedCenters.map((center) => <tr key={center.id} className="hover:bg-slate-50"><td className="px-4 py-3"><input type="checkbox" checked={selectedCenterIds.includes(center.id)} onChange={() => toggleCenter(center.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /></td><td className="px-4 py-3 font-medium text-slate-800">{center.center}</td><td className="px-4 py-3 text-slate-600">{center.district}</td><td className="px-4 py-3 text-right font-semibold text-slate-900">{center.capacity}</td><td className="px-4 py-3 font-medium text-slate-700">{scheduleDates[0] || '—'}</td><td className="px-4 py-3"><span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">Available</span></td></tr>)}
                     </tbody>
                   </table>
                 </div>
+                {centers.length > 0 && (
+                  <div className="flex items-center justify-between text-sm text-slate-600">
+                    <span>{centers.length} center{centers.length === 1 ? '' : 's'}</span>
+                    <Pagination page={centersPage} totalPages={centersTotalPages} onChange={setCentersPage} />
+                  </div>
+                )}
                 <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${capacityPassed ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{capacityPassed ? `Capacity check passed. ${selectedCapacity} seats selected for ${selectedApplicants} applicants.` : `Selected center capacity is short by ${capacityShortage} seats. Select more centers.`}</div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <h3 className="mb-3 text-sm font-bold text-slate-900">Center Allocation by District or by Preference</h3>
