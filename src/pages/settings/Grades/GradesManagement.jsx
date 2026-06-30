@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
-import { Plus, ArrowLeft, MoreVertical, Filter, X } from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from 'components/ui/ConfirmDelete';
@@ -26,6 +26,7 @@ import { GRID_SX } from 'utils/gridStyles';
 import { hasPermission } from "utils/permissions";
 
 const PERM = "settings.grades";
+const FILTER_FETCH_PAGE_SIZE = 100;
 
 const GradesManagement = () => {
   const navigate = useNavigate();
@@ -42,7 +43,6 @@ const GradesManagement = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     name: '',
     status: ''
@@ -72,6 +72,7 @@ const GradesManagement = () => {
       ...prev,
       [name]: value
     }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
@@ -79,6 +80,7 @@ const GradesManagement = () => {
       name: '',
       status: ''
     });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const [paginationModel, setPaginationModel] = useState({
@@ -105,41 +107,84 @@ const GradesManagement = () => {
     (row) => (row.status ?? "active").toLowerCase() === "inactive"
   ).length;
 
-  /* ===============================
-     SEARCH FILTER
-  =============================== */
-  const filteredRows = rows.filter((row) => {
-    // Basic search term filter
-    const searchMatch = !searchTerm.trim() || 
-      row.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (!searchMatch) return false;
-
-    // Advanced filters
-    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) {
-      return false;
-    }
-
-    if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
-      return false;
-    }
-    
-    return true;
+  const headers = () => ({
+    Authorization: `Bearer ${TOKEN}`,
+    Accept: "application/json",
+    "X-API-KEY": API_KEY,
   });
+
+  const formatGradeRows = (items) => items.map((item) => ({
+    id: item.hash_id || item.id,
+    hash_id: item.hash_id || item.id,
+    name: item.name,
+    status: item.status ?? "active",
+  }));
+
+  const matchesFilters = (row) => {
+    const name = filters.name.trim().toLowerCase();
+    const status = filters.status.trim().toLowerCase();
+
+    if (name && !String(row.name || '').toLowerCase().includes(name)) return false;
+    if (status && String(row.status || '').toLowerCase() !== status) return false;
+
+    return true;
+  };
+
+  const fetchGradePage = async (page, pageSize) => {
+    const response = await fetch(
+      `${API_BASE}/settings/grades?page=${page}&per_page=${pageSize}`,
+      { headers: headers() }
+    );
+    const result = await response.json();
+
+    if (!(response.ok || result.status === 200 || result.success === true)) {
+      throw new Error(result.message || "Failed to load grades");
+    }
+
+    const payload = result.data ?? {};
+    const data = payload.data ?? result.data ?? [];
+
+    return {
+      data: Array.isArray(data) ? data : [],
+      total: Number(payload.total ?? 0),
+      lastPage: Number(payload.last_page ?? 0),
+    };
+  };
+
+  const fetchFilteredGrades = async (page, pageSize) => {
+    const firstPage = await fetchGradePage(1, FILTER_FETCH_PAGE_SIZE);
+    const totalRows = firstPage.total || firstPage.data.length;
+    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
+
+    const remainingPages = lastPage > 1
+      ? await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetchGradePage(i + 2, FILTER_FETCH_PAGE_SIZE)
+          )
+        )
+      : [];
+
+    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
+    const filteredRows = formatGradeRows(allRows).filter(matchesFilters);
+    const startIndex = page * pageSize;
+
+    setRows(filteredRows.slice(startIndex, startIndex + pageSize));
+    setTotal(filteredRows.length);
+  };
 
   /* ================= FETCH ================= */
   const fetchGrades = async (page = 0, pageSize = 15) => {
     setLoading(true);
     try {
+      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+      if (hasActiveFilters) {
+        await fetchFilteredGrades(page, pageSize);
+        return;
+      }
+
       const response = await fetch(
         `${API_BASE}/settings/grades?page=${page + 1}&per_page=${pageSize}`,
-        {
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            Accept: "application/json",
-            "X-API-KEY": API_KEY,
-          },
-        }
+        { headers: headers() }
       );
 
       const result = await response.json();
@@ -147,12 +192,7 @@ const GradesManagement = () => {
       if (result.status === 200 || result.success === true) {
         const dataArray = result.data?.data || result.data || [];
 
-        const formatted = dataArray.map((item) => ({
-          id: item.id,
-          hash_id: item.hash_id,
-          name: item.name,
-          status: item.status ?? "active",
-        }));
+        const formatted = formatGradeRows(Array.isArray(dataArray) ? dataArray : []);
 
         setRows(formatted);
         setTotal(result.data?.total || formatted.length);
@@ -168,7 +208,8 @@ const GradesManagement = () => {
 
   useEffect(() => {
     fetchGrades(paginationModel.page, paginationModel.pageSize);
-  }, [paginationModel.page, paginationModel.pageSize]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.status]);
 
   // ── Workaround for live backend unique-name bug ──────────────────────────
   // The live UpdateGradeRequest ignores null instead of the grade's own ID,
