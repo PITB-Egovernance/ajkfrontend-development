@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import DepartmentUserService from 'services/DepartmentUserService';
+import { fetchPaginatedApiList } from 'utils';
 
 const fieldSx = {
   '& .MuiOutlinedInput-root': {
@@ -79,18 +80,11 @@ const CreateDepartmentUser = () => {
 
   const fetchDepartments = async () => {
     try {
-      const res = await fetch(`${API_BASE}/settings/departments`, {
+      const data = await fetchPaginatedApiList(`${API_BASE}/settings/departments`, {
         headers: getHeaders(),
+        perPage: 200,
       });
-
-      const result = await res.json();
-
-      if (result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
-        setDepartmentOptions(normalizeDepartments(data));
-      } else {
-        toast.error(result.message || 'Failed to load departments');
-      }
+      setDepartmentOptions(normalizeDepartments(data));
     } catch (error) {
       toast.error('Server error while loading departments');
     }

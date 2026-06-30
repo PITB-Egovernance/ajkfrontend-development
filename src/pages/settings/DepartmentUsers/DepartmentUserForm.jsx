@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import DepartmentUserService from 'services/DepartmentUserService';
+import { fetchPaginatedApiList } from 'utils';
 import 'pages/job-creation/JobCreationForm.css';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
@@ -47,13 +48,16 @@ const DepartmentUserForm = () => {
 
     const fetchOptions = async () => {
       try {
-        const [dRes, depRes, rRes] = await Promise.all([
+        const [dRes, departments, rRes] = await Promise.all([
           fetch(`${Config.apiUrl}/settings/districts`, { headers: authHeaders }),
-          fetch(`${Config.apiUrl}/settings/departments?per_page=200`, { headers: authHeaders }),
+          fetchPaginatedApiList(`${Config.apiUrl}/settings/departments`, {
+            headers: authHeaders,
+            perPage: 200,
+          }),
           fetch(`${Config.apiUrl}/settings/roles`, { headers: authHeaders }),
         ]);
         const [dData, depData, rData] = await Promise.all([
-          dRes.json(), depRes.json(), rRes.json(),
+          dRes.json(), Promise.resolve(departments), rRes.json(),
         ]);
 
         if (dData.success) {
@@ -61,13 +65,10 @@ const DepartmentUserForm = () => {
             (dData.data?.data ?? dData.data ?? []).map((d) => ({ id: d.hash_id, name: d.name }))
           );
         }
-        if (depData.success || depData.status === 200) {
-          const list = depData.data?.data ?? depData.data ?? [];
-          setDepartmentOptions(
-            list.filter((d) => (d.status ?? 'active') === 'active')
-              .map((d) => ({ id: d.hash_id || d.id, name: d.department_name || d.name }))
-          );
-        }
+        setDepartmentOptions(
+          depData.filter((d) => (d.status ?? 'active') === 'active')
+            .map((d) => ({ id: d.hash_id || d.id, name: d.department_name || d.name }))
+        );
         if (rData.success) {
           setRoleOptions(
             (rData.data?.data ?? rData.data ?? [])

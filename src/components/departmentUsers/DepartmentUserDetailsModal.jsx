@@ -10,6 +10,7 @@ import Button from 'components/ui/Button';
 import DepartmentUserService from 'services/DepartmentUserService';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { fetchPaginatedApiList } from 'utils';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const STATUS_OPTIONS = ['active', 'inactive'];
@@ -79,15 +80,17 @@ const DepartmentUserDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
     setOptionsLoading(true);
     const headers = { Authorization: `Bearer ${AuthService.getToken()}`, Accept: 'application/json', 'X-API-KEY': Config.apiKey };
     try {
-      const [dRes, depRes, rRes] = await Promise.all([
+      const [dRes, departments, rRes] = await Promise.all([
         fetch(`${Config.apiUrl}/settings/districts`, { headers }),
-        fetch(`${Config.apiUrl}/settings/departments?per_page=200`, { headers }),
+        fetchPaginatedApiList(`${Config.apiUrl}/settings/departments`, {
+          headers,
+          perPage: 200,
+        }),
         fetch(`${Config.apiUrl}/settings/roles`, { headers }),
       ]);
-      const [dData, depData, rData] = await Promise.all([dRes.json(), depRes.json(), rRes.json()]);
+      const [dData, depData, rData] = await Promise.all([dRes.json(), Promise.resolve(departments), rRes.json()]);
       setDistrictOptions((dData.data?.data ?? dData.data ?? []).map((d) => ({ id: d.hash_id, name: d.name })));
-      const depList = depData.data?.data ?? depData.data ?? [];
-      setDepartmentOptions(depList.filter((d) => (d.status ?? 'active') === 'active').map((d) => ({ id: d.hash_id || d.id, name: d.department_name || d.name })));
+      setDepartmentOptions(depData.filter((d) => (d.status ?? 'active') === 'active').map((d) => ({ id: d.hash_id || d.id, name: d.department_name || d.name })));
       setRoleOptions((rData.data?.data ?? rData.data ?? []).filter((r) => !r.deleted_at).map((r) => ({ id: r.hash_id, name: r.role_name })));
     } catch { toast.error('Failed to load options'); }
     finally { setOptionsLoading(false); }
