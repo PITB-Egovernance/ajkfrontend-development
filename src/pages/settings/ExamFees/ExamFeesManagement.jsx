@@ -5,7 +5,7 @@ import {
   DialogContent, DialogActions, Menu, MenuItem,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
-import { Plus, ArrowLeft, MoreVertical, DollarSign } from 'lucide-react';
+import { Plus, ArrowLeft, MoreVertical, DollarSign, Filter, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
@@ -17,6 +17,7 @@ import { hasPermission } from 'utils/permissions';
 const PERM = 'settings.exam_test_fee';
 
 const API_BASE = Config.apiUrl;
+const FILTER_FETCH_PAGE_SIZE = 100;
 
 const TEST_TYPES = ['MCQs', 'Written Exam'];
 
@@ -58,26 +59,104 @@ const ExamFeesManagement = () => {
   const [formData, setFormData] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [saving,   setSaving]   = useState(false);
-  const [search,   setSearch]   = useState('');
-  const [filterType, setFilterType] = useState('');
+  const [filters,  setFilters]  = useState({ label: '', test_type: '', amount: '', status: '' });
+  const [total,    setTotal]    = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const fetchAll = async () => {
+  const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ label: '', test_type: '', amount: '', status: '' });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const formatExamFeeRows = (items, startIndex = 0) => items.map((item, i) => ({
+    id:        item.hash_id || item.id,
+    sr_no:     startIndex + i + 1,
+    hash_id:   item.hash_id || item.id,
+    test_type: item.test_type,
+    label:     item.label || '',
+    amount:    item.amount,
+    status:    item.status ?? 'active',
+  }));
+
+  const fetchExamFeePage = async (page, pageSize) => {
+    const res = await fetch(
+      `${API_BASE}/settings/exam-fees?page=${page}&per_page=${pageSize}`,
+      { headers: getHeaders() }
+    );
+    const result = await res.json();
+    if (!(res.ok || result.success || result.status === 200)) {
+      throw new Error(result.message || 'Failed to load exam fees');
+    }
+
+    const payload = result.data ?? {};
+    const data = payload.data ?? result.data ?? [];
+    return {
+      data: Array.isArray(data) ? data : [],
+      total: Number(payload.total ?? 0),
+      lastPage: Number(payload.last_page ?? 0),
+    };
+  };
+
+  const fetchFilteredExamFees = async (page, pageSize) => {
+    const label = filters.label.trim().toLowerCase();
+    const testType = filters.test_type.trim();
+    const amount = filters.amount.trim().toLowerCase();
+    const status = filters.status.trim().toLowerCase();
+    const firstPage = await fetchExamFeePage(1, FILTER_FETCH_PAGE_SIZE);
+    const totalRows = firstPage.total || firstPage.data.length;
+    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
+
+    const remainingPages = lastPage > 1
+      ? await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetchExamFeePage(i + 2, FILTER_FETCH_PAGE_SIZE)
+          )
+        )
+      : [];
+
+    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
+    const filteredRows = formatExamFeeRows(allRows).filter((row) => {
+      if (label && !String(row.label || '').toLowerCase().includes(label)) return false;
+      if (testType && row.test_type !== testType) return false;
+      if (amount && !String(row.amount ?? '').toLowerCase().includes(amount)) return false;
+      if (status && String(row.status || '').toLowerCase() !== status) return false;
+      return true;
+    });
+    const startIndex = page * pageSize;
+
+    setRows(
+      filteredRows
+        .slice(startIndex, startIndex + pageSize)
+        .map((row, i) => ({ ...row, sr_no: startIndex + i + 1 }))
+    );
+    setTotal(filteredRows.length);
+  };
+
+  const fetchAll = async (page = 0, pageSize = 15) => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/exam-fees`, { headers: getHeaders() });
+      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+      if (hasActiveFilters) {
+        await fetchFilteredExamFees(page, pageSize);
+        return;
+      }
+
+      const res    = await fetch(`${API_BASE}/settings/exam-fees?page=${page + 1}&per_page=${pageSize}`, { headers: getHeaders() });
       const result = await res.json();
-      if (result.success || result.status === 200) {
+      if (res.ok || result.success || result.status === 200) {
+        const payload = result.data ?? {};
         const data = result.data?.data ?? result.data ?? [];
-        setRows(data.map((item, i) => ({
-          id:        item.hash_id || item.id,
-          sr_no:     i + 1,
-          hash_id:   item.hash_id,
-          test_type: item.test_type,
-          label:     item.label || '',
-          amount:    item.amount,
-          status:    item.status ?? 'active',
-        })));
+        const dataArray = Array.isArray(data) ? data : [];
+        setRows(formatExamFeeRows(dataArray, page * pageSize));
+        setTotal(Number(payload.total ?? dataArray.length ?? 0));
       } else {
         toast.error(result.message || 'Failed to load exam fees');
       }
@@ -85,17 +164,13 @@ const ExamFeesManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
-
-  const filtered = rows.filter((r) => {
-    const q = search.trim().toLowerCase();
-    const matchSearch = !q ||
-      r.test_type?.toLowerCase().includes(q) ||
-      r.label?.toLowerCase().includes(q) ||
-      String(r.amount).includes(q);
-    const matchType = !filterType || r.test_type === filterType;
-    return matchSearch && matchType;
-  });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchAll(paginationModel.page, paginationModel.pageSize);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.label, filters.test_type, filters.amount, filters.status]);
 
   const openAdd  = () => { setEditing(null); setFormData(emptyForm); setFormError(''); setOpen(true); };
   const openEdit = (row) => {
@@ -135,7 +210,7 @@ const ExamFeesManagement = () => {
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Exam fee updated successfully' : 'Exam fee added successfully');
         setOpen(false);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || (isUpdate ? 'Failed to update exam fee' : 'Failed to add exam fee'));
       }
@@ -153,7 +228,11 @@ const ExamFeesManagement = () => {
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         toast.success('Exam fee deleted successfully');
-        fetchAll();
+        if (rows.length === 1 && paginationModel.page > 0) {
+          setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
+        } else {
+          fetchAll(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Failed to delete exam fee');
       }
@@ -180,11 +259,11 @@ const ExamFeesManagement = () => {
     }] : []),
   ];
 
-  if (loading) return <InlineLoader text="Loading exam fees..." variant="ring" size="lg" />;
+  if (loading && rows.length === 0) return <InlineLoader text="Loading exam fees..." variant="ring" size="lg" />;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-sm p-6">
+      <div className="mx-auto bg-white rounded-xl shadow-sm p-6" style={{ minWidth: "-webkit-fill-available" }}>
 
         <div className="flex justify-between items-start mb-6">
           <div>
@@ -212,35 +291,92 @@ const ExamFeesManagement = () => {
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-5">
               <p className="text-sm text-blue-700 font-medium">Total Exam Fees</p>
-              <h2 className="text-3xl font-bold text-blue-900 mt-1">{rows.length}</h2>
+              <h2 className="text-3xl font-bold text-blue-900 mt-1">{total}</h2>
             </CardContent>
           </Card>
         </div>
 
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <TextField size="small" placeholder="Search exam fees..."
-            value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 280 }} />
-          <TextField select size="small" label="Filter by Test Type"
-            value={filterType} onChange={(e) => setFilterType(e.target.value)} sx={{ minWidth: 200 }}>
-            <MenuItem value="">All Test Types</MenuItem>
-            {TEST_TYPES.map((t) => (<MenuItem key={t} value={t}>{t}</MenuItem>))}
-          </TextField>
-          {filterType && (
-            <button onClick={() => setFilterType('')}
-              className="px-3 py-1.5 border border-slate-300 text-slate-600 text-sm rounded-lg hover:bg-slate-50">
-              Clear
-            </button>
-          )}
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <Filter size={20} className="text-slate-600" />
+              <h3 className="text-sm font-semibold text-slate-900">Filter Exam Fees</h3>
+            </div>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
+              >
+                <X size={14} /> Clear All
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <TextField
+              size="small"
+              label="Label"
+              name="label"
+              placeholder="Filter by label"
+              value={filters.label}
+              onChange={handleFilterChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              select
+              size="small"
+              label="Test Type"
+              name="test_type"
+              value={filters.test_type}
+              onChange={handleFilterChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            >
+              <MenuItem value="">All Test Type</MenuItem>
+              {TEST_TYPES.map((type) => (
+                <MenuItem key={type} value={type}>{type}</MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              size="small"
+              label="Fee Amount"
+              name="amount"
+              placeholder="Filter by amount"
+              value={filters.amount}
+              onChange={handleFilterChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              select
+              size="small"
+              label="Status"
+              name="status"
+              value={filters.status}
+              onChange={handleFilterChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            >
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
+          </div>
         </div>
 
         <TooltipDataGrid
-          rows={filtered}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
+          paginationMode="server"
+          rowCount={total}
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
+          loading={loading}
           autoHeight
           disableRowSelectionOnClick
           sx={gridSx}

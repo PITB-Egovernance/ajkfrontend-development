@@ -13,12 +13,14 @@ import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
 
 const PERM = 'settings.test_types';
 
 const API_BASE = Config.apiUrl;
+const FILTER_FETCH_PAGE_SIZE = 100;
 
 const EXAM_CATEGORIES = [
   { value: 'one_paper_mcq',         label: 'One Paper MCQ' },
@@ -27,8 +29,6 @@ const EXAM_CATEGORIES = [
   { value: 'joint_competitive_exam', label: 'Joint Competitive Exam' },
 ];
 
-const categoryLabel = (value) =>
-  EXAM_CATEGORIES.find((c) => c.value === value)?.label || value || '—';
 
 const getHeaders = (json = true) => {
   const h = {
@@ -74,32 +74,129 @@ const TestTypesManagement = () => {
   const [formData, setFormData] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [saving,   setSaving]   = useState(false);
-  const [search,   setSearch]   = useState('');
+  const [filters,  setFilters]  = useState({ name: '', exam_category: '', total_marks: '', status: '' });
+  const [total,    setTotal]    = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const fetchAll = async () => {
+  const filterConfig = [
+    { name: 'name', label: 'Name', type: 'text', placeholder: 'Filter by name' },
+    {
+      name: 'exam_category',
+      label: 'Category',
+      type: 'select',
+      options: EXAM_CATEGORIES,
+    },
+    { name: 'total_marks', label: 'Total Marks', type: 'text', placeholder: 'Filter by marks' },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+    },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ name: '', exam_category: '', total_marks: '', status: '' });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const formatTestTypeRows = (items, startIndex = 0) => items.map((item, i) => ({
+    id:        item.hash_id || item.id,
+    sr_no:     startIndex + i + 1,
+    hash_id:   item.hash_id || item.id,
+    name:      item.name || '',
+    description: item.description || '',
+    exam_category: item.exam_category || '',
+    total_marks:   item.total_marks ?? 0,
+    paper_weightage_percentage:     item.paper_weightage_percentage ?? '',
+    interview_weightage_percentage: item.interview_weightage_percentage ?? '',
+    interview_marks:    item.interview_marks ?? '',
+    passing_marks:      item.passing_marks ?? '',
+    passing_percentage: item.passing_percentage ?? '',
+    is_passing_required: !!item.is_passing_required,
+    status:    item.status ?? 'active',
+  }));
+
+  const fetchTestTypePage = async (page, pageSize) => {
+    const res = await fetch(
+      `${API_BASE}/settings/test-types?page=${page}&per_page=${pageSize}`,
+      { headers: getHeaders() }
+    );
+    const result = await res.json();
+    if (!(res.ok || result.success || result.status === 200)) {
+      throw new Error(result.message || 'Failed to load exam test types');
+    }
+
+    const payload = result.data ?? {};
+    const data = payload.data ?? result.data ?? [];
+    return {
+      data: Array.isArray(data) ? data : [],
+      total: Number(payload.total ?? 0),
+      lastPage: Number(payload.last_page ?? 0),
+    };
+  };
+
+  const fetchFilteredTestTypes = async (page, pageSize) => {
+    const name = filters.name.trim().toLowerCase();
+    const examCategory = filters.exam_category.trim();
+    const totalMarks = filters.total_marks.trim().toLowerCase();
+    const status = filters.status.trim().toLowerCase();
+    const firstPage = await fetchTestTypePage(1, FILTER_FETCH_PAGE_SIZE);
+    const totalRows = firstPage.total || firstPage.data.length;
+    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
+
+    const remainingPages = lastPage > 1
+      ? await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetchTestTypePage(i + 2, FILTER_FETCH_PAGE_SIZE)
+          )
+        )
+      : [];
+
+    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
+    const filteredRows = formatTestTypeRows(allRows).filter((row) => {
+      if (name && !String(row.name || '').toLowerCase().includes(name)) return false;
+      if (examCategory && row.exam_category !== examCategory) return false;
+      if (totalMarks && !String(row.total_marks ?? '').toLowerCase().includes(totalMarks)) return false;
+      if (status && String(row.status || '').toLowerCase() !== status) return false;
+      return true;
+    });
+    const startIndex = page * pageSize;
+
+    setRows(
+      filteredRows
+        .slice(startIndex, startIndex + pageSize)
+        .map((row, i) => ({ ...row, sr_no: startIndex + i + 1 }))
+    );
+    setTotal(filteredRows.length);
+  };
+
+  const fetchAll = async (page = 0, pageSize = 15) => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/test-types`, { headers: getHeaders() });
+      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+      if (hasActiveFilters) {
+        await fetchFilteredTestTypes(page, pageSize);
+        return;
+      }
+
+      const res    = await fetch(`${API_BASE}/settings/test-types?page=${page + 1}&per_page=${pageSize}`, { headers: getHeaders() });
       const result = await res.json();
-      if (result.success || result.status === 200) {
+      if (res.ok || result.success || result.status === 200) {
+        const payload = result.data ?? {};
         const data = result.data?.data ?? result.data ?? [];
-        setRows(data.map((item, i) => ({
-          id:        item.hash_id || item.id,
-          sr_no:     i + 1,
-          hash_id:   item.hash_id,
-          name:      item.name || '',
-          description: item.description || '',
-          exam_category: item.exam_category || '',
-          total_marks:   item.total_marks ?? 0,
-          paper_weightage_percentage:     item.paper_weightage_percentage ?? '',
-          interview_weightage_percentage: item.interview_weightage_percentage ?? '',
-          interview_marks:    item.interview_marks ?? '',
-          passing_marks:      item.passing_marks ?? '',
-          passing_percentage: item.passing_percentage ?? '',
-          is_passing_required: !!item.is_passing_required,
-          status:    item.status ?? 'active',
-        })));
+        const dataArray = Array.isArray(data) ? data : [];
+        setRows(formatTestTypeRows(dataArray, page * pageSize));
+        setTotal(Number(payload.total ?? dataArray.length ?? 0));
       } else {
         toast.error(result.message || 'Failed to load exam test types');
       }
@@ -107,19 +204,14 @@ const TestTypesManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchAll(paginationModel.page, paginationModel.pageSize);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.exam_category, filters.total_marks, filters.status]);
 
-  const filtered = rows.filter((r) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      r.name?.toLowerCase().includes(q) ||
-      categoryLabel(r.exam_category).toLowerCase().includes(q) ||
-      String(r.total_marks).includes(q)
-    );
-  });
-
-  const total         = rows.length;
   const activeCount   = rows.filter((r) => (r.status ?? 'active') === 'active').length;
   const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
 
@@ -195,7 +287,7 @@ const TestTypesManagement = () => {
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Exam test type updated successfully' : 'Exam test type added successfully');
         setOpen(false);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         const fieldErrors = result.errors ? Object.values(result.errors).flat().join(', ') : '';
         toast.error(fieldErrors || result.message || (isUpdate ? 'Failed to update exam test type' : 'Failed to add exam test type'));
@@ -214,7 +306,11 @@ const TestTypesManagement = () => {
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         toast.success('Exam test type deleted successfully');
-        fetchAll();
+        if (rows.length === 1 && paginationModel.page > 0) {
+          setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
+        } else {
+          fetchAll(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Failed to delete exam test type');
       }
@@ -240,7 +336,7 @@ const TestTypesManagement = () => {
       const r = await res.json();
       if (res.ok || r.status === 200 || r.success) {
         toast.success(`Exam test type marked as ${newStatus}`);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         const fieldErrors = r.errors ? Object.values(r.errors).flat().join(', ') : '';
         toast.error(fieldErrors || r.message || 'Status update failed');
@@ -328,20 +424,23 @@ const TestTypesManagement = () => {
           </Card>
         </div>
 
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <div className="mb-0">
-            <TextField size="small" placeholder="Search exam test types..."
-              value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 320 }} />
-          </div>
-        </div>
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Exam/Test Types"
+        />
 
         <TooltipDataGrid
-          rows={filtered}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
+          paginationMode="server"
+          rowCount={total}
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           loading={loading}
           autoHeight

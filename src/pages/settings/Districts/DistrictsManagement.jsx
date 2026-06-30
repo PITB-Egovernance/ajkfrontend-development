@@ -17,8 +17,6 @@ import {
   Plus,
   ArrowLeft,
   MoreVertical,
-  Filter,
-  X
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -26,11 +24,12 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
-import { PageLoader, InlineLoader } from "components/ui/Loader";
+import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 
 const PERM = "settings.districts"; // permission scope for this module
+const FILTER_FETCH_PAGE_SIZE = 100;
 
 const gridSx = {
   border: "none",
@@ -63,7 +62,6 @@ const DistrictsManagement = () => {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     name: '',
     code: '',
@@ -100,6 +98,7 @@ const DistrictsManagement = () => {
       ...prev,
       [name]: value
     }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
@@ -108,6 +107,7 @@ const DistrictsManagement = () => {
       code: '',
       status: ''
     });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const [paginationModel, setPaginationModel] = useState({
@@ -126,21 +126,90 @@ const DistrictsManagement = () => {
     code: "",
   });
 
+  const getHeaders = () => ({
+    Authorization: `Bearer ${TOKEN}`,
+    Accept: "application/json",
+    "X-API-KEY": API_KEY,
+  });
+
+  const formatDistrictRows = (items) => items.map((item) => ({
+    id: item.hash_id || item.id,
+    hash_id: item.hash_id || item.id,
+    name: item.name,
+    code: item.code,
+    created_at: item.created_at,
+    status: item.status ?? "active",
+  }));
+
+  const matchesFilters = (row) => {
+    const name = filters.name.trim().toLowerCase();
+    const code = filters.code.trim().toLowerCase();
+    const status = filters.status.trim().toLowerCase();
+
+    if (name && !String(row.name || '').toLowerCase().includes(name)) return false;
+    if (code && !String(row.code || '').toLowerCase().includes(code)) return false;
+    if (status && String(row.status || '').toLowerCase() !== status) return false;
+
+    return true;
+  };
+
+  const fetchDistrictPage = async (page, pageSize) => {
+    const response = await fetch(
+      `${API_BASE}/settings/districts?page=${page}&per_page=${pageSize}`,
+      { headers: getHeaders() }
+    );
+    const result = await response.json();
+
+    if (!(response.ok || result.status === 200 || result.success)) {
+      throw new Error(result.message || "Failed to load districts");
+    }
+
+    const payload = result.data ?? {};
+    const data = payload.data ?? result.data ?? [];
+
+    return {
+      data: Array.isArray(data) ? data : [],
+      total: Number(payload.total ?? 0),
+      lastPage: Number(payload.last_page ?? 0),
+    };
+  };
+
+  const fetchFilteredDistricts = async (page, pageSize) => {
+    const firstPage = await fetchDistrictPage(1, FILTER_FETCH_PAGE_SIZE);
+    const totalRows = firstPage.total || firstPage.data.length;
+    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
+
+    const remainingPages = lastPage > 1
+      ? await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetchDistrictPage(i + 2, FILTER_FETCH_PAGE_SIZE)
+          )
+        )
+      : [];
+
+    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
+    const filteredRows = formatDistrictRows(allRows).filter(matchesFilters);
+    const startIndex = page * pageSize;
+
+    setRows(filteredRows.slice(startIndex, startIndex + pageSize));
+    setTotal(filteredRows.length);
+  };
+
   /* ===============================
      FETCH DISTRICTS (SERVER PAGINATION)
   =============================== */
   const fetchDistricts = async (page = 0, pageSize = 15) => {
     setLoading(true);
     try {
+      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+      if (hasActiveFilters) {
+        await fetchFilteredDistricts(page, pageSize);
+        return;
+      }
+
       const response = await fetch(
         `${API_BASE}/settings/districts?page=${page + 1}&per_page=${pageSize}`,
-        {
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            Accept: "application/json",
-            "X-API-KEY": API_KEY,
-          },
-        }
+        { headers: getHeaders() }
       );
 
       const result = await response.json();
@@ -152,14 +221,7 @@ const DistrictsManagement = () => {
         const data       = payload.data ?? result.data ?? [];
         const totalCount = payload.total ?? data.length ?? 0;
 
-        const formatted = data.map((item) => ({
-          id: item.hash_id,
-          hash_id: item.hash_id,
-          name: item.name,
-          code: item.code,
-          created_at: item.created_at,
-          status: item.status ?? "active",
-        }));
+        const formatted = formatDistrictRows(Array.isArray(data) ? data : []);
 
         setRows(formatted);
         setTotal(totalCount);
@@ -176,7 +238,7 @@ const DistrictsManagement = () => {
   useEffect(() => {
     fetchDistricts(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.code, filters.status]);
 
   /* ===============================
      ACTION MENU
@@ -287,33 +349,6 @@ const DistrictsManagement = () => {
       setLoading(false);
     }
   };
-
-  /* ===============================
-     SEARCH FILTER
-  =============================== */
-  const filteredRows = rows.filter((row) => {
-    // Basic search term filter
-    const searchMatch = !searchTerm.trim() || 
-      row.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(row.code)?.includes(searchTerm);
-    
-    if (!searchMatch) return false;
-
-    // Advanced filters
-    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) {
-      return false;
-    }
-    
-    if (filters.code && !String(row.code).toLowerCase().includes(filters.code.toLowerCase())) {
-      return false;
-    }
-
-    if (filters.status && row.status !== filters.status) {
-      return false;
-    }
-    
-    return true;
-  });
 
   const handleToggleStatus = async (row, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
@@ -471,7 +506,7 @@ const DistrictsManagement = () => {
 
       {/* DATAGRID */}
       <TooltipDataGrid
-        rows={filteredRows}
+        rows={rows}
         columns={columns}
         getRowId={(row) => row.id}
         paginationModel={paginationModel}

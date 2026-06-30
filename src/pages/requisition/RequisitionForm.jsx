@@ -9,7 +9,7 @@ import Step3Eligibility from './Steps/Step3Eligibility';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
-import { extractFilePath, persistDraftFilePath, getPersistedDraftFilePath, clearPersistedDraftFiles } from 'utils';
+import { extractFilePath, persistDraftFilePath, getPersistedDraftFilePath, clearPersistedDraftFiles, fetchPaginatedApiList } from 'utils';
 import { validateRequisitionStep } from 'schemas';
 import { CheckCircle2 } from 'lucide-react';
 import './RequisitionForm.css';
@@ -71,22 +71,21 @@ const RequisitionForm = () => {
 
   const fetchDistricts = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/districts`, {
+      const list = await fetchPaginatedApiList(`${API_BASE}/settings/districts`, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
           Accept: 'application/json',
           'X-API-KEY': API_KEY,
         },
       });
-      const result = await response.json();
-      if (result.success) {
-        setDistrictOptions(
-          result.data.data.map((d) => ({
-            id: d.hash_id,
-            name: d.name
+      setDistrictOptions(
+        list
+          .filter((d) => (d.status ?? 'active') === 'active')
+          .map((d) => ({
+            id: d.hash_id || d.id,
+            name: d.name,
           }))
-        );
-      }
+      );
     } catch (error) {
       toast.error('Failed to load districts');
     }
@@ -94,25 +93,21 @@ const RequisitionForm = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/departments?per_page=200`, {
+      const list = await fetchPaginatedApiList(`${API_BASE}/settings/departments`, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
           Accept: 'application/json',
           'X-API-KEY': API_KEY,
         },
       });
-      const result = await response.json();
-      if (result.success || result.status === 200) {
-        const list = result.data?.data ?? result.data ?? [];
-        setDepartmentOptions(
-          list
-            .filter((d) => (d.status ?? 'active') === 'active')
-            .map((d) => ({
-              id: d.hash_id || d.id,
-              name: d.department_name || d.name,
-            }))
-        );
-      }
+      setDepartmentOptions(
+        list
+          .filter((d) => (d.status ?? 'active') === 'active')
+          .map((d) => ({
+            id: d.hash_id || d.id,
+            name: d.department_name || d.name,
+          }))
+      );
     } catch (error) {
     }
   };

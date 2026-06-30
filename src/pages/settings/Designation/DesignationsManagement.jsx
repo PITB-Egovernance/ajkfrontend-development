@@ -28,6 +28,7 @@ import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridS
 const PERM = "settings.designations";
 
 const API_BASE = Config.apiUrl;
+const FILTER_FETCH_PAGE_SIZE = 100;
 
 const DESIGNATION_TYPE_OPTIONS = [
   { value: "Internal", label: "Internal" },
@@ -68,7 +69,6 @@ const DesignationsManagement = () => {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [grades, setGrades] = useState([]);
 
   const [filters, setFilters] = useState({
@@ -107,6 +107,7 @@ const DesignationsManagement = () => {
       ...prev,
       [name]: value
     }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
@@ -115,6 +116,7 @@ const DesignationsManagement = () => {
       grade_id: '',
       status: ''
     });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const [paginationModel, setPaginationModel] = useState({
@@ -135,6 +137,83 @@ const DesignationsManagement = () => {
     status: "active",
   });
 
+  const formatDesignationRows = (items) =>
+    items.map((item) => {
+      const type = normalizeDesignationType(getDesignationType(item));
+      const gradeId = item.grade_id ?? item.grade?.id ?? item.grade?.hash_id ?? "";
+
+      return {
+        id: item.hash_id || item.id,
+        hash_id: item.hash_id || item.id,
+        name: item.name,
+        grade_id: gradeId,
+        grade_hash_id: item.grade?.hash_id || item.grade_hash_id || gradeId,
+        grade_name: item.grade?.name || item.grade_name || "",
+        type,
+        status: item.status ?? "active",
+      };
+    });
+
+  const matchesFilters = (row) => {
+    const name = filters.name.trim().toLowerCase();
+    const gradeId = String(filters.grade_id || '').trim();
+    const status = filters.status.trim().toLowerCase();
+
+    if (name && !String(row.name || '').toLowerCase().includes(name)) return false;
+    if (
+      gradeId &&
+      String(row.grade_id) !== gradeId &&
+      String(row.grade_hash_id) !== gradeId
+    ) {
+      return false;
+    }
+    if (status && String(row.status || '').toLowerCase() !== status) return false;
+
+    return true;
+  };
+
+  const fetchDesignationPage = async (page, pageSize) => {
+    const response = await fetch(
+      `${API_BASE}/settings/designations?page=${page}&per_page=${pageSize}`,
+      { headers: getHeaders(false) }
+    );
+    const result = await response.json();
+
+    if (!(response.ok || result.success === true || result.status === 200)) {
+      throw new Error(result.message || "Failed to load designations");
+    }
+
+    const payload = result.data ?? {};
+    const data = payload.data ?? result.data ?? [];
+
+    return {
+      data: Array.isArray(data) ? data : [],
+      total: Number(payload.total ?? 0),
+      lastPage: Number(payload.last_page ?? 0),
+    };
+  };
+
+  const fetchFilteredDesignations = async (page, pageSize) => {
+    const firstPage = await fetchDesignationPage(1, FILTER_FETCH_PAGE_SIZE);
+    const totalRows = firstPage.total || firstPage.data.length;
+    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
+
+    const remainingPages = lastPage > 1
+      ? await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetchDesignationPage(i + 2, FILTER_FETCH_PAGE_SIZE)
+          )
+        )
+      : [];
+
+    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
+    const filteredRows = formatDesignationRows(allRows).filter(matchesFilters);
+    const startIndex = page * pageSize;
+
+    setRows(filteredRows.slice(startIndex, startIndex + pageSize));
+    setTotal(filteredRows.length);
+  };
+
   /* ===============================
      FETCH DESIGNATIONS
   =============================== */
@@ -142,6 +221,12 @@ const DesignationsManagement = () => {
     setLoading(true);
 
     try {
+      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+      if (hasActiveFilters) {
+        await fetchFilteredDesignations(page, pageSize);
+        return;
+      }
+
       const response = await fetch(
         `${API_BASE}/settings/designations?page=${page + 1}&per_page=${pageSize}`,
         {
@@ -154,20 +239,7 @@ const DesignationsManagement = () => {
       if (result.success === true || result.status === 200) {
         const dataArray = result.data?.data || result.data || [];
 
-        const formatted = dataArray
-          .map((item) => {
-            const type = normalizeDesignationType(getDesignationType(item));
-
-            return {
-              id: item.hash_id,
-              hash_id: item.hash_id,
-              name: item.name,
-              grade_id: item.grade_id,
-              grade_name: item.grade?.name || item.grade_name || "",
-              type,
-              status: item.status ?? "active",
-            };
-          });
+        const formatted = formatDesignationRows(Array.isArray(dataArray) ? dataArray : []);
 
         setRows(formatted);
         setTotal(result.data?.total || formatted.length);
@@ -183,7 +255,7 @@ const DesignationsManagement = () => {
 
  const fetchGrades = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/grades`, {
+      const response = await fetch(`${API_BASE}/settings/grades?per_page=1000`, {
         headers: getHeaders(false),
       });
 
@@ -210,13 +282,14 @@ const DesignationsManagement = () => {
   };
 
   useEffect(() => {
-    const init = async () => {
-      await fetchGrades();
-      await fetchDesignations(paginationModel.page, paginationModel.pageSize);
-    };
-    init();
+    fetchGrades();
     // eslint-disable-next-line
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, []);
+
+  useEffect(() => {
+    fetchDesignations(paginationModel.page, paginationModel.pageSize);
+    // eslint-disable-next-line
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.grade_id, filters.status]);
 
   /* ===============================
      STATUS COUNTS
@@ -228,32 +301,6 @@ const DesignationsManagement = () => {
   const inactiveCount = rows.filter(
     (row) => (row.status ?? "active").toLowerCase() === "inactive"
   ).length;
-
-  /* ===============================
-     SEARCH FILTER
-  =============================== */
-  const filteredRows = rows.filter((row) => {
-    // Basic search term filter
-    const searchMatch = !searchTerm.trim() || 
-      row.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (!searchMatch) return false;
-
-    // Advanced filters
-    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) {
-      return false;
-    }
-    
-    if (filters.grade_id && String(row.grade_id) !== String(filters.grade_id)) {
-      return false;
-    }
-
-    if (filters.status && row.status?.toLowerCase() !== filters.status.toLowerCase()) {
-      return false;
-    }
-    
-    return true;
-  });
 
   /* ===============================
      ADD / UPDATE
@@ -531,7 +578,7 @@ const DesignationsManagement = () => {
 
         {/* TABLE */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}

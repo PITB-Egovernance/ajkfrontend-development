@@ -5,7 +5,7 @@ import {
   DialogContent, DialogActions, Menu, MenuItem, Switch,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
-import { Plus, ArrowLeft, MoreVertical, ClipboardCheck, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, ArrowLeft, MoreVertical, ClipboardCheck, Trash2, CheckCircle, XCircle, Filter, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
@@ -19,6 +19,7 @@ import { GRID_SX } from 'utils/gridStyles';
 const PERM = 'settings.tests';
 
 const API_BASE = Config.apiUrl;
+const FILTER_FETCH_PAGE_SIZE = 100;
 
 const getHeaders = (json = true) => {
   const h = {
@@ -60,12 +61,41 @@ const TestsManagement = () => {
   const [formData, setFormData] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [saving,   setSaving]   = useState(false);
-  const [search,   setSearch]   = useState('');
+  const [filters,  setFilters]  = useState({ test_type_id: '', test_fees: '', status: '' });
+  const [total,    setTotal]    = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
   // Exam types for the form dropdown — fetched from the test-types dropdown endpoint (active only)
   const [examTypes,    setExamTypes]    = useState([]);
   const [loadingTypes, setLoadingTypes] = useState(false);
+
+  const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ test_type_id: '', test_fees: '', status: '' });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const formatTestRows = (items, startIndex = 0) => items.map((item, i) => {
+    const ttObj = item.test_type && typeof item.test_type === 'object' ? item.test_type : null;
+    return {
+      id:         item.hash_id || item.id,
+      sr_no:      startIndex + i + 1,
+      hash_id:    item.hash_id || item.id,
+      test_type_id:   ttObj?.hash_id || item.test_type_id || item.test_type_hash_id || item.exam_test_type_id || '',
+      test_type_name: ttObj?.name || item.test_type_name
+        || (typeof item.test_type === 'string' ? item.test_type : '') || '',
+      test_name:  item.test_name  || item.name || '',
+      test_fees:  item.test_fees  ?? item.fees ?? 0,
+      status:     item.status     ?? 'active',
+    };
+  });
 
   const fetchExamTypes = async () => {
     setLoadingTypes(true);
@@ -83,28 +113,75 @@ const TestsManagement = () => {
     finally { setLoadingTypes(false); }
   };
 
-  const fetchAll = async () => {
+  const fetchTestPage = async (page, pageSize) => {
+    const res = await fetch(
+      `${API_BASE}/settings/tests?page=${page}&per_page=${pageSize}`,
+      { headers: getHeaders() }
+    );
+    const result = await res.json();
+    if (!(res.ok || result.success || result.status === 200)) {
+      throw new Error(result.message || 'Failed to load tests');
+    }
+
+    const payload = result.data ?? {};
+    const data = payload.data ?? result.data ?? [];
+    return {
+      data: Array.isArray(data) ? data : [],
+      total: Number(payload.total ?? 0),
+      lastPage: Number(payload.last_page ?? 0),
+    };
+  };
+
+  const fetchFilteredTests = async (page, pageSize) => {
+    const testTypeId = String(filters.test_type_id || '').trim();
+    const testFees = String(filters.test_fees || '').trim().toLowerCase();
+    const status = String(filters.status || '').trim().toLowerCase();
+    const firstPage = await fetchTestPage(1, FILTER_FETCH_PAGE_SIZE);
+    const totalRows = firstPage.total || firstPage.data.length;
+    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
+
+    const remainingPages = lastPage > 1
+      ? await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetchTestPage(i + 2, FILTER_FETCH_PAGE_SIZE)
+          )
+        )
+      : [];
+
+    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
+    const filteredRows = formatTestRows(allRows).filter((row) => {
+      if (testTypeId && String(row.test_type_id) !== testTypeId) return false;
+      if (testFees && !String(row.test_fees ?? '').toLowerCase().includes(testFees)) return false;
+      if (status && String(row.status || '').toLowerCase() !== status) return false;
+      return true;
+    });
+    const startIndex = page * pageSize;
+
+    setRows(
+      filteredRows
+        .slice(startIndex, startIndex + pageSize)
+        .map((row, i) => ({ ...row, sr_no: startIndex + i + 1 }))
+    );
+    setTotal(filteredRows.length);
+  };
+
+  const fetchAll = async (page = 0, pageSize = 15) => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/tests`, { headers: getHeaders() });
+      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+      if (hasActiveFilters) {
+        await fetchFilteredTests(page, pageSize);
+        return;
+      }
+
+      const res    = await fetch(`${API_BASE}/settings/tests?page=${page + 1}&per_page=${pageSize}`, { headers: getHeaders() });
       const result = await res.json();
-      if (result.success || result.status === 200) {
+      if (res.ok || result.success || result.status === 200) {
+        const payload = result.data ?? {};
         const data = result.data?.data ?? result.data ?? [];
-        setRows(data.map((item, i) => {
-          // The test-type relation may arrive as a nested object, a flat hash id, or just a name
-          const ttObj = item.test_type && typeof item.test_type === 'object' ? item.test_type : null;
-          return {
-            id:         item.hash_id || item.id,
-            sr_no:      i + 1,
-            hash_id:    item.hash_id,
-            test_type_id:   ttObj?.hash_id || item.test_type_id || item.test_type_hash_id || item.exam_test_type_id || '',
-            test_type_name: ttObj?.name || item.test_type_name
-              || (typeof item.test_type === 'string' ? item.test_type : '') || '',
-            test_name:  item.test_name  || item.name || '',
-            test_fees:  item.test_fees  ?? item.fees ?? 0,
-            status:     item.status     ?? 'active',
-          };
-        }));
+        const dataArray = Array.isArray(data) ? data : [];
+        setRows(formatTestRows(dataArray, page * pageSize));
+        setTotal(Number(payload.total ?? dataArray.length ?? 0));
       } else {
         toast.error(result.message || 'Failed to load tests');
       }
@@ -112,21 +189,19 @@ const TestsManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); fetchExamTypes(); }, []);
+  useEffect(() => { fetchExamTypes(); }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchAll(paginationModel.page, paginationModel.pageSize);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.test_type_id, filters.test_fees, filters.status]);
 
   // Resolve a test-type display name — prefer the name from the list, fall back to the dropdown options
   const typeNameById = (id) => examTypes.find((t) => t.hash_id === id)?.name || '';
 
-  const filtered = rows.filter((r) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      (r.test_type_name || typeNameById(r.test_type_id)).toLowerCase().includes(q) ||
-      String(r.test_fees).includes(q)
-    );
-  });
-
-  const total         = rows.length;
   const activeCount   = rows.filter((r) => (r.status ?? 'active') === 'active').length;
   const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
 
@@ -138,7 +213,7 @@ const TestsManagement = () => {
       if (res.ok || r.status === 200 || r.success) {
         toast.success(r.success || successMsg);
         setSelectionModel([]);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(r.message || 'Action failed');
       }
@@ -203,7 +278,7 @@ const TestsManagement = () => {
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Test fee updated successfully' : 'Test fee added successfully');
         setOpen(false);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || (isUpdate ? 'Failed to update test fee' : 'Failed to add test fee'));
       }
@@ -222,7 +297,11 @@ const TestsManagement = () => {
       if (res.ok || result.success || result.status === 200) {
         toast.success('Test deleted successfully');
         setSelectionModel((p) => p.filter((id) => id !== row.hash_id));
-        fetchAll();
+        if (rows.length === 1 && paginationModel.page > 0) {
+          setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
+        } else {
+          fetchAll(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Failed to delete test');
       }
@@ -247,7 +326,7 @@ const TestsManagement = () => {
       const r = await res.json();
       if (res.ok || r.status === 200 || r.success) {
         toast.success(`Test fee marked as ${newStatus}`);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         // Show backend validation messages if present (Laravel returns { errors: { field: [..] } })
         const fieldErrors = r.errors ? Object.values(r.errors).flat().join(', ') : '';
@@ -338,12 +417,67 @@ const TestsManagement = () => {
         </div>
 
         {/* TOOLBAR — bulk actions appear when rows are selected */}
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <div className="mb-0">
-            <TextField size="small" placeholder="Search tests..."
-              value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 320 }} />
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <Filter size={20} className="text-slate-600" />
+              <h3 className="text-sm font-semibold text-slate-900">Filter Exam Fee</h3>
+            </div>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
+              >
+                <X size={14} /> Clear All
+              </button>
+            )}
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <TextField
+              select
+              size="small"
+              label="Test Type"
+              name="test_type_id"
+              value={filters.test_type_id}
+              onChange={handleFilterChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            >
+              <MenuItem value="">All Test Type</MenuItem>
+              {examTypes.map((type) => (
+                <MenuItem key={type.hash_id} value={type.hash_id}>{type.name}</MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              size="small"
+              label="Test Fee"
+              name="test_fees"
+              placeholder="Filter by fee"
+              value={filters.test_fees}
+              onChange={handleFilterChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              select
+              size="small"
+              label="Status"
+              name="status"
+              value={filters.status}
+              onChange={handleFilterChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            >
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
           {selectionModel.length > 0 && (
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 flex-wrap">
               <span className="text-sm font-semibold text-slate-700 mr-1">{selectionModel.length} selected</span>
@@ -358,12 +492,14 @@ const TestsManagement = () => {
         </div>
 
         <TooltipDataGrid
-          rows={filtered}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
+          paginationMode="server"
+          rowCount={total}
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           loading={loading}
           autoHeight

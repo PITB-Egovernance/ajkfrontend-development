@@ -9,7 +9,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
-import { extractFilePath, getPersistedDraftFilePath } from 'utils';
+import { extractFilePath, getPersistedDraftFilePath, fetchPaginatedApiList } from 'utils';
 import './RequisitionForm.css';
 
 const steps = [
@@ -62,22 +62,21 @@ const RequisitionEdit = () => {
 
   const fetchDistricts = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/districts`, {
+      const list = await fetchPaginatedApiList(`${API_BASE}/settings/districts`, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
           Accept: 'application/json',
           'X-API-KEY': API_KEY,
         },
       });
-      const result = await response.json();
-      if (result.success) {
-        setDistrictOptions(
-          result.data.data.map((d) => ({
-            id: d.hash_id,
-            name: d.name
+      setDistrictOptions(
+        list
+          .filter((d) => (d.status ?? 'active') === 'active')
+          .map((d) => ({
+            id: d.hash_id || d.id,
+            name: d.name,
           }))
-        );
-      }
+      );
     } catch (error) {
       toast.error('Failed to load districts');
     }
@@ -85,25 +84,21 @@ const RequisitionEdit = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/departments?per_page=200`, {
+      const list = await fetchPaginatedApiList(`${API_BASE}/settings/departments`, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
           Accept: 'application/json',
           'X-API-KEY': API_KEY,
         },
       });
-      const result = await response.json();
-      if (result.success || result.status === 200) {
-        const list = result.data?.data ?? result.data ?? [];
-        setDepartmentOptions(
-          list
-            .filter((d) => (d.status ?? 'active') === 'active')
-            .map((d) => ({
-              id: d.hash_id || d.id,
-              name: d.department_name || d.name,
-            }))
-        );
-      }
+      setDepartmentOptions(
+        list
+          .filter((d) => (d.status ?? 'active') === 'active')
+          .map((d) => ({
+            id: d.hash_id || d.id,
+            name: d.department_name || d.name,
+          }))
+      );
     } catch (error) {
     }
   };
