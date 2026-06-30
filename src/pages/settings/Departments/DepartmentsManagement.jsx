@@ -13,11 +13,13 @@ import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { hasPermission } from 'utils/permissions';
 
 const PERM = 'settings.departments';
 
 const API_BASE = Config.apiUrl;
+const FILTER_FETCH_PAGE_SIZE = 100;
 
 const getHeaders = () => ({
   Authorization: `Bearer ${AuthService.getToken()}`,
@@ -52,7 +54,12 @@ const DepartmentsManagement = () => {
 
   const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search,  setSearch]  = useState('');
+  const [total,   setTotal]   = useState(0);
+  const [filters, setFilters] = useState({
+    department_name: '',
+    contact_person: '',
+    status: '',
+  });
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [anchorEl,    setAnchorEl]    = useState(null);
@@ -66,23 +73,139 @@ const DepartmentsManagement = () => {
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
 
-  const fetchAll = async () => {
+  const filterConfig = [
+    {
+      name: 'department_name',
+      label: 'Department Name',
+      type: 'text',
+      placeholder: 'Filter by department name',
+    },
+    {
+      name: 'contact_person',
+      label: 'Contact Person',
+      type: 'text',
+      placeholder: 'Filter by contact person',
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+    },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ department_name: '', contact_person: '', status: '' });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const formatDepartmentRows = (items, startIndex = 0) => items.map((item, i) => ({
+    id:              item.hash_id || item.id,
+    sr_no:           startIndex + i + 1,
+    hash_id:         item.hash_id,
+    department_name: item.department_name || item.name,
+    contact_person:  item.contact_person  || '',
+    phone_number:    item.phone_number    || '',
+    mobile_number:   item.mobile_number   || '',
+    status:          String(item.status || 'active').toLowerCase(),
+  }));
+
+  const matchesFilters = (row) => {
+    const departmentName = filters.department_name.trim().toLowerCase();
+    const contactPerson = filters.contact_person.trim().toLowerCase();
+    const status = filters.status.trim().toLowerCase();
+
+    if (departmentName && !String(row.department_name || '').toLowerCase().includes(departmentName)) {
+      return false;
+    }
+    if (contactPerson && !String(row.contact_person || '').toLowerCase().includes(contactPerson)) {
+      return false;
+    }
+    if (status && String(row.status || '').toLowerCase() !== status) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const fetchDepartmentPage = async (page, pageSize) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      per_page: String(pageSize),
+    });
+    const res = await fetch(`${API_BASE}/settings/departments?${params.toString()}`, { headers: getHeaders() });
+    const result = await res.json();
+    if (!(res.ok || result.success || result.status === 200)) {
+      throw new Error(result.message || 'Failed to load departments');
+    }
+
+    const payload = result.data ?? {};
+    const data = payload.data ?? result.data ?? [];
+
+    return {
+      data: Array.isArray(data) ? data : [],
+      total: Number(payload.total ?? 0),
+      lastPage: Number(payload.last_page ?? 0),
+    };
+  };
+
+  const fetchFilteredDepartments = async (page, pageSize) => {
+    const firstPage = await fetchDepartmentPage(1, FILTER_FETCH_PAGE_SIZE);
+    const totalRows = firstPage.total || firstPage.data.length;
+    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
+
+    const remainingPages = lastPage > 1
+      ? await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) =>
+            fetchDepartmentPage(i + 2, FILTER_FETCH_PAGE_SIZE)
+          )
+        )
+      : [];
+
+    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
+    const filteredRows = formatDepartmentRows(allRows).filter(matchesFilters);
+    const startIndex = page * pageSize;
+
+    setRows(
+      filteredRows
+        .slice(startIndex, startIndex + pageSize)
+        .map((row, i) => ({ ...row, sr_no: startIndex + i + 1 }))
+    );
+    setTotal(filteredRows.length);
+  };
+
+  const fetchAll = async (page = 0, pageSize = 15) => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/departments`, { headers: getHeaders() });
+      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
+      if (hasActiveFilters) {
+        await fetchFilteredDepartments(page, pageSize);
+        return;
+      }
+
+      const params = new URLSearchParams({
+        page: String(page + 1),
+        per_page: String(pageSize),
+      });
+
+      const res    = await fetch(`${API_BASE}/settings/departments?${params.toString()}`, { headers: getHeaders() });
       const result = await res.json();
-      if (result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
-        setRows(data.map((item, i) => ({
-          id:              item.hash_id || item.id,
-          sr_no:           i + 1,
-          hash_id:         item.hash_id,
-          department_name: item.department_name || item.name,
-          contact_person:  item.contact_person  || '',
-          phone_number:    item.phone_number    || '',
-          mobile_number:   item.mobile_number   || '',
-          status:          String(item.status || 'active').toLowerCase(),
-        })));
+      if (res.ok || result.success || result.status === 200) {
+        const payload = result.data ?? {};
+        const data = payload.data ?? result.data ?? [];
+        const dataArray = Array.isArray(data) ? data : [];
+
+        setRows(formatDepartmentRows(dataArray, page * pageSize));
+        setTotal(Number(payload.total ?? dataArray.length ?? 0));
       } else {
         toast.error(result.message || 'Failed to load departments');
       }
@@ -90,17 +213,13 @@ const DepartmentsManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
-
-
-  const filteredRows = rows.filter((r) => {
-    const q = search.toLowerCase();
-    return !q ||
-      r.department_name?.toLowerCase().includes(q) ||
-      r.contact_person?.toLowerCase().includes(q) ||
-      r.phone_number?.includes(q) ||
-      r.mobile_number?.includes(q);
-  });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchAll(paginationModel.page, paginationModel.pageSize);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.department_name, filters.contact_person, filters.status]);
 
   const openAdd = () => {
     setEditing(null);
@@ -149,7 +268,7 @@ const DepartmentsManagement = () => {
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Department updated successfully' : 'Department created successfully');
         setOpenModal(false);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || (isUpdate ? 'Failed to update department' : 'Failed to create department'));
       }
@@ -169,7 +288,11 @@ const DepartmentsManagement = () => {
       const result = await res.json();
       if (result.success || result.status === 200) {
         toast.success('Department deleted successfully');
-        fetchAll();
+        if (rows.length === 1 && paginationModel.page > 0) {
+          setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
+        } else {
+          fetchAll(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Failed to delete department');
       }
@@ -200,7 +323,7 @@ const DepartmentsManagement = () => {
 
       if (res.ok || result.success || result.status === 200) {
         toast.success(`Department marked as ${newStatus}`);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || 'Status update failed');
       }
@@ -246,7 +369,7 @@ const DepartmentsManagement = () => {
     }] : []),
   ];
 
-  if (loading) return <InlineLoader text="Loading departments..." variant="ring" size="lg" />;
+  if (loading && rows.length === 0) return <InlineLoader text="Loading departments..." variant="ring" size="lg" />;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
@@ -276,24 +399,28 @@ const DepartmentsManagement = () => {
 
         <div className="grid grid-cols-1 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-            <CardContent className="p-6"><p className="text-sm text-blue-700 font-medium">Total Departments</p><h2 className="text-3xl font-bold text-blue-900 mt-2">{rows.length}</h2></CardContent>
+            <CardContent className="p-6"><p className="text-sm text-blue-700 font-medium">Total Departments</p><h2 className="text-3xl font-bold text-blue-900 mt-2">{total}</h2></CardContent>
           </Card>
         </div>
 
-        <div className="mb-6">
-          <TextField size="small" placeholder="Search departments..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }}
-            sx={{ width: 340 }} />
-        </div>
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Departments"
+        />
 
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
+          paginationMode="server"
+          rowCount={total}
+          loading={loading}
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           autoHeight
           disableRowSelectionOnClick
