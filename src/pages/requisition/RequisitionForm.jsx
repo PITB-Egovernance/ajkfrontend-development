@@ -71,22 +71,21 @@ const RequisitionForm = () => {
 
   const fetchDistricts = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/districts`, {
+      const list = await fetchPaginatedApiList(`${API_BASE}/settings/districts`, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
           Accept: 'application/json',
           'X-API-KEY': API_KEY,
         },
       });
-      const result = await response.json();
-      if (result.success) {
-        setDistrictOptions(
-          result.data.data.map((d) => ({
-            id: d.hash_id,
-            name: d.name
+      setDistrictOptions(
+        list
+          .filter((d) => (d.status ?? 'active') === 'active')
+          .map((d) => ({
+            id: d.hash_id || d.id,
+            name: d.name,
           }))
-        );
-      }
+      );
     } catch (error) {
       toast.error('Failed to load districts');
     }
