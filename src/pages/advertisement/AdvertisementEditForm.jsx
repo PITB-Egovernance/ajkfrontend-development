@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Checkbox, TextField, MenuItem } from "@mui/material";
@@ -85,6 +85,92 @@ const getDesignationName = (designation) => {
   return String(designation);
 };
 
+const getJobKey = (job) => {
+  const value =
+    job?.hash_id ||
+    job?.id ||
+    job?.job_id ||
+    job?.job_detail_id ||
+    job?.requisition_id ||
+    "";
+
+  return value ? String(value) : "";
+};
+
+const getJobDepartmentName = (job) => {
+  if (!job) return "";
+  if (typeof job.department === "object" && job.department) {
+    return job.department.name || job.department.department_name || "";
+  }
+  return job.department || job.department_name || "";
+};
+
+const normalizeJobOption = (job) => {
+  const id = getJobKey(job);
+  if (!id) return null;
+
+  return {
+    id,
+    hash_id: job.hash_id || id,
+    designation: job.designation || job.post_title || job.title || `Requisition ${id}`,
+    department: getJobDepartmentName(job),
+    scale: job.scale?.name || job.scale?.scale_name || job.scale || "",
+    num_posts: Number(job.num_posts || job.pivot?.num_posts || 1) || 1,
+  };
+};
+
+const mergeJobOptions = (...lists) => {
+  const map = new Map();
+
+  lists.flat().forEach((job) => {
+    const option = normalizeJobOption(job);
+    if (!option) return;
+    map.set(option.id, { ...map.get(option.id), ...option });
+  });
+
+  return Array.from(map.values());
+};
+
+const buildAdvertisementChangeLogs = (originalJobs, selectedIds, jobConfigs) => {
+  const selectedSet = new Set(selectedIds.map(String));
+  const logs = [];
+
+  originalJobs.forEach((job) => {
+    const jobId = String(job.id);
+    const originalCount = Number(job.num_posts || 0);
+    const currentCount = Number(jobConfigs[jobId]?.numPosts || 0);
+
+    if (!selectedSet.has(jobId)) {
+      logs.push({
+        type: "deleted",
+        field: "job_deleted",
+        label: "Deleted Post",
+        job_id: jobId,
+        designation: job.designation,
+        before: `${job.designation} (${originalCount} post${originalCount === 1 ? "" : "s"})`,
+        after: "Deleted",
+        message: `${job.designation} deleted from advertisement. Previous requisition posts: ${originalCount}.`,
+      });
+      return;
+    }
+
+    if (currentCount && originalCount !== currentCount) {
+      logs.push({
+        type: "count_changed",
+        field: "num_posts",
+        label: "No. of Posts",
+        job_id: jobId,
+        designation: job.designation,
+        before: originalCount,
+        after: currentCount,
+        message: `${job.designation} posts changed from ${originalCount} to ${currentCount}.`,
+      });
+    }
+  });
+
+  return logs;
+};
+
 const getSecretaryName = async () => {
   const response = await fetch(`${Config.apiUrl}/settings/digital-signature?per_page=200`, {
     headers: authHeaders(),
@@ -141,6 +227,8 @@ const AdvertisementEditForm = () => {
   const [extendDateEnabled, setExtendDateEnabled] = useState(false);
   const [existingSecretaryName, setExistingSecretaryName] = useState("");
   const [existingPublishDate, setExistingPublishDate] = useState("");
+  const [availableJobs, setAvailableJobs] = useState([]);
+  const [originalJobs, setOriginalJobs] = useState([]);
   const [publishModal, setPublishModal] = useState({
     open: false,
     payload: null,
@@ -419,6 +507,56 @@ const AdvertisementEditForm = () => {
     "";
   const [jobTitles, setJobTitles] = useState({});
   const [selectedIds, setSelectedIds] = useState([]);
+  const [originalSelectedIds, setOriginalSelectedIds] = useState([]);
+
+  const selectedJobOptions = useMemo(
+    () => availableJobs.filter((job) => selectedIds.includes(String(job.id))),
+    [availableJobs, selectedIds]
+  );
+
+  const advertisementChangeLogs = useMemo(
+    () => buildAdvertisementChangeLogs(originalJobs, selectedIds, jobConfigs),
+    [originalJobs, selectedIds, jobConfigs]
+  );
+
+  const updatePostCount = (jobId, value) => {
+    const numericValue = Math.max(1, Number(value) || 1);
+
+    setJobConfigs((prev) => ({
+      ...prev,
+      [jobId]: {
+        ...prev[jobId],
+        numPosts: numericValue,
+      },
+    }));
+
+    setAvailableJobs((prev) =>
+      prev.map((job) =>
+        String(job.id) === String(jobId)
+          ? { ...job, num_posts: numericValue }
+          : job
+      )
+    );
+  };
+
+  const removeSelectedPost = (jobId) => {
+    if (selectedIds.length === 1) {
+      toast.error("Advertisement must have at least one job");
+      return;
+    }
+
+    setSelectedIds((prev) => prev.filter((id) => String(id) !== String(jobId)));
+    setJobConfigs((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+    setJobTitles((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+  };
 
   useEffect(() => {
     const fetchAdvertisement = async () => {
@@ -461,7 +599,8 @@ const AdvertisementEditForm = () => {
             const jTitles = {};
             const jConfigs = {};
             data.job_details.forEach((job) => {
-              const jobId = String(job.hash_id || job.id);
+              const jobId = getJobKey(job);
+              if (!jobId) return;
               const subjectRows = getJobSubjectRows(data, job);
               const subjectIds = subjectRows
                 .map(getSubjectIdFromRow)
@@ -486,11 +625,16 @@ const AdvertisementEditForm = () => {
                   "",
                 subjectIds,
                 cceStage: savedCceStage,
+                numPosts: Number(job.num_posts || job.pivot?.num_posts || 1) || 1,
               };
             });
             setSelectedIds(jIds);
+            setOriginalSelectedIds(jIds);
             setJobTitles(jTitles);
             setJobConfigs(jConfigs);
+            const jobOptions = mergeJobOptions(data.job_details);
+            setAvailableJobs(jobOptions);
+            setOriginalJobs(jobOptions);
           }
         } else {
           toast.error("Failed to load advertisement details");
@@ -629,6 +773,15 @@ const AdvertisementEditForm = () => {
       return;
     }
 
+    if (!selectedIds.length) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        job_ids: ["Please keep at least one post in the advertisement"],
+      }));
+      toast.error("Please keep at least one post in the advertisement");
+      return;
+    }
+
     const filteredTerms = termsConditions.filter((t) => t.trim().length > 0);
 
     if (filteredTerms.length === 0) {
@@ -667,15 +820,26 @@ const AdvertisementEditForm = () => {
     const testTypesPayload = {};
     const subjectsPayload = {};
     const cceStagesPayload = {};
+    const postCountsPayload = {};
+    const removedJobIds = originalSelectedIds.filter(
+      (jobId) => !selectedIds.includes(jobId)
+    );
+    const selectedJobDetailsPayload = selectedIds.map((jobId) => ({
+      id: jobId,
+      job_id: jobId,
+      hash_id: jobId,
+      num_posts: Math.max(1, Number(jobConfigs[jobId]?.numPosts) || 1),
+    }));
     const validSubjectHashIds = new Set(
       subjects.map((subject) => String(subject.hash_id))
     );
 
-    Object.keys(jobConfigs).forEach((jobId) => {
+    selectedIds.forEach((jobId) => {
       const config = jobConfigs[jobId] || {};
 
       feesPayload[jobId] = config.fee || "";
       testTypesPayload[jobId] = config.testType || "";
+      postCountsPayload[jobId] = Math.max(1, Number(config.numPosts) || 1);
 
       subjectsPayload[jobId] = isWrittenTestType(config.testType)
         ? subjects
@@ -719,10 +883,25 @@ const AdvertisementEditForm = () => {
       terms_conditions: filteredTerms,
       status: status === "active" ? "published" : status,
       extend_date: shouldUseExtendDate ? extendDate : null,
+      job_ids: selectedIds,
+      job_ids_csv: selectedIds.join(","),
+      remove_job_ids: removedJobIds,
+      removed_job_ids: removedJobIds,
+      deleted_job_ids: removedJobIds,
+      delete_job_ids: removedJobIds,
       job_fees: JSON.stringify(feesPayload),
       job_test_types: JSON.stringify(testTypesPayload),
       job_subjects: JSON.stringify(subjectsPayload),
       job_cce_stages: JSON.stringify(cceStagesPayload),
+      job_post_counts: postCountsPayload,
+      job_num_posts: postCountsPayload,
+      job_counts: postCountsPayload,
+      post_counts: postCountsPayload,
+      jobs: selectedJobDetailsPayload,
+      job_details: selectedJobDetailsPayload,
+      change_logs: advertisementChangeLogs,
+      advertisement_change_logs: advertisementChangeLogs,
+      change_logs_json: JSON.stringify(advertisementChangeLogs),
     };
 
     if (status === "active" && originalStatus === "active") {
@@ -947,6 +1126,130 @@ const AdvertisementEditForm = () => {
                           : fieldErrors?.extend_date || "Advertisement stays open until this date, beyond the closing date"
                       }
                     />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="row" style={{ margin: 0 }}>
+              <div className="col-md-12">
+                <h6 className="section-title">Advertisement Posts</h6>
+              </div>
+            </div>
+
+            <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
+              <div className="mb-4 flex flex-col gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900">
+                    Jobs included in this advertisement
+                  </p>
+                  <p className="mt-1 text-xs text-emerald-700">
+                    Change total posts or remove a job from this advertisement.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm">
+                  {selectedIds.reduce(
+                    (total, jobId) =>
+                      total + (Number(jobConfigs[jobId]?.numPosts) || 0),
+                    0
+                  )}{" "}
+                  total posts
+                </span>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="hidden md:grid md:grid-cols-[minmax(0,1fr)_140px_56px] gap-3 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase text-slate-600">
+                  <span>Post</span>
+                  <span>No. of Posts</span>
+                  <span className="text-center">Action</span>
+                </div>
+                {selectedJobOptions.length ? (
+                  selectedJobOptions.map((job) => {
+                    const jobId = String(job.id);
+                    return (
+                      <div
+                        key={jobId}
+                        className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_140px_56px] gap-3 items-center border-t border-slate-100 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-800">
+                            {job.designation}
+                          </p>
+                          <p className="mt-1 truncate text-xs text-slate-500">
+                            {[job.department, job.scale].filter(Boolean).join(" | ") || `Job ID: ${jobId}`}
+                          </p>
+                        </div>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          value={jobConfigs[jobId]?.numPosts || job.num_posts || 1}
+                          onChange={(e) => updatePostCount(jobId, e.target.value)}
+                          inputProps={{ min: 1, step: 1 }}
+                          size="small"
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-prev flex justify-center items-center"
+                          onClick={() => removeSelectedPost(jobId)}
+                          title="Remove post"
+                          disabled={selectedIds.length === 1}
+                          style={{ height: 40, padding: "0 12px" }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="px-4 py-6 text-sm text-slate-500">
+                    No posts selected for this advertisement.
+                  </div>
+                )}
+              </div>
+
+              {!!fieldErrors?.job_ids && (
+                <div style={{ marginTop: 8, color: "#dc3545", fontSize: 12 }}>
+                  {Array.isArray(fieldErrors.job_ids)
+                    ? fieldErrors.job_ids.join(", ")
+                    : fieldErrors.job_ids}
+                </div>
+              )}
+
+              <div className="mt-5 rounded-xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-slate-800">Change Logs</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Before values are requisition posts; after values are advertisement edited posts.
+                  </p>
+                </div>
+                {advertisementChangeLogs.length ? (
+                  <div className="divide-y divide-slate-100">
+                    {advertisementChangeLogs.map((log, index) => (
+                      <div key={`${log.job_id}-${index}`} className="grid grid-cols-1 gap-2 px-4 py-3 md:grid-cols-[minmax(0,1fr)_140px_140px] md:items-center">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-800">
+                            {log.designation}
+                          </p>
+                          <p className="text-xs text-slate-500">{log.label}</p>
+                        </div>
+                        <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          <span className="block font-semibold">Before</span>
+                          {log.before}
+                        </div>
+                        <div className={`rounded-lg px-3 py-2 text-xs ${
+                          log.type === "deleted"
+                            ? "bg-red-50 text-red-700"
+                            : "bg-emerald-50 text-emerald-700"
+                        }`}>
+                          <span className="block font-semibold">After</span>
+                          {log.after}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 py-4 text-sm text-slate-500">
+                    No post count or deleted post changes yet.
                   </div>
                 )}
               </div>

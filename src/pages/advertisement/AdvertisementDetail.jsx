@@ -385,8 +385,49 @@ const AdvertisementDetail = () => {
     return parts.join(' | ');
   };
 
+  const getServiceRuleText = (job) => {
+    const value =
+      job.service_rules_text ||
+      job.service_rule_text ||
+      job.requisition?.service_rules_text ||
+      job.requisition?.service_rule_text ||
+      job.step1?.service_rules_text ||
+      job.step1?.service_rule_text ||
+      job.job_detail?.service_rules_text ||
+      job.job_detail?.service_rule_text ||
+      '';
+
+    return String(value || '').trim();
+  };
+
   const getJobChangeLogs = (job) => {
-    const logs = job.change_logs || job.change_log_details || job.change_log || [];
+    const normalizeLogList = (value) => {
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string' && value.trim()) {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [value];
+        } catch {
+          return [value];
+        }
+      }
+      return [];
+    };
+
+    const adLevelLogs =
+      advertisement?.advertisement_change_logs ||
+      advertisement?.change_logs ||
+      advertisement?.change_log ||
+      advertisement?.change_logs_json ||
+      [];
+    const logs = [
+      ...normalizeLogList(job.change_logs),
+      ...normalizeLogList(job.change_log_details),
+      ...normalizeLogList(job.change_log),
+      ...normalizeLogList(adLevelLogs).filter(
+        (log) => String(log?.job_id || '') === String(job.hash_id || job.id || '')
+      ),
+    ];
 
     if (Array.isArray(logs)) {
       return logs
@@ -408,6 +449,27 @@ const AdvertisementDetail = () => {
 
     if (typeof logs === 'string' && logs.trim()) {
       return [{ label: 'Changed Field', before: 'N/A', after: 'N/A', message: logs }];
+    }
+
+    return [];
+  };
+
+  const getAdvertisementChangeLogs = () => {
+    const raw =
+      advertisement?.advertisement_change_logs ||
+      advertisement?.change_logs ||
+      advertisement?.change_log ||
+      advertisement?.change_logs_json ||
+      [];
+
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
     }
 
     return [];
@@ -521,6 +583,13 @@ const AdvertisementDetail = () => {
   }
 
   const termsList = parseTerms(advertisement.terms_conditions);
+  const advertisementChangeLogs = getAdvertisementChangeLogs();
+  const deletedJobLogs = advertisementChangeLogs.filter(
+    (log) => log?.type === 'deleted' || log?.field === 'job_deleted'
+  );
+  const postCountLogs = advertisementChangeLogs.filter(
+    (log) => log?.type === 'count_changed' || log?.field === 'num_posts'
+  );
 
   // Running serial number across ALL departments/posts (1, 2, 3 ...).
   // Reset on every render; the JSX maps execute top-to-bottom in order.
@@ -721,6 +790,17 @@ const AdvertisementDetail = () => {
         }
         table.adv-req td.desc-col { text-align: left; }
         table.adv-req td.qual-col { text-align: justify; }
+        .adv-service-rule-text {
+          display: block;
+          margin-top: 6px;
+          padding-top: 6px;
+          border-top: 1px dashed #cdd3cd;
+          white-space: pre-wrap;
+        }
+        .adv-service-rule-text b {
+          color: #14532d;
+          font-weight: 700;
+        }
         table.adv-req th:first-child,
         table.adv-req td:first-child {
           border-left: none;
@@ -1031,6 +1111,47 @@ const AdvertisementDetail = () => {
         .adv-new-value {
           background: #ecfdf5;
           color: #14532d;
+        }
+        .adv-change-log {
+          margin: 10px 0 12px;
+          border: 1px solid #cdd3cd;
+          background: #fff;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+        .adv-change-log-title {
+          background: #f4f7f4;
+          border-bottom: 1px solid #cdd3cd;
+          color: #14532d;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .08em;
+          padding: 5px 8px;
+          text-transform: uppercase;
+        }
+        .adv-change-log-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 135px 135px;
+          gap: 6px;
+          padding: 6px 8px;
+          border-top: 1px solid #edf0ed;
+          font-size: 10.5px;
+        }
+        .adv-change-log-row:first-of-type {
+          border-top: none;
+        }
+        .adv-change-log-row b {
+          color: #14532d;
+        }
+        .adv-change-before {
+          color: #92400e;
+        }
+        .adv-change-after {
+          color: #047857;
+        }
+        .adv-change-deleted {
+          color: #b91c1c;
+          font-weight: 700;
         }
         .adv-signoff {
           margin-top: 26px;
@@ -1369,6 +1490,7 @@ const AdvertisementDetail = () => {
                           .map((mp) => `${getDistrictName(mp.district)} ${mp.post || ''}`.trim())
                           .join(', ')
                       : districtOptions.map((d) => d.name).join(', ') || 'All AJK Districts';
+                  const serviceRuleText = getServiceRuleText(job);
 
                   return (
                     <article key={jobIdx} className="adv-post">
@@ -1454,6 +1576,11 @@ const AdvertisementDetail = () => {
 
                             <td className="qual-col">
                               {renderChangedValue(getQualificationText(job), qualificationChange)}
+                              {serviceRuleText && (
+                                <span className="adv-service-rule-text">
+                                  <b>Service Rule:</b> {serviceRuleText}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         </tbody>
@@ -1477,6 +1604,26 @@ const AdvertisementDetail = () => {
                 })}
             </section>
           ))}
+
+          {(postCountLogs.length > 0 || deletedJobLogs.length > 0) && (
+            <section className="adv-change-log">
+              <div className="adv-change-log-title">Change Logs</div>
+              {[...postCountLogs, ...deletedJobLogs].map((log, index) => (
+                <div key={`${log.job_id || index}-${index}`} className="adv-change-log-row">
+                  <div>
+                    <b>{log.designation || log.label || 'Post'}</b>
+                    <div>{log.message || log.label}</div>
+                  </div>
+                  <div className="adv-change-before">
+                    <b>Before:</b> {log.before ?? 'N/A'}
+                  </div>
+                  <div className={log.type === 'deleted' || log.field === 'job_deleted' ? 'adv-change-deleted' : 'adv-change-after'}>
+                    <b>After:</b> {log.after ?? 'N/A'}
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
 
           <h3 className="adv-block-title">Terms &amp; Conditions</h3>
 
