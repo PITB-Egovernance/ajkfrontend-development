@@ -44,6 +44,7 @@ const QualificationsManagement = () => {
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
   const [form, setForm] = useState({
     qualification_name: '',
+    qualification_type: '',
     status: 'active',
   });
   const [saving,   setSaving]   = useState(false);
@@ -62,6 +63,7 @@ const QualificationsManagement = () => {
           sr_no:    i + 1,
           hash_id:  item.hash_id,
           name:     item.qualification_name || item.name,
+          type:     String(item.type || 'required').toLowerCase(),
           status:   String(item.status || 'active').toLowerCase(),
         })));
       } else {
@@ -80,7 +82,7 @@ const QualificationsManagement = () => {
 
   const openAdd = () => {
     setEditing(null);
-    setForm({ qualification_name: '', status: 'active' });
+    setForm({ qualification_name: '', qualification_type: '', status: 'active' });
     setOpen(true);
   };
 
@@ -88,6 +90,7 @@ const QualificationsManagement = () => {
     setEditing(row);
     setForm({
       qualification_name: row.name || '',
+      qualification_type: String(row.type || 'required').toLowerCase(),
       status: String(row.status || 'active').toLowerCase(),
     });
     setOpen(true);
@@ -95,6 +98,7 @@ const QualificationsManagement = () => {
 
   const handleSubmit = async () => {
     if (!form.qualification_name.trim()) { toast.error('Qualification name is required'); return; }
+    if (!form.qualification_type) { toast.error('Please select the qualification type'); return; }
     setSaving(true);
     try {
       const isUpdate = !!editing;
@@ -106,6 +110,7 @@ const QualificationsManagement = () => {
         headers: getHeaders(),
         body: JSON.stringify({
           qualification_name: form.qualification_name.trim(),
+          type: form.qualification_type,
           status: form.status,
         }),
       });
@@ -146,7 +151,7 @@ const QualificationsManagement = () => {
       const res    = await fetch(`${API_BASE}/settings/qualifications/${row.hash_id || row.id}/update`, {
         method: 'PUT',
         headers: getHeaders(),
-        body: JSON.stringify({ qualification_name: row.name, status: newStatus }),
+        body: JSON.stringify({ qualification_name: row.name, type: row.type, status: newStatus }),
       });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
@@ -161,6 +166,13 @@ const QualificationsManagement = () => {
   const columns = [
     { field: 'sr_no', headerName: '#',             width: 60 },
     { field: 'name',  headerName: 'Qualification',  flex: 1 },
+    {
+      field: 'type',
+      headerName: 'Type',
+      width: 150,
+      renderCell: (p) =>
+        String(p.value).toLowerCase() === 'professional' ? 'Professional' : 'Required',
+    },
     {
       field: 'status',
       headerName: 'Status',
@@ -249,6 +261,22 @@ const QualificationsManagement = () => {
               }))}
               placeholder="e.g. Bachelor's Degree"
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} />
+            <TextField
+              select
+              fullWidth
+              label="Type"
+              margin="normal"
+              size="small"
+              value={form.qualification_type}
+              onChange={(e) => setForm((current) => ({
+                ...current,
+                qualification_type: e.target.value,
+              }))}
+            >
+              <MenuItem value="" disabled>— Select Type —</MenuItem>
+              <MenuItem value="required">Required</MenuItem>
+              <MenuItem value="professional">Professional</MenuItem>
+            </TextField>
             <TextField
               select
               fullWidth

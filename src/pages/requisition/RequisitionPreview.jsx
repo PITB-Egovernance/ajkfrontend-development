@@ -439,6 +439,29 @@ const RequisitionPreview = () => {
                   </TableCell>
                 </TableRow>
                 <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Professional Qualification</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const raw = step2.professional_qualification || '';
+                      const qualNames = Array.isArray(raw)
+                        ? raw
+                        : raw.split(',').map(q => q.trim()).filter(Boolean);
+                      if (qualNames.length > 0) {
+                        return (
+                          <div className="flex flex-wrap gap-1.5">
+                            {qualNames.map((name, idx) => (
+                              <span key={idx} className="inline-block bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-sm font-medium">
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return 'N/A';
+                    })()}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Equivalent Qualification</TableCell>
                   <TableCell>{step2.equivalent_qualification || 'N/A'}</TableCell>
                 </TableRow>

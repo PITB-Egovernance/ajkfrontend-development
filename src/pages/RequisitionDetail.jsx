@@ -386,6 +386,7 @@ const RequisitionDetail = () => {
             if (direct && typeof direct === 'object') {
               return {
                 academic_qualification:   direct.academic_qualification   ?? step2.academic_qualification,
+                professional_qualification: direct.professional_qualification ?? step2.professional_qualification,
                 equivalent_qualification:  direct.equivalent_qualification ?? step2.equivalent_qualification,
                 authority_certificate:     direct.authority_certificate    ?? step2.authority_certificate,
                 degree_equivalence:        direct.degree_equivalence       ?? step2.degree_equivalence,
@@ -398,6 +399,7 @@ const RequisitionDetail = () => {
             }
             return {
               academic_qualification:   data.academic_qualification   ?? step2.academic_qualification,
+              professional_qualification: data.professional_qualification ?? step2.professional_qualification,
               equivalent_qualification:  data.equivalent_qualification ?? step2.equivalent_qualification,
               authority_certificate:     data.authority_certificate    ?? step2.authority_certificate,
               degree_equivalence:        data.degree_equivalence       ?? step2.degree_equivalence,
@@ -582,8 +584,8 @@ const RequisitionDetail = () => {
           : 'No syllabus file uploaded yet'],
         [
           '4',
-          'Qualification Required:\n(i) Required Qualification\n(ii) Equivalent qualification authority\n(iii) Name degree of equivalence\n(iv) Any other Qualification\n(v) Training with institute name',
-          `(i) ${requisition.qualification?.academic_qualification || 'N/A'}\n(ii) ${requisition.qualification?.equivalent_qualification || 'N/A'}\n(iii) ${requisition.qualification?.degree_equivalence || 'N/A'}\n(iv) ${requisition.qualification?.any_other_qualification || 'N/A'}\n(v) ${requisition.qualification?.training_institute || 'N/A'}`
+          'Qualification Required:\n(i) Required Qualification\n(ii) Professional Qualification\n(iii) Equivalent qualification authority\n(iv) Name degree of equivalence\n(v) Any other Qualification\n(vi) Training with institute name',
+          `(i) ${requisition.qualification?.academic_qualification || 'N/A'}\n(ii) ${requisition.qualification?.professional_qualification || 'N/A'}\n(iii) ${requisition.qualification?.equivalent_qualification || 'N/A'}\n(iv) ${requisition.qualification?.degree_equivalence || 'N/A'}\n(v) ${requisition.qualification?.any_other_qualification || 'N/A'}\n(vi) ${requisition.qualification?.training_institute || 'N/A'}`
         ],
         [
           '5',
@@ -809,24 +811,29 @@ const RequisitionDetail = () => {
         <table style={styles.table}>
           <tbody>
             <tr>
-              <th style={styles.number}>1</th>
-              <td style={styles.tableCell}>
-                (i) Designation or nomenclature of the Post(s)<span style={styles.fieldLine}></span>
-                (ii) Scale of the Post.<span style={styles.fieldLine}></span>
-                (iii) Department & Class of Service<span style={styles.fieldLine}></span>
-                (iv) Percentage of quota fixed for direct recruitment viz-a-viz promotion quota (Quote Rules)<span style={styles.fieldLine}></span>
-                (v) Number of posts to be filled through direct recruitment as (iv) above on permanent basis<span style={styles.fieldLine}></span>
-                (vi) Date(s) of availability of vacancy(s) OR Period from __________ to __________
-                <p style={{ marginBottom: '10px' }}></p>
-              </td>
-              <td style={styles.tableCellValue}>
-                (i)&nbsp;&nbsp;{requisition.designation || 'N/A'}<span style={styles.fieldLine}></span>
-                (ii)&nbsp;&nbsp;{getScaleName(requisition.scale)}<span style={styles.fieldLine}></span>
-                (iii)&nbsp;&nbsp;{(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}<span style={styles.fieldLine}></span>
-                (iv)&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_percentage)} (Promotion)&nbsp;&nbsp;|&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_promotion)} (Direct)<span style={styles.fieldLine}></span>
-                (v)&nbsp;&nbsp;{requisition.num_posts || 'N/A'}<span style={styles.fieldLine}></span>
-                (vi)&nbsp;&nbsp;Details in Annex "A"<span className=""></span>
-              </td>
+              <th style={styles.number} rowSpan={6}>1</th>
+              <td style={styles.itemLabel}>(i) Designation or nomenclature of the Post(s)</td>
+              <td style={styles.itemValue}>(i)&nbsp;&nbsp;{requisition.designation || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(ii) Scale of the Post.</td>
+              <td style={styles.itemValue}>(ii)&nbsp;&nbsp;{getScaleName(requisition.scale)}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(iii) Department & Class of Service</td>
+              <td style={styles.itemValue}>(iii)&nbsp;&nbsp;{(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(iv) Percentage of quota fixed for direct recruitment viz-a-viz promotion quota (Quote Rules)</td>
+              <td style={styles.itemValue}>(iv)&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_percentage)} (Promotion)&nbsp;&nbsp;|&nbsp;&nbsp;{getQuotaDisplay(requisition.quota_promotion)} (Direct)</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(v) Number of posts to be filled through direct recruitment as (iv) above on permanent basis</td>
+              <td style={styles.itemValue}>(v)&nbsp;&nbsp;{requisition.num_posts || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(vi) Date(s) of availability of vacancy(s) OR Period from __________ to __________</td>
+              <td style={styles.itemValue}>(vi)&nbsp;&nbsp;Details in Annex "A"</td>
             </tr>
 
             <tr>
@@ -857,41 +864,55 @@ const RequisitionDetail = () => {
             </tr>
 
             <tr>
-              <th style={styles.number}>4</th>
-              <td style={styles.tableCell}>
-                <b>Qualification Required:</b><br />
-                (i) Required Qualification<span style={styles.fieldLine}></span>
-                (ii) In case of equivalent qualification is accepted, name the authority for issuing the equivalent certificate.<span style={styles.fieldLine}></span>
-                (iii) Name degree of equivalence.<span style={styles.fieldLine}></span>
-                (iv) Any other Qualification under Rules.<span style={styles.fieldLine}></span>
-                (v) Training with the name of training institute.
-                <p style={{ marginBottom: '10px' }}></p>
-              </td>
-              <td style={styles.tableCellValue}>
-                <br />
-                (i)&nbsp;&nbsp;{requisition.qualification?.academic_qualification || 'N/A'}<span style={styles.fieldLine}></span>
-                (ii)&nbsp;&nbsp;{requisition.qualification?.equivalent_qualification || 'N/A'}<span style={{ ...styles.fieldLine, marginTop: '22px' }}></span>
-                (iii)&nbsp;&nbsp;{requisition.qualification?.degree_equivalence || 'N/A'}<span style={styles.fieldLine}></span>
-                (iv)&nbsp;&nbsp;{requisition.qualification?.any_other_qualification || 'N/A'}<span style={styles.fieldLine}></span>
-                (v)&nbsp;&nbsp;{requisition.qualification?.training_institute || 'N/A'}<span></span>
-              </td>
+              <th style={styles.number} rowSpan={7}>4</th>
+              <td style={styles.itemLabel}><b>Qualification Required:</b></td>
+              <td style={styles.itemValue}></td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(i) Required Qualification</td>
+              <td style={styles.itemValue}>(i)&nbsp;&nbsp;{requisition.qualification?.academic_qualification || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(ii) Professional Qualification</td>
+              <td style={styles.itemValue}>(ii)&nbsp;&nbsp;{requisition.qualification?.professional_qualification || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(iii) In case of equivalent qualification is accepted, name the authority for issuing the equivalent certificate.</td>
+              <td style={styles.itemValue}>(iii)&nbsp;&nbsp;{requisition.qualification?.equivalent_qualification || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(iv) Name degree of equivalence.</td>
+              <td style={styles.itemValue}>(iv)&nbsp;&nbsp;{requisition.qualification?.degree_equivalence || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(v) Any other Qualification under Rules.</td>
+              <td style={styles.itemValue}>(v)&nbsp;&nbsp;{requisition.qualification?.any_other_qualification || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(vi) Training with the name of training institute.</td>
+              <td style={styles.itemValue}>(vi)&nbsp;&nbsp;{requisition.qualification?.training_institute || 'N/A'}</td>
             </tr>
 
             <tr>
-              <th style={styles.number}>5</th>
-              <td style={styles.tableCell}>
-                <b>Experience:</b><br />
-                (i) What type of experience required<span style={styles.fieldLine}></span>
-                (ii) Length of experience<span style={styles.fieldLine}></span>
-                (iii) Minimum required qualification after acquisition of which the prescribed experience shall be counted<span style={styles.fieldLine}></span>
-                <br /><b>Note:</b> Only those experience certificates shall be accepted, which shall be in accordance with Rule Notification # AJKPSC/1-2017/1077-10782 approved by AJK PSC. (Rules Attached)
-              </td>
-              <td style={styles.tableCellValue}>
-                <br />
-                (i)&nbsp;&nbsp;{requisition.qualification?.experience_type || 'N/A'}<span style={styles.fieldLine}></span>
-                (ii)&nbsp;&nbsp;{requisition.qualification?.experience_length || 'N/A'}<span style={styles.fieldLine}></span>
-                (iii)&nbsp;&nbsp;{requisition.qualification?.min_qualification || 'N/A'}<span style={styles.fieldLine}></span>
-              </td>
+              <th style={styles.number} rowSpan={5}>5</th>
+              <td style={styles.itemLabel}><b>Experience:</b></td>
+              <td style={styles.itemValue}></td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(i) What type of experience required</td>
+              <td style={styles.itemValue}>(i)&nbsp;&nbsp;{requisition.qualification?.experience_type || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(ii) Length of experience</td>
+              <td style={styles.itemValue}>(ii)&nbsp;&nbsp;{requisition.qualification?.experience_length || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}>(iii) Minimum required qualification after acquisition of which the prescribed experience shall be counted</td>
+              <td style={styles.itemValue}>(iii)&nbsp;&nbsp;{requisition.qualification?.min_qualification || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style={styles.itemLabel}><b>Note:</b> Only those experience certificates shall be accepted, which shall be in accordance with Rule Notification # AJKPSC/1-2017/1077-10782 approved by AJK PSC. (Rules Attached)</td>
+              <td style={styles.itemValue}></td>
             </tr>
 
             <tr>
@@ -1109,6 +1130,20 @@ const styles = {
     width: '50%',
   },
   tableCellValue: {
+    border: '1px solid #000',
+    padding: '6px 8px',
+    verticalAlign: 'top',
+    fontSize: '14px',
+    width: '45%',
+  },
+  itemLabel: {
+    border: '1px solid #000',
+    padding: '6px 8px',
+    verticalAlign: 'top',
+    fontSize: '14px',
+    width: '50%',
+  },
+  itemValue: {
     border: '1px solid #000',
     padding: '6px 8px',
     verticalAlign: 'top',
