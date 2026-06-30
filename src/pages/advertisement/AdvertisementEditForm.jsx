@@ -15,11 +15,6 @@ const FALLBACK_TESTS = [
   { id: '2', test_type_id: '2', test_name: 'Written Exam', test_fees: 1010 },
 ];
 
-const CCE_STAGES = [
-  { value: 'screening', label: 'Screening' },
-  { value: 'written_test', label: 'Written Test' },
-];
-
 const STATUS_OPTIONS = [
   // { value: 'pending', label: 'Pending' },
   { value: 'active', label: 'Published' },
@@ -169,6 +164,9 @@ const serializeDistrictRows = (rows = []) =>
       post: row.post || "",
       quota: row.quota || "",
     }));
+
+const getDistrictPostTotal = (rows = []) =>
+  rows.reduce((total, row) => total + (Number(row.post) || 0), 0);
 
 const normalizeJobOption = (job) => {
   const id = getJobKey(job);
@@ -324,7 +322,6 @@ const AdvertisementEditForm = () => {
   const [jobConfigs, setJobConfigs] = useState({});
   const [examTests, setExamTests] = useState(FALLBACK_TESTS);
   const [testTypes, setTestTypes] = useState([]);
-  const [subjects, setSubjects] = useState([]);
   const [status, setStatus] = useState("pending");
   const [originalStatus, setOriginalStatus] = useState("pending");
   const [extendDate, setExtendDate] = useState("");
@@ -344,72 +341,6 @@ const AdvertisementEditForm = () => {
     secretaryLoading: false,
     secretaryError: "",
   });
-
-
-  // Fetch subjects for Written Exam dropdown
-  useEffect(() => {
-    let aborted = false;
-
-    (async () => {
-      try {
-        const headers = {
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          Accept: "application/json",
-          "X-API-KEY": Config.apiKey,
-        };
-
-        const fetchPage = async (page) => {
-          const res = await fetch(
-            `${Config.apiUrl}/settings/subjects?page=${page}&per_page=100`,
-            { method: "GET", headers }
-          );
-          const result = await res.json();
-
-          if (!res.ok) {
-            throw new Error(result.message || "Failed to load subjects");
-          }
-
-          return result.data ?? {};
-        };
-
-        const firstPage = await fetchPage(1);
-        const lastPage = Number(firstPage.last_page) || 1;
-        const remainingPages = await Promise.all(
-          Array.from({ length: Math.max(lastPage - 1, 0) }, (_, index) =>
-            fetchPage(index + 2)
-          )
-        );
-
-        if (aborted) return;
-
-        const list = [firstPage, ...remainingPages].flatMap((page) =>
-          Array.isArray(page.data) ? page.data : []
-        );
-
-        setSubjects(
-          list
-            .filter(
-              (subject) =>
-                String(subject.status || "active").toLowerCase() === "active"
-            )
-            .filter((subject) => subject.hash_id)
-            .map((subject) => ({
-              hash_id: String(subject.hash_id),
-              id: subject.id ? String(subject.id) : "",
-              name: subject.name || subject.subject_name || subject.title || "",
-              total_marks: Number(subject.total_marks) || 0,
-            }))
-            .filter((subject) => subject.hash_id && subject.name)
-        );
-      } catch {
-        setSubjects([]);
-      }
-    })();
-
-    return () => {
-      aborted = true;
-    };
-  }, []);
 
   // Fetch the active test types for the dropdown
   useEffect(() => {
@@ -483,76 +414,6 @@ const AdvertisementEditForm = () => {
   };
 
 
-  const getTestTypeName = (typeId) => {
-    const option = testTypeOptions.find(
-      (t) => String(t.hash_id) === String(typeId)
-    );
-    return (option?.name || "").toLowerCase().trim();
-  };
-
-  const isWrittenTestType = (typeId) => {
-    const name = getTestTypeName(typeId);
-    return name.includes("written") && !name.includes("combined");
-  };
-
-  const isCombinedCompetitiveExam = (typeId) => {
-    const name = getTestTypeName(typeId);
-    return (
-      name.includes("combined") ||
-      name.includes("competitive") ||
-      name.includes("cce")
-    );
-  };
-
-  const normalizeSubjectIds = (subjectIds = []) =>
-    (Array.isArray(subjectIds) ? subjectIds : [])
-      .filter((value) => value !== null && value !== undefined && value !== "")
-      .map(String);
-
-  const subjectMatchesSelectedIds = (subject, subjectIds = []) => {
-    const selected = normalizeSubjectIds(subjectIds);
-
-    return selected.some(
-      (selectedId) =>
-        String(subject.hash_id || "") === selectedId ||
-        String(subject.id || "") === selectedId
-    );
-  };
-
-  const getSelectedSubjectMarks = (subjectIds = []) =>
-    subjects.reduce(
-      (total, subject) =>
-        subjectMatchesSelectedIds(subject, subjectIds)
-          ? total + subject.total_marks
-          : total,
-      0
-    );
-
-  const toggleSubject = (jobId, subject) => {
-    setJobConfigs((prev) => {
-      const currentIds = normalizeSubjectIds(prev[jobId]?.subjectIds);
-      const aliases = [subject.hash_id, subject.id].filter(Boolean).map(String);
-      const isSelected = aliases.some((id) => currentIds.includes(id));
-      const withoutSubject = currentIds.filter((id) => !aliases.includes(id));
-
-      return {
-        ...prev,
-        [jobId]: {
-          ...prev[jobId],
-          subjectIds: isSelected
-            ? withoutSubject
-            : [...withoutSubject, subject.hash_id],
-        },
-      };
-    });
-
-    setFieldErrors((prev) => {
-      const next = { ...prev };
-      delete next[`subject_${jobId}`];
-      return next;
-    });
-  };
-
   const getJobSubjectRows = (data, job) => {
     const rows = Array.isArray(data.job_subjects) ? data.job_subjects : [];
     const jobs = Array.isArray(data.job_details) ? data.job_details : [];
@@ -602,14 +463,6 @@ const AdvertisementEditForm = () => {
     });
   };
 
-  const getSubjectIdFromRow = (row) =>
-    row.subject?.hash_id ||
-    row.subject_hash_id ||
-    row.subjectHashId ||
-    row.subject?.id ||
-    row.subject_id ||
-    row.hash_id ||
-    "";
   const [jobTitles, setJobTitles] = useState({});
   const [selectedIds, setSelectedIds] = useState([]);
   const [originalSelectedIds, setOriginalSelectedIds] = useState([]);
@@ -626,6 +479,18 @@ const AdvertisementEditForm = () => {
 
   const updatePostCount = (jobId, value) => {
     const numericValue = Math.max(1, Number(value) || 1);
+    const districtTotal = getDistrictPostTotal(jobConfigs[jobId]?.districtPosts || []);
+
+    if (districtTotal > numericValue) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        [`district_posts_${jobId}`]: [
+          `District distribution total (${districtTotal}) cannot exceed total posts (${numericValue}).`,
+        ],
+      }));
+      toast.error("District distribution cannot exceed total posts");
+      return;
+    }
 
     setJobConfigs((prev) => ({
       ...prev,
@@ -642,6 +507,12 @@ const AdvertisementEditForm = () => {
           : job
       )
     );
+
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[`district_posts_${jobId}`];
+      return next;
+    });
   };
 
   const updateQualificationText = (jobId, value) => {
@@ -655,6 +526,28 @@ const AdvertisementEditForm = () => {
   };
 
   const updateDistrictPost = (jobId, index, field, value) => {
+    const currentRows = [...(jobConfigs[jobId]?.districtPosts || [])];
+    currentRows[index] = { ...currentRows[index], [field]: value };
+    const totalPosts = Math.max(1, Number(jobConfigs[jobId]?.numPosts) || 1);
+    const districtTotal = getDistrictPostTotal(currentRows);
+
+    if (field === "post" && districtTotal > totalPosts) {
+      setFieldErrors((errors) => ({
+        ...errors,
+        [`district_posts_${jobId}`]: [
+          `District distribution total (${districtTotal}) cannot exceed total posts (${totalPosts}).`,
+        ],
+      }));
+      toast.error("District distribution cannot exceed total posts");
+      return;
+    }
+
+    setFieldErrors((errors) => {
+      const next = { ...errors };
+      delete next[`district_posts_${jobId}`];
+      return next;
+    });
+
     setJobConfigs((prev) => {
       const rows = [...(prev[jobId]?.districtPosts || [])];
       rows[index] = { ...rows[index], [field]: value };
@@ -683,6 +576,17 @@ const AdvertisementEditForm = () => {
   };
 
   const removeDistrictPost = (jobId, index) => {
+    const nextRows = (jobConfigs[jobId]?.districtPosts || []).filter((_, rowIndex) => rowIndex !== index);
+    const totalPosts = Math.max(1, Number(jobConfigs[jobId]?.numPosts) || 1);
+
+    if (getDistrictPostTotal(nextRows) <= totalPosts) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[`district_posts_${jobId}`];
+        return next;
+      });
+    }
+
     setJobConfigs((prev) => ({
       ...prev,
       [jobId]: {
@@ -755,10 +659,6 @@ const AdvertisementEditForm = () => {
               const jobId = getJobKey(job);
               if (!jobId) return;
               const subjectRows = getJobSubjectRows(data, job);
-              const subjectIds = subjectRows
-                .map(getSubjectIdFromRow)
-                .filter(Boolean)
-                .map(String);
 
               const savedCceStage =
                 job.pivot?.cce_stage ||
@@ -776,7 +676,7 @@ const AdvertisementEditForm = () => {
                     ? job.pivot.test_type.hash_id || job.pivot.test_type.id
                     : job.pivot?.test_type) ||
                   "",
-                subjectIds,
+                subjectIds: [],
                 cceStage: savedCceStage,
                 numPosts: Number(job.num_posts || job.pivot?.num_posts || 1) || 1,
                 qualificationText: getQualificationText(job),
@@ -945,28 +845,20 @@ const AdvertisementEditForm = () => {
     }
 
     for (const jobId of selectedIds) {
-      const config = jobConfigs[jobId] || {};
+      const jobMeta = availableJobs.find((job) => String(job.id) === String(jobId));
+      if (!jobMeta?.quotaBased) continue;
 
-      if (
-        isWrittenTestType(config.testType) &&
-        (!Array.isArray(config.subjectIds) || config.subjectIds.length === 0)
-      ) {
+      const totalPosts = Math.max(1, Number(jobConfigs[jobId]?.numPosts) || 1);
+      const districtTotal = getDistrictPostTotal(jobConfigs[jobId]?.districtPosts || []);
+
+      if (districtTotal > totalPosts) {
         setFieldErrors((prev) => ({
           ...prev,
-          [`subject_${jobId}`]: [
-            "Please select at least one subject for Written Exam",
+          [`district_posts_${jobId}`]: [
+            `District distribution total (${districtTotal}) cannot exceed total posts (${totalPosts}).`,
           ],
         }));
-        toast.error("Please select at least one subject for Written Exam");
-        return;
-      }
-
-      if (isCombinedCompetitiveExam(config.testType) && !config.cceStage) {
-        setFieldErrors((prev) => ({
-          ...prev,
-          [`cce_stage_${jobId}`]: ["Please select CCE stage"],
-        }));
-        toast.error("Please select CCE stage");
+        toast.error("District distribution cannot exceed total posts");
         return;
       }
     }
@@ -995,10 +887,6 @@ const AdvertisementEditForm = () => {
         district_posts: quotaBased ? serializeDistrictRows(jobConfigs[jobId]?.districtPosts || []) : [],
       };
     });
-    const validSubjectHashIds = new Set(
-      subjects.map((subject) => String(subject.hash_id))
-    );
-
     selectedIds.forEach((jobId) => {
       const config = jobConfigs[jobId] || {};
       const jobMeta = availableJobs.find((job) => String(job.id) === String(jobId));
@@ -1010,18 +898,9 @@ const AdvertisementEditForm = () => {
       qualificationsPayload[jobId] = config.qualificationText || "";
       districtPostsPayload[jobId] = quotaBased ? serializeDistrictRows(config.districtPosts || []) : [];
 
-      subjectsPayload[jobId] = isWrittenTestType(config.testType)
-        ? subjects
-            .filter((subject) =>
-              subjectMatchesSelectedIds(subject, config.subjectIds || [])
-            )
-            .map((subject) => String(subject.hash_id))
-            .filter((hashId) => validSubjectHashIds.has(hashId))
-        : [];
+      subjectsPayload[jobId] = [];
 
-      cceStagesPayload[jobId] = isCombinedCompetitiveExam(config.testType)
-        ? config.cceStage || ""
-        : "";
+      cceStagesPayload[jobId] = "";
     });
 
     const shouldUseExtendDate = extendDateEnabled && Boolean(extendDate);
@@ -1337,6 +1216,8 @@ const AdvertisementEditForm = () => {
                 {selectedJobOptions.length ? (
                   selectedJobOptions.map((job) => {
                     const jobId = String(job.id);
+                    const districtTotal = getDistrictPostTotal(jobConfigs[jobId]?.districtPosts || []);
+                    const totalPosts = Math.max(1, Number(jobConfigs[jobId]?.numPosts || job.num_posts) || 1);
                     return (
                       <div
                         key={jobId}
@@ -1425,7 +1306,7 @@ const AdvertisementEditForm = () => {
                                   </div>
                                 )}
                               </div>
-                              <div className="border-t border-slate-100 px-3 py-2">
+                              <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                 <button
                                   type="button"
                                   className="btn btn-primary"
@@ -1435,7 +1316,19 @@ const AdvertisementEditForm = () => {
                                   <Plus size={14} />
                                   <span>Add District</span>
                                 </button>
+                                <span className={`text-xs font-semibold ${
+                                  districtTotal > totalPosts ? "text-red-600" : "text-slate-500"
+                                }`}>
+                                  Distribution: {districtTotal}/{totalPosts}
+                                </span>
                               </div>
+                              {!!fieldErrors?.[`district_posts_${jobId}`] && (
+                                <div className="border-t border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                                  {Array.isArray(fieldErrors[`district_posts_${jobId}`])
+                                    ? fieldErrors[`district_posts_${jobId}`].join(", ")
+                                    : fieldErrors[`district_posts_${jobId}`]}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1539,12 +1432,8 @@ const AdvertisementEditForm = () => {
                                   ...prev[jobId],
                                   testType: newType,
                                   fee: newFee,
-                                  subjectIds: isWrittenTestType(newType)
-                                    ? prev[jobId]?.subjectIds || []
-                                    : [],
-                                  cceStage: isCombinedCompetitiveExam(newType)
-                                    ? prev[jobId]?.cceStage || ""
-                                    : "",
+                                  subjectIds: [],
+                                  cceStage: "",
                                 },
                               }));
 
@@ -1603,140 +1492,6 @@ const AdvertisementEditForm = () => {
                           />
                         </div>
 
-                        {isWrittenTestType(jobConfigs[jobId]?.testType) && (
-                          <div className="col-md-12 form-group">
-                            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px] gap-4 items-stretch">
-                              <div className={`rounded-xl border bg-white overflow-hidden ${
-                                fieldErrors?.[`subject_${jobId}`] ? "border-red-400" : "border-slate-200"
-                              }`}>
-                                <div className="flex items-center justify-between gap-4 px-5 py-4 bg-slate-50 border-b border-slate-200">
-                                  <div>
-                                    <p className="text-sm font-semibold text-slate-800">Select Subjects</p>
-                                    <p className="mt-1 text-xs text-slate-500">Choose one or more subjects for the written exam</p>
-                                  </div>
-                                  <span className="shrink-0 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
-                                    {subjects.filter((subject) =>
-                                      subjectMatchesSelectedIds(subject, jobConfigs[jobId]?.subjectIds || [])
-                                    ).length} selected
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 max-h-80 overflow-y-auto">
-                                  {subjects.map((subject) => {
-                                    const checked = subjectMatchesSelectedIds(
-                                      subject,
-                                      jobConfigs[jobId]?.subjectIds || []
-                                    );
-                                    return (
-                                      <label
-                                        key={subject.hash_id}
-                                        className={`flex items-center gap-3 min-h-12 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                                          checked
-                                            ? "border-emerald-400 bg-emerald-50"
-                                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                        }`}
-                                      >
-                                        <Checkbox
-                                          checked={checked}
-                                          onChange={() => toggleSubject(jobId, subject)}
-                                          size="small"
-                                          sx={{ p: 0, color: "#10b981", "&.Mui-checked": { color: "#059669" } }}
-                                        />
-                                        <span className="min-w-0 flex-1 text-sm font-medium text-slate-700 leading-5">
-                                          {subject.name}
-                                        </span>
-                                        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 whitespace-nowrap">
-                                          {subject.total_marks} marks
-                                        </span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
-                              <div className="flex min-h-[152px] flex-col justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-6">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Total Marks</p>
-                                <p className="mt-2 text-4xl font-bold text-emerald-900">
-                                  {getSelectedSubjectMarks(jobConfigs[jobId]?.subjectIds)}
-                                </p>
-                                <p className="mt-2 text-xs leading-5 text-emerald-700">
-                                  Sum of all selected subject marks
-                                </p>
-                              </div>
-                            </div>
-
-                            <p className={`mt-2 text-xs ${
-                              fieldErrors?.[`subject_${jobId}`] ? "text-red-600" : "text-slate-500"
-                            }`}>
-                              {fieldErrors?.[`subject_${jobId}`]
-                                ? Array.isArray(fieldErrors[`subject_${jobId}`])
-                                  ? fieldErrors[`subject_${jobId}`].join(", ")
-                                  : fieldErrors[`subject_${jobId}`]
-                                : "Selected subject marks are added automatically."}
-                            </p>
-                          </div>
-                        )}
-
-                        {isCombinedCompetitiveExam(
-                          jobConfigs[jobId]?.testType
-                        ) && (
-                          <div className="col-md-12 form-group">
-                            <div className={`rounded-xl border bg-white overflow-hidden ${
-                              fieldErrors?.[`cce_stage_${jobId}`] ? "border-red-400" : "border-slate-200"
-                            }`}>
-                              <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
-                                <p className="text-sm font-semibold text-slate-800">Select CCE Stage</p>
-                                <p className="mt-1 text-xs text-slate-500">
-                                  Choose one stage for the Combined Competitive Examination
-                                </p>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
-                                {CCE_STAGES.map((stage) => {
-                                  const checked = jobConfigs[jobId]?.cceStage === stage.value;
-                                  return (
-                                    <label
-                                      key={stage.value}
-                                      className={`flex items-center gap-3 min-h-12 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                                        checked
-                                          ? "border-emerald-400 bg-emerald-50"
-                                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                      }`}
-                                    >
-                                      <Checkbox
-                                        checked={checked}
-                                        onChange={() => {
-                                          setJobConfigs((prev) => ({
-                                            ...prev,
-                                            [jobId]: {
-                                              ...prev[jobId],
-                                              cceStage: checked ? "" : stage.value,
-                                            },
-                                          }));
-                                          setFieldErrors((prev) => {
-                                            const next = { ...prev };
-                                            delete next[`cce_stage_${jobId}`];
-                                            return next;
-                                          });
-                                        }}
-                                        size="small"
-                                        sx={{ p: 0, color: "#10b981", "&.Mui-checked": { color: "#059669" } }}
-                                      />
-                                      <span className="text-sm font-medium text-slate-700">{stage.label}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                            <p className={`mt-2 text-xs ${
-                              fieldErrors?.[`cce_stage_${jobId}`] ? "text-red-600" : "text-slate-500"
-                            }`}>
-                              {fieldErrors?.[`cce_stage_${jobId}`]
-                                ? Array.isArray(fieldErrors[`cce_stage_${jobId}`])
-                                  ? fieldErrors[`cce_stage_${jobId}`].join(", ")
-                                  : fieldErrors[`cce_stage_${jobId}`]
-                                : "Only one CCE stage can be selected."}
-                            </p>
-                          </div>
-                        )}
                       </div>
                     </div>
                   );

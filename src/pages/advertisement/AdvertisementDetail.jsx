@@ -1573,7 +1573,7 @@ const AdvertisementDetail = () => {
 
                             <td className="desc-col">
                               <span className="kv">
-                                <b>Department:</b> {dept.name || 'N/A'}
+                                {/* <b>Department:</b> {dept.name || 'N/A'} */}
                               </span>
                               <span className="kv">
                                 <b>Quota:</b> {renderChangedValue(quotaLabel, quotaChange)}
@@ -1607,7 +1607,7 @@ const AdvertisementDetail = () => {
                             </td>
 
                             <td className="qual-col">
-                              {renderChangedValue(getQualificationText(job), qualificationChange)}
+                              {/* {renderChangedValue(getQualificationText(job), qualificationChange)} */}
                               {serviceRuleText && (
                                 <span className="adv-service-rule-text">
                                   {serviceRuleText}
@@ -1676,12 +1676,12 @@ const AdvertisementDetail = () => {
               </div>
             </div>
 
-            <div className="adv-disclaimer">
+            {/* <div className="adv-disclaimer">
               <b>Note:</b> This is an English-language, reformatted version prepared from the original bilingual
               (Urdu/English) advertisement for ease of reading. The Terms &amp; Conditions have been translated from Urdu.
               In case of any difference, the <b>original advertisement</b> shall prevail. Please verify the closing date,
               fee, bank account details and other particulars before applying.
-            </div>
+            </div> */}
           </div>
             </div>
             </td>
