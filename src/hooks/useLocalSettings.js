@@ -78,6 +78,7 @@ export const useLocalSettings = () => {
           const quals = (qData.data?.data ?? qData.data ?? []).map((item) => ({
             id:     item.hash_id || item.id,
             name:   item.qualification_name || item.name,
+            type:   String(item.type ?? 'required').toLowerCase(),
             status: item.status ?? 'active',
           }));
           setQualifications(quals);

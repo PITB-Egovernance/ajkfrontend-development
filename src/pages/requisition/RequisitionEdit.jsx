@@ -184,6 +184,7 @@ const RequisitionEdit = () => {
           },
           step2: {
             academic_qualification:   req.qualification?.academic_qualification || '',
+            professional_qualification: req.qualification?.professional_qualification || '',
             equivalent_qualification: req.qualification?.equivalent_qualification || '',
             authority_certificate:    req.qualification?.authority_certificate || '',
             degree_equivalence:       req.qualification?.degree_equivalence || '',

@@ -10,6 +10,10 @@ import {
   DialogContent,
   DialogActions,
   Switch,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  FormLabel,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, BookOpen, Trash2, CheckCircle, XCircle } from "lucide-react";
@@ -47,7 +51,7 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
-const EMPTY_FORM = { subject_name: "", total_marks: "", subject_group: "", status: "active" };
+const EMPTY_FORM = { subject_name: "", total_marks: "", subject_type: "compulsory", subject_group: "", status: "active" };
 
 const SubjectManagement = () => {
   const navigate = useNavigate();
@@ -88,6 +92,7 @@ const SubjectManagement = () => {
           hash_id:       item.hash_id || item.id,
           sr_no:         page * pageSize + i + 1,
           subject_name:  item.subject_name,
+          subject_type:  item.subject_type ?? "compulsory",
           subject_group: item.subject_group,
           total_marks:   item.total_marks,
           status:        item.status ?? "active",
@@ -168,6 +173,7 @@ const SubjectManagement = () => {
     setFormData({
       subject_name:  selectedRow.subject_name,
       total_marks:   String(selectedRow.total_marks),
+      subject_type:  selectedRow.subject_type ?? "compulsory",
       subject_group: selectedRow.subject_group,
       status:        selectedRow.status ?? "active",
     });
@@ -182,7 +188,8 @@ const SubjectManagement = () => {
     if (!formData.subject_name.trim()) errs.subject_name = "Subject name is required";
     if (!formData.total_marks || isNaN(Number(formData.total_marks)) || Number(formData.total_marks) <= 0)
       errs.total_marks = "Marks must be a positive number";
-    if (!formData.subject_group) errs.subject_group = "Group is required";
+    if (formData.subject_type === "optional" && !formData.subject_group)
+      errs.subject_group = "Group is required";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -225,6 +232,7 @@ const SubjectManagement = () => {
         rows.map((r) =>
           SubjectApi.update(r.hash_id, {
             subject_name:  r.subject_name,
+            subject_type:  r.subject_type,
             subject_group: r.subject_group,
             total_marks:   r.total_marks,
             status,
@@ -246,6 +254,7 @@ const SubjectManagement = () => {
     try {
       await SubjectApi.update(row.hash_id, {
         subject_name:  row.subject_name,
+        subject_type:  row.subject_type,
         subject_group: row.subject_group,
         total_marks:   row.total_marks,
         status:        newStatus,
@@ -264,7 +273,8 @@ const SubjectManagement = () => {
     try {
       const payload = {
         subject_name:  formData.subject_name.trim(),
-        subject_group: formData.subject_group,
+        subject_type:  formData.subject_type,
+        subject_group: formData.subject_type === "optional" ? formData.subject_group : "",
         total_marks:   Number(formData.total_marks),
         status:        formData.status,
       };
@@ -288,6 +298,23 @@ const SubjectManagement = () => {
   const columns = [
     { field: "sr_no",         headerName: "#",            width: 65  },
     { field: "subject_name",  headerName: "Subject Name", flex: 1    },
+    {
+      field: "subject_type",
+      headerName: "Type",
+      width: 130,
+      renderCell: (p) => {
+        const isOptional = String(p.value).toLowerCase() === "optional";
+        return (
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+              isOptional ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+            }`}
+          >
+            {isOptional ? "Optional" : "Compulsory"}
+          </span>
+        );
+      },
+    },
     { field: "subject_group", headerName: "Group",        width: 130 },
     { field: "total_marks",   headerName: "Marks",        width: 100 },
     {
@@ -343,7 +370,7 @@ const SubjectManagement = () => {
                 <BookOpen size={22} className="text-emerald-700" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Subjects</h1>
+                <h1 className="text-2xl font-bold text-slate-900">CCE Subjects</h1>
                 <p className="text-sm text-slate-500">Manage subject entries</p>
               </div>
             </div>
@@ -481,44 +508,61 @@ const SubjectManagement = () => {
               placeholder="e.g. 100"
             />
 
-            <TextField
-              select
-              fullWidth
-              label="Group"
-              margin="normal"
-              size="small"
-              value={formData.subject_group}
-              onChange={(e) => {
-                setFormData((f) => ({ ...f, subject_group: e.target.value }));
-                if (e.target.value) setFormErrors((errs) => ({ ...errs, subject_group: undefined }));
-              }}
-              error={!!formErrors.subject_group}
-              helperText={formErrors.subject_group || "Select the subject group"}
-            >
-              <MenuItem value="">— Select Group —</MenuItem>
-              {/* Preserve a previously-saved group that is no longer active. */}
-              {formData.subject_group && !groups.includes(formData.subject_group) && (
-                <MenuItem value={formData.subject_group}>{formData.subject_group}</MenuItem>
-              )}
-              {groups.map((g) => (
-                <MenuItem key={g} value={g}>{g}</MenuItem>
-              ))}
-            </TextField>
+            <div className="mt-3">
+              <FormLabel className="text-sm font-medium text-slate-700">Subject Type</FormLabel>
+              <RadioGroup
+                row
+                value={formData.subject_type}
+                onChange={(e) => {
+                  const subject_type = e.target.value;
+                  setFormData((f) => ({
+                    ...f,
+                    subject_type,
+                    // Group only applies to optional subjects; clear it for compulsory.
+                    subject_group: subject_type === "optional" ? f.subject_group : "",
+                  }));
+                  if (subject_type !== "optional") setFormErrors((errs) => ({ ...errs, subject_group: undefined }));
+                }}
+              >
+                <FormControlLabel
+                  value="compulsory"
+                  control={<Radio size="small" sx={{ color: "#064e3b", "&.Mui-checked": { color: "#064e3b" } }} />}
+                  label="Compulsory"
+                />
+                <FormControlLabel
+                  value="optional"
+                  control={<Radio size="small" sx={{ color: "#064e3b", "&.Mui-checked": { color: "#064e3b" } }} />}
+                  label="Optional"
+                />
+              </RadioGroup>
+            </div>
 
-            {editingRow && (
+            {formData.subject_type === "optional" && (
               <TextField
                 select
                 fullWidth
-                label="Status"
+                label="Group"
                 margin="normal"
                 size="small"
-                value={formData.status}
-                onChange={(e) => setFormData((f) => ({ ...f, status: e.target.value }))}
+                value={formData.subject_group}
+                onChange={(e) => {
+                  setFormData((f) => ({ ...f, subject_group: e.target.value }));
+                  if (e.target.value) setFormErrors((errs) => ({ ...errs, subject_group: undefined }));
+                }}
+                error={!!formErrors.subject_group}
+                helperText={formErrors.subject_group || "Select the subject group"}
               >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
+                <MenuItem value="">— Select Group —</MenuItem>
+                {/* Preserve a previously-saved group that is no longer active. */}
+                {formData.subject_group && !groups.includes(formData.subject_group) && (
+                  <MenuItem value={formData.subject_group}>{formData.subject_group}</MenuItem>
+                )}
+                {groups.map((g) => (
+                  <MenuItem key={g} value={g}>{g}</MenuItem>
+                ))}
               </TextField>
             )}
+
           </DialogContent>
 
           <DialogActions className="px-4 pb-4 gap-2">

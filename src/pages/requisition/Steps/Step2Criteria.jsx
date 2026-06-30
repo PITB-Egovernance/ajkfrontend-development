@@ -52,8 +52,15 @@ const OtherInput = React.forwardRef(
 const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   const { activeQualifications, activeDegrees } = useLocalSettings();
 
+  // Split qualifications by their configured type so each dropdown only shows
+  // its own kind (Required vs Professional). Untyped/legacy entries default to
+  // "required".
+  const requiredQualifications     = activeQualifications.filter((q) => String(q.type ?? 'required').toLowerCase() !== 'professional');
+  const professionalQualifications = activeQualifications.filter((q) => String(q.type ?? 'required').toLowerCase() === 'professional');
+
   const [formData, setFormData] = useState({
     academic_qualification:   [],
+    professional_qualification: [],
     equivalent_qualification: '',
     authority_certificate:    '',
     degree_equivalence:       '',
@@ -241,10 +248,12 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   const [customAcademic, setCustomAcademic] = useState('');
   const [customDegree,   setCustomDegree]   = useState('');
   const [customMinQual,  setCustomMinQual]  = useState('');
+  const [customProfessional, setCustomProfessional] = useState('');
 
   // Tracks which dropdowns are in "Other" mode.
   const [showOther, setShowOther] = useState({
     academic_qualification: false,
+    professional_qualification: false,
     degree_equivalence:     false,
     min_qualification:      false,
   });
@@ -253,11 +262,13 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   // programmatically (e.g. when "Other (specify)" is chosen).
   const [openAcademicSelect, setOpenAcademicSelect] = useState(false);
   const [openMinQualSelect,  setOpenMinQualSelect]  = useState(false);
+  const [openProfessionalSelect, setOpenProfessionalSelect] = useState(false);
 
   // Refs to the custom "Other" inputs so we can move the cursor into them once
   // the dropdown has fully closed (the menu's focus trap releases on close).
   const academicOtherRef = useRef(null);
   const minQualOtherRef   = useRef(null);
+  const professionalOtherRef = useRef(null);
 
   useEffect(() => {
     if (!showOther.academic_qualification) return;
@@ -270,6 +281,12 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     const t = setTimeout(() => minQualOtherRef.current?.focus(), 250);
     return () => clearTimeout(t);
   }, [showOther.min_qualification]);
+
+  useEffect(() => {
+    if (!showOther.professional_qualification) return;
+    const t = setTimeout(() => professionalOtherRef.current?.focus(), 250);
+    return () => clearTimeout(t);
+  }, [showOther.professional_qualification]);
 
   const [showAuthority, setShowAuthority] = useState(false);
 
@@ -305,6 +322,11 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           ? (Array.isArray(data.academic_qualification)
               ? data.academic_qualification
               : String(data.academic_qualification).split(',').map((s) => s.trim()).filter(Boolean))
+          : [],
+        professional_qualification: data.professional_qualification
+          ? (Array.isArray(data.professional_qualification)
+              ? data.professional_qualification
+              : String(data.professional_qualification).split(',').map((s) => s.trim()).filter(Boolean))
           : [],
         equivalent_qualification: data.equivalent_qualification || '',
         authority_certificate:    data.authority_certificate    || '',
@@ -384,10 +406,20 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     });
   };
 
+  const handleProfessionalQualToggle = (qualName) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.professional_qualification) ? prev.professional_qualification : [];
+      const next = current.includes(qualName)
+        ? current.filter((q) => q !== qualName)
+        : [...current, qualName];
+      return { ...prev, professional_qualification: next };
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === 'academic_qualification' || name === 'min_qualification') return;
+    if (name === 'academic_qualification' || name === 'min_qualification' || name === 'professional_qualification') return;
 
     if (value === OTHER) {
       setShowOther((prev) => ({ ...prev, [name]: true }));
@@ -471,6 +503,11 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         const current = Array.isArray(prev.min_qualification) ? prev.min_qualification : [];
         return { ...prev, min_qualification: current.includes(trimmed) ? current : [...current, trimmed] };
       });
+    } else if (fieldName === 'professional_qualification') {
+      setFormData((prev) => {
+        const current = Array.isArray(prev.professional_qualification) ? prev.professional_qualification : [];
+        return { ...prev, professional_qualification: current.includes(trimmed) ? current : [...current, trimmed] };
+      });
     } else if (fieldName === 'degree_equivalence') {
       setFormData((prev) => {
         const current = prev.eligible_degrees
@@ -502,6 +539,9 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     }
     if (Array.isArray(submitData.min_qualification)) {
       submitData.min_qualification = submitData.min_qualification.join(', ');
+    }
+    if (Array.isArray(submitData.professional_qualification)) {
+      submitData.professional_qualification = submitData.professional_qualification.join(', ');
     }
     if (selectedDegreeList.length > 0) {
       submitData.degree_equivalence = selectedDegreeList.join(',');
@@ -581,7 +621,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           >
             <MenuItem dense onClick={(e) => {
               e.preventDefault();
-              const allNames = activeQualifications.map((q) => q.name);
+              const allNames = requiredQualifications.map((q) => q.name);
               const current = Array.isArray(formData.academic_qualification) ? formData.academic_qualification : [];
               const allSelected = allNames.every((n) => current.includes(n));
               const nextExp = allSelected ? {} : Object.fromEntries(allNames.map((n) => [n, (formData.qualification_experience || {})[n] ?? 0]));
@@ -593,13 +633,13 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               }));
             }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
               <Checkbox size="small"
-                checked={activeQualifications.length > 0 && activeQualifications.every((q) => (formData.academic_qualification || []).includes(q.name))}
-                indeterminate={activeQualifications.some((q) => (formData.academic_qualification || []).includes(q.name)) && !activeQualifications.every((q) => (formData.academic_qualification || []).includes(q.name))}
+                checked={requiredQualifications.length > 0 && requiredQualifications.every((q) => (formData.academic_qualification || []).includes(q.name))}
+                indeterminate={requiredQualifications.some((q) => (formData.academic_qualification || []).includes(q.name)) && !requiredQualifications.every((q) => (formData.academic_qualification || []).includes(q.name))}
                 sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
               />
               <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
             </MenuItem>
-            {activeQualifications.map((q) => (
+            {requiredQualifications.map((q) => (
               <MenuItem key={q.id} dense onClick={(e) => { e.preventDefault(); handleAcademicQualToggle(q.name); }}>
                 <Checkbox
                   size="small"
@@ -623,6 +663,75 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               placeholder="e.g. Diploma in Engineering"
               onConfirm={() => confirmCustom('academic_qualification', customAcademic, setCustomAcademic)}
               onCancel={() => setShowOther((prev) => ({ ...prev, academic_qualification: false }))}
+            />
+          )}
+        </div>
+
+        {/* Professional Qualification (multi-select with checkboxes) — qualifications of type "professional" */}
+        <div className="col-md-6 form-group">
+          <TextField
+            fullWidth select
+            label="Professional Qualification"
+            name="professional_qualification"
+            value={Array.isArray(formData.professional_qualification) ? formData.professional_qualification : []}
+            SelectProps={{
+              multiple: true,
+              open: openProfessionalSelect,
+              onOpen: () => setOpenProfessionalSelect(true),
+              onClose: () => setOpenProfessionalSelect(false),
+              onChange: () => {},
+              renderValue: (selected) => {
+                if (!selected || selected.length === 0) return '';
+                return (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                    {selected.map((v) => <Chip key={v} label={v} size="small" />)}
+                  </Box>
+                );
+              },
+              MenuProps: { PaperProps: { sx: { maxHeight: 380 } }, disableRestoreFocus: true, disableEnforceFocus: true },
+            }}
+          >
+            <MenuItem dense onClick={(e) => {
+              e.preventDefault();
+              const allNames = professionalQualifications.map((q) => q.name);
+              const current = Array.isArray(formData.professional_qualification) ? formData.professional_qualification : [];
+              const allSelected = allNames.every((n) => current.includes(n));
+              setFormData((prev) => ({
+                ...prev,
+                professional_qualification: allSelected ? [] : allNames,
+              }));
+            }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+              <Checkbox size="small"
+                checked={professionalQualifications.length > 0 && professionalQualifications.every((q) => (formData.professional_qualification || []).includes(q.name))}
+                indeterminate={professionalQualifications.some((q) => (formData.professional_qualification || []).includes(q.name)) && !professionalQualifications.every((q) => (formData.professional_qualification || []).includes(q.name))}
+                sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
+              />
+              <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+            </MenuItem>
+            {professionalQualifications.map((q) => (
+              <MenuItem key={q.id} dense onClick={(e) => { e.preventDefault(); handleProfessionalQualToggle(q.name); }}>
+                <Checkbox
+                  size="small"
+                  checked={(formData.professional_qualification || []).includes(q.name)}
+                  sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' } }}
+                />
+                <ListItemText primary={q.name} />
+              </MenuItem>
+            ))}
+            <MenuItem dense onClick={(e) => { e.preventDefault(); setOpenProfessionalSelect(false); setShowOther((prev) => ({ ...prev, professional_qualification: true })); }}
+              sx={{ color: 'text.secondary', fontStyle: 'italic', borderTop: '1px solid #e2e8f0' }}>
+              <ListItemText primary="Other (specify)" />
+            </MenuItem>
+          </TextField>
+          {showOther.professional_qualification && (
+            <OtherInput
+              ref={professionalOtherRef}
+              fieldName="professional_qualification"
+              value={customProfessional}
+              setValue={setCustomProfessional}
+              placeholder="e.g. Certified Internal Auditor"
+              onConfirm={() => confirmCustom('professional_qualification', customProfessional, setCustomProfessional)}
+              onCancel={() => setShowOther((prev) => ({ ...prev, professional_qualification: false }))}
             />
           )}
         </div>
@@ -867,7 +976,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
           >
             <MenuItem dense onClick={(e) => {
               e.preventDefault();
-              const allNames = activeQualifications.map((q) => q.name);
+              const allNames = requiredQualifications.map((q) => q.name);
               const current = Array.isArray(formData.min_qualification) ? formData.min_qualification : [];
               const allSelected = allNames.every((n) => current.includes(n));
               setFormData((prev) => ({
@@ -876,13 +985,13 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               }));
             }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
               <Checkbox size="small"
-                checked={activeQualifications.length > 0 && activeQualifications.every((q) => (formData.min_qualification || []).includes(q.name))}
-                indeterminate={activeQualifications.some((q) => (formData.min_qualification || []).includes(q.name)) && !activeQualifications.every((q) => (formData.min_qualification || []).includes(q.name))}
+                checked={requiredQualifications.length > 0 && requiredQualifications.every((q) => (formData.min_qualification || []).includes(q.name))}
+                indeterminate={requiredQualifications.some((q) => (formData.min_qualification || []).includes(q.name)) && !requiredQualifications.every((q) => (formData.min_qualification || []).includes(q.name))}
                 sx={{ p: 0.5, color: '#10b981', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
               />
               <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
             </MenuItem>
-            {activeQualifications.map((q) => (
+            {requiredQualifications.map((q) => (
               <MenuItem key={q.id} dense onClick={(e) => { e.preventDefault(); handleMinQualToggle(q.name); }}>
                 <Checkbox
                   size="small"
