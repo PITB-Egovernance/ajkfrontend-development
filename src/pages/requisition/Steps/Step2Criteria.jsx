@@ -9,6 +9,46 @@ import toast from 'react-hot-toast';
 // Sentinel value used to detect "Other" selection in every dropdown.
 const OTHER = '__other__';
 
+// Reusable "Other" reveal block. Declared at module scope (not inside the
+// component) so it keeps a stable identity and does NOT remount on every
+// keystroke — otherwise the input would lose focus while typing.
+const OtherInput = React.forwardRef(
+  ({ fieldName, value, setValue, placeholder = 'Enter custom value…', onConfirm, onCancel }, ref) => (
+    <div className="mt-2 flex gap-2 items-center animate-in fade-in duration-200">
+      <TextField
+        fullWidth
+        size="small"
+        inputRef={ref}
+        label={`Custom ${fieldName === 'degree_equivalence' ? 'Degree' : 'Qualification'}`}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholder}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onConfirm();
+          }
+        }}
+        autoFocus
+      />
+      <button
+        type="button"
+        onClick={onConfirm}
+        className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded-lg whitespace-nowrap"
+      >
+        Add &amp; Set
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="px-3 py-2 border border-slate-300 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50"
+      >
+        Cancel
+      </button>
+    </div>
+  )
+);
+
 const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   const { activeQualifications, activeDegrees } = useLocalSettings();
 
@@ -208,6 +248,28 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     degree_equivalence:     false,
     min_qualification:      false,
   });
+
+  // Controlled open state for the multi-select dropdowns so we can close them
+  // programmatically (e.g. when "Other (specify)" is chosen).
+  const [openAcademicSelect, setOpenAcademicSelect] = useState(false);
+  const [openMinQualSelect,  setOpenMinQualSelect]  = useState(false);
+
+  // Refs to the custom "Other" inputs so we can move the cursor into them once
+  // the dropdown has fully closed (the menu's focus trap releases on close).
+  const academicOtherRef = useRef(null);
+  const minQualOtherRef   = useRef(null);
+
+  useEffect(() => {
+    if (!showOther.academic_qualification) return;
+    const t = setTimeout(() => academicOtherRef.current?.focus(), 250);
+    return () => clearTimeout(t);
+  }, [showOther.academic_qualification]);
+
+  useEffect(() => {
+    if (!showOther.min_qualification) return;
+    const t = setTimeout(() => minQualOtherRef.current?.focus(), 250);
+    return () => clearTimeout(t);
+  }, [showOther.min_qualification]);
 
   const [showAuthority, setShowAuthority] = useState(false);
 
@@ -484,42 +546,6 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     onNext(buildSubmitData());
   };
 
-  // ── Reusable "Other" reveal block ─────────────────────────────────────────
-
-  const OtherInput = ({ fieldName, value, setValue, placeholder = 'Enter custom value…' }) => (
-    <div className="mt-2 flex gap-2 items-center animate-in fade-in duration-200">
-      <TextField
-        fullWidth
-        size="small"
-        label={`Custom ${fieldName === 'degree_equivalence' ? 'Degree' : 'Qualification'}`}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder={placeholder}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            confirmCustom(fieldName, value, setValue);
-          }
-        }}
-        autoFocus
-      />
-      <button
-        type="button"
-        onClick={() => confirmCustom(fieldName, value, setValue)}
-        className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded-lg whitespace-nowrap"
-      >
-        Add &amp; Set
-      </button>
-      <button
-        type="button"
-        onClick={() => setShowOther((prev) => ({ ...prev, [fieldName]: false }))}
-        className="px-3 py-2 border border-slate-300 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50"
-      >
-        Cancel
-      </button>
-    </div>
-  );
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -538,6 +564,9 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
             value={Array.isArray(formData.academic_qualification) ? formData.academic_qualification : []}
             SelectProps={{
               multiple: true,
+              open: openAcademicSelect,
+              onOpen: () => setOpenAcademicSelect(true),
+              onClose: () => setOpenAcademicSelect(false),
               onChange: () => {},
               renderValue: (selected) => {
                 if (!selected || selected.length === 0) return '';
@@ -547,7 +576,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
                   </Box>
                 );
               },
-              MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+              MenuProps: { PaperProps: { sx: { maxHeight: 380 } }, disableRestoreFocus: true, disableEnforceFocus: true },
             }}
           >
             <MenuItem dense onClick={(e) => {
@@ -580,17 +609,20 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
                 <ListItemText primary={q.name} />
               </MenuItem>
             ))}
-            <MenuItem dense onClick={(e) => { e.preventDefault(); setShowOther((prev) => ({ ...prev, academic_qualification: true })); }}
+            <MenuItem dense onClick={(e) => { e.preventDefault(); setOpenAcademicSelect(false); setShowOther((prev) => ({ ...prev, academic_qualification: true })); }}
               sx={{ color: 'text.secondary', fontStyle: 'italic', borderTop: '1px solid #e2e8f0' }}>
               <ListItemText primary="Other (specify)" />
             </MenuItem>
           </TextField>
           {showOther.academic_qualification && (
             <OtherInput
+              ref={academicOtherRef}
               fieldName="academic_qualification"
               value={customAcademic}
               setValue={setCustomAcademic}
               placeholder="e.g. Diploma in Engineering"
+              onConfirm={() => confirmCustom('academic_qualification', customAcademic, setCustomAcademic)}
+              onCancel={() => setShowOther((prev) => ({ ...prev, academic_qualification: false }))}
             />
           )}
         </div>
@@ -707,6 +739,8 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               value={customDegree}
               setValue={setCustomDegree}
               placeholder="e.g. BS Environmental Science"
+              onConfirm={() => confirmCustom('degree_equivalence', customDegree, setCustomDegree)}
+              onCancel={() => setShowOther((prev) => ({ ...prev, degree_equivalence: false }))}
             />
           )}
 
@@ -816,6 +850,9 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
             value={Array.isArray(formData.min_qualification) ? formData.min_qualification : []}
             SelectProps={{
               multiple: true,
+              open: openMinQualSelect,
+              onOpen: () => setOpenMinQualSelect(true),
+              onClose: () => setOpenMinQualSelect(false),
               onChange: () => {},
               renderValue: (selected) => {
                 if (!selected || selected.length === 0) return '';
@@ -825,7 +862,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
                   </Box>
                 );
               },
-              MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
+              MenuProps: { PaperProps: { sx: { maxHeight: 380 } }, disableRestoreFocus: true, disableEnforceFocus: true },
             }}
           >
             <MenuItem dense onClick={(e) => {
@@ -855,17 +892,20 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
                 <ListItemText primary={q.name} />
               </MenuItem>
             ))}
-            <MenuItem dense onClick={(e) => { e.preventDefault(); setShowOther((prev) => ({ ...prev, min_qualification: true })); }}
+            <MenuItem dense onClick={(e) => { e.preventDefault(); setOpenMinQualSelect(false); setShowOther((prev) => ({ ...prev, min_qualification: true })); }}
               sx={{ color: 'text.secondary', fontStyle: 'italic', borderTop: '1px solid #e2e8f0' }}>
               <ListItemText primary="Other (specify)" />
             </MenuItem>
           </TextField>
           {showOther.min_qualification && (
             <OtherInput
+              ref={minQualOtherRef}
               fieldName="min_qualification"
               value={customMinQual}
               setValue={setCustomMinQual}
               placeholder="e.g. Associate Degree"
+              onConfirm={() => confirmCustom('min_qualification', customMinQual, setCustomMinQual)}
+              onCancel={() => setShowOther((prev) => ({ ...prev, min_qualification: false }))}
             />
           )}
         </div>
