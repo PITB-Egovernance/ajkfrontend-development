@@ -143,22 +143,16 @@ const RollNumberExamFlow = () => {
         if (g.id) gradeMap[String(g.id)] = g.name || g.grade_name || '';
       });
 
+      // Strictly match candidate applications to admin job posts via ext_adv_id
+      // (admin job detail hash). This is the authoritative link — only
+      // candidates whose job_post.ext_adv_id equals a post's hash_id are
+      // counted as having applied for that specific post.
       const jobPostCountMap = {};
-      const jobPostDeptMap = {};
       const candidateAppsAvailable = Array.isArray(candidateApps) && candidateApps.length > 0;
       if (candidateAppsAvailable) {
         candidateApps.forEach(app => {
           const extAdvId = app.job_post?.ext_adv_id || null;
-          const portalHash = app.job_post?.hash_id || null;
-          const dept = app.job_post?.department || null;
-          if (extAdvId) {
-            jobPostCountMap[extAdvId] = (jobPostCountMap[extAdvId] || 0) + 1;
-            if (dept) jobPostDeptMap[extAdvId] = dept;
-          }
-          if (portalHash) {
-            jobPostCountMap[portalHash] = (jobPostCountMap[portalHash] || 0) + 1;
-            if (dept) jobPostDeptMap[portalHash] = dept;
-          }
+          if (extAdvId) jobPostCountMap[extAdvId] = (jobPostCountMap[extAdvId] || 0) + 1;
         });
       }
 
@@ -192,10 +186,7 @@ const RollNumberExamFlow = () => {
           meta: meta.badge,
           posts: jobs.map((job) => {
             const jobId = job.hash_id || String(job.id);
-            const adminDept = (typeof job.department === 'object' && job.department !== null)
-              ? (job.department.department_name || job.department.name || '')
-              : (job.department || job.department_name || '');
-            const deptName = adminDept || jobPostDeptMap[jobId] || 'N/A';
+            const deptName = job.department_label || 'N/A';
             const rawScale = gradeMap[job.scale] || job.scale || '';
             const scaleDisplay = rawScale ? (rawScale.toUpperCase().startsWith('BPS') ? rawScale : `BPS-${rawScale}`) : '';
             const candidateCount = jobPostCountMap[jobId] ?? 0;
@@ -289,6 +280,43 @@ const RollNumberExamFlow = () => {
 
       if (uniqueApps.length === 0) {
         toast.error('No applications found for the selected posts');
+        setGenerating(false);
+        return;
+      }
+
+      // Check admin backend for already-generated roll numbers. If every
+      // selected candidate already has one, skip generation entirely and
+      // just show the existing slips (view/download only).
+      const advIds = [...new Set(selectedPosts.map(p => p.advertisementId))];
+      const existingRollMap = {};
+      for (const advId of advIds) {
+        const result = await RollNumberApi.getApplicationsByAdvertisement(advId, { per_page: 1000 });
+        const apps = result?.data?.applications?.data ?? [];
+        apps.forEach(a => {
+          const roll = a.rollNumber || a.roll_number;
+          if (roll?.roll_number) existingRollMap[a.application_number] = roll;
+        });
+      }
+
+      const newApps = uniqueApps.filter(a => !existingRollMap[a.application_number]);
+
+      if (newApps.length === 0) {
+        setGeneratedCandidates(uniqueApps.map(app => {
+          const existing = existingRollMap[app.application_number];
+          const name = app.snapshot_data?.name || app.candidate?.name || '';
+          return {
+            id: app.application_number,
+            photo: name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
+            roll: existing?.roll_number,
+            name,
+            cnic: app.snapshot_data?.cnic || app.candidate?.cnic || '',
+            district: '',
+            center: existing?.examCenter?.name || existing?.exam_center?.name || '',
+          };
+        }));
+        toast.success('All selected candidates already have roll numbers generated');
+        setGenerated(true);
+        setStage(3);
         setGenerating(false);
         return;
       }
