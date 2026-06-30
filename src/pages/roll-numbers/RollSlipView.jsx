@@ -164,7 +164,7 @@ const RollSlipView = () => {
             <InfoRow label="District" value={data.district} />
             <InfoRow label="Subject" value={<strong>{data.subject}</strong>} />
 
-            {(data.examDate || data.attendanceTime) && (
+            {Array.isArray(data.examSessions) && data.examSessions.length > 0 && (
               <table className="w-full border-collapse border-2 border-emerald-900 mt-2 text-sm">
                 <thead>
                   <tr className="bg-emerald-50">
@@ -175,12 +175,14 @@ const RollSlipView = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="text-center">
-                    <td className="border border-emerald-900 px-2 py-1">{data.examDay || '—'}</td>
-                    <td className="border border-emerald-900 px-2 py-1">{data.examDate || '—'}</td>
-                    <td className="border border-emerald-900 px-2 py-1">{data.attendanceTime || '—'}</td>
-                    <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900">{data.postName}{data.postScale ? ` (BS-${data.postScale})` : ''}</td>
-                  </tr>
+                  {data.examSessions.map((session, idx) => (
+                    <tr key={idx} className="text-center">
+                      <td className="border border-emerald-900 px-2 py-1">{session.day || '—'}</td>
+                      <td className="border border-emerald-900 px-2 py-1">{session.date || '—'}</td>
+                      <td className="border border-emerald-900 px-2 py-1">{session.time || '—'}</td>
+                      <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900">{session.postName || '—'}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
