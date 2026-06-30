@@ -453,6 +453,16 @@ const RollNumberExamFlow = () => {
 
       const centerId = selectedCenterIds[0];
       const prefix = 'AJK';
+      // Multi-paper exam types (Two Paper MCQs etc.) schedule each paper
+      // separately even though all papers share one roll number — send the
+      // full per-paper schedule so the slip can show one row per paper.
+      const papers = meta.papers.map((label, index) => ({
+        label,
+        date: scheduleDates[index] || null,
+        time: scheduleTimes[index] || null,
+        end_time: computeEndTime(scheduleTimes[index], scheduleDurations[index]) || null,
+      })).filter(p => p.date || p.time);
+
       const body = {
         application_numbers: uniqueApps.map(a => a.application_number),
         candidates,
@@ -462,6 +472,7 @@ const RollNumberExamFlow = () => {
         format: 'sequential',
         exam_date: scheduleDates[0] || null,
         attendance_time: scheduleTimes[0] || null,
+        papers: papers.length > 1 ? papers : undefined,
       };
 
       const result = await RollNumberApi.generateSlips(body);
