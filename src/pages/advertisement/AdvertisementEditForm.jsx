@@ -102,12 +102,78 @@ const getJobDepartmentName = (job) => {
   if (typeof job.department === "object" && job.department) {
     return job.department.name || job.department.department_name || "";
   }
-  return job.department || job.department_name || "";
+  return job.department || job.department_label || job.department_name || "";
 };
+
+const getQualificationText = (job) => {
+  const pivotText = job?.pivot?.qualification_text || job?.qualification_text;
+  if (pivotText) return String(pivotText);
+
+  const q = job?.qualification;
+  if (!q) return "";
+
+  return [
+    q.academic_qualification,
+    q.degree_equivalence ? `Degree Equivalence: ${q.degree_equivalence}` : "",
+    q.any_other_qualification ? `Other Qualification: ${q.any_other_qualification}` : "",
+    q.experience_length ? `Experience: ${q.experience_length} Years` : "",
+    q.training_institute ? `Training Institute: ${q.training_institute}` : "",
+  ].filter(Boolean).join(" | ");
+};
+
+const parseMaybeJsonArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const normalizeDistrictPosts = (job) => {
+  const overrideRows = parseMaybeJsonArray(
+    job?.advertisement_district_posts || job?.pivot?.district_posts
+  );
+  const rows = overrideRows.length
+    ? overrideRows
+    : (Array.isArray(job?.multiple_posts) ? job.multiple_posts : (Array.isArray(job?.districtPosts) ? job.districtPosts : []));
+
+  return rows.map((row, index) => ({
+    id: row.id || `${getJobKey(job)}-district-${index}`,
+    district: row.district || row.district_name || "",
+    post: row.post || row.posts || row.num_posts || "",
+    quota: row.quota || row.quota_percentage || "",
+  }));
+};
+
+const getMeritType = (job) =>
+  String(job?.eligibility?.merit_type || job?.merit_type || job?.pivot?.merit_type || "").toLowerCase();
+
+const isQuotaBasedJob = (job) => {
+  if (typeof job?.quotaBased === "boolean") return job.quotaBased;
+  const meritType = getMeritType(job);
+  if (meritType === "open_merit") return false;
+  if (meritType === "quota_wise") return true;
+  return normalizeDistrictPosts(job).length > 0;
+};
+
+const serializeDistrictRows = (rows = []) =>
+  rows
+    .filter((row) => row.district || row.post || row.quota)
+    .map((row) => ({
+      district: row.district || "",
+      post: row.post || "",
+      quota: row.quota || "",
+    }));
 
 const normalizeJobOption = (job) => {
   const id = getJobKey(job);
   if (!id) return null;
+  const quotaBased = isQuotaBasedJob(job);
 
   return {
     id,
@@ -116,8 +182,17 @@ const normalizeJobOption = (job) => {
     department: getJobDepartmentName(job),
     scale: job.scale?.name || job.scale?.scale_name || job.scale || "",
     num_posts: Number(job.num_posts || job.pivot?.num_posts || 1) || 1,
+    qualificationText: getQualificationText(job),
+    districtPosts: quotaBased ? normalizeDistrictPosts(job) : [],
+    quotaBased,
   };
 };
+
+const stringifyDistrictPosts = (rows = []) =>
+  rows
+    .filter((row) => row.district || row.post || row.quota)
+    .map((row) => `${row.district || "N/A"}:${row.post || "0"}:${row.quota || ""}`)
+    .join(" | ");
 
 const mergeJobOptions = (...lists) => {
   const map = new Map();
@@ -164,6 +239,36 @@ const buildAdvertisementChangeLogs = (originalJobs, selectedIds, jobConfigs) => 
         before: originalCount,
         after: currentCount,
         message: `${job.designation} posts changed from ${originalCount} to ${currentCount}.`,
+      });
+    }
+
+    const originalQualification = String(job.qualificationText || "").trim();
+    const currentQualification = String(jobConfigs[jobId]?.qualificationText || "").trim();
+    if (originalQualification !== currentQualification) {
+      logs.push({
+        type: "qualification_changed",
+        field: "qualification",
+        label: "Qualification",
+        job_id: jobId,
+        designation: job.designation,
+        before: originalQualification || "N/A",
+        after: currentQualification || "Removed",
+        message: `${job.designation} qualification changed.`,
+      });
+    }
+
+    const originalDistricts = stringifyDistrictPosts(job.districtPosts);
+    const currentDistricts = stringifyDistrictPosts(jobConfigs[jobId]?.districtPosts || []);
+    if (job.quotaBased && originalDistricts !== currentDistricts) {
+      logs.push({
+        type: "districts_changed",
+        field: "district_posts",
+        label: "Districts",
+        job_id: jobId,
+        designation: job.designation,
+        before: originalDistricts || "N/A",
+        after: currentDistricts || "Removed",
+        message: `${job.designation} districts changed.`,
       });
     }
   });
@@ -539,6 +644,54 @@ const AdvertisementEditForm = () => {
     );
   };
 
+  const updateQualificationText = (jobId, value) => {
+    setJobConfigs((prev) => ({
+      ...prev,
+      [jobId]: {
+        ...prev[jobId],
+        qualificationText: value,
+      },
+    }));
+  };
+
+  const updateDistrictPost = (jobId, index, field, value) => {
+    setJobConfigs((prev) => {
+      const rows = [...(prev[jobId]?.districtPosts || [])];
+      rows[index] = { ...rows[index], [field]: value };
+
+      return {
+        ...prev,
+        [jobId]: {
+          ...prev[jobId],
+          districtPosts: rows,
+        },
+      };
+    });
+  };
+
+  const addDistrictPost = (jobId) => {
+    setJobConfigs((prev) => ({
+      ...prev,
+      [jobId]: {
+        ...prev[jobId],
+        districtPosts: [
+          ...(prev[jobId]?.districtPosts || []),
+          { id: `${jobId}-district-${Date.now()}`, district: "", post: "", quota: "" },
+        ],
+      },
+    }));
+  };
+
+  const removeDistrictPost = (jobId, index) => {
+    setJobConfigs((prev) => ({
+      ...prev,
+      [jobId]: {
+        ...prev[jobId],
+        districtPosts: (prev[jobId]?.districtPosts || []).filter((_, rowIndex) => rowIndex !== index),
+      },
+    }));
+  };
+
   const removeSelectedPost = (jobId) => {
     if (selectedIds.length === 1) {
       toast.error("Advertisement must have at least one job");
@@ -626,6 +779,8 @@ const AdvertisementEditForm = () => {
                 subjectIds,
                 cceStage: savedCceStage,
                 numPosts: Number(job.num_posts || job.pivot?.num_posts || 1) || 1,
+                qualificationText: getQualificationText(job),
+                districtPosts: isQuotaBasedJob(job) ? normalizeDistrictPosts(job) : [],
               };
             });
             setSelectedIds(jIds);
@@ -821,25 +976,39 @@ const AdvertisementEditForm = () => {
     const subjectsPayload = {};
     const cceStagesPayload = {};
     const postCountsPayload = {};
+    const qualificationsPayload = {};
+    const districtPostsPayload = {};
     const removedJobIds = originalSelectedIds.filter(
       (jobId) => !selectedIds.includes(jobId)
     );
-    const selectedJobDetailsPayload = selectedIds.map((jobId) => ({
-      id: jobId,
-      job_id: jobId,
-      hash_id: jobId,
-      num_posts: Math.max(1, Number(jobConfigs[jobId]?.numPosts) || 1),
-    }));
+    const selectedJobDetailsPayload = selectedIds.map((jobId) => {
+      const jobMeta = availableJobs.find((job) => String(job.id) === String(jobId));
+      const quotaBased = !!jobMeta?.quotaBased;
+
+      return {
+        id: jobId,
+        job_id: jobId,
+        hash_id: jobId,
+        num_posts: Math.max(1, Number(jobConfigs[jobId]?.numPosts) || 1),
+        qualification_text: jobConfigs[jobId]?.qualificationText || "",
+        quota_based: quotaBased,
+        district_posts: quotaBased ? serializeDistrictRows(jobConfigs[jobId]?.districtPosts || []) : [],
+      };
+    });
     const validSubjectHashIds = new Set(
       subjects.map((subject) => String(subject.hash_id))
     );
 
     selectedIds.forEach((jobId) => {
       const config = jobConfigs[jobId] || {};
+      const jobMeta = availableJobs.find((job) => String(job.id) === String(jobId));
+      const quotaBased = !!jobMeta?.quotaBased;
 
       feesPayload[jobId] = config.fee || "";
       testTypesPayload[jobId] = config.testType || "";
       postCountsPayload[jobId] = Math.max(1, Number(config.numPosts) || 1);
+      qualificationsPayload[jobId] = config.qualificationText || "";
+      districtPostsPayload[jobId] = quotaBased ? serializeDistrictRows(config.districtPosts || []) : [];
 
       subjectsPayload[jobId] = isWrittenTestType(config.testType)
         ? subjects
@@ -897,6 +1066,8 @@ const AdvertisementEditForm = () => {
       job_num_posts: postCountsPayload,
       job_counts: postCountsPayload,
       post_counts: postCountsPayload,
+      job_qualifications: qualificationsPayload,
+      job_district_posts: districtPostsPayload,
       jobs: selectedJobDetailsPayload,
       job_details: selectedJobDetailsPayload,
       change_logs: advertisementChangeLogs,
@@ -1137,17 +1308,17 @@ const AdvertisementEditForm = () => {
               </div>
             </div>
 
-            <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
-              <div className="mb-4 flex flex-col gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 p-4 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
+              <div className="mb-3 flex flex-col gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-emerald-900">
                     Jobs included in this advertisement
                   </p>
-                  <p className="mt-1 text-xs text-emerald-700">
+                  <p className="text-xs text-emerald-700">
                     Change total posts or remove a job from this advertisement.
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm">
+                <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">
                   {selectedIds.reduce(
                     (total, jobId) =>
                       total + (Number(jobConfigs[jobId]?.numPosts) || 0),
@@ -1158,7 +1329,7 @@ const AdvertisementEditForm = () => {
               </div>
 
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <div className="hidden md:grid md:grid-cols-[minmax(0,1fr)_140px_56px] gap-3 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase text-slate-600">
+                <div className="hidden md:grid md:grid-cols-[minmax(0,1fr)_120px_48px] gap-2 bg-slate-100 px-3 py-2.5 text-xs font-semibold uppercase text-slate-600">
                   <span>Post</span>
                   <span>No. of Posts</span>
                   <span className="text-center">Action</span>
@@ -1169,34 +1340,105 @@ const AdvertisementEditForm = () => {
                     return (
                       <div
                         key={jobId}
-                        className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_140px_56px] gap-3 items-center border-t border-slate-100 px-4 py-3"
+                        className="border-t border-slate-100 px-3 py-3"
                       >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-800">
-                            {job.designation}
-                          </p>
-                          <p className="mt-1 truncate text-xs text-slate-500">
-                            {[job.department, job.scale].filter(Boolean).join(" | ") || `Job ID: ${jobId}`}
-                          </p>
+                        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_120px_48px] gap-2 items-center">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-800">
+                              {job.designation}
+                            </p>
+                            <p className="truncate text-xs text-slate-500">
+                              {[job.department, job.scale].filter(Boolean).join(" | ") || `Job ID: ${jobId}`}
+                            </p>
+                          </div>
+                          <TextField
+                            fullWidth
+                            type="number"
+                            value={jobConfigs[jobId]?.numPosts || job.num_posts || 1}
+                            onChange={(e) => updatePostCount(jobId, e.target.value)}
+                            inputProps={{ min: 1, step: 1 }}
+                            size="small"
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-prev flex justify-center items-center"
+                            onClick={() => removeSelectedPost(jobId)}
+                            title="Remove post"
+                            disabled={selectedIds.length === 1}
+                            style={{ height: 38, padding: "0 10px" }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          value={jobConfigs[jobId]?.numPosts || job.num_posts || 1}
-                          onChange={(e) => updatePostCount(jobId, e.target.value)}
-                          inputProps={{ min: 1, step: 1 }}
-                          size="small"
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-prev flex justify-center items-center"
-                          onClick={() => removeSelectedPost(jobId)}
-                          title="Remove post"
-                          disabled={selectedIds.length === 1}
-                          style={{ height: 40, padding: "0 12px" }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+
+                        <div className="mt-3 grid grid-cols-1 gap-3">
+                          <TextField
+                            fullWidth
+                            multiline
+                            minRows={2}
+                            label="Qualification"
+                            value={jobConfigs[jobId]?.qualificationText || ""}
+                            onChange={(e) => updateQualificationText(jobId, e.target.value)}
+                            placeholder="Enter qualification text for this advertisement"
+                            size="small"
+                          />
+
+                          {job.quotaBased && (
+                            <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                              <div className="divide-y divide-slate-200 bg-white">
+                                {(jobConfigs[jobId]?.districtPosts || []).length ? (
+                                  (jobConfigs[jobId]?.districtPosts || []).map((row, index) => (
+                                    <div
+                                      key={row.id || `${jobId}-${index}`}
+                                      className="grid grid-cols-1 gap-2 px-3 py-2 md:grid-cols-[minmax(0,1fr)_150px_38px] md:items-center"
+                                    >
+                                      <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="District / Unit"
+                                        value={row.district || ""}
+                                        onChange={(e) => updateDistrictPost(jobId, index, "district", e.target.value)}
+                                      />
+                                      <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Distribution"
+                                        type="number"
+                                        value={row.post || ""}
+                                        onChange={(e) => updateDistrictPost(jobId, index, "post", e.target.value)}
+                                        inputProps={{ min: 0, step: 1 }}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="btn btn-prev flex justify-center items-center"
+                                        onClick={() => removeDistrictPost(jobId, index)}
+                                        title="Remove district"
+                                        style={{ height: 36, padding: "0 10px" }}
+                                      >
+                                        <Trash2 size={15} />
+                                      </button>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="px-3 py-2 text-xs text-slate-500">
+                                    No district rows.
+                                  </div>
+                                )}
+                              </div>
+                              <div className="border-t border-slate-100 px-3 py-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-primary"
+                                  onClick={() => addDistrictPost(jobId)}
+                                  style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 32, padding: "0 10px", whiteSpace: "nowrap" }}
+                                >
+                                  <Plus size={14} />
+                                  <span>Add District</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })

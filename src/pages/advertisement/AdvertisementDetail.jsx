@@ -360,6 +360,9 @@ const AdvertisementDetail = () => {
   };
 
   const getQualificationText = (job) => {
+    const pivotText = job.pivot?.qualification_text || job.qualification_text;
+    if (pivotText) return pivotText;
+
     const q = job.qualification;
     if (!q) return 'N/A';
 
@@ -398,6 +401,20 @@ const AdvertisementDetail = () => {
       '';
 
     return String(value || '').trim();
+  };
+
+  const getAdvertisementDistrictPosts = (job) => {
+    const value = job.advertisement_district_posts || job.pivot?.district_posts;
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string' && value.trim()) {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
   };
 
   const getJobChangeLogs = (job) => {
@@ -454,27 +471,6 @@ const AdvertisementDetail = () => {
     return [];
   };
 
-  const getAdvertisementChangeLogs = () => {
-    const raw =
-      advertisement?.advertisement_change_logs ||
-      advertisement?.change_logs ||
-      advertisement?.change_log ||
-      advertisement?.change_logs_json ||
-      [];
-
-    if (Array.isArray(raw)) return raw;
-    if (typeof raw === 'string' && raw.trim()) {
-      try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-
-    return [];
-  };
-
   const getChangeByField = (changeLogs, fields = [], labels = []) => {
     const fieldSet = fields.map((field) => String(field).toLowerCase());
     const labelSet = labels.map((label) => String(label).toLowerCase());
@@ -521,13 +517,15 @@ const AdvertisementDetail = () => {
         deptName = job.department;
       } else if (job.department && typeof job.department === 'object') {
         deptName = job.department.department_name || job.department.name || 'Other Department';
+      } else if (job.department_label) {
+        deptName = job.department_label;
       } else if (job.department_name) {
         deptName = job.department_name;
       }
 
       const deptId = (job.department && typeof job.department === 'object')
         ? (job.department.hash_id || job.department.id || deptName)
-        : deptName;
+        : (job.department_id || deptName);
 
       if (!map[deptId]) {
         map[deptId] = {
@@ -583,13 +581,6 @@ const AdvertisementDetail = () => {
   }
 
   const termsList = parseTerms(advertisement.terms_conditions);
-  const advertisementChangeLogs = getAdvertisementChangeLogs();
-  const deletedJobLogs = advertisementChangeLogs.filter(
-    (log) => log?.type === 'deleted' || log?.field === 'job_deleted'
-  );
-  const postCountLogs = advertisementChangeLogs.filter(
-    (log) => log?.type === 'count_changed' || log?.field === 'num_posts'
-  );
 
   // Running serial number across ALL departments/posts (1, 2, 3 ...).
   // Reset on every render; the JSX maps execute top-to-bottom in order.
@@ -635,15 +626,17 @@ const AdvertisementDetail = () => {
         }
         .adv-masthead {
           position: relative;
-          text-align: center;
+          min-height: 62px;
+          text-align: left;
           border-bottom: 2px solid #14532d;
           padding-bottom: 8px;
         }
         .adv-mast-info {
           position: absolute;
-          top: 0;
-          left: 0;
-          text-align: left;
+          top: 32px;
+          right: 0;
+          max-width: 210px;
+          text-align: right;
         }
         .adv-mast-info .adv-name {
           font-size: 12.5px;
@@ -699,22 +692,50 @@ const AdvertisementDetail = () => {
           background: #7d6418;
         }
         .adv-mast-center {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 70px;
+          min-height: 78px;
+          padding-right: 230px;
           text-align: center;
         }
         .adv-crest-img {
-          width: 52px;
-          height: 52px;
-          margin: 0 auto 3px;
+          width: 72px;
+          height: 72px;
+          margin: 0;
           display: block;
           object-fit: contain;
+          flex: 0 0 auto;
         }
         .adv-title {
           font-family: Georgia, "Times New Roman", serif;
-          font-size: 13px;
-          font-weight: 700;
           color: #14532d;
           letter-spacing: .01em;
-          white-space: nowrap;
+          line-height: 1.15;
+          text-align: center;
+          text-transform: uppercase;
+        }
+        .adv-title-main {
+          display: block;
+          font-size: 15px;
+          font-weight: 900;
+          line-height: 1.15;
+        }
+        .adv-title-sub {
+          display: block;
+          font-size: 17px;
+          font-weight: 900;
+          line-height: 1.15;
+          margin-top: 2px;
+        }
+        .adv-title-place {
+          display: block;
+          font-size: 14px;
+          font-weight: 700;
+          line-height: 1.2;
+          margin-top: 4px;
+          text-transform: none;
         }
         .adv-dept-center {
           text-align: center;
@@ -1400,7 +1421,9 @@ const AdvertisementDetail = () => {
                 className="adv-crest-img"
               />
               <div className="adv-title">
-                Azad Government of the State of Jammu &amp; Kashmir, Jalalabad, Muzaffarabad
+                <span className="adv-title-main">Azad Jammu &amp; Kashmir</span>
+                <span className="adv-title-sub">Public Service Commission</span>
+                <span className="adv-title-place">Jalalabad, Muzaffarabad.</span>
               </div>
             </div>
 
@@ -1472,6 +1495,7 @@ const AdvertisementDetail = () => {
                       'experience_length',
                       'experience_type',
                       'training_institute',
+                      'qualification',
                     ],
                     [
                       'Academic qualification',
@@ -1481,12 +1505,17 @@ const AdvertisementDetail = () => {
                       'Experience length',
                       'Experience type',
                       'Training institute',
+                      'Qualification',
                     ]
                   );
 
+                  const advertisementDistrictPosts = getAdvertisementDistrictPosts(job);
+                  const districtRows = advertisementDistrictPosts.length
+                    ? advertisementDistrictPosts
+                    : (job.multiple_posts || []);
                   const districtsNote =
-                    job.multiple_posts?.length > 0
-                      ? job.multiple_posts
+                    districtRows.length > 0
+                      ? districtRows
                           .map((mp) => `${getDistrictName(mp.district)} ${mp.post || ''}`.trim())
                           .join(', ')
                       : districtOptions.map((d) => d.name).join(', ') || 'All AJK Districts';
@@ -1533,7 +1562,7 @@ const AdvertisementDetail = () => {
                             <th>Sr No</th>
                             <th>Case No</th>
                             <th>Description</th>
-                            <th>Qualification</th>
+                            <th>Service Rules / Qualification</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1543,6 +1572,9 @@ const AdvertisementDetail = () => {
                             <td className="case-col">{job.hash_id || 'N/A'}</td>
 
                             <td className="desc-col">
+                              <span className="kv">
+                                <b>Department:</b> {dept.name || 'N/A'}
+                              </span>
                               <span className="kv">
                                 <b>Quota:</b> {renderChangedValue(quotaLabel, quotaChange)}
                               </span>
@@ -1578,7 +1610,7 @@ const AdvertisementDetail = () => {
                               {renderChangedValue(getQualificationText(job), qualificationChange)}
                               {serviceRuleText && (
                                 <span className="adv-service-rule-text">
-                                  <b>Service Rule:</b> {serviceRuleText}
+                                  {serviceRuleText}
                                 </span>
                               )}
                             </td>
@@ -1604,26 +1636,6 @@ const AdvertisementDetail = () => {
                 })}
             </section>
           ))}
-
-          {(postCountLogs.length > 0 || deletedJobLogs.length > 0) && (
-            <section className="adv-change-log">
-              <div className="adv-change-log-title">Change Logs</div>
-              {[...postCountLogs, ...deletedJobLogs].map((log, index) => (
-                <div key={`${log.job_id || index}-${index}`} className="adv-change-log-row">
-                  <div>
-                    <b>{log.designation || log.label || 'Post'}</b>
-                    <div>{log.message || log.label}</div>
-                  </div>
-                  <div className="adv-change-before">
-                    <b>Before:</b> {log.before ?? 'N/A'}
-                  </div>
-                  <div className={log.type === 'deleted' || log.field === 'job_deleted' ? 'adv-change-deleted' : 'adv-change-after'}>
-                    <b>After:</b> {log.after ?? 'N/A'}
-                  </div>
-                </div>
-              ))}
-            </section>
-          )}
 
           <h3 className="adv-block-title">Terms &amp; Conditions</h3>
 

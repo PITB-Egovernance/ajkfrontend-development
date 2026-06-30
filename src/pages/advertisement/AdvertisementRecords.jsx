@@ -602,14 +602,14 @@ const AdvertisementRecords = () => {
         );
       }
     },
-    {
-      field: 'change_logs',
-      headerName: 'Change Logs',
-      width: 300,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => <ChangeLogsCell logs={params.row.change_logs} />
-    },
+    // {
+    //   field: 'change_logs',
+    //   headerName: 'Change Logs',
+    //   width: 300,
+    //   sortable: false,
+    //   filterable: false,
+    //   renderCell: (params) => <ChangeLogsCell logs={params.row.change_logs} />
+    // },
     {
       field: 'actions',
       headerName: 'Actions',
