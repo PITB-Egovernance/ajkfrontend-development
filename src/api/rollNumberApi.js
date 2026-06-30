@@ -64,6 +64,14 @@ const RollNumberApi = {
     });
   },
 
+  // JSON slip data for the in-app viewer (fast — skips PDF rendering)
+  getSlipViewData: async (applicationNumber) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}/view-data`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
   // Update an existing slip's editable fields
   updateSlip: async (applicationNumber, body) => {
     const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}`, {

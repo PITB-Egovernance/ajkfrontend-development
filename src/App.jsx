@@ -75,6 +75,7 @@ import DepartmentUserForm from 'pages/settings/DepartmentUsers/DepartmentUserFor
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
 import RollSlipEditor from 'pages/roll-numbers/RollSlipEditor';
+import RollSlipView from 'pages/roll-numbers/RollSlipView';
 import RollNumberExamFlow from 'pages/roll-numbers/RollNumberExamFlow';
 import AwardList from 'pages/award-list/AwardList';
 import AwardListDetail from 'pages/award-list/AwardListDetail';
@@ -228,6 +229,7 @@ function App() {
           <Route path="roll-numbers" element={<RollNumberManagement />} />
           <Route path="roll-numbers/exam/:examType" element={<RollNumberExamFlow />} />
           <Route path="roll-numbers/edit-slip/:applicationNumber" element={<RollSlipEditor />} />
+          <Route path="roll-numbers/slip/:applicationNumber" element={<RollSlipView />} />
 
           {/* Award List Routes */}
           <Route path="award-lists" element={<AwardList />} />

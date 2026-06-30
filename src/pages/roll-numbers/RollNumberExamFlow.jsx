@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileCheck2, Filter, Hash, MapPin, Search, Send, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Download, Eye, FileCheck2, Filter, Hash, MapPin, Search, Send, Users } from 'lucide-react';
 import { MenuItem, TextField } from '@mui/material';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
@@ -442,6 +442,13 @@ const RollNumberExamFlow = () => {
         ext_advertisement_id: app.job_post?.ext_advertisement_id || '',
         preferred_exam_cities: (app.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
         personal_details: app.snapshot_data || {},
+        // Pass document URLs straight through from the candidate API (already
+        // fetched by the browser) so the backend doesn't need its own
+        // outbound call to the candidate portal to resolve them later.
+        documents: (app.candidate?.documents || []).map(d => ({
+          doc_type: d.doc_type || d.type || '',
+          file_url: d.file_url || d.url || '',
+        })).filter(d => d.doc_type && d.file_url),
       }));
 
       const centerId = selectedCenterIds[0];
@@ -480,6 +487,13 @@ const RollNumberExamFlow = () => {
       setGenerating(false);
     }
   };
+
+  // Navigates to a dedicated full-page slip viewer route (in-app, not a
+  // modal or a new browser tab) — consistent with how Advertisement detail
+  // pages are viewed elsewhere in the app.
+  const viewSlip = useCallback((applicationNumber) => {
+    navigate(`/dashboard/roll-numbers/slip/${applicationNumber}`);
+  }, [navigate]);
 
   const downloadSlip = useCallback(async (applicationNumber) => {
     const tid = toast.loading('Preparing slip PDF…');
@@ -668,7 +682,7 @@ const RollNumberExamFlow = () => {
               {generatedCandidates.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No candidates generated yet</td></tr>
               )}
-              {generatedCandidates.map((candidate) => <tr key={candidate.id} className="hover:bg-slate-50"><td className="px-4 py-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-200 text-sm font-bold text-slate-700">{candidate.photo}</div></td><td className="px-4 py-3 font-bold text-slate-900">{candidate.roll}</td><td className="px-4 py-3"><div className="font-semibold text-slate-900">{candidate.name}</div><div className="text-xs text-slate-500">{candidate.cnic}{candidate.district ? ` | ${candidate.district}` : ''}</div></td><td className="px-4 py-3 text-slate-600">{selectedPosts.map((post) => post.post).join(' + ') || 'N/A'}</td><td className="px-4 py-3 text-slate-600">{candidate.center}</td><td className="px-4 py-3 text-right"><Button variant="outline" size="sm" className="bg-white" onClick={() => downloadSlip(candidate.id)}>View Slip</Button></td></tr>)}
+              {generatedCandidates.map((candidate) => <tr key={candidate.id} className="hover:bg-slate-50"><td className="px-4 py-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-200 text-sm font-bold text-slate-700">{candidate.photo}</div></td><td className="px-4 py-3 font-bold text-slate-900">{candidate.roll}</td><td className="px-4 py-3"><div className="font-semibold text-slate-900">{candidate.name}</div><div className="text-xs text-slate-500">{candidate.cnic}{candidate.district ? ` | ${candidate.district}` : ''}</div></td><td className="px-4 py-3 text-slate-600">{selectedPosts.map((post) => post.post).join(' + ') || 'N/A'}</td><td className="px-4 py-3 text-slate-600">{candidate.center}</td><td className="px-4 py-3 text-right"><div className="flex justify-end gap-2"><Button variant="outline" size="sm" className="gap-1.5 bg-white" onClick={() => viewSlip(candidate.id)}><Eye size={14} /> View Slip</Button><Button variant="outline" size="sm" className="w-9 h-9 p-0 bg-white" title="Download Slip" aria-label="Download Slip" onClick={() => downloadSlip(candidate.id)}><Download size={14} /></Button></div></td></tr>)}
             </tbody></table></div>
             <div className="flex justify-start"><Button variant="outline" className="gap-2 bg-white" onClick={() => setStage(2)}><ArrowLeft size={15} /> Back to Allocation</Button></div>
           </CardContent></Card>
