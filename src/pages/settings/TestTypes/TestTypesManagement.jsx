@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
-import {
-  TextField, IconButton, Dialog, DialogTitle,
-  DialogContent, DialogActions, Menu, MenuItem, Switch, FormControlLabel,
-} from '@mui/material';
+import { IconButton, Menu, MenuItem, Switch } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, MoreVertical, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -26,7 +23,7 @@ const EXAM_CATEGORIES = [
   { value: 'one_paper_mcq',         label: 'One Paper MCQ' },
   { value: 'two_paper_mcq',         label: 'Two Paper MCQ' },
   { value: 'written_exam',          label: 'Written Exam' },
-  { value: 'joint_competitive_exam', label: 'Joint Competitive Exam' },
+  { value: 'joint_competitive_exam', label: 'CCE Exam' },
 ];
 
 
@@ -40,20 +37,6 @@ const getHeaders = (json = true) => {
   return h;
 };
 
-const emptyForm = {
-  name: '',
-  description: '',
-  exam_category: 'one_paper_mcq',
-  total_marks: '',
-  paper_weightage_percentage: '',
-  interview_weightage_percentage: '',
-  interview_marks: '',
-  passing_marks: '',
-  passing_percentage: '',
-  is_passing_required: false,
-  status: 'active',
-};
-
 const TestTypesManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);
   const canEdit = hasPermission(`${PERM}.edit`);
@@ -63,17 +46,12 @@ const TestTypesManagement = () => {
 
   const [rows,     setRows]     = useState([]);
   const [loading,  setLoading]  = useState(true);
-  const [open,     setOpen]     = useState(false);
-  const [editing,  setEditing]  = useState(null);
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
 
-  const [formData, setFormData] = useState(emptyForm);
-  const [formError, setFormError] = useState('');
-  const [saving,   setSaving]   = useState(false);
   const [filters,  setFilters]  = useState({ name: '', exam_category: '', total_marks: '', status: '' });
   const [total,    setTotal]    = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
@@ -86,7 +64,6 @@ const TestTypesManagement = () => {
       type: 'select',
       options: EXAM_CATEGORIES,
     },
-    { name: 'total_marks', label: 'Total Marks', type: 'text', placeholder: 'Filter by marks' },
     {
       name: 'status',
       label: 'Status',
@@ -122,6 +99,24 @@ const TestTypesManagement = () => {
     interview_marks:    item.interview_marks ?? '',
     passing_marks:      item.passing_marks ?? '',
     passing_percentage: item.passing_percentage ?? '',
+    // Two-paper / written / CCE extended fields (used to prefill the edit page).
+    paper1_weightage_percentage:    item.paper1_weightage_percentage ?? '',
+    paper2_weightage_percentage:    item.paper2_weightage_percentage ?? '',
+    total_subjects:                 item.total_subjects ?? '',
+    qualification_marks_percentage: item.qualification_marks_percentage ?? '',
+    interview_percentage:           item.interview_percentage ?? '',
+    screening_total_marks:          item.screening_total_marks ?? '',
+    screening_passing_marks:        item.screening_passing_marks ?? '',
+    screening_passing_percentage:   item.screening_passing_percentage ?? '',
+    screening_include_in_merit:     !!item.screening_include_in_merit,
+    compulsory_subjects_total_marks: item.compulsory_subjects_total_marks ?? '',
+    optional_subjects_total_marks:  item.optional_subjects_total_marks ?? '',
+    written_total_marks:            item.written_total_marks ?? '',
+    passing_percentage_per_subject: item.passing_percentage_per_subject ?? '',
+    aggregate_passing_percentage:   item.aggregate_passing_percentage ?? '',
+    interview_total_marks:          item.interview_total_marks ?? '',
+    interview_passing_percentage:   item.interview_passing_percentage ?? '',
+    interview_include_in_merit:     !!item.interview_include_in_merit,
     is_passing_required: !!item.is_passing_required,
     status:    item.status ?? 'active',
   }));
@@ -215,86 +210,9 @@ const TestTypesManagement = () => {
   const activeCount   = rows.filter((r) => (r.status ?? 'active') === 'active').length;
   const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
 
-  const openAdd = () => {
-    setEditing(null);
-    setFormData(emptyForm);
-    setFormError('');
-    setOpen(true);
-  };
+  const openAdd = () => navigate('/dashboard/settings/test-types/create');
 
-  const openEdit = (row) => {
-    setEditing(row);
-    setFormData({
-      name:          row.name || '',
-      description:   row.description || '',
-      exam_category: row.exam_category || 'one_paper_mcq',
-      total_marks:   row.total_marks ?? '',
-      paper_weightage_percentage:     row.paper_weightage_percentage ?? '',
-      interview_weightage_percentage: row.interview_weightage_percentage ?? '',
-      interview_marks:    row.interview_marks ?? '',
-      passing_marks:      row.passing_marks ?? '',
-      passing_percentage: row.passing_percentage ?? '',
-      is_passing_required: !!row.is_passing_required,
-      status:        row.status || 'active',
-    });
-    setFormError('');
-    setOpen(true);
-  };
-
-  // Build the request payload — omit optional numeric fields left blank so the
-  // backend keeps them null rather than rejecting an empty string.
-  const buildPayload = () => {
-    const payload = {
-      name:          formData.name.trim(),
-      exam_category: formData.exam_category,
-      total_marks:   Number(formData.total_marks),
-      status:        formData.status,
-      is_passing_required: !!formData.is_passing_required,
-    };
-    if (formData.description.trim()) payload.description = formData.description.trim();
-    const optionalNumbers = [
-      'paper_weightage_percentage',
-      'interview_weightage_percentage',
-      'interview_marks',
-      'passing_marks',
-      'passing_percentage',
-    ];
-    optionalNumbers.forEach((key) => {
-      if (formData[key] !== '' && formData[key] !== null) payload[key] = Number(formData[key]);
-    });
-    return payload;
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.name.trim())       { setFormError('Name is required.'); return; }
-    if (String(formData.total_marks).trim() === '') { setFormError('Total marks is required.'); return; }
-    const marks = Number(formData.total_marks);
-    if (Number.isNaN(marks) || marks < 0) { setFormError('Total marks must be a non-negative number.'); return; }
-
-    setSaving(true);
-    setFormError('');
-    try {
-      const isUpdate = !!editing;
-      const url = isUpdate
-        ? `${API_BASE}/settings/test-types/${editing.hash_id}/update`
-        : `${API_BASE}/settings/test-types/create`;
-      const res = await fetch(url, {
-        method:  isUpdate ? 'PUT' : 'POST',
-        headers: getHeaders(),
-        body:    JSON.stringify(buildPayload()),
-      });
-      const result = await res.json();
-      if (res.ok || result.success || result.status === 200 || result.status === 201) {
-        toast.success(isUpdate ? 'Exam test type updated successfully' : 'Exam test type added successfully');
-        setOpen(false);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
-      } else {
-        const fieldErrors = result.errors ? Object.values(result.errors).flat().join(', ') : '';
-        toast.error(fieldErrors || result.message || (isUpdate ? 'Failed to update exam test type' : 'Failed to add exam test type'));
-      }
-    } catch { toast.error('Server error while saving exam test type'); }
-    finally { setSaving(false); }
-  };
+  const openEdit = (row) => navigate(`/dashboard/settings/test-types/${row.hash_id}/edit`, { state: { row } });
 
   const handleDelete = async (row) => {
     if (!await confirmDelete({ title: 'Delete Exam Test Type', identifier: row.name })) return;
@@ -347,9 +265,6 @@ const TestTypesManagement = () => {
   const columns = [
     { field: 'sr_no',         headerName: '#',          width: 60 },
     { field: 'name',          headerName: 'Name',       flex: 1, minWidth: 200 },
-    
-    { field: 'total_marks',   headerName: 'Total Marks', width: 130,
-      renderCell: (p) => Number(p.value || 0).toLocaleString('en-PK') },
     { field: 'status',        headerName: 'Status',     width: 110,
       renderCell: (p) => (
         <Switch
@@ -452,71 +367,6 @@ const TestTypesManagement = () => {
           {canEdit && <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) openEdit(r); }}>Edit</MenuItem>}
           {canDelete && <MenuItem onClick={() => { const r = selectedRow; handleMenuClose(); if (r) handleDelete(r); }} sx={{ color: 'red' }}>Delete</MenuItem>}
         </Menu>
-
-        <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-          <DialogTitle className="font-bold">{editing ? 'Edit Exam/Test Type' : 'Add Exam/Test Type'}</DialogTitle>
-          <DialogContent>
-            {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
-            <TextField fullWidth autoFocus required label="Name" margin="normal" size="small"
-              value={formData.name}
-              onChange={(e) => { setFormData((f) => ({ ...f, name: e.target.value })); setFormError(''); }}
-              placeholder="e.g. PMS Two Paper MCQ" />
-            <TextField fullWidth multiline minRows={2} label="Description (optional)" margin="normal" size="small"
-              value={formData.description}
-              onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Short description of this exam test type" />
-
-            <div className="grid grid-cols-2 gap-3">
-              <TextField fullWidth required type="number" label="Total Marks" margin="normal" size="small"
-                value={formData.total_marks}
-                onChange={(e) => { setFormData((f) => ({ ...f, total_marks: e.target.value })); setFormError(''); }}
-                inputProps={{ min: 0, step: '0.01' }} placeholder="e.g. 200" />
-              {/*<TextField fullWidth type="number" label="Interview Marks" margin="normal" size="small"
-                value={formData.interview_marks}
-                onChange={(e) => setFormData((f) => ({ ...f, interview_marks: e.target.value }))}
-                inputProps={{ min: 0, step: '0.01' }} placeholder="e.g. 40" />*/}
-              <TextField fullWidth type="number" label="Paper Weightage (%)" margin="normal" size="small"
-                value={formData.paper_weightage_percentage}
-                onChange={(e) => setFormData((f) => ({ ...f, paper_weightage_percentage: e.target.value }))}
-                inputProps={{ min: 0, max: 100, step: '0.01' }} placeholder="0 - 100" />
-              <TextField fullWidth type="number" label="Interview Weightage (%)" margin="normal" size="small"
-                value={formData.interview_weightage_percentage}
-                onChange={(e) => setFormData((f) => ({ ...f, interview_weightage_percentage: e.target.value }))}
-                inputProps={{ min: 0, max: 100, step: '0.01' }} placeholder="0 - 100" />
-              <TextField fullWidth type="number" label="Passing Marks" margin="normal" size="small"
-                value={formData.passing_marks}
-                onChange={(e) => setFormData((f) => ({ ...f, passing_marks: e.target.value }))}
-                inputProps={{ min: 0, step: '0.01' }} placeholder="e.g. 100" />
-              <TextField fullWidth type="number" label="Passing Percentage (%)" margin="normal" size="small"
-                value={formData.passing_percentage}
-                onChange={(e) => setFormData((f) => ({ ...f, passing_percentage: e.target.value }))}
-                inputProps={{ min: 0, max: 100, step: '0.01' }} placeholder="0 - 100" />
-            </div>
-
-            <div className="flex items-center justify-between flex-wrap gap-2 mt-2">
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.is_passing_required}
-                    onChange={(e) => setFormData((f) => ({ ...f, is_passing_required: e.target.checked }))}
-                    size="small"
-                  />
-                }
-                label="Passing required"
-              />
-            </div>
-          </DialogContent>
-          <DialogActions className="px-4 pb-4 gap-2">
-            <button onClick={() => setOpen(false)} disabled={saving}
-              className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">
-              Cancel
-            </button>
-            <button onClick={handleSubmit} disabled={saving}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white font-medium rounded-lg text-sm disabled:opacity-60">
-              {saving ? 'Saving…' : editing ? 'Update' : 'Add'}
-            </button>
-          </DialogActions>
-        </Dialog>
       </div>
     </div>
   );
