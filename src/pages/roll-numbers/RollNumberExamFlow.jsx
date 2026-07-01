@@ -114,6 +114,13 @@ const RollNumberExamFlow = () => {
   const [scheduleTimes, setScheduleTimes] = useState(() => meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
   const [scheduleDurations, setScheduleDurations] = useState(() => meta.papers.map((_, i) => i === 1 ? 120 : 90));
 
+  // Reset schedule state when exam type changes (same component, different route param)
+  useEffect(() => {
+    setScheduleDates(meta.papers.map(() => ''));
+    setScheduleTimes(meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
+    setScheduleDurations(meta.papers.map((_, i) => i === 1 ? 120 : 90));
+  }, [examType]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [advertisements, setAdvertisements] = useState([]);
   const [centers, setCenters] = useState([]);
   const [generatedCandidates, setGeneratedCandidates] = useState([]);
@@ -641,9 +648,9 @@ const RollNumberExamFlow = () => {
                   <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4">
                     <div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-                      <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(event) => setScheduleDates((current) => current.map((date, dateIndex) => dateIndex === index ? event.target.value : date))} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
-                      <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(event) => setScheduleTimes((current) => current.map((time, timeIndex) => timeIndex === index ? event.target.value : time))} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
-                      <TextField select size="small" label="Duration *" value={scheduleDurations[index] ?? 90} onChange={(event) => setScheduleDurations((current) => current.map((dur, durIndex) => durIndex === index ? Number(event.target.value) : dur))} required InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
+                      <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(event) => { const v = event.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                      <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(event) => { const v = event.target.value; setScheduleTimes((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                      <TextField select size="small" label="Duration *" value={scheduleDurations[index] ?? 90} onChange={(event) => { const v = Number(event.target.value); setScheduleDurations((cur) => { const a = [...cur]; while (a.length <= index) a.push(90); a[index] = v; return a; }); }} required InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
                         <MenuItem value={60}>60 Minutes</MenuItem>
                         <MenuItem value={90}>90 Minutes</MenuItem>
                         <MenuItem value={120}>120 Minutes</MenuItem>
