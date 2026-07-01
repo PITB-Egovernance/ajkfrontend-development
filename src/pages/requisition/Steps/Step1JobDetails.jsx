@@ -415,7 +415,7 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
             {designationOptions.map((d) => (
               <MenuItem key={d.id} value={d.name}>{d.name}</MenuItem>
             ))}
-            {!isOtherDesignation && formData.designation && !designationOptions.some((d) => d.name === formData.designation) && (
+            {!isOtherDesignation && !!formData.designation && !designationOptions.some((d) => d.name === formData.designation) && (
               <MenuItem value={formData.designation}>{formData.designation}</MenuItem>
             )}
             <MenuItem value={OTHER_DESIGNATION} sx={{ color: 'text.secondary', fontStyle: 'italic' }}>

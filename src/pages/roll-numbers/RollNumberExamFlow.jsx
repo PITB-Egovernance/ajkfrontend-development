@@ -17,20 +17,6 @@ const examTypeMeta = {
   'cce-exams': { title: 'CCE Exams Roll Number Management', badge: 'CCE Exams', description: 'CCE exams roll number generation following the same allocation pattern.', papers: ['CCE Exam'], testTypeFilter: (tt) => /cce/i.test(tt) },
 };
 
-const EXAM_TYPE_MAP = {
-  'one-paper-mcqs': ['MCQs', 'MCQ', 'One Paper MCQs', 'one-paper-mcqs'],
-  'two-paper-mcqs': ['Two Paper MCQs', 'two-paper-mcqs'],
-  'written-exams': ['Written Exam', 'Written', 'written-exams'],
-  'cce-exams': ['CCE', 'CCE Exam', 'cce-exams'],
-};
-
-const matchesExamType = (pivotTestType, examType, testTypeMap = {}) => {
-  if (!pivotTestType) return false;
-  const resolved = testTypeMap[String(pivotTestType)] || String(pivotTestType);
-  const tt = resolved.toLowerCase();
-  const keywords = EXAM_TYPE_MAP[examType] || [];
-  return keywords.some((k) => tt.includes(k.toLowerCase()));
-};
 
 const StepHeader = ({ number, title, subtitle }) => (
   <div className="flex items-start gap-3">
@@ -235,7 +221,8 @@ const RollNumberExamFlow = () => {
         .map((ad) => {
           const jobs = (ad.job_details || []).filter((job) => {
             const testType = job.pivot?.test_type || job.test_type || '';
-            return matchesExamType(testType, examType, testTypeMap);
+            const resolved = testTypeMap[String(testType)] || String(testType);
+            return meta.testTypeFilter(resolved);
           });
           if (jobs.length === 0) return null;
           return { ad, jobs };
@@ -365,6 +352,18 @@ const RollNumberExamFlow = () => {
     if (selectedCenterIds.length === 0) {
       toast.error('Select at least one exam center');
       return;
+    }
+
+    // Validate all paper schedules
+    for (let i = 0; i < meta.papers.length; i++) {
+      if (!scheduleDates[i]) {
+        toast.error(`${meta.papers[i]} Schedule: Start Date is required`);
+        return;
+      }
+      if (!scheduleTimes[i]) {
+        toast.error(`${meta.papers[i]} Schedule: Start Time is required`);
+        return;
+      }
     }
 
     setGenerating(true);
@@ -642,9 +641,9 @@ const RollNumberExamFlow = () => {
                   <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4">
                     <div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-                      <TextField size="small" type="date" label="Start Date" value={scheduleDates[index] || ''} onChange={(event) => setScheduleDates((current) => current.map((date, dateIndex) => dateIndex === index ? event.target.value : date))} InputLabelProps={{ shrink: true }} />
-                      <TextField size="small" type="time" label="Start Time" value={scheduleTimes[index] || ''} onChange={(event) => setScheduleTimes((current) => current.map((time, timeIndex) => timeIndex === index ? event.target.value : time))} InputLabelProps={{ shrink: true }} />
-                      <TextField select size="small" label="Duration" value={scheduleDurations[index] ?? 90} onChange={(event) => setScheduleDurations((current) => current.map((dur, durIndex) => durIndex === index ? Number(event.target.value) : dur))} InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
+                      <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(event) => setScheduleDates((current) => current.map((date, dateIndex) => dateIndex === index ? event.target.value : date))} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                      <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(event) => setScheduleTimes((current) => current.map((time, timeIndex) => timeIndex === index ? event.target.value : time))} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                      <TextField select size="small" label="Duration *" value={scheduleDurations[index] ?? 90} onChange={(event) => setScheduleDurations((current) => current.map((dur, durIndex) => durIndex === index ? Number(event.target.value) : dur))} required InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
                         <MenuItem value={60}>60 Minutes</MenuItem>
                         <MenuItem value={90}>90 Minutes</MenuItem>
                         <MenuItem value={120}>120 Minutes</MenuItem>
@@ -682,7 +681,7 @@ const RollNumberExamFlow = () => {
                 </div>
               </div>
 </div>
-            <div className="flex flex-wrap items-center justify-between gap-3"><Button variant="outline" className="gap-2 bg-white" onClick={() => setStage(1)}><ArrowLeft size={15} /> Back</Button><Button className="gap-2" disabled={!capacityPassed || generating} onClick={generateRollNumbers}><Send size={15} /> {generating ? 'Generating…' : 'Generate Roll Numbers'}</Button></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><Button variant="outline" className="gap-2 bg-white" onClick={() => setStage(1)}><ArrowLeft size={15} /> Back</Button><Button className="gap-2" disabled={!capacityPassed || generating || scheduleDates.some((d) => !d) || scheduleTimes.some((t) => !t)} onClick={generateRollNumbers}><Send size={15} /> {generating ? 'Generating…' : 'Generate Roll Numbers'}</Button></div>
           </CardContent></Card>
         )}
 
