@@ -296,22 +296,6 @@ const GroupsManagement = () => {
             <TextField fullWidth autoFocus label="Group Name" margin="normal" size="small"
               value={form.group_name} onChange={(e) => setForm((f) => ({ ...f, group_name: e.target.value }))}
               placeholder="e.g. Computer Science" />
-
-            {/* Status dropdown — only on edit */}
-            {editing && (
-              <TextField
-                select
-                fullWidth
-                label="Status"
-                margin="normal"
-                size="small"
-                value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
-              </TextField>
-            )}
           </DialogContent>
 
           <DialogActions className="px-4 pb-4 gap-2">

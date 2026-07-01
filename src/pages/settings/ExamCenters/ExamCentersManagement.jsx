@@ -523,20 +523,6 @@ const ExamCentersManagement = () => {
               onChange={(e) => setFormData((p) => ({ ...p, capacity: e.target.value }))}
               placeholder="e.g. 500"
             />
-            <TextField
-              fullWidth
-              select
-              label="Status"
-              margin="normal"
-              size="small"
-              value={formData.status}
-              onChange={(e) =>
-                setFormData((p) => ({ ...p, status: e.target.value }))
-              }
-            >
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button type="button" onClick={() => setOpenModal(false)} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">Cancel</button>

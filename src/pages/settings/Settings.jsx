@@ -20,7 +20,8 @@ import {
   Stamp,
   Boxes,
   Newspaper,
-  Hash
+  Hash,
+  FileText
 } from 'lucide-react';
 import { hasSubModuleAccess, isAdminUser } from 'utils/permissions';
 
@@ -68,6 +69,14 @@ const Settings = () => {
       iconBg: 'bg-rose-500',
       link: '/dashboard/settings/subjects',
       permModule: 'settings', permSub: 'subjects',
+    },
+    {
+      icon: FileText,
+      title: 'Written Exam Subjects',
+      description: 'Manage written exam subjects per designation',
+      iconBg: 'bg-emerald-500',
+      link: '/dashboard/settings/written-exam-subjects',
+      permModule: 'settings', permSub: 'written_exam_subjects',
     },
     {
       icon: Award,

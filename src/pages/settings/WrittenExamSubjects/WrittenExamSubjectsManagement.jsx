@@ -10,13 +10,9 @@ import {
   DialogContent,
   DialogActions,
   Switch,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  FormLabel,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
-import { Plus, ArrowLeft, MoreVertical, BookOpen, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical, FileText, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from "components/ui/ConfirmDelete";
@@ -24,8 +20,9 @@ import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
-import SubjectApi from "api/subjectApi";
-const PERM = "settings.subjects";
+import WrittenExamSubjectApi from "api/writtenExamSubjectApi";
+
+const PERM = "settings.written_exam_subjects";
 
 const gridSx = {
   border: "none",
@@ -51,9 +48,9 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
-const EMPTY_FORM = { subject_name: "", total_marks: "", subject_type: "compulsory", subject_group: "", status: "active" };
+const EMPTY_FORM = { designation: "", subject_name: "", total_marks: "", status: "active" };
 
-const SubjectManagement = () => {
+const WrittenExamSubjectsManagement = () => {
   const navigate = useNavigate();
   const canAdd = hasPermission(`${PERM}.add`);
   const canEdit = hasPermission(`${PERM}.edit`);
@@ -61,11 +58,11 @@ const SubjectManagement = () => {
   const canRowActions = canEdit || canDelete;
 
   const [allRows,    setAllRows]    = useState([]);
-  const [groups,     setGroups]     = useState([]);   // active group names from the Groups module
+  const [designations, setDesignations] = useState([]);   // active designation names
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [totalRows,  setTotalRows]  = useState(0);
-  const [filters,    setFilters]    = useState({ subject_name: "", subject_group: "", status: "" });
+  const [filters,    setFilters]    = useState({ designation: "", subject_name: "", status: "" });
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]  = useState([]);
@@ -83,7 +80,7 @@ const SubjectManagement = () => {
   ) => {
     setLoading(true);
     try {
-      const result = await SubjectApi.getAll(page + 1, pageSize);
+      const result = await WrittenExamSubjectApi.getAll(page + 1, pageSize);
       const pagination = result.data ?? {};
       const data = pagination.data ?? result.data ?? [];
       setAllRows(
@@ -91,18 +88,15 @@ const SubjectManagement = () => {
           id:            item.hash_id || item.id,
           hash_id:       item.hash_id || item.id,
           sr_no:         page * pageSize + i + 1,
+          designation:   item.designation ?? item.designation_name ?? item.post ?? "",
           subject_name:  item.subject_name,
-          // Type is derived from the group: a subject with a group is optional,
-          // one without a group is compulsory.
-          subject_type:  item.subject_group ? "optional" : "compulsory",
-          subject_group: item.subject_group,
           total_marks:   item.total_marks,
           status:        item.status ?? "active",
         }))
       );
       setTotalRows(Number(pagination.total) || 0);
     } catch {
-      toast.error("Failed to load subject data");
+      toast.error("Failed to load written exam subjects");
       setAllRows([]);
       setTotalRows(0);
     } finally {
@@ -110,19 +104,19 @@ const SubjectManagement = () => {
     }
   };
 
-  /* ── FETCH ACTIVE GROUPS ── */
-  const fetchGroups = async () => {
+  /* ── FETCH ACTIVE DESIGNATIONS ── */
+  const fetchDesignations = async () => {
     try {
-      const result = await SubjectApi.getGroups();
+      const result = await WrittenExamSubjectApi.getDesignations();
       const data = result.data?.data ?? result.data ?? [];
-      setGroups(
+      setDesignations(
         (Array.isArray(data) ? data : [])
-          .filter((g) => String(g?.status ?? "active").toLowerCase() === "active")
-          .map((g) => g.group_name ?? g.name ?? "")
+          .filter((d) => String(d?.status ?? "active").toLowerCase() === "active")
+          .map((d) => d.name ?? d.designation_name ?? d.title ?? "")
           .filter(Boolean)
       );
     } catch {
-      setGroups([]);
+      setDesignations([]);
     }
   };
 
@@ -131,13 +125,13 @@ const SubjectManagement = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paginationModel.page, paginationModel.pageSize]);
 
-  useEffect(() => { fetchGroups(); }, []);
+  useEffect(() => { fetchDesignations(); }, []);
 
   /* ── FILTER CONFIG ── */
   const filterConfig = [
-    { name: "subject_name",  label: "Subject Name", type: "text",   placeholder: "Filter by name" },
-    { name: "subject_group", label: "Group",        type: "select", options: groups.map((g) => ({ value: g, label: g })) },
-    { name: "status",        label: "Status",       type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
+    { name: "designation",  label: "Designation",  type: "select", options: designations.map((d) => ({ value: d, label: d })) },
+    { name: "subject_name", label: "Subject Name", type: "text",   placeholder: "Filter by name" },
+    { name: "status",       label: "Status",       type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
   ];
 
   const handleFilterChange = (e) => {
@@ -145,13 +139,13 @@ const SubjectManagement = () => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleClearFilters = () => setFilters({ subject_name: "", subject_group: "", status: "" });
+  const handleClearFilters = () => setFilters({ designation: "", subject_name: "", status: "" });
 
   /* ── CLIENT-SIDE FILTER ── */
   const filteredRows = allRows.filter((row) => {
-    if (filters.subject_name  && !row.subject_name?.toLowerCase().includes(filters.subject_name.toLowerCase())) return false;
-    if (filters.subject_group && row.subject_group !== filters.subject_group) return false;
-    if (filters.status        && row.status        !== filters.status)        return false;
+    if (filters.designation  && row.designation !== filters.designation) return false;
+    if (filters.subject_name && !row.subject_name?.toLowerCase().includes(filters.subject_name.toLowerCase())) return false;
+    if (filters.status       && row.status !== filters.status) return false;
     return true;
   });
 
@@ -173,11 +167,10 @@ const SubjectManagement = () => {
   const handleEdit = () => {
     setEditingRow(selectedRow);
     setFormData({
-      subject_name:  selectedRow.subject_name,
-      total_marks:   String(selectedRow.total_marks),
-      subject_type:  selectedRow.subject_type ?? "compulsory",
-      subject_group: selectedRow.subject_group,
-      status:        selectedRow.status ?? "active",
+      designation:  selectedRow.designation,
+      subject_name: selectedRow.subject_name,
+      total_marks:  String(selectedRow.total_marks),
+      status:       selectedRow.status ?? "active",
     });
     setFormErrors({});
     setOpenModal(true);
@@ -187,11 +180,10 @@ const SubjectManagement = () => {
   /* ── VALIDATION ── */
   const validate = () => {
     const errs = {};
+    if (!formData.designation) errs.designation = "Designation is required";
     if (!formData.subject_name.trim()) errs.subject_name = "Subject name is required";
     if (!formData.total_marks || isNaN(Number(formData.total_marks)) || Number(formData.total_marks) <= 0)
       errs.total_marks = "Marks must be a positive number";
-    if (formData.subject_type === "optional" && !formData.subject_group)
-      errs.subject_group = "Group is required";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -200,10 +192,10 @@ const SubjectManagement = () => {
   const handleDelete = async () => {
     if (!selectedRow) return;
     handleMenuClose();
-    if (!await confirmDelete({ title: "Delete Subject", identifier: selectedRow.subject_name })) return;
+    if (!await confirmDelete({ title: "Delete Written Exam Subject", identifier: selectedRow.subject_name })) return;
     try {
-      await SubjectApi.delete(selectedRow.hash_id);
-      toast.success("Subject deleted successfully");
+      await WrittenExamSubjectApi.delete(selectedRow.hash_id);
+      toast.success("Written exam subject deleted successfully");
       setSelectionModel((p) => p.filter((id) => id !== selectedRow.id));
       fetchAll();
     } catch {
@@ -214,10 +206,10 @@ const SubjectManagement = () => {
   /* ── BULK ACTIONS ── */
   const handleBulkDelete = async () => {
     if (!selectionModel.length) return;
-    if (!await confirmDelete({ title: "Delete Subjects", message: `Delete ${selectionModel.length} subject${selectionModel.length > 1 ? "s" : ""}?` })) return;
+    if (!await confirmDelete({ title: "Delete Written Exam Subjects", message: `Delete ${selectionModel.length} subject${selectionModel.length > 1 ? "s" : ""}?` })) return;
     try {
       const rows = allRows.filter((r) => selectionModel.includes(r.id));
-      await Promise.all(rows.map((r) => SubjectApi.delete(r.hash_id)));
+      await Promise.all(rows.map((r) => WrittenExamSubjectApi.delete(r.hash_id)));
       toast.success("Deleted selected subjects");
       setSelectionModel([]);
       fetchAll();
@@ -232,11 +224,10 @@ const SubjectManagement = () => {
       const rows = allRows.filter((r) => selectionModel.includes(r.id));
       await Promise.all(
         rows.map((r) =>
-          SubjectApi.update(r.hash_id, {
-            subject_name:  r.subject_name,
-            subject_type:  r.subject_type,
-            subject_group: r.subject_group,
-            total_marks:   r.total_marks,
+          WrittenExamSubjectApi.update(r.hash_id, {
+            designation:  r.designation,
+            subject_name: r.subject_name,
+            total_marks:  r.total_marks,
             status,
           })
         )
@@ -254,12 +245,11 @@ const SubjectManagement = () => {
     const newStatus = row.status === "active" ? "inactive" : "active";
     if (!await confirmStatus({ newStatus })) return;
     try {
-      await SubjectApi.update(row.hash_id, {
-        subject_name:  row.subject_name,
-        subject_type:  row.subject_type,
-        subject_group: row.subject_group,
-        total_marks:   row.total_marks,
-        status:        newStatus,
+      await WrittenExamSubjectApi.update(row.hash_id, {
+        designation:  row.designation,
+        subject_name: row.subject_name,
+        total_marks:  row.total_marks,
+        status:       newStatus,
       });
       toast.success(`Marked as ${newStatus}`);
       fetchAll();
@@ -274,18 +264,17 @@ const SubjectManagement = () => {
     setSaving(true);
     try {
       const payload = {
-        subject_name:  formData.subject_name.trim(),
-        subject_type:  formData.subject_type,
-        subject_group: formData.subject_type === "optional" ? formData.subject_group : "",
-        total_marks:   Number(formData.total_marks),
-        status:        formData.status,
+        designation:  formData.designation,
+        subject_name: formData.subject_name.trim(),
+        total_marks:  Number(formData.total_marks),
+        status:       formData.status,
       };
       if (editingRow) {
-        await SubjectApi.update(editingRow.hash_id, payload);
-        toast.success("Subject updated successfully");
+        await WrittenExamSubjectApi.update(editingRow.hash_id, payload);
+        toast.success("Written exam subject updated successfully");
       } else {
-        await SubjectApi.create(payload);
-        toast.success("Subject added successfully");
+        await WrittenExamSubjectApi.create(payload);
+        toast.success("Written exam subject added successfully");
       }
       setOpenModal(false);
       fetchAll();
@@ -299,25 +288,8 @@ const SubjectManagement = () => {
   /* ── COLUMNS ── */
   const columns = [
     { field: "sr_no",         headerName: "#",            width: 65  },
+    { field: "designation",   headerName: "Designation",  flex: 1    },
     { field: "subject_name",  headerName: "Subject Name", flex: 1    },
-    {
-      field: "subject_type",
-      headerName: "Type",
-      width: 130,
-      renderCell: (p) => {
-        const isOptional = String(p.value).toLowerCase() === "optional";
-        return (
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-              isOptional ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
-            }`}
-          >
-            {isOptional ? "Optional" : "Compulsory"}
-          </span>
-        );
-      },
-    },
-    { field: "subject_group", headerName: "Group",        width: 130 },
     { field: "total_marks",   headerName: "Marks",        width: 100 },
     {
       field: "status",
@@ -327,7 +299,7 @@ const SubjectManagement = () => {
         <Switch
           checked={p.value === "active"}
           onChange={() => handleToggleStatus(p.row)}
-          inputProps={{ "aria-label": "toggle subject status" }}
+          inputProps={{ "aria-label": "toggle written exam subject status" }}
           size="small"
           disabled={!canEdit}
           color={p.value === "active" ? "success" : "error"}
@@ -350,7 +322,7 @@ const SubjectManagement = () => {
   if (loading && allRows.length === 0)
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <InlineLoader text="Loading subject data..." variant="ring" size="lg" />
+        <InlineLoader text="Loading written exam subjects..." variant="ring" size="lg" />
       </div>
     );
 
@@ -369,11 +341,11 @@ const SubjectManagement = () => {
             </button>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg">
-                <BookOpen size={22} className="text-emerald-700" />
+                <FileText size={22} className="text-emerald-700" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">CCE Subjects</h1>
-                <p className="text-sm text-slate-500">Manage subject entries</p>
+                <h1 className="text-2xl font-bold text-slate-900">Written Exam Subjects</h1>
+                <p className="text-sm text-slate-500">Manage written exam subjects per designation</p>
               </div>
             </div>
           </div>
@@ -443,7 +415,7 @@ const SubjectManagement = () => {
           onFilterChange={handleFilterChange}
           onClearFilters={handleClearFilters}
           filterConfig={filterConfig}
-          title="Filter Subjects"
+          title="Filter Written Exam Subjects"
         />
 
         {/* GRID */}
@@ -474,15 +446,38 @@ const SubjectManagement = () => {
         {/* ADD / EDIT MODAL */}
         <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
           <DialogTitle className="font-bold">
-            {editingRow ? "Edit Subject" : "Add Subject"}
+            {editingRow ? "Edit Written Exam Subject" : "Add Written Exam Subject"}
           </DialogTitle>
           <DialogContent>
+            <TextField
+              select
+              fullWidth
+              label="Designation"
+              margin="normal"
+              size="small"
+              value={formData.designation}
+              onChange={(e) => {
+                setFormData((f) => ({ ...f, designation: e.target.value }));
+                if (e.target.value) setFormErrors((errs) => ({ ...errs, designation: undefined }));
+              }}
+              error={!!formErrors.designation}
+              helperText={formErrors.designation || "Select the designation"}
+            >
+              <MenuItem value="">— Select Designation —</MenuItem>
+              {/* Preserve a previously-saved designation that is no longer active. */}
+              {formData.designation && !designations.includes(formData.designation) && (
+                <MenuItem value={formData.designation}>{formData.designation}</MenuItem>
+              )}
+              {designations.map((d) => (
+                <MenuItem key={d} value={d}>{d}</MenuItem>
+              ))}
+            </TextField>
+
             <TextField
               fullWidth
               label="Subject Name"
               margin="normal"
               size="small"
-              autoFocus
               value={formData.subject_name}
               onChange={(e) => {
                 setFormData((f) => ({ ...f, subject_name: e.target.value }));
@@ -490,7 +485,7 @@ const SubjectManagement = () => {
               }}
               error={!!formErrors.subject_name}
               helperText={formErrors.subject_name}
-              placeholder="e.g. Mathematics"
+              placeholder="e.g. General Knowledge"
             />
 
             <TextField
@@ -509,62 +504,6 @@ const SubjectManagement = () => {
               helperText={formErrors.total_marks || "Total marks for this subject"}
               placeholder="e.g. 100"
             />
-
-            <div className="mt-3">
-              <FormLabel className="text-sm font-medium text-slate-700">Subject Type</FormLabel>
-              <RadioGroup
-                row
-                value={formData.subject_type}
-                onChange={(e) => {
-                  const subject_type = e.target.value;
-                  setFormData((f) => ({
-                    ...f,
-                    subject_type,
-                    // Group only applies to optional subjects; clear it for compulsory.
-                    subject_group: subject_type === "optional" ? f.subject_group : "",
-                  }));
-                  if (subject_type !== "optional") setFormErrors((errs) => ({ ...errs, subject_group: undefined }));
-                }}
-              >
-                <FormControlLabel
-                  value="compulsory"
-                  control={<Radio size="small" sx={{ color: "#064e3b", "&.Mui-checked": { color: "#064e3b" } }} />}
-                  label="Compulsory"
-                />
-                <FormControlLabel
-                  value="optional"
-                  control={<Radio size="small" sx={{ color: "#064e3b", "&.Mui-checked": { color: "#064e3b" } }} />}
-                  label="Optional"
-                />
-              </RadioGroup>
-            </div>
-
-            {formData.subject_type === "optional" && (
-              <TextField
-                select
-                fullWidth
-                label="Group"
-                margin="normal"
-                size="small"
-                value={formData.subject_group}
-                onChange={(e) => {
-                  setFormData((f) => ({ ...f, subject_group: e.target.value }));
-                  if (e.target.value) setFormErrors((errs) => ({ ...errs, subject_group: undefined }));
-                }}
-                error={!!formErrors.subject_group}
-                helperText={formErrors.subject_group || "Select the subject group"}
-              >
-                <MenuItem value="">— Select Group —</MenuItem>
-                {/* Preserve a previously-saved group that is no longer active. */}
-                {formData.subject_group && !groups.includes(formData.subject_group) && (
-                  <MenuItem value={formData.subject_group}>{formData.subject_group}</MenuItem>
-                )}
-                {groups.map((g) => (
-                  <MenuItem key={g} value={g}>{g}</MenuItem>
-                ))}
-              </TextField>
-            )}
-
           </DialogContent>
 
           <DialogActions className="px-4 pb-4 gap-2">
@@ -591,5 +530,4 @@ const SubjectManagement = () => {
   );
 };
 
-export default SubjectManagement;
-
+export default WrittenExamSubjectsManagement;

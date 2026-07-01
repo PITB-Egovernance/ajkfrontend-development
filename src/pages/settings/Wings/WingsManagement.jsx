@@ -419,22 +419,6 @@ const WingsManagement = () => {
               InputLabelProps={{ shrink: true }}
             />
 
-            {/* Status — only shown when editing */}
-            {editingWing && (
-              <TextField
-                select
-                fullWidth
-                label="Status"
-                margin="normal"
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                SelectProps={{ native: true }}
-                InputLabelProps={{ shrink: true }}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </TextField>
-            )}
           </DialogContent>
 
           <DialogActions>

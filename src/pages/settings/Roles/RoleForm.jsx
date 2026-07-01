@@ -238,7 +238,7 @@ const RoleForm = () => {
                 helperText={errors.roleName}
                 InputProps={{ readOnly }}
               />
-              {(isEdit || isView) && (
+              {isView && (
                 <TextField
                   select fullWidth label="Status" value={status}
                   onChange={(e) => setStatus(e.target.value)}

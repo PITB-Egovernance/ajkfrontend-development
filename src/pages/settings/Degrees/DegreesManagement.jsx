@@ -294,18 +294,6 @@ const DegreesManagement = () => {
               onChange={(e) => setForm((f) => ({ ...f, degree_group: e.target.value }))}
               placeholder="e.g. Computer Science"
               helperText="Optional group name for categorizing this degree" />
-            <TextField
-              select
-              fullWidth
-              label="Status"
-              margin="normal"
-              size="small"
-              value={form.status}
-              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-            >
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button onClick={() => setOpen(false)} disabled={saving}

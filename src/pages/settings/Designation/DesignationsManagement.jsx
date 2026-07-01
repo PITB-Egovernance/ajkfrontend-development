@@ -23,7 +23,7 @@ import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
-import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 
 const PERM = "settings.designations";
 
@@ -183,13 +183,14 @@ const DesignationsManagement = () => {
       throw new Error(result.message || "Failed to load designations");
     }
 
-    const payload = result.data ?? {};
-    const data = payload.data ?? result.data ?? [];
+    const data = Array.isArray(result.data?.data)
+      ? result.data.data
+      : (Array.isArray(result.data) ? result.data : []);
 
     return {
-      data: Array.isArray(data) ? data : [],
-      total: Number(payload.total ?? 0),
-      lastPage: Number(payload.last_page ?? 0),
+      data,
+      total:    Number(result.data?.total     ?? result.meta?.total     ?? result.total     ?? data.length),
+      lastPage: Number(result.data?.last_page  ?? result.meta?.last_page ?? result.last_page ?? 0),
     };
   };
 
@@ -237,12 +238,21 @@ const DesignationsManagement = () => {
       const result = await response.json();
 
       if (result.success === true || result.status === 200) {
-        const dataArray = result.data?.data || result.data || [];
+        const dataArray = Array.isArray(result.data?.data)
+          ? result.data.data
+          : (Array.isArray(result.data) ? result.data : []);
 
-        const formatted = formatDesignationRows(Array.isArray(dataArray) ? dataArray : []);
+        const formatted = formatDesignationRows(dataArray);
+
+        // Total can live in several places depending on how the API serialises
+        // the paginator: paginator-style (result.data.total) or API-Resource
+        // collection style (result.meta.total). Fall back to the row count.
+        const totalCount = Number(
+          result.data?.total ?? result.meta?.total ?? result.total ?? formatted.length
+        );
 
         setRows(formatted);
-        setTotal(result.data?.total || formatted.length);
+        setTotal(totalCount);
       } else {
         toast.error(result.message || "Failed to load designations");
       }
@@ -583,7 +593,6 @@ const DesignationsManagement = () => {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
-          initialState={GRID_INITIAL_STATE}
           paginationMode="server"
           rowCount={total}
           loading={loading}

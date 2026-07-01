@@ -25,6 +25,7 @@ const PERMISSION_MODULES_BASE = {
       degrees:            { label: 'Degrees',            actions: ['add', 'edit', 'delete', 'view'] },
       companies:          { label: 'Companies',          actions: ['add', 'edit', 'delete', 'view'] },
       subjects:           { label: 'Subjects',           actions: ['add', 'edit', 'delete', 'view'] },
+      written_exam_subjects: { label: 'Written Exam Subjects', actions: ['add', 'edit', 'delete', 'view'] },
       certificates:       { label: 'Certificates',       actions: ['add', 'edit', 'delete', 'view'] },
       requisition_statements: { label: 'Requisition Statements', actions: ['add', 'edit', 'delete', 'view'] },
       digital_signatures: { label: 'Digital Signatures', actions: ['add', 'edit', 'delete', 'view'] },

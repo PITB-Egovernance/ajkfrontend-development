@@ -325,6 +325,7 @@ const EmployeeRegistrationForm = ({
           setDesignationOptions(
             (desigResult.data?.data ?? desigResult.data ?? [])
               .filter((d) => String(d.type || '').toLowerCase() === 'internal')
+              .filter((d) => String(d.status ?? 'active').toLowerCase() === 'active')
               .filter(
                 (d) =>
                   !['chairman', 'secretary'].includes(
@@ -594,9 +595,7 @@ const EmployeeRegistrationForm = ({
   ]);
 
   const fieldSx = {
-    '& .MuiOutlinedInput-root': { minHeight: 64 },
-    '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 64 },
-    '& .MuiOutlinedInput-input': { padding: '16px 14px', fontSize: '15px' },
+    '& .MuiOutlinedInput-input': { padding: '8.5px 14px' },
   };
 
   const handleSubmit = async (e) => {

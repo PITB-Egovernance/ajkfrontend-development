@@ -277,21 +277,6 @@ const QualificationsManagement = () => {
               <MenuItem value="required">Required</MenuItem>
               <MenuItem value="professional">Professional</MenuItem>
             </TextField>
-            <TextField
-              select
-              fullWidth
-              label="Status"
-              margin="normal"
-              size="small"
-              value={form.status}
-              onChange={(e) => setForm((current) => ({
-                ...current,
-                status: e.target.value,
-              }))}
-            >
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button onClick={() => setOpen(false)} disabled={saving}

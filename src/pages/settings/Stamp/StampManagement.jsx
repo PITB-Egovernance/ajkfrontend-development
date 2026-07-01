@@ -496,21 +496,6 @@ const StampManagement = () => {
               />
             </div>
 
-            {/* Status dropdown — only on edit */}
-            {editingRow && (
-              <TextField
-                select
-                fullWidth
-                label="Status"
-                margin="normal"
-                size="small"
-                value={formData.status}
-                onChange={(e) => setFormData((f) => ({ ...f, status: e.target.value }))}
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
-              </TextField>
-            )}
 
           </DialogContent>
 

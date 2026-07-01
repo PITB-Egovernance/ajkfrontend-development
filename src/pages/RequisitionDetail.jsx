@@ -568,13 +568,25 @@ const RequisitionDetail = () => {
       const serviceRulesUrl = requisition.service_rules ? `${baseUrl}/${requisition.service_rules}` : null;
       const syllabusUrl = requisition.syllabus ? `${baseUrl}/${requisition.syllabus}` : null;
 
-      // Main Table Data
+      // A numbered cell that vertically spans all of its sub-item rows, so the
+      // serial number sits beside the whole group (mirrors the on-screen table).
+      const numCell = (label, span) => ({
+        content: label,
+        rowSpan: span,
+        styles: { halign: 'center', fontStyle: 'bold', fillColor: [245, 245, 245], valign: 'top' },
+      });
+
+      // Main Table Data — each (i)…(vi) item is its OWN row so the label and its
+      // value share a row and never drift apart when one side wraps.
       const tableData = [
-        [
-          '1',
-          '(i) Designation or nomenclature of the Post(s)\n(ii) Scale of the Post\n(iii) Department & Class of Service\n(iv) Percentage of quota fixed\n(v) Number of posts to be filled\n(vi) Date(s) of availability of vacancy(s)',
-          `(i) ${requisition.designation || 'N/A'}\n(ii) ${getScaleName(requisition.scale)}\n(iii) ${(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}\n(iv) Direct: ${getQuotaDisplay(requisition.quota_percentage)} | Promotion: ${getQuotaDisplay(requisition.quota_promotion)}\n(v) ${requisition.num_posts || 'N/A'}\n(vi) Details in Annex "A"`
-        ],
+        // 1 — Post details
+        [numCell('1', 6), '(i) Designation or nomenclature of the Post(s)', `(i) ${requisition.designation || 'N/A'}`],
+        ['(ii) Scale of the Post', `(ii) ${getScaleName(requisition.scale)}`],
+        ['(iii) Department & Class of Service', `(iii) ${(typeof requisition.department === 'object' ? requisition.department?.name : requisition.department) || 'N/A'}`],
+        ['(iv) Percentage of quota fixed', `(iv) Direct: ${getQuotaDisplay(requisition.quota_percentage)} | Promotion: ${getQuotaDisplay(requisition.quota_promotion)}`],
+        ['(v) Number of posts to be filled', `(v) ${requisition.num_posts || 'N/A'}`],
+        ['(vi) Date(s) of availability of vacancy(s)', '(vi) Details in Annex "A"'],
+
         ['2', 'Service Rules for the Post(s) to be filled', (serviceRulesUrl
           ? serviceRulesUrl
           : 'No service rule file uploaded yet')
@@ -582,21 +594,28 @@ const RequisitionDetail = () => {
         ['3', 'Approved syllabus for the Post(s) to be filled', syllabusUrl
           ? syllabusUrl
           : 'No syllabus file uploaded yet'],
-        [
-          '4',
-          'Qualification Required:\n(i) Required Qualification\n(ii) Professional Qualification\n(iii) Equivalent qualification authority\n(iv) Name degree of equivalence\n(v) Any other Qualification\n(vi) Training with institute name',
-          `(i) ${requisition.qualification?.academic_qualification || 'N/A'}\n(ii) ${requisition.qualification?.professional_qualification || 'N/A'}\n(iii) ${requisition.qualification?.equivalent_qualification || 'N/A'}\n(iv) ${requisition.qualification?.degree_equivalence || 'N/A'}\n(v) ${requisition.qualification?.any_other_qualification || 'N/A'}\n(vi) ${requisition.qualification?.training_institute || 'N/A'}`
-        ],
-        [
-          '5',
-          'Experience:\n(i) Type of experience required\n(ii) Length of experience\n(iii) Minimum required qualification',
-          `(i) ${requisition.qualification?.experience_type || 'N/A'}\n(ii) ${requisition.qualification?.experience_length || 'N/A'}\n(iii) ${requisition.qualification?.min_qualification || 'N/A'}`
-        ],
-        [
-          '6',
-          'Age Limit:\n(i) Minimum\n(ii) Maximum\n(iii) Relaxation, if any',
-          `(i) ${requisition.eligibility?.min_age || 'N/A'}\n(ii) ${requisition.eligibility?.max_age || 'N/A'}\n(iii) ${requisition.eligibility?.age_relaxation || 'N/A'}`
-        ],
+
+        // 4 — Qualification Required (header + 6 items)
+        [numCell('4', 7), 'Qualification Required:', ''],
+        ['(i) Required Qualification', `(i) ${requisition.qualification?.academic_qualification || 'N/A'}`],
+        ['(ii) Professional Qualification', `(ii) ${requisition.qualification?.professional_qualification || 'N/A'}`],
+        ['(iii) Equivalent qualification authority', `(iii) ${requisition.qualification?.equivalent_qualification || 'N/A'}`],
+        ['(iv) Name degree of equivalence', `(iv) ${requisition.qualification?.degree_equivalence || 'N/A'}`],
+        ['(v) Any other Qualification', `(v) ${requisition.qualification?.any_other_qualification || 'N/A'}`],
+        ['(vi) Training with institute name', `(vi) ${requisition.qualification?.training_institute || 'N/A'}`],
+
+        // 5 — Experience (header + 3 items)
+        [numCell('5', 4), 'Experience:', ''],
+        ['(i) Type of experience required', `(i) ${requisition.qualification?.experience_type || 'N/A'}`],
+        ['(ii) Length of experience', `(ii) ${requisition.qualification?.experience_length || 'N/A'}`],
+        ['(iii) Minimum required qualification', `(iii) ${requisition.qualification?.min_qualification || 'N/A'}`],
+
+        // 6 — Age Limit (header + 3 items)
+        [numCell('6', 4), 'Age Limit:', ''],
+        ['(i) Minimum', `(i) ${requisition.eligibility?.min_age || 'N/A'}`],
+        ['(ii) Maximum', `(ii) ${requisition.eligibility?.max_age || 'N/A'}`],
+        ['(iii) Relaxation, if any', `(iii) ${requisition.eligibility?.age_relaxation || 'N/A'}`],
+
         ['7', 'Nationality', requisition.eligibility?.nationality || 'N/A'],
         ['8', 'Domicile (Name Districts/Units)', formatDomicile(requisition?.eligibility?.domicile)],
         ['10', 'Any other condition of qualification', requisition.eligibility?.other_conditions || 'N/A'],
@@ -627,8 +646,13 @@ const RequisitionDetail = () => {
         margin: { left: marginLeft, right: marginRight },
         didDrawCell: (data) => {
           if (data.column.index !== 2) return;
-          const rowIndex = data.row.index;
-          const url = rowIndex === 1 ? serviceRulesUrl : rowIndex === 2 ? syllabusUrl : null;
+          // Identify the service-rules / syllabus cells by their content so the
+          // link survives the per-item row restructuring above.
+          const raw = data.cell.raw;
+          const text = typeof raw === 'object' && raw !== null ? raw.content : raw;
+          const url = text === serviceRulesUrl ? serviceRulesUrl
+            : text === syllabusUrl ? syllabusUrl
+            : null;
           if (url) {
             doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url });
           }

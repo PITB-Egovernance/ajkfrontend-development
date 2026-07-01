@@ -58,6 +58,7 @@ import RequisitionApprovalFlow from 'pages/settings/ApprovalFlow/RequisitionAppr
 import RequisitionApprovalTrackPage from 'pages/requisition/RequisitionApprovalTrackPage';
 import MyRequisitionsQueue from 'pages/requisition/MyRequisitionsQueue';
 import SubjectManagement from 'pages/settings/Subject/SubjectManagement';
+import WrittenExamSubjectsManagement from 'pages/settings/WrittenExamSubjects/WrittenExamSubjectsManagement';
 import SubjectsSyllabus from 'pages/settings/Subject/SubjectsSyllabus';
 import CertificatesManagement from 'pages/settings/Certificates/CertificatesManagement';
 import RequisitionStatementsManagement from 'pages/settings/RequisitionStatements/RequisitionStatementsManagement';
@@ -207,6 +208,7 @@ function App() {
           <Route path="settings/test-types" element={<TestTypesManagement />} />
           <Route path="approval-flow" element={<RequisitionApprovalFlow />} />
           <Route path="settings/subjects" element={<SubjectManagement />} />
+          <Route path="settings/written-exam-subjects" element={<WrittenExamSubjectsManagement />} />
           {/* Public syllabus view (not in sidebar) — open directly via URL */}
           <Route path="settings/subjects-syllabus" element={<SubjectsSyllabus />} />
           <Route path="settings/certificates" element={<CertificatesManagement />} />

@@ -141,13 +141,14 @@ const GradesManagement = () => {
       throw new Error(result.message || "Failed to load grades");
     }
 
-    const payload = result.data ?? {};
-    const data = payload.data ?? result.data ?? [];
+    const data = Array.isArray(result.data?.data)
+      ? result.data.data
+      : (Array.isArray(result.data) ? result.data : []);
 
     return {
-      data: Array.isArray(data) ? data : [],
-      total: Number(payload.total ?? 0),
-      lastPage: Number(payload.last_page ?? 0),
+      data,
+      total:    Number(result.data?.total     ?? result.meta?.total     ?? result.total     ?? data.length),
+      lastPage: Number(result.data?.last_page  ?? result.meta?.last_page ?? result.last_page ?? 0),
     };
   };
 
@@ -190,12 +191,20 @@ const GradesManagement = () => {
       const result = await response.json();
       // console.log('Result', result)
       if (result.status === 200 || result.success === true) {
-        const dataArray = result.data?.data || result.data || [];
+        const dataArray = Array.isArray(result.data?.data)
+          ? result.data.data
+          : (Array.isArray(result.data) ? result.data : []);
 
-        const formatted = formatGradeRows(Array.isArray(dataArray) ? dataArray : []);
+        const formatted = formatGradeRows(dataArray);
+
+        // Total can live in result.data.total (paginator) or result.meta.total
+        // (API-Resource collection). Fall back to the row count.
+        const totalCount = Number(
+          result.data?.total ?? result.meta?.total ?? result.total ?? formatted.length
+        );
 
         setRows(formatted);
-        setTotal(result.data?.total || formatted.length);
+        setTotal(totalCount);
       } else {
         toast.error(result.message || "Failed to load grades");
       }

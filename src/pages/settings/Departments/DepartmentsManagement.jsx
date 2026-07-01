@@ -456,20 +456,6 @@ const DepartmentsManagement = () => {
               }}
               inputProps={{ inputMode: 'numeric', maxLength: 11 }}
               placeholder="03XXXXXXXXX" />
-            <TextField
-              select
-              fullWidth
-              label="Status"
-              margin="normal"
-              size="small"
-              value={formData.status}
-              onChange={(e) =>
-                setFormData((f) => ({ ...f, status: e.target.value }))
-              }
-            >
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
             <button onClick={() => setOpenModal(false)} disabled={saving}

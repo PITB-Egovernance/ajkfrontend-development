@@ -420,20 +420,6 @@ const RequisitionStatementsManagement = () => {
               placeholder="Enter the requisition statement text…"
             />
 
-            {editingRow && (
-              <TextField
-                select
-                fullWidth
-                label="Status"
-                margin="normal"
-                size="small"
-                value={formData.status}
-                onChange={(e) => setFormData((f) => ({ ...f, status: e.target.value }))}
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
-              </TextField>
-            )}
           </DialogContent>
 
           <DialogActions className="px-4 pb-4 gap-2">

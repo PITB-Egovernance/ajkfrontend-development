@@ -504,14 +504,6 @@ const TestTypesManagement = () => {
                 }
                 label="Passing required"
               />
-              {editing && (
-                <TextField select label="Status" size="small" sx={{ minWidth: 160 }}
-                  value={formData.status}
-                  onChange={(e) => setFormData((f) => ({ ...f, status: e.target.value }))}>
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                </TextField>
-              )}
             </div>
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">

@@ -515,22 +515,6 @@ const TehsilsManagement = () => {
                     </TextField>
                   </div>
 
-                  {editingTehsil && (
-                    <div>
-                      <TextField
-                        select
-                        fullWidth
-                        label="Status"
-                        id="status"
-                        name="status"
-                        value={formData.status}
-                        onChange={handleInputChange}
-                      >
-                        <MenuItem value="active">Active</MenuItem>
-                        <MenuItem value="inactive">Inactive</MenuItem>
-                      </TextField>
-                    </div>
-                  )}
                 </div>
 
                 <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex justify-end gap-3 rounded-b-xl">
