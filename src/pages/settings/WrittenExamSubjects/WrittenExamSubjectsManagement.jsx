@@ -48,7 +48,12 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
-const EMPTY_FORM = { designation: "", subject_name: "", total_marks: "", status: "active" };
+const EMPTY_FORM = { designation_id: "", designation: "", subject_name: "", subject_marks: "", status: "active" };
+
+const getDesignationId = (item) => item?.designation_id ?? item?.designation?.id ?? item?.designation?.hash_id ?? "";
+const getDesignationName = (item) =>
+  item?.designation?.name ?? item?.designation_name ?? item?.designation ?? item?.post ?? "";
+const getSubjectMarks = (item) => item?.subject_marks ?? item?.total_marks ?? item?.marks ?? "";
 
 const WrittenExamSubjectsManagement = () => {
   const navigate = useNavigate();
@@ -88,9 +93,10 @@ const WrittenExamSubjectsManagement = () => {
           id:            item.hash_id || item.id,
           hash_id:       item.hash_id || item.id,
           sr_no:         page * pageSize + i + 1,
-          designation:   item.designation ?? item.designation_name ?? item.post ?? "",
+          designation_id: getDesignationId(item),
+          designation:   getDesignationName(item),
           subject_name:  item.subject_name,
-          total_marks:   item.total_marks,
+          subject_marks: getSubjectMarks(item),
           status:        item.status ?? "active",
         }))
       );
@@ -112,8 +118,11 @@ const WrittenExamSubjectsManagement = () => {
       setDesignations(
         (Array.isArray(data) ? data : [])
           .filter((d) => String(d?.status ?? "active").toLowerCase() === "active")
-          .map((d) => d.name ?? d.designation_name ?? d.title ?? "")
-          .filter(Boolean)
+          .map((d) => ({
+            id: String(d.hash_id ?? d.id ?? ""),
+            name: d.name ?? d.designation_name ?? d.title ?? "",
+          }))
+          .filter((d) => d.id && d.name)
       );
     } catch {
       setDesignations([]);
@@ -129,7 +138,7 @@ const WrittenExamSubjectsManagement = () => {
 
   /* ── FILTER CONFIG ── */
   const filterConfig = [
-    { name: "designation",  label: "Designation",  type: "select", options: designations.map((d) => ({ value: d, label: d })) },
+    { name: "designation",  label: "Designation",  type: "select", options: designations.map((d) => ({ value: d.name, label: d.name })) },
     { name: "subject_name", label: "Subject Name", type: "text",   placeholder: "Filter by name" },
     { name: "status",       label: "Status",       type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
   ];
@@ -156,6 +165,15 @@ const WrittenExamSubjectsManagement = () => {
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
+  const findDesignationById = (id) => designations.find((d) => String(d.id) === String(id));
+  const findDesignationByName = (name) => designations.find((d) => d.name === name);
+  const resolveDesignationId = (row) => row.designation_id || findDesignationByName(row.designation)?.id || "";
+  const buildPayload = (row) => ({
+    designation_id: String(resolveDesignationId(row)),
+    subject_name: row.subject_name.trim(),
+    subject_marks: Number(row.subject_marks),
+    status: row.status,
+  });
 
   const openAdd = () => {
     setEditingRow(null);
@@ -165,12 +183,14 @@ const WrittenExamSubjectsManagement = () => {
   };
 
   const handleEdit = () => {
+    const designationId = resolveDesignationId(selectedRow);
     setEditingRow(selectedRow);
     setFormData({
-      designation:  selectedRow.designation,
-      subject_name: selectedRow.subject_name,
-      total_marks:  String(selectedRow.total_marks),
-      status:       selectedRow.status ?? "active",
+      designation_id: designationId,
+      designation:    selectedRow.designation,
+      subject_name:   selectedRow.subject_name,
+      subject_marks:  String(selectedRow.subject_marks),
+      status:         selectedRow.status ?? "active",
     });
     setFormErrors({});
     setOpenModal(true);
@@ -180,10 +200,10 @@ const WrittenExamSubjectsManagement = () => {
   /* ── VALIDATION ── */
   const validate = () => {
     const errs = {};
-    if (!formData.designation) errs.designation = "Designation is required";
+    if (!formData.designation_id) errs.designation_id = "Designation is required";
     if (!formData.subject_name.trim()) errs.subject_name = "Subject name is required";
-    if (!formData.total_marks || isNaN(Number(formData.total_marks)) || Number(formData.total_marks) <= 0)
-      errs.total_marks = "Marks must be a positive number";
+    if (!formData.subject_marks || isNaN(Number(formData.subject_marks)) || Number(formData.subject_marks) <= 0)
+      errs.subject_marks = "Marks must be a positive number";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -224,12 +244,7 @@ const WrittenExamSubjectsManagement = () => {
       const rows = allRows.filter((r) => selectionModel.includes(r.id));
       await Promise.all(
         rows.map((r) =>
-          WrittenExamSubjectApi.update(r.hash_id, {
-            designation:  r.designation,
-            subject_name: r.subject_name,
-            total_marks:  r.total_marks,
-            status,
-          })
+          WrittenExamSubjectApi.update(r.hash_id, buildPayload({ ...r, status }))
         )
       );
       toast.success(`Marked as ${status}`);
@@ -245,12 +260,7 @@ const WrittenExamSubjectsManagement = () => {
     const newStatus = row.status === "active" ? "inactive" : "active";
     if (!await confirmStatus({ newStatus })) return;
     try {
-      await WrittenExamSubjectApi.update(row.hash_id, {
-        designation:  row.designation,
-        subject_name: row.subject_name,
-        total_marks:  row.total_marks,
-        status:       newStatus,
-      });
+      await WrittenExamSubjectApi.update(row.hash_id, buildPayload({ ...row, status: newStatus }));
       toast.success(`Marked as ${newStatus}`);
       fetchAll();
     } catch {
@@ -263,12 +273,7 @@ const WrittenExamSubjectsManagement = () => {
     if (!validate()) return;
     setSaving(true);
     try {
-      const payload = {
-        designation:  formData.designation,
-        subject_name: formData.subject_name.trim(),
-        total_marks:  Number(formData.total_marks),
-        status:       formData.status,
-      };
+      const payload = buildPayload(formData);
       if (editingRow) {
         await WrittenExamSubjectApi.update(editingRow.hash_id, payload);
         toast.success("Written exam subject updated successfully");
@@ -290,7 +295,7 @@ const WrittenExamSubjectsManagement = () => {
     { field: "sr_no",         headerName: "#",            width: 65  },
     { field: "designation",   headerName: "Designation",  flex: 1    },
     { field: "subject_name",  headerName: "Subject Name", flex: 1    },
-    { field: "total_marks",   headerName: "Marks",        width: 100 },
+    { field: "subject_marks", headerName: "Marks",        width: 100 },
     {
       field: "status",
       headerName: "Status",
@@ -455,21 +460,26 @@ const WrittenExamSubjectsManagement = () => {
               label="Designation"
               margin="normal"
               size="small"
-              value={formData.designation}
+              value={formData.designation_id}
               onChange={(e) => {
-                setFormData((f) => ({ ...f, designation: e.target.value }));
-                if (e.target.value) setFormErrors((errs) => ({ ...errs, designation: undefined }));
+                const designation = findDesignationById(e.target.value);
+                setFormData((f) => ({
+                  ...f,
+                  designation_id: e.target.value,
+                  designation: designation?.name || "",
+                }));
+                if (e.target.value) setFormErrors((errs) => ({ ...errs, designation_id: undefined }));
               }}
-              error={!!formErrors.designation}
-              helperText={formErrors.designation || "Select the designation"}
+              error={!!formErrors.designation_id}
+              helperText={formErrors.designation_id || "Select the designation"}
             >
               <MenuItem value="">— Select Designation —</MenuItem>
               {/* Preserve a previously-saved designation that is no longer active. */}
-              {formData.designation && !designations.includes(formData.designation) && (
-                <MenuItem value={formData.designation}>{formData.designation}</MenuItem>
+              {formData.designation_id && !findDesignationById(formData.designation_id) && (
+                <MenuItem value={formData.designation_id}>{formData.designation}</MenuItem>
               )}
               {designations.map((d) => (
-                <MenuItem key={d} value={d}>{d}</MenuItem>
+                <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>
               ))}
             </TextField>
 
@@ -495,13 +505,13 @@ const WrittenExamSubjectsManagement = () => {
               size="small"
               type="number"
               inputProps={{ min: 1 }}
-              value={formData.total_marks}
+              value={formData.subject_marks}
               onChange={(e) => {
-                setFormData((f) => ({ ...f, total_marks: e.target.value }));
-                if (e.target.value && Number(e.target.value) > 0) setFormErrors((errs) => ({ ...errs, total_marks: undefined }));
+                setFormData((f) => ({ ...f, subject_marks: e.target.value }));
+                if (e.target.value && Number(e.target.value) > 0) setFormErrors((errs) => ({ ...errs, subject_marks: undefined }));
               }}
-              error={!!formErrors.total_marks}
-              helperText={formErrors.total_marks || "Total marks for this subject"}
+              error={!!formErrors.subject_marks}
+              helperText={formErrors.subject_marks || "Total marks for this subject"}
               placeholder="e.g. 100"
             />
           </DialogContent>
