@@ -150,6 +150,13 @@ const RollNumberApi = {
     return handleResponse(res);
   },
 
+  getCenterUtilization: async () => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/center-utilization`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
   getAdvertisementsWithJobs: async (perPage = 100) => {
     const res = await fetch(`${ADMIN_API_BASE}/advertisements?per_page=${perPage}`, {
       headers: getAdminHeaders(false),
