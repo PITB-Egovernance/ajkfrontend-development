@@ -300,23 +300,6 @@ const SubjectManagement = () => {
   const columns = [
     { field: "sr_no",         headerName: "#",            width: 65  },
     { field: "subject_name",  headerName: "Subject Name", flex: 1    },
-    {
-      field: "subject_type",
-      headerName: "Type",
-      width: 130,
-      renderCell: (p) => {
-        const isOptional = String(p.value).toLowerCase() === "optional";
-        return (
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-              isOptional ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
-            }`}
-          >
-            {isOptional ? "Optional" : "Compulsory"}
-          </span>
-        );
-      },
-    },
     { field: "subject_group", headerName: "Group",        width: 130 },
     { field: "total_marks",   headerName: "Marks",        width: 100 },
     {

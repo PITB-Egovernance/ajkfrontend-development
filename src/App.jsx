@@ -54,6 +54,7 @@ import NationalitiesManagement from 'pages/settings/Nationality/NationalitiesMan
 import TestsManagement from 'pages/settings/Tests/TestsManagement';
 import ExamFeesManagement from 'pages/settings/ExamFees/ExamFeesManagement';
 import TestTypesManagement from 'pages/settings/TestTypes/TestTypesManagement';
+import TestTypeForm from 'pages/settings/TestTypes/TestTypeForm';
 import RequisitionApprovalFlow from 'pages/settings/ApprovalFlow/RequisitionApprovalFlow';
 import RequisitionApprovalTrackPage from 'pages/requisition/RequisitionApprovalTrackPage';
 import MyRequisitionsQueue from 'pages/requisition/MyRequisitionsQueue';
@@ -206,6 +207,8 @@ function App() {
           <Route path="settings/tests" element={<TestsManagement />} />
           <Route path="settings/exam-fees" element={<ExamFeesManagement />} />
           <Route path="settings/test-types" element={<TestTypesManagement />} />
+          <Route path="settings/test-types/create" element={<TestTypeForm />} />
+          <Route path="settings/test-types/:id/edit" element={<TestTypeForm />} />
           <Route path="approval-flow" element={<RequisitionApprovalFlow />} />
           <Route path="settings/subjects" element={<SubjectManagement />} />
           <Route path="settings/written-exam-subjects" element={<WrittenExamSubjectsManagement />} />
