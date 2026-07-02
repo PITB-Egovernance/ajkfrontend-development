@@ -27,7 +27,28 @@ const RollSlipView = () => {
       setLoading(true);
       try {
         const result = await RollNumberApi.getSlipViewData(applicationNumber);
-        if (!cancelled) setData(result.data);
+        const primaryData = result.data;
+        if (process.env.NODE_ENV !== 'production') console.log('[SlipViewData]', JSON.stringify(primaryData, null, 2));
+
+        // Find other applications that share the same roll number (clubbed posts)
+        // and merge their exam sessions into this slip
+        let allSessions = [...(primaryData.examSessions || [])];
+        try {
+          const r = await RollNumberApi.getShortlisted({ per_page: 500 });
+          const rollRecords = r?.data?.data ?? [];
+          const siblings = rollRecords.filter(
+            item => item.roll_number === primaryData.rollNo && item.application_number !== applicationNumber
+          );
+          for (const sibling of siblings) {
+            try {
+              const r2 = await RollNumberApi.getSlipViewData(sibling.application_number);
+              const extra = r2?.data?.examSessions ?? [];
+              allSessions = [...allSessions, ...extra];
+            } catch { /* skip silently */ }
+          }
+        } catch { /* use primary sessions only */ }
+
+        if (!cancelled) setData({ ...primaryData, examSessions: allSessions });
       } catch (err) {
         if (!cancelled) {
           toast.error(err?.message || 'Failed to load slip');
@@ -100,15 +121,27 @@ const RollSlipView = () => {
         <div className="max-w-5xl mx-auto my-6 bg-white shadow-sm border border-slate-200 rounded-lg p-10" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
 
           {/* HEADER */}
-          <div className="text-center pb-2 border-b-4 border-double border-emerald-900 mb-3">
-            {data.logoDataUri ? (
-              <img src={data.logoDataUri} alt="AJK PSC Logo" className="h-16 mx-auto mb-1" />
-            ) : (
-              <div className="h-16 w-16 rounded-full bg-emerald-900 mx-auto mb-1" />
-            )}
-            <div className="text-base font-bold text-emerald-900 tracking-wide">Azad Jammu &amp; Kashmir</div>
-            <div className="text-sm font-bold text-emerald-900">Public Service Commission Muzaffarabad</div>
-            <div className="text-sm font-bold underline mt-0.5 tracking-wide">Examination Slip</div>
+          <div className="pb-2 border-b-4 border-double border-emerald-900 mb-3">
+            <div className="flex items-start justify-between">
+              {/* Left: Logo + Title */}
+              <div className="flex items-center gap-3">
+                {data.logoDataUri ? (
+                  <img src={data.logoDataUri} alt="AJK PSC Logo" className="h-16 shrink-0" />
+                ) : (
+                  <div className="h-16 w-16 rounded-full bg-emerald-900 shrink-0" />
+                )}
+                <div>
+                  <div className="text-sm font-extrabold text-emerald-900 tracking-wide uppercase">Azad Jammu &amp; Kashmir</div>
+                  <div className="text-base font-black text-emerald-900 uppercase tracking-wide leading-tight">Public Service Commission</div>
+                  <div className="text-sm font-bold text-emerald-900 mt-0.5">Jalalabad, Muzaffarabad.</div>
+                </div>
+              </div>
+              {/* Right: EXAMINATION SLIP label + dated/ref */}
+              <div className="text-right shrink-0 pl-4">
+                <div className="text-sm font-bold underline text-emerald-900 tracking-widest uppercase leading-tight">EXAMINATION<br/>SLIP</div>
+                <div className="text-xs text-slate-500 mt-1">Dated: {data.generatedAt}</div>
+              </div>
+            </div>
           </div>
 
           {/* CANDIDATE DETAILS CARD */}
@@ -116,10 +149,9 @@ const RollSlipView = () => {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               <div className="md:col-span-2 space-y-0.5">
                 <InfoRow label="Name" value={data.candidateName} bold />
-                <InfoRow label="Post Name" value={<>{data.postName}{data.postScale ? <strong> (BS-{data.postScale})</strong> : null}</>} />
-                <InfoRow label="Advertisement No" value={data.advertisementNo} />
+                <InfoRow label="Father/Husband Name" value={data.fatherName || data.fatherHusbandName || data.father_name || data.father_husband_name || '—'} />
+                <InfoRow label="CNIC No" value={data.candidateCnic || '—'} />
                 <InfoRow label="Roll No" value={<span className="font-mono font-bold text-lg tracking-wide">{data.rollNo}</span>} />
-                <InfoRow label="Department" value={data.department} />
               </div>
               <div className="md:col-span-3 flex justify-end">
                 <div className="grid gap-2" style={{ gridTemplateColumns: '214px 120px' }}>
@@ -142,77 +174,83 @@ const RollSlipView = () => {
             </div>
           </div>
 
-          {/* BODY TEXT */}
-          <div className="text-sm leading-relaxed text-justify mb-3">
-            <p className="italic font-bold mb-1">Aslam o alikum!</p>
-            You are hereby intimated that AJK Public Service Commission plans to conduct examination for the
-            aforementioned post on <span className="underline font-bold">{data.examDate || data.generatedAt}</span> at{' '}
-            <span className="underline font-bold">{data.attendanceTime || 'Scheduled Time'}</span>.
-            Hence, this Examination Slip is being issued in your favor to participate therein. It is pertinent
-            to clarify that the AJK Public Service Commission is allowing you to sit for the exam without preliminary
-            review of your documents. You may participate in this examination at your own risk, however, following
-            the exam, if it is determined through scrutiny that you do not meet the necessary requirements/criterion
-            (i.e. education, experience, district, age etc) for this post, in that case your candidature shall
-            automatically stand forfeited for being not eligible thereof. In such circumstances, you will not be
-            called for interview etc.
-          </div>
+          {/* BODY TEXT — dynamic from Roll Number Slip Note settings */}
+          {data.slipNoteHtml && (
+            <>
+              <hr className="border-slate-200 my-2" />
+              <div
+                className="text-sm leading-relaxed text-justify mb-3 [&_.greeting]:italic [&_.greeting]:font-bold [&_.greeting]:block [&_.greeting]:mb-1 [&_.highlight]:underline [&_.highlight]:font-bold [&_p]:mb-1"
+                dangerouslySetInnerHTML={{ __html: data.slipNoteHtml }}
+              />
+            </>
+          )}
 
           {/* SCHEDULE */}
           <div className="mb-3">
             <p className="text-center font-bold underline text-emerald-900 mb-1.5">EXAMINATION / TEST CENTRE &amp; SCHEDULE</p>
             <InfoRow label="Exam Center" value={<><strong>{(data.examCenter || '').toUpperCase()}</strong>{data.examCity ? `, ${data.examCity.toUpperCase()}` : ''}</>} />
             <InfoRow label="District" value={data.district} />
-            <InfoRow label="Subject" value={<strong>{data.subject}</strong>} />
 
-            {Array.isArray(data.examSessions) && data.examSessions.length > 0 && (
-              <table className="w-full border-collapse border-2 border-emerald-900 mt-2 text-sm">
-                <thead>
-                  <tr className="bg-emerald-50">
-                    <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DAY</th>
-                    <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DATE</th>
-                    <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">ATTENDANCE TIME</th>
-                    <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">POST NAME</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.examSessions.map((session, idx) => (
-                    <tr key={idx} className="text-center">
-                      <td className="border border-emerald-900 px-2 py-1">{session.day || '—'}</td>
-                      <td className="border border-emerald-900 px-2 py-1">{session.date || '—'}</td>
-                      <td className="border border-emerald-900 px-2 py-1">{session.time || '—'}</td>
-                      <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900">{session.postName || '—'}</td>
+            {Array.isArray(data.examSessions) && data.examSessions.length > 0 && (() => {
+              const to12Hour = (t) => {
+                if (!t) return '—';
+                const [h, m] = t.split(':').map(Number);
+                if (isNaN(h)) return t;
+                const period = h >= 12 ? 'PM' : 'AM';
+                const hour = h % 12 || 12;
+                return `${hour}:${String(m || 0).padStart(2, '0')} ${period}`;
+              };
+              // Group sessions sharing the same day+date+time into one table row
+              const groups = Object.values(
+                data.examSessions.reduce((acc, s) => {
+                  const key = `${s.day}||${s.date}||${s.time}`;
+                  if (!acc[key]) acc[key] = { day: s.day, date: s.date, time: s.time, posts: [] };
+                  acc[key].posts.push(s);
+                  return acc;
+                }, {})
+              );
+              return (
+                <table className="w-full border-collapse border-2 border-emerald-900 mt-2 text-sm">
+                  <thead>
+                    <tr className="bg-emerald-50">
+                      <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DAY</th>
+                      <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DATE</th>
+                      <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">ATTENDANCE TIME</th>
+                      <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DESCRIPTION</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  </thead>
+                  <tbody>
+                    {groups.map((group, idx) => (
+                      <tr key={idx} className="text-center">
+                        <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.day || '—'}</td>
+                        <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.date || '—'}</td>
+                        <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{to12Hour(group.time)}</td>
+                        <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900">
+                          {group.posts.map((session, pIdx) => (
+                            <div key={pIdx} className={pIdx > 0 ? 'border-t border-emerald-100 mt-1 pt-1' : ''}>
+                              {[
+                                session.advertisementNo || session.advertisement_no || data.advertisementNo,
+                                session.department || session.departmentName || session.department_name || data.department,
+                                session.postName || null,
+                              ].filter(Boolean).join(', ') || '—'}
+                            </div>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
           </div>
 
-          {/* INSTRUCTIONS */}
-          <div className="mb-3">
-            <p className="font-bold underline text-sm mb-1">Instructions for participation in the exam:</p>
-            <ol className="list-decimal pl-5 space-y-0.5 text-xs">
-              <li>Please ensure to bring your National Identity Card (Original) and Call Letter also.</li>
-              <li>You are required to reach the Examination Hall at least 30 minutes before the start of the exam.</li>
-              <li>Bring your exam folder, pen/marker (blue/black).</li>
-              <li className="text-red-900">All type of written material, calculator, mobile, cordless phone, wrist watch (with calculator) or any type of other mechanical aid or a weapon are strictly prohibited. Moreover, use of whitener fluid is not allowed at answer sheet.</li>
-              <li className="text-red-900">Use of any illegal mean in the exam may result in your disqualification.</li>
-              <li>No claims for TA/DA will be entertained.</li>
-              <li>No entry after 15 minutes of commencement of exam. This is only on justifiable grounds where circumstances found beyond human control.</li>
-              <li>You will not be allowed to enter in the examination hall if you are not fulfilling above conditionalities.</li>
-            </ol>
-          </div>
-
-          {/* CONTACT */}
-          <div className="text-sm mb-4">
-            <p className="mb-1">For any query please contact at following telephone numbers:</p>
-            <div className="flex flex-wrap gap-x-4 text-xs font-bold">
-              <span>• 05822-920206</span>
-              <span>• 05822-920016</span>
-              <span>• 05822-920214</span>
-              <span>• 05822-920204</span>
-            </div>
-          </div>
+          {/* INSTRUCTIONS — dynamic from Roll Number Slip Instruction settings */}
+          {data.slipInstructionHtml && (
+            <div
+              className="mb-4 text-sm [&_.instructions-heading]:font-bold [&_.instructions-heading]:underline [&_.instructions-heading]:block [&_.instructions-heading]:mb-1 [&_.instructions-heading]:mt-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:text-xs [&_li]:leading-snug [&_li]:mb-0.5 [&_.warn]:text-red-900 [&_p]:text-xs [&_p]:mt-2"
+              dangerouslySetInnerHTML={{ __html: data.slipInstructionHtml }}
+            />
+          )}
 
           {/* FOOTER */}
           <div className="grid grid-cols-3 items-end text-center mb-2">
@@ -225,8 +263,7 @@ const RollSlipView = () => {
               )}
             </div>
             <div className="text-xs text-slate-500">
-              Generated: {data.generatedAt}<br />
-              Ref: {data.applicationNo}
+              Generated: {data.generatedAt}
             </div>
             <div>
               <div className="border-t border-slate-600 w-28 mx-auto mb-1" />
@@ -244,7 +281,6 @@ const RollSlipView = () => {
             <p className="text-[10px] text-slate-500 border-t border-slate-200 mt-1 pt-1">
               <strong className="text-emerald-900">This is a system-generated document.</strong>
               &nbsp;&middot;&nbsp; Generated on {data.generatedAt}
-              &nbsp;&middot;&nbsp; Document Ref: {data.applicationNo}
             </p>
           </div>
         </div>

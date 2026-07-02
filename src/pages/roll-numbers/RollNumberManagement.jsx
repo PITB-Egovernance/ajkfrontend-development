@@ -8,6 +8,7 @@ import {
 import {
   Hash,
   Eye,
+  FileText,
   RefreshCw,
   MoreVertical,
   Download,
@@ -369,12 +370,16 @@ const RollNumberManagement = () => {
   };
 
   // ── Stats ───────────────────────────────────────────────────────────────
-  const stats = useMemo(() => ({
-    total:     allRows.length,
-    published: allRows.filter((r) => r.published_at).length,
-    pending:   allRows.filter((r) => !r.published_at).length,
-    centers:   new Set(allRows.map((r) => r.exam_center).filter(Boolean)).size,
-  }), [allRows]);
+  const stats = useMemo(() => {
+    const uniqueCnics = new Set(allRows.map((r) => r.cnic).filter((c) => c && c !== 'N/A'));
+    return {
+      total:      allRows.length,
+      unique:     uniqueCnics.size || allRows.length,
+      published:  allRows.filter((r) => r.published_at).length,
+      pending:    allRows.filter((r) => !r.published_at).length,
+      centers:    new Set(allRows.map((r) => r.exam_center).filter(Boolean)).size,
+    };
+  }, [allRows]);
 
   // ── Columns ─────────────────────────────
   const columns = [
@@ -462,11 +467,17 @@ const RollNumberManagement = () => {
         </div>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200">
             <CardContent className="p-4">
-              <p className="text-xs text-indigo-700 font-medium">Roll Slips Generated</p>
-              <h2 className="text-2xl font-bold text-indigo-900 mt-1">{stats.total}</h2>
+              <p className="text-xs text-indigo-700 font-medium">Unique Candidates</p>
+              <h2 className="text-2xl font-bold text-indigo-900 mt-1">{stats.unique}</h2>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200">
+            <CardContent className="p-4">
+              <p className="text-xs text-violet-700 font-medium">Total Slips</p>
+              <h2 className="text-2xl font-bold text-violet-900 mt-1">{stats.total}</h2>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
@@ -569,6 +580,11 @@ const RollNumberManagement = () => {
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <MenuItem key="view-slip"
+          onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate(`/dashboard/roll-numbers/slip/${row.application_number}`); }}
+          disabled={!selectedRow?.roll_number}>
+          <FileText size={16} style={{ marginRight: '8px' }} className="text-emerald-600" /> View Slip
+        </MenuItem>
         <MenuItem key="view" onClick={handleView}>
           <Eye size={16} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
         </MenuItem>
