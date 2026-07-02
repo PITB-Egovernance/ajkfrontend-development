@@ -52,6 +52,21 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
 );
 
 const EMPTY_FORM = { subject_name: "", total_marks: "", subject_type: "compulsory", subject_group: "", status: "active" };
+const FILTERED_PAGE_SIZE = 100;
+
+const mapSubjectRows = (data, startIndex = 0) =>
+  (Array.isArray(data) ? data : []).map((item, i) => ({
+    id:            item.hash_id || item.id,
+    hash_id:       item.hash_id || item.id,
+    sr_no:         startIndex + i + 1,
+    subject_name:  item.subject_name,
+    // Type is derived from the group: a subject with a group is optional,
+    // one without a group is compulsory.
+    subject_type:  item.subject_group ? "optional" : "compulsory",
+    subject_group: item.subject_group,
+    total_marks:   item.total_marks,
+    status:        item.status ?? "active",
+  }));
 
 const SubjectManagement = () => {
   const navigate = useNavigate();
@@ -75,6 +90,7 @@ const SubjectManagement = () => {
   const [editingRow,  setEditingRow]  = useState(null);
   const [formData,    setFormData]    = useState(EMPTY_FORM);
   const [formErrors,  setFormErrors]  = useState({});
+  const hasActiveFilters = Object.values(filters).some((value) => String(value ?? "").trim() !== "");
 
   /* ── FETCH ── */
   const fetchAll = async (
@@ -86,21 +102,42 @@ const SubjectManagement = () => {
       const result = await SubjectApi.getAll(page + 1, pageSize);
       const pagination = result.data ?? {};
       const data = pagination.data ?? result.data ?? [];
-      setAllRows(
-        (Array.isArray(data) ? data : []).map((item, i) => ({
-          id:            item.hash_id || item.id,
-          hash_id:       item.hash_id || item.id,
-          sr_no:         page * pageSize + i + 1,
-          subject_name:  item.subject_name,
-          // Type is derived from the group: a subject with a group is optional,
-          // one without a group is compulsory.
-          subject_type:  item.subject_group ? "optional" : "compulsory",
-          subject_group: item.subject_group,
-          total_marks:   item.total_marks,
-          status:        item.status ?? "active",
-        }))
-      );
+      setAllRows(mapSubjectRows(data, page * pageSize));
       setTotalRows(Number(pagination.total) || 0);
+    } catch {
+      toast.error("Failed to load subject data");
+      setAllRows([]);
+      setTotalRows(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllForFilters = async () => {
+    setLoading(true);
+    try {
+      const firstResult = await SubjectApi.getAll(1, FILTERED_PAGE_SIZE);
+      const firstPagination = firstResult.data ?? {};
+      const firstData = firstPagination.data ?? firstResult.data ?? [];
+      const total = Number(firstPagination.total) || firstData.length;
+      const lastPage = Number(firstPagination.last_page) || Math.ceil(total / FILTERED_PAGE_SIZE) || 1;
+
+      let rows = mapSubjectRows(firstData);
+
+      if (lastPage > 1) {
+        const restResults = await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, i) => SubjectApi.getAll(i + 2, FILTERED_PAGE_SIZE))
+        );
+
+        restResults.forEach((result, index) => {
+          const pagination = result.data ?? {};
+          const data = pagination.data ?? result.data ?? [];
+          rows = rows.concat(mapSubjectRows(data, (index + 1) * FILTERED_PAGE_SIZE));
+        });
+      }
+
+      setAllRows(rows);
+      setTotalRows(rows.length);
     } catch {
       toast.error("Failed to load subject data");
       setAllRows([]);
@@ -127,9 +164,14 @@ const SubjectManagement = () => {
   };
 
   useEffect(() => {
+    if (hasActiveFilters) {
+      fetchAllForFilters();
+      return;
+    }
+
     fetchAll(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, [paginationModel.page, paginationModel.pageSize, hasActiveFilters]);
 
   useEffect(() => { fetchGroups(); }, []);
 
@@ -143,9 +185,15 @@ const SubjectManagement = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+    setSelectionModel([]);
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const handleClearFilters = () => setFilters({ subject_name: "", subject_group: "", status: "" });
+  const handleClearFilters = () => {
+    setFilters({ subject_name: "", subject_group: "", status: "" });
+    setSelectionModel([]);
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
 
   /* ── CLIENT-SIDE FILTER ── */
   const filteredRows = allRows.filter((row) => {
@@ -205,7 +253,7 @@ const SubjectManagement = () => {
       await SubjectApi.delete(selectedRow.hash_id);
       toast.success("Subject deleted successfully");
       setSelectionModel((p) => p.filter((id) => id !== selectedRow.id));
-      fetchAll();
+      hasActiveFilters ? fetchAllForFilters() : fetchAll();
     } catch {
       toast.error("Delete failed");
     }
@@ -220,7 +268,7 @@ const SubjectManagement = () => {
       await Promise.all(rows.map((r) => SubjectApi.delete(r.hash_id)));
       toast.success("Deleted selected subjects");
       setSelectionModel([]);
-      fetchAll();
+      hasActiveFilters ? fetchAllForFilters() : fetchAll();
     } catch {
       toast.error("Bulk delete failed");
     }
@@ -243,7 +291,7 @@ const SubjectManagement = () => {
       );
       toast.success(`Marked as ${status}`);
       setSelectionModel([]);
-      fetchAll();
+      hasActiveFilters ? fetchAllForFilters() : fetchAll();
     } catch {
       toast.error("Status update failed");
     }
@@ -262,7 +310,7 @@ const SubjectManagement = () => {
         status:        newStatus,
       });
       toast.success(`Marked as ${newStatus}`);
-      fetchAll();
+      hasActiveFilters ? fetchAllForFilters() : fetchAll();
     } catch {
       toast.error("Status update failed");
     }
@@ -288,7 +336,7 @@ const SubjectManagement = () => {
         toast.success("Subject added successfully");
       }
       setOpenModal(false);
-      fetchAll();
+      hasActiveFilters ? fetchAllForFilters() : fetchAll();
     } catch (err) {
       toast.error(err.message || "Operation failed");
     } finally {
@@ -300,7 +348,24 @@ const SubjectManagement = () => {
   const columns = [
     { field: "sr_no",         headerName: "#",            width: 65  },
     { field: "subject_name",  headerName: "Subject Name", flex: 1    },
-    { field: "subject_group", headerName: "Group",        width: 130 },
+    {
+      field: "subject_group",
+      headerName: "Group",
+      width: 150,
+      renderCell: (p) => {
+        const isCompulsory = p.row.subject_type === "compulsory" || !p.value;
+
+        return isCompulsory ? (
+          <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+            Compulsory
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-full border border-yellow-200 bg-yellow-50 px-2.5 py-0.5 text-xs font-semibold text-yellow-700">
+            {p.value}
+          </span>
+        );
+      },
+    },
     { field: "total_marks",   headerName: "Marks",        width: 100 },
     {
       field: "status",
@@ -437,8 +502,8 @@ const SubjectManagement = () => {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="server"
-          rowCount={totalRows}
+          paginationMode={hasActiveFilters ? "client" : "server"}
+          rowCount={hasActiveFilters ? filteredRows.length : totalRows}
           loading={loading}
           autoHeight
           checkboxSelection
