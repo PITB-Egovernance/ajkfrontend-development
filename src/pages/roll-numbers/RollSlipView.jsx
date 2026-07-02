@@ -16,7 +16,7 @@ const InfoRow = ({ label, value, bold }) => (
 
 const RollSlipView = () => {
   const navigate = useNavigate();
-  const { applicationNumber } = useParams();
+  const { rollNumber } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -26,29 +26,8 @@ const RollSlipView = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const result = await RollNumberApi.getSlipViewData(applicationNumber);
-        const primaryData = result.data;
-        if (process.env.NODE_ENV !== 'production') console.log('[SlipViewData]', JSON.stringify(primaryData, null, 2));
-
-        // Find other applications that share the same roll number (clubbed posts)
-        // and merge their exam sessions into this slip
-        let allSessions = [...(primaryData.examSessions || [])];
-        try {
-          const r = await RollNumberApi.getShortlisted({ per_page: 500 });
-          const rollRecords = r?.data?.data ?? [];
-          const siblings = rollRecords.filter(
-            item => item.roll_number === primaryData.rollNo && item.application_number !== applicationNumber
-          );
-          for (const sibling of siblings) {
-            try {
-              const r2 = await RollNumberApi.getSlipViewData(sibling.application_number);
-              const extra = r2?.data?.examSessions ?? [];
-              allSessions = [...allSessions, ...extra];
-            } catch { /* skip silently */ }
-          }
-        } catch { /* use primary sessions only */ }
-
-        if (!cancelled) setData({ ...primaryData, examSessions: allSessions });
+        const result = await RollNumberApi.getSlipViewData(rollNumber);
+        if (!cancelled) setData(result.data);
       } catch (err) {
         if (!cancelled) {
           toast.error(err?.message || 'Failed to load slip');
@@ -60,13 +39,14 @@ const RollSlipView = () => {
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [applicationNumber, navigate]);
+  }, [rollNumber, navigate]);
 
   const handleDownload = async () => {
     setDownloading(true);
     const tid = toast.loading('Preparing slip PDF…');
     try {
-      const res = await RollNumberApi.downloadSlip(applicationNumber);
+      const appNo = data?.applicationNo;
+      const res = await RollNumberApi.downloadSlip(appNo);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         toast.dismiss(tid);
@@ -77,7 +57,7 @@ const RollSlipView = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `AdmissionSlip_${applicationNumber}.pdf`;
+      a.download = `AdmissionSlip_${rollNumber}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -104,7 +84,7 @@ const RollSlipView = () => {
             <div className="p-2 bg-emerald-100 rounded-lg"><Hash size={18} className="text-emerald-800" /></div>
             <div>
               <h1 className="text-base font-bold text-slate-900">Roll Number Slip</h1>
-              <p className="text-xs text-slate-500">{applicationNumber}</p>
+              <p className="text-xs text-slate-500">{rollNumber}</p>
             </div>
           </div>
         </div>
@@ -122,24 +102,19 @@ const RollSlipView = () => {
 
           {/* HEADER */}
           <div className="pb-2 border-b-4 border-double border-emerald-900 mb-3">
-            <div className="flex items-start justify-between">
-              {/* Left: Logo + Title */}
-              <div className="flex items-center gap-3">
-                {data.logoDataUri ? (
-                  <img src={data.logoDataUri} alt="AJK PSC Logo" className="h-16 shrink-0" />
-                ) : (
-                  <div className="h-16 w-16 rounded-full bg-emerald-900 shrink-0" />
-                )}
-                <div>
-                  <div className="text-sm font-extrabold text-emerald-900 tracking-wide uppercase">Azad Jammu &amp; Kashmir</div>
-                  <div className="text-base font-black text-emerald-900 uppercase tracking-wide leading-tight">Public Service Commission</div>
-                  <div className="text-sm font-bold text-emerald-900 mt-0.5">Jalalabad, Muzaffarabad.</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '89px', minHeight: '78px', paddingRight: '160px', textAlign: 'center' }}>
+              {data.logoDataUri ? (
+                <img src={data.logoDataUri} alt="AJK PSC Logo" className="shrink-0" style={{ width: '72px', height: '72px', display: 'block', objectFit: 'contain', flex: '0 0 auto' }} />
+              ) : (
+                <div className="rounded-full bg-emerald-900 shrink-0" style={{ width: '72px', height: '72px', flex: '0 0 auto' }} />
+              )}
+              <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', color: '#064e3b', lineHeight: 1.15, textAlign: 'center' }}>
+                <div style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Azad Jammu &amp; Kashmir</div>
+                <div style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em', marginTop: '2px' }}>Public Service Commission</div>
+                <div style={{ display: 'block', fontSize: '14px', fontWeight: 700, lineHeight: 1.2, marginTop: '4px', textTransform: 'none' }}>Jalalabad, Muzaffarabad.</div>
+                <div className="mt-3">
+                  <span className="text-base font-black underline text-emerald-900 tracking-widest">Admission Letter For Test/Examination</span>
                 </div>
-              </div>
-              {/* Right: EXAMINATION SLIP label + dated/ref */}
-              <div className="text-right shrink-0 pl-4">
-                <div className="text-sm font-bold underline text-emerald-900 tracking-widest uppercase leading-tight">EXAMINATION<br/>SLIP</div>
-                <div className="text-xs text-slate-500 mt-1">Dated: {data.generatedAt}</div>
               </div>
             </div>
           </div>
@@ -193,29 +168,47 @@ const RollSlipView = () => {
 
             {Array.isArray(data.examSessions) && data.examSessions.length > 0 && (() => {
               const to12Hour = (t) => {
-                if (!t) return '—';
+                if (!t || t === '—') return t || '—';
                 const [h, m] = t.split(':').map(Number);
                 if (isNaN(h)) return t;
                 const period = h >= 12 ? 'PM' : 'AM';
                 const hour = h % 12 || 12;
-                return `${hour}:${String(m || 0).padStart(2, '0')} ${period}`;
+                return `${hour}:${String(m || 0).padStart(2, '0')}${period}`;
               };
-              // Group sessions sharing the same day+date+time into one table row
+              const timeRange = (start, end) => end ? `${to12Hour(start)} to ${to12Hour(end)}` : to12Hour(start);
+              // Group sessions sharing the same day+date+time into one table row.
+              // Supports both new backend (separate label field) and old backend
+              // (label embedded in postName as "Post Title — Paper 1").
               const groups = Object.values(
                 data.examSessions.reduce((acc, s) => {
                   const key = `${s.day}||${s.date}||${s.time}`;
-                  if (!acc[key]) acc[key] = { day: s.day, date: s.date, time: s.time, posts: [] };
-                  acc[key].posts.push(s);
+                  let lbl = s.label ?? null;
+                  let name = s.postName ?? '';
+                  if (!lbl) {
+                    const m = name.match(/\s+[—–]\s+(Paper\s+\d+)$/i);
+                    if (m) { lbl = m[1]; name = name.slice(0, -m[0].length).trim(); }
+                  }
+                  if (!acc[key]) acc[key] = { day: s.day, date: s.date, time: s.time, endTime: s.endTime ?? null, label: lbl, posts: [] };
+                  acc[key].posts.push({ ...s, postName: name });
                   return acc;
                 }, {})
               );
+              const hasLabels = groups.some(g => g.label);
+              // If every group has the identical set of posts, show description
+              // only once (rowspan) so it doesn't repeat for Paper 1 / Paper 2.
+              const descKey = (posts) => posts.map(p =>
+                `${p.advertisementNo ?? ''}||${p.department ?? ''}||${p.postName ?? ''}`
+              ).join('|');
+              const firstKey = descKey(groups[0]?.posts ?? []);
+              const allSameDesc = groups.length > 1 && groups.every(g => descKey(g.posts) === firstKey);
               return (
                 <table className="w-full border-collapse border-2 border-emerald-900 mt-2 text-sm">
                   <thead>
                     <tr className="bg-emerald-50">
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DAY</th>
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DATE</th>
-                      <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">ATTENDANCE TIME</th>
+                      <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">TIME</th>
+                      {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>}
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DESCRIPTION</th>
                     </tr>
                   </thead>
@@ -224,18 +217,22 @@ const RollSlipView = () => {
                       <tr key={idx} className="text-center">
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.day || '—'}</td>
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.date || '—'}</td>
-                        <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{to12Hour(group.time)}</td>
-                        <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900">
-                          {group.posts.map((session, pIdx) => (
-                            <div key={pIdx} className={pIdx > 0 ? 'border-t border-emerald-100 mt-1 pt-1' : ''}>
-                              {[
-                                session.advertisementNo || session.advertisement_no || data.advertisementNo,
-                                session.department || session.departmentName || session.department_name || data.department,
-                                session.postName || null,
-                              ].filter(Boolean).join(', ') || '—'}
-                            </div>
-                          ))}
-                        </td>
+                        <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{timeRange(group.time, group.endTime)}</td>
+                        {hasLabels && <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle font-bold text-emerald-900">{group.label || '—'}</td>}
+                        {(!allSameDesc || idx === 0) && (
+                          <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900 align-top"
+                              rowSpan={allSameDesc ? groups.length : undefined}>
+                            {group.posts.map((session, pIdx) => (
+                              <div key={pIdx} className={pIdx > 0 ? 'border-t border-emerald-100 mt-1 pt-1' : ''}>
+                                {[
+                                  session.advertisementNo || session.advertisement_no || data.advertisementNo,
+                                  session.postName || null,
+                                  session.department || session.departmentName || session.department_name || data.department,
+                                ].filter(Boolean).join(', ') || '—'}
+                              </div>
+                            ))}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -277,7 +274,7 @@ const RollSlipView = () => {
 
           <div className="mt-2 pt-1 border-t-2 border-emerald-900 text-center">
             <p className="text-xs font-bold text-emerald-900">Azad Jammu &amp; Kashmir Public Service Commission</p>
-            <p className="text-[11px] text-slate-600">Plot-13, Chattar Domel, Muzaffarabad &nbsp;|&nbsp; www.ajkpsc.gop.pk &nbsp;|&nbsp; info@ajkpsc.gop.pk</p>
+            <p className="text-[11px] text-slate-600">Muzaffarabad &nbsp;|&nbsp; www.ajkpsc.gop.pk &nbsp;|&nbsp; info@ajkpsc.gop.pk</p>
             <p className="text-[10px] text-slate-500 border-t border-slate-200 mt-1 pt-1">
               <strong className="text-emerald-900">This is a system-generated document.</strong>
               &nbsp;&middot;&nbsp; Generated on {data.generatedAt}

@@ -581,7 +581,7 @@ const RollNumberManagement = () => {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
         <MenuItem key="view-slip"
-          onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate(`/dashboard/roll-numbers/slip/${row.application_number}`); }}
+          onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate(`/dashboard/roll-numbers/slip/${encodeURIComponent(row.roll_number)}`); }}
           disabled={!selectedRow?.roll_number}>
           <FileText size={16} style={{ marginRight: '8px' }} className="text-emerald-600" /> View Slip
         </MenuItem>

@@ -64,9 +64,9 @@ const RollNumberApi = {
     });
   },
 
-  // JSON slip data for the in-app viewer (fast — skips PDF rendering)
-  getSlipViewData: async (applicationNumber) => {
-    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${applicationNumber}/view-data`, {
+  // JSON slip data for the in-app viewer looked up by roll number (fast — skips PDF rendering)
+  getSlipViewData: async (rollNumber) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/roll-slip/${encodeURIComponent(rollNumber)}/view-data`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);

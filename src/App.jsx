@@ -242,7 +242,7 @@ function App() {
           <Route path="roll-numbers" element={<RollNumberManagement />} />
           <Route path="roll-numbers/exam/:examType" element={<RollNumberExamFlow />} />
           <Route path="roll-numbers/edit-slip/:applicationNumber" element={<RollSlipEditor />} />
-          <Route path="roll-numbers/slip/:applicationNumber" element={<RollSlipView />} />
+          <Route path="roll-numbers/slip/:rollNumber" element={<RollSlipView />} />
 
           {/* Award List Routes */}
           <Route path="award-lists" element={<AwardList />} />

@@ -16,8 +16,9 @@ const to12Hour = (t) => {
   const [h, m] = t.split(':').map(Number);
   if (isNaN(h)) return t;
   const period = h >= 12 ? 'PM' : 'AM';
-  return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${period}`;
+  return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')}${period}`;
 };
+const timeRange = (start, end) => end ? `${to12Hour(start)} to ${to12Hour(end)}` : to12Hour(start);
 
 const RollNumberPublicSlip = () => {
   const { rollNumber } = useParams();
@@ -77,20 +78,17 @@ const RollNumberPublicSlip = () => {
 
         {/* HEADER */}
         <div className="pb-2 border-b-4 border-double border-emerald-900 mb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              {data.logoDataUri
-                ? <img src={data.logoDataUri} alt="AJK PSC Logo" className="h-16 shrink-0" />
-                : <div className="h-16 w-16 rounded-full bg-emerald-900 shrink-0" />}
-              <div>
-                <div className="text-sm font-extrabold text-emerald-900 tracking-wide uppercase">Azad Jammu &amp; Kashmir</div>
-                <div className="text-base font-black text-emerald-900 uppercase tracking-wide leading-tight">Public Service Commission</div>
-                <div className="text-sm font-bold text-emerald-900 mt-0.5">Jalalabad, Muzaffarabad.</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '89px', minHeight: '78px', paddingRight: '160px', textAlign: 'center' }}>
+            {data.logoDataUri
+              ? <img src={data.logoDataUri} alt="AJK PSC Logo" className="shrink-0" style={{ width: '72px', height: '72px', display: 'block', objectFit: 'contain', flex: '0 0 auto' }} />
+              : <div className="rounded-full bg-emerald-900 shrink-0" style={{ width: '72px', height: '72px', flex: '0 0 auto' }} />}
+            <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', color: '#064e3b', lineHeight: 1.15, textAlign: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em' }}>Azad Jammu &amp; Kashmir</div>
+              <div style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em', marginTop: '2px' }}>Public Service Commission</div>
+              <div style={{ display: 'block', fontSize: '14px', fontWeight: 700, lineHeight: 1.2, marginTop: '4px', textTransform: 'none' }}>Jalalabad, Muzaffarabad.</div>
+              <div className="mt-3">
+                <span className="text-base font-black underline text-emerald-900 tracking-widest">Admission Letter For Test/Examination</span>
               </div>
-            </div>
-            <div className="text-right shrink-0 pl-4">
-              <div className="text-sm font-bold underline text-emerald-900 tracking-widest uppercase leading-tight">EXAMINATION<br/>SLIP</div>
-              <div className="text-xs text-slate-500 mt-1">Dated: {data.generatedAt}</div>
             </div>
           </div>
         </div>
@@ -138,34 +136,47 @@ const RollNumberPublicSlip = () => {
           <InfoRow label="Exam Center" value={<><strong>{(data.examCenter || '').toUpperCase()}</strong>{data.examCity ? `, ${data.examCity.toUpperCase()}` : ''}</>} />
           <InfoRow label="District"    value={data.district} />
 
-          {data.sessionGroups?.length > 0 && (
-            <table className="w-full border-collapse border-2 border-emerald-900 mt-2 text-sm">
-              <thead>
-                <tr className="bg-emerald-50">
-                  <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DAY</th>
-                  <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DATE</th>
-                  <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">ATTENDANCE TIME</th>
-                  <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DESCRIPTION</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.sessionGroups.map((group, idx) => (
-                  <tr key={idx} className="text-center">
-                    <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{group.day || '—'}</td>
-                    <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{group.date || '—'}</td>
-                    <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{to12Hour(group.time)}</td>
-                    <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900">
-                      {group.posts?.map((post, pIdx) => (
-                        <div key={pIdx} className={pIdx > 0 ? 'border-t border-emerald-100 mt-1 pt-1' : ''}>
-                          {[post.advertisementNo, post.department, post.postName].filter(Boolean).join(', ')}
-                        </div>
-                      ))}
-                    </td>
+          {data.sessionGroups?.length > 0 && (() => {
+            const hasLabels = data.sessionGroups.some(g => g.label);
+            const descKey = (posts) => (posts ?? []).map(p =>
+              `${p.advertisementNo ?? ''}||${p.department ?? ''}||${p.postName ?? ''}`
+            ).join('|');
+            const firstKey = descKey(data.sessionGroups[0]?.posts);
+            const allSameDesc = data.sessionGroups.length > 1 && data.sessionGroups.every(g => descKey(g.posts) === firstKey);
+            return (
+              <table className="w-full border-collapse border-2 border-emerald-900 mt-2 text-sm">
+                <thead>
+                  <tr className="bg-emerald-50">
+                    <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DAY</th>
+                    <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DATE</th>
+                    <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">TIME</th>
+                    {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>}
+                    <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DESCRIPTION</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {data.sessionGroups.map((group, idx) => (
+                    <tr key={idx} className="text-center">
+                      <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{group.day || '—'}</td>
+                      <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{group.date || '—'}</td>
+                      <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{timeRange(group.time, group.endTime)}</td>
+                      {hasLabels && <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap font-bold text-emerald-900">{group.label || '—'}</td>}
+                      {(!allSameDesc || idx === 0) && (
+                        <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900 align-top"
+                            rowSpan={allSameDesc ? data.sessionGroups.length : undefined}>
+                          {group.posts?.map((post, pIdx) => (
+                            <div key={pIdx} className={pIdx > 0 ? 'border-t border-emerald-100 mt-1 pt-1' : ''}>
+                              {[post.advertisementNo, post.postName, post.department].filter(Boolean).join(', ')}
+                            </div>
+                          ))}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
         </div>
 
         {/* INSTRUCTIONS */}
@@ -179,7 +190,7 @@ const RollNumberPublicSlip = () => {
         {/* FOOTER */}
         <div className="mt-4 pt-2 border-t-2 border-emerald-900 text-center">
           <p className="text-xs font-bold text-emerald-900">Azad Jammu &amp; Kashmir Public Service Commission</p>
-          <p className="text-[11px] text-slate-600">Plot-13, Chattar Domel, Muzaffarabad &nbsp;|&nbsp; www.ajkpsc.gop.pk &nbsp;|&nbsp; info@ajkpsc.gop.pk</p>
+          <p className="text-[11px] text-slate-600">Muzaffarabad &nbsp;|&nbsp; www.ajkpsc.gop.pk &nbsp;|&nbsp; info@ajkpsc.gop.pk</p>
           <p className="text-[10px] text-slate-500 border-t border-slate-200 mt-1 pt-1">
             <strong className="text-emerald-900">This is a system-generated document.</strong>
             &nbsp;·&nbsp; Verified on {data.verifiedAt} &nbsp;·&nbsp; Roll No: {data.rollNo}

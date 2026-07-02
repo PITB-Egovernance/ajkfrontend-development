@@ -803,7 +803,7 @@ const RollNumberExamFlow = () => {
               papers: papers.length > 1 ? papers : undefined,
               allocation_method: allocationMethod,
               auto_allocate: true,
-              ...(rollPrefix.trim() !== '' ? { prefix: rollPrefix.trim() } : {}),
+              prefix: rollPrefix.trim(),
             });
 
             const slips = result?.data?.slips ?? [];
@@ -899,7 +899,7 @@ const RollNumberExamFlow = () => {
         papers: papers.length > 1 ? papers : undefined,
         allocation_method: allocationMethod,
         auto_allocate: false,
-        ...(rollPrefix.trim() !== '' ? { prefix: rollPrefix.trim() } : {}),
+        prefix: rollPrefix.trim(),
       });
       const slips = result?.data?.slips ?? [];
       const count = result?.data?.generated_count ?? slips.length;
@@ -933,8 +933,8 @@ const RollNumberExamFlow = () => {
   // Navigates to a dedicated full-page slip viewer route (in-app, not a
   // modal or a new browser tab) — consistent with how Advertisement detail
   // pages are viewed elsewhere in the app.
-  const viewSlip = useCallback((applicationNumber) => {
-    navigate(`/dashboard/roll-numbers/slip/${applicationNumber}`);
+  const viewSlip = useCallback((rollNumber) => {
+    navigate(`/dashboard/roll-numbers/slip/${encodeURIComponent(rollNumber)}`);
   }, [navigate]);
 
   const downloadSlip = useCallback(async (applicationNumber) => {
@@ -1606,7 +1606,7 @@ const RollNumberExamFlow = () => {
                           <td className="px-4 py-3 text-slate-600">{c.start_date || scheduleDates[0] || '—'}</td>
                           <td className="px-4 py-3 text-right">
                             <div className="inline-flex gap-2">
-                              <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-white px-3" onClick={() => viewSlip(c.id)}>
+                              <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-white px-3" onClick={() => viewSlip(c.roll)}>
                                 <Eye size={13} /> View Slip
                               </Button>
                               <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-white px-3" onClick={() => downloadSlip(c.id)}>
