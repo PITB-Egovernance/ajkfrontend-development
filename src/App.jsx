@@ -79,6 +79,8 @@ import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
 import RollSlipEditor from 'pages/roll-numbers/RollSlipEditor';
 import RollSlipView from 'pages/roll-numbers/RollSlipView';
+import RollNumberVerify from 'pages/roll-numbers/RollNumberVerify';
+import RollNumberPublicSlip from 'pages/roll-numbers/RollNumberPublicSlip';
 import RollNumberExamFlow from 'pages/roll-numbers/RollNumberExamFlow';
 import AwardList from 'pages/award-list/AwardList';
 import AwardListDetail from 'pages/award-list/AwardListDetail';
@@ -102,6 +104,10 @@ function App() {
   return (
     <Router>
       <Routes>
+        {/* Fully public — QR code slip verification */}
+        <Route path="/verify/roll/:rollNumber" element={<RollNumberVerify />} />
+        <Route path="/verify/roll/:rollNumber/slip" element={<RollNumberPublicSlip />} />
+
         {/* Public pages - redirect to dashboard if already logged in */}
         <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
