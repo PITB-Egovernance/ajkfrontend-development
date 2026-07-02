@@ -213,18 +213,22 @@ const AdvertisementDetail = () => {
   const getTestTypeName = (rawTestType) => {
     if (!rawTestType) return 'N/A';
 
-    if (typeof rawTestType === 'object') {
-      return (
-        rawTestType.test_name ||
-        rawTestType.name ||
-        rawTestType.title ||
-        rawTestType.hash_id ||
-        rawTestType.id ||
-        'N/A'
-      );
-    }
+    const directName =
+      typeof rawTestType === 'object'
+        ? rawTestType.test_name || rawTestType.name || rawTestType.title || ''
+        : '';
+    if (directName) return directName;
 
-    const str = String(rawTestType).trim();
+    const str = String(
+      typeof rawTestType === 'object'
+        ? rawTestType.test_type_id ||
+            rawTestType.hash_id ||
+            rawTestType.id ||
+            rawTestType.test_type ||
+            ''
+        : rawTestType
+    ).trim();
+    if (!str) return 'N/A';
 
     const matched = testTypeOptions.find((t) =>
       String(t.id) === str ||
@@ -503,6 +507,16 @@ const AdvertisementDetail = () => {
         <span className="adv-new-value">After: {change.after ?? currentValue}</span>
       </span>
     );
+  };
+
+  const formatTestTypeChange = (change) => {
+    if (!change) return change;
+
+    return {
+      ...change,
+      before: getTestTypeName(change.before),
+      after: getTestTypeName(change.after),
+    };
   };
 
   const groupedJobs = useMemo(() => {
@@ -1449,8 +1463,11 @@ const AdvertisementDetail = () => {
                   const jobSubjects = getJobSubjects(job);
                   const examTypeName = getTestTypeName(
                     job.pivot?.test_type ||
+                    job.pivot?.test_type_id ||
                     job.test_type ||
+                    job.test_type_id ||
                     job.exam_test_type ||
+                    job.exam_test_type_id ||
                     job.exam_type
                   );
                   const isCceExamType = /cce|combined|competitive/i.test(
@@ -1484,7 +1501,13 @@ const AdvertisementDetail = () => {
                   const maxAgeChange = getChangeByField(changeLogs, ['max_age'], ['Max age']);
                   const ageChange = minAgeChange || maxAgeChange;
                   const genderChange = getChangeByField(changeLogs, ['gender_basis'], ['Gender']);
-                  const examTypeChange = getChangeByField(changeLogs, ['test_type'], ['Test type']);
+                  const examTypeChange = formatTestTypeChange(
+                    getChangeByField(
+                      changeLogs,
+                      ['test_type', 'test_type_id', 'exam_test_type', 'exam_test_type_id', 'exam_type'],
+                      ['Test type', 'Exam type']
+                    )
+                  );
                   const qualificationChange = getChangeByField(
                     changeLogs,
                     [
