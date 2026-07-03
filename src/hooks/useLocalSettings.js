@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 
 const LIVE_API = Config.apiUrl;
 const liveHeaders = () => ({
@@ -68,14 +69,18 @@ export const useLocalSettings = () => {
   useEffect(() => {
     const fetchLive = async () => {
       try {
-        const [qRes, dRes] = await Promise.all([
-          fetch(`${LIVE_API}/settings/qualifications`, { headers: liveHeaders() }),
-          fetch(`${LIVE_API}/settings/degrees`,        { headers: liveHeaders() }),
+        const headers = liveHeaders();
+        const [qItems, dRes] = await Promise.all([
+          fetchPaginatedApiList(`${LIVE_API}/settings/qualifications`, {
+            headers,
+            perPage: 200,
+          }),
+          fetch(`${LIVE_API}/settings/degrees`, { headers }),
         ]);
-        const [qData, dData] = await Promise.all([qRes.json(), dRes.json()]);
+        const dData = await dRes.json();
 
-        if (qData.success || qData.status === 200) {
-          const quals = (qData.data?.data ?? qData.data ?? []).map((item) => ({
+        if (qItems.length > 0) {
+          const quals = qItems.map((item) => ({
             id:     item.hash_id || item.id,
             name:   item.qualification_name || item.name,
             type:   String(item.type ?? 'required').toLowerCase(),

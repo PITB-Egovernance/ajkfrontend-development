@@ -697,6 +697,7 @@ const AdvertisementCreateForm = () => {
                       <TextField
                         select
                         fullWidth
+                        required
                         label="Test Type"
                         value={jobConfigs[jobId]?.testType || ""}
                         onChange={(e) => {

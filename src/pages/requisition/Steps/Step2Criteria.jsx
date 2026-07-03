@@ -771,8 +771,8 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
             select
             label={
               formData.equivalent_qualification === 'Yes'
-                ? 'Name Degree of Equivalence *'
-                : 'Name Degree of Equivalence (Optional)'
+                ? 'Name Degree / Equivalent degree *'
+                : 'Name Degree / Equivalent degree (Optional)'
             }
             value={selectedDegreeList}
             SelectProps={{

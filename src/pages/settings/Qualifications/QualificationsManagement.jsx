@@ -15,6 +15,7 @@ import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
+import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 const PERM = 'settings.qualifications';
 
 const API_BASE = Config.apiUrl;
@@ -35,6 +36,7 @@ const QualificationsManagement = () => {
 
   const [rows,     setRows]     = useState([]);
   const [loading,  setLoading]  = useState(true);
+  const [totalRows, setTotalRows] = useState(0);
   const [open,     setOpen]     = useState(false);
   const [editing,  setEditing]  = useState(null);
   const [anchorEl,    setAnchorEl]    = useState(null);
@@ -51,13 +53,16 @@ const QualificationsManagement = () => {
   const [search,   setSearch]   = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const fetchAll = async () => {
+  const fetchAll = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/qualifications`, { headers: getHeaders() });
-      const result = await res.json();
-      if (result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
+      const hasSearch = Boolean(search.trim());
+
+      if (hasSearch) {
+        const data = await fetchPaginatedApiList(`${API_BASE}/settings/qualifications`, {
+          headers: getHeaders(),
+          perPage: 200,
+        });
         setRows(data.map((item, i) => ({
           id:       item.hash_id || item.id,
           sr_no:    i + 1,
@@ -66,14 +71,33 @@ const QualificationsManagement = () => {
           type:     String(item.type || 'required').toLowerCase(),
           status:   String(item.status || 'active').toLowerCase(),
         })));
+        setTotalRows(data.length);
+        return;
+      }
+
+      const res    = await fetch(`${API_BASE}/settings/qualifications?page=${page + 1}&per_page=${pageSize}`, { headers: getHeaders() });
+      const result = await res.json();
+      if (result.success || result.status === 200) {
+        const data = result.data?.data ?? result.data ?? [];
+        setRows(data.map((item, i) => ({
+          id:       item.hash_id || item.id,
+          sr_no:    page * pageSize + i + 1,
+          hash_id:  item.hash_id,
+          name:     item.qualification_name || item.name,
+          type:     String(item.type || 'required').toLowerCase(),
+          status:   String(item.status || 'active').toLowerCase(),
+        })));
+        setTotalRows(Number(result.data?.total) || data.length);
       } else {
         toast.error(result.message || 'Failed to load qualifications');
+        setRows([]);
+        setTotalRows(0);
       }
-    } catch { toast.error('Server error'); }
+    } catch { toast.error('Server error'); setRows([]); setTotalRows(0); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(paginationModel.page, paginationModel.pageSize); }, [paginationModel.page, paginationModel.pageSize, search]);
 
 
   const filtered = rows.filter((r) =>
@@ -118,7 +142,7 @@ const QualificationsManagement = () => {
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Updated successfully' : 'Qualification added');
         setOpen(false);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || 'Operation failed');
       }
@@ -135,7 +159,11 @@ const QualificationsManagement = () => {
       const result = await res.json();
       if (result.success || result.status === 200) {
         toast.success('Deleted');
-        fetchAll();
+        if (rows.length === 1 && paginationModel.page > 0) {
+          setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
+        } else {
+          fetchAll(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Delete failed');
       }
@@ -156,7 +184,7 @@ const QualificationsManagement = () => {
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         toast.success(`Marked as ${newStatus}`);
-        fetchAll();
+        fetchAll(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || 'Status update failed');
       }
@@ -237,12 +265,15 @@ const QualificationsManagement = () => {
 
         <div className="mb-4">
           <TextField size="small" placeholder="Search qualifications..."
-            value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 320 }} />
+            value={search} onChange={(e) => { setSearch(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }} sx={{ width: 320 }} />
         </div>
 
         <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX} />
+          paginationMode={search.trim() ? 'client' : 'server'}
+          rowCount={search.trim() ? filtered.length : totalRows}
+          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
+          loading={loading} />
 
         {/* 3-dot action menu */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
