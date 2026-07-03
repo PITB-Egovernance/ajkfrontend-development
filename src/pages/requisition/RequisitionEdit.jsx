@@ -249,7 +249,7 @@ const RequisitionEdit = () => {
       if (!data.num_posts || data.num_posts < 1) errors.num_posts = 'No. of Posts Requisitioned is required';
     } else if (step === 1) {
       if (!data.academic_qualification) errors.academic_qualification = 'Required qualification is required';
-      if (!data.degree_equivalence) errors.degree_equivalence = 'Degree equivalence is required';
+      // if (!data.degree_equivalence) errors.degree_equivalence = 'Degree equivalence is required';
     } else if (step === 2) {
       if (!data.min_age || data.min_age < 18) errors.min_age = 'Minimum age must be at least 18';
       if (!data.max_age || data.max_age < data.min_age) errors.max_age = 'Maximum age must be greater than minimum age';
@@ -485,7 +485,7 @@ const RequisitionEdit = () => {
           <InlineLoader text="Loading form data..." variant="ring" size="lg" />
         ) : (
           <div className="form-step active">
-            {changeLogEntries.length > 0 && (
+            {/* {changeLogEntries.length > 0 && (
               <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <div className="mb-2 text-sm font-semibold text-slate-700">Change History</div>
                 <ul className="space-y-2 text-sm text-slate-600">
@@ -497,8 +497,8 @@ const RequisitionEdit = () => {
                   ))}
                 </ul>
               </div>
-            )}
-            {renderStepContent()}
+            )} */}
+            {/* {renderStepContent()} */}
           </div>
         )}
       </div>

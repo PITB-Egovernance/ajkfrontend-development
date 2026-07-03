@@ -14,7 +14,8 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import { hasPermission } from 'utils/permissions';
-import { GRID_SX } from 'utils/gridStyles';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 
 const PERM = 'settings.degrees';
 
@@ -37,8 +38,9 @@ const DegreesManagement = () => {
   const navigate = useNavigate();
 
   const [rows,   setRows]   = useState([]);
-  const [groups, setGroups] = useState([]);   // degree groups from API
+  const [groups, setGroups] = useState([]);   // all known degree groups — used for the filter dropdown
   const [loading, setLoading] = useState(true);
+  const [totalRows, setTotalRows] = useState(0);
   const [open,    setOpen]    = useState(false);
   const [editing, setEditing] = useState(null);
   const [anchorEl,    setAnchorEl]    = useState(null);
@@ -49,45 +51,77 @@ const DegreesManagement = () => {
   const [form,    setForm]    = useState(emptyForm);
   const [saving,  setSaving]  = useState(false);
   const [togglingId, setTogglingId] = useState(null);
-  const [search,  setSearch]  = useState('');
-  const [filterGroup, setFilterGroup] = useState('');
+  const [filters, setFilters] = useState({ degree_name: '', degree_group: '', status: '' });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const fetchAll = async () => {
+  const fetchAll = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const degRes  = await fetch(`${API_BASE}/settings/degrees`, { headers: getHeaders() });
+      const params = new URLSearchParams({ page: String(page + 1), per_page: String(pageSize) });
+      const degRes  = await fetch(`${API_BASE}/settings/degrees?${params.toString()}`, { headers: getHeaders() });
       const degData = await degRes.json();
 
       if (degData.success || degData.status === 200) {
-        const data = degData.data?.data ?? degData.data ?? [];
+        const pagination = degData.data ?? {};
+        const data = pagination.data ?? degData.data ?? [];
         const mapped = (Array.isArray(data) ? data : [])
           .filter(Boolean)
           .map((item, i) => ({
             id:           item.hash_id || item.id,
-            sr_no:        i + 1,
+            sr_no:        page * pageSize + i + 1,
             hash_id:      item.hash_id,
             degree_name:  item.degree_name || item.name || '',
             degree_group: item.degree_group || '',
             status:       String(item.status || 'active').toLowerCase(),
           }));
         setRows(mapped);
-        // Distinct group names from existing degrees — used only for the filter dropdown.
-        setGroups([...new Set(mapped.map((r) => r.degree_group).filter(Boolean))]);
+        setTotalRows(Number(pagination.total) || mapped.length);
       } else {
         toast.error(degData.message || 'Failed to load degrees');
+        setRows([]);
+        setTotalRows(0);
       }
-    } catch { toast.error('Server error'); }
+    } catch { toast.error('Server error'); setRows([]); setTotalRows(0); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  // Full group list for the filter dropdown — independent of the currently loaded page.
+  const fetchGroups = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/settings/degrees?per_page=1000`, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success || data.status === 200) {
+        const list = data.data?.data ?? data.data ?? [];
+        setGroups([...new Set((Array.isArray(list) ? list : []).map((d) => d.degree_group).filter(Boolean))]);
+      }
+    } catch { /* non-critical — group filter stays empty */ }
+  };
 
+  useEffect(() => {
+    fetchAll(paginationModel.page, paginationModel.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize]);
+
+  useEffect(() => { fetchGroups(); }, []);
+
+  const filterConfig = [
+    { name: 'degree_name',  label: 'Degree Name',  type: 'text',   placeholder: 'Filter by degree name' },
+    { name: 'degree_group', label: 'Degree Group', type: 'select', options: groups.map((g) => ({ value: g, label: g })) },
+    { name: 'status',       label: 'Status',       type: 'select', options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleClearFilters = () => setFilters({ degree_name: '', degree_group: '', status: '' });
 
   const filtered = rows.filter((r) => {
-    const matchSearch = !search.trim() || r.degree_name?.toLowerCase().includes(search.toLowerCase());
-    const matchGroup  = !filterGroup || r.degree_group === filterGroup;
-    return matchSearch && matchGroup;
+    const matchName  = !filters.degree_name.trim() || r.degree_name?.toLowerCase().includes(filters.degree_name.toLowerCase());
+    const matchGroup = !filters.degree_group || r.degree_group === filters.degree_group;
+    const matchStatus = !filters.status || r.status === filters.status;
+    return matchName && matchGroup && matchStatus;
   });
 
   const openAdd  = () => { setEditing(null); setForm(emptyForm); setOpen(true); };
@@ -123,6 +157,7 @@ const DegreesManagement = () => {
         toast.success(isUpdate ? 'Updated successfully' : 'Degree added');
         setOpen(false);
         fetchAll();
+        fetchGroups();
       } else {
         toast.error(result.message || 'Operation failed');
       }
@@ -218,7 +253,7 @@ const DegreesManagement = () => {
     }] : []),
   ];
 
-  if (loading) return <InlineLoader text="Loading degrees..." variant="ring" size="lg" />;
+  if (loading && rows.length === 0) return <InlineLoader text="Loading degrees..." variant="ring" size="lg" />;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
@@ -248,33 +283,22 @@ const DegreesManagement = () => {
 
         <div className="grid grid-cols-1 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-            <CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{rows.length}</h2></CardContent>
+            <CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{totalRows}</h2></CardContent>
           </Card>
         </div>
 
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <TextField size="small" placeholder="Search degrees..."
-            value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 280 }} />
-          <TextField select size="small" label="Filter by Group"
-            value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} sx={{ minWidth: 200 }}>
-            <MenuItem value="">All Groups</MenuItem>
-            {groups.map((g, i) => (
-              <MenuItem key={`${g}-${i}`} value={g}>
-                {g}
-              </MenuItem>
-            ))}
-          </TextField>
-          {filterGroup && (
-            <button onClick={() => setFilterGroup('')}
-              className="px-3 py-1.5 border border-slate-300 text-slate-600 text-sm rounded-lg hover:bg-slate-50">
-              Clear
-            </button>
-          )}
-        </div>
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Degrees"
+        />
 
         <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX} />
+          pageSizeOptions={GRID_PAGE_SIZE_OPTIONS} paginationMode="server" rowCount={totalRows}
+          loading={loading} autoHeight disableRowSelectionOnClick sx={GRID_SX} />
 
         {/* 3-dot action menu */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
