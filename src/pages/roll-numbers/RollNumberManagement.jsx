@@ -8,6 +8,7 @@ import {
 import {
   Hash,
   Eye,
+  FileText,
   RefreshCw,
   MoreVertical,
   Download,
@@ -31,8 +32,8 @@ const PERM = 'roll_number.roll_number_generation';
 const DEFAULT_FILTERS = {
   search: '',
   advertisement_no: '',
-  generated: '',
   preferred_exam_city: '',
+  exam_center: '',
   payment_status: '',
   slip_status: '',
 };
@@ -40,16 +41,8 @@ const DEFAULT_FILTERS = {
 const FILTER_CONFIG = [
   { name: 'search', label: 'Search (Name / CNIC / Ref ID / Roll No)', type: 'text', placeholder: 'Search by name, CNIC, Ref ID, or Roll No' },
   { name: 'advertisement_no', label: 'Advertisement No', type: 'text', placeholder: 'e.g. Advertisement 50-26' },
-  { name: 'preferred_exam_city', label: 'Exam City Preference', type: 'text', placeholder: 'e.g. Muzaffarabad' },
-  {
-    name: 'generated',
-    label: 'Roll Number',
-    type: 'select',
-    options: [
-      { value: 'yes', label: 'Generated' },
-      { value: 'no', label: 'Not Generated' },
-    ],
-  },
+  { name: 'exam_center', label: 'Exam Center', type: 'text', placeholder: 'e.g. Muzaffarabad' },
+  { name: 'preferred_exam_city', label: 'Preferred Exam City', type: 'text', placeholder: 'e.g. Rawalakot' },
   {
     name: 'payment_status',
     label: 'Payment Status',
@@ -131,29 +124,7 @@ const RollNumberManagement = () => {
     return map;
   }, []);
 
-  // ── Admin roll number status (per application_number) ──────────────────
-  const fetchAdminRollMap = useCallback(async () => {
-    const map = {};
-    try {
-      let page = 1;
-      const perPage = 200;
-      for (let i = 0; i < 5; i++) {
-        const result = await RollNumberApi.getShortlisted({ per_page: perPage, page });
-        const data = result?.data?.data ?? [];
-        data.forEach((item) => {
-          if (item.application_number) map[item.application_number] = item;
-        });
-        const lastPage = result?.data?.last_page ?? 1;
-        if (page >= lastPage || data.length === 0) break;
-        page += 1;
-      }
-    } catch {
-      // silent — roll number status simply won't be available
-    }
-    return map;
-  }, []);
-
-  // ── Full candidate-portal application list (paged through, all pages) ──
+  // ── Full candidate-portal application list (optional enrichment only) ──
   const fetchAllCandidateApplications = useCallback(async () => {
     const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
     let allApps = [];
@@ -175,58 +146,88 @@ const RollNumberManagement = () => {
         );
         remaining.forEach((page) => { allApps = allApps.concat(page); });
       }
-    } catch (err) {
-      throw err;
+    } catch {
+      // silent — portal enrichment simply won't be available
     }
     return allApps;
   }, []);
 
-  // ── Data ─────────────────────────────────────────────────────────────
+  // ── Data: admin-first fetch (portal used only for optional enrichment) ──
   const fetchApplications = useCallback(async () => {
     setLoading(true);
     try {
-      const [candidateApps, advMap, adminRollMap] = await Promise.all([
-        fetchAllCandidateApplications(),
-        fetchAdminAdvertisementMap(),
-        fetchAdminRollMap(),
-      ]);
+      // PRIMARY: fetch all generated roll number records from admin API
+      const adminRollRecords = [];
+      try {
+        let page = 1;
+        for (let i = 0; i < 10; i++) {
+          const result = await RollNumberApi.getShortlisted({ per_page: 200, page });
+          const data = result?.data?.data ?? [];
+          adminRollRecords.push(...data);
+          const lastPage = result?.data?.last_page ?? 1;
+          if (page >= lastPage || data.length === 0) break;
+          page += 1;
+        }
+      } catch { /* silent */ }
 
-      const mapped = candidateApps.map((item) => {
-        const snapshot = item.snapshot_data || {};
-        const adminRoll = adminRollMap[item.application_number] || {};
-        const extAdvertisementId = item.job_post?.ext_advertisement_id || null;
-        const extAdvId = item.job_post?.ext_adv_id || null;
-        const resolvedAdvNo = (extAdvertisementId && advMap[extAdvertisementId])
-          || (extAdvId && advMap[extAdvId])
-          || item.job_post?.adv_number
-          || item.advertisement_no
-          || 'N/A';
+      // SECONDARY: advertisement map for adv_no resolution
+      let advMap = {};
+      try { advMap = await fetchAdminAdvertisementMap(); } catch { /* silent */ }
 
-        return {
-          id:                item.application_number || item.hash_id || String(item.id),
-          application_number: item.application_number,
-          applicant_name:    snapshot.name || item.candidate?.name || item.profile?.full_name || 'N/A',
-          cnic:              snapshot.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
-          job_title:         item.job_post?.post_title || item.job_post?.title || 'N/A',
-          advertisement_no:  resolvedAdvNo,
-          applied_at:        item.submitted_at || item.created_at ? formatDate(item.submitted_at || item.created_at) : 'N/A',
-          payment_status:    item.payment?.payment_status || item.payment_status || (item.payment?.paid_at ? 'paid' : 'unpaid'),
-          preferred_exam_cities: (item.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || c?.name || '')).filter(Boolean),
-          roll_number:       adminRoll.roll_number || null,
-          exam_center:       adminRoll.exam_center || null,
-          exam_city:         adminRoll.exam_city || null,
-          published_at:      adminRoll.published_at || null,
-        };
-      });
+      // OPTIONAL: candidate portal data for preferred_exam_cities / payment_status enrichment
+      let portalAppsMap = {};
+      try {
+        const portalApps = await fetchAllCandidateApplications();
+        (portalApps || []).forEach(app => {
+          if (app.application_number) portalAppsMap[app.application_number] = app;
+        });
+      } catch { /* silent */ }
 
-      setAllRows(mapped);
+      // Build rows directly from admin roll records
+      const rows = adminRollRecords
+        .filter(item => item.application_number && item.roll_number)
+        .map(item => {
+          const portalApp = portalAppsMap[item.application_number] || {};
+          const snapshot = portalApp.snapshot_data || {};
+          const extAdvId = portalApp.job_post?.ext_adv_id || null;
+          const extAdvId2 = portalApp.job_post?.ext_advertisement_id || null;
+          const resolvedAdvNo = (extAdvId && advMap[extAdvId])
+            || (extAdvId2 && advMap[extAdvId2])
+            || portalApp.job_post?.adv_number
+            || item.adv_number
+            || 'N/A';
+
+          const rollStr = typeof item.roll_number === 'string' ? item.roll_number
+                        : (item.roll_number?.roll_number || null);
+
+          return {
+            id:                item.application_number,
+            application_number: item.application_number,
+            applicant_name:    item.candidate_name || snapshot.name || portalApp.candidate?.name || 'N/A',
+            cnic:              item.candidate_cnic || snapshot.cnic || portalApp.candidate?.cnic || 'N/A',
+            job_title:         portalApp.job_post?.post_title || portalApp.job_post?.title || item.designation || 'N/A',
+            advertisement_no:  resolvedAdvNo,
+            applied_at:        item.applied_at || portalApp.submitted_at || portalApp.created_at
+              ? formatDate(item.applied_at || portalApp.submitted_at || portalApp.created_at) : 'N/A',
+            payment_status:    portalApp.payment?.payment_status || portalApp.payment_status
+              || (item.paid_at ? 'paid' : 'N/A'),
+            preferred_exam_cities: (portalApp.preferred_exam_cities || [])
+              .map(c => typeof c === 'string' ? c : (c?.city || c?.name || '')).filter(Boolean),
+            roll_number:       rollStr,
+            exam_center:       item.exam_center || null,
+            exam_city:         item.exam_city || null,
+            published_at:      item.published_at || null,
+          };
+        });
+
+      setAllRows(rows);
     } catch (err) {
-      toast.error(err?.message || 'Failed to load applications from candidate portal');
+      toast.error(err?.message || 'Failed to load roll number slips');
       setAllRows([]);
     } finally {
       setLoading(false);
     }
-  }, [fetchAllCandidateApplications, fetchAdminAdvertisementMap, fetchAdminRollMap]);
+  }, [fetchAdminAdvertisementMap, fetchAllCandidateApplications]);
 
   useEffect(() => {
     fetchApplications();
@@ -238,6 +239,7 @@ const RollNumberManagement = () => {
     const search = filters.search.trim().toLowerCase();
     const advNo = filters.advertisement_no.trim().toLowerCase();
     const city = filters.preferred_exam_city.trim().toLowerCase();
+    const center = filters.exam_center.trim().toLowerCase();
 
     return allRows.filter((row) => {
       if (search) {
@@ -245,10 +247,9 @@ const RollNumberManagement = () => {
         if (!haystack.includes(search)) return false;
       }
       if (advNo && !row.advertisement_no.toLowerCase().includes(advNo)) return false;
-      if (filters.generated === 'yes' && !row.roll_number) return false;
-      if (filters.generated === 'no' && row.roll_number) return false;
+      if (center && !(row.exam_center || '').toLowerCase().includes(center)) return false;
       if (city && !row.preferred_exam_cities.some((c) => c.toLowerCase().includes(city))) return false;
-      if (filters.payment_status && row.payment_status?.toLowerCase() !== filters.payment_status) return false;
+      if (filters.payment_status && (row.payment_status || '').toLowerCase() !== filters.payment_status) return false;
       if (filters.slip_status === 'published' && !row.published_at) return false;
       if (filters.slip_status === 'pending' && row.published_at) return false;
       return true;
@@ -369,12 +370,16 @@ const RollNumberManagement = () => {
   };
 
   // ── Stats ───────────────────────────────────────────────────────────────
-  const stats = useMemo(() => ({
-    total:        allRows.length,
-    withRoll:     allRows.filter((r) => r.roll_number).length,
-    withoutRoll:  allRows.filter((r) => !r.roll_number).length,
-    published:    allRows.filter((r) => r.published_at).length,
-  }), [allRows]);
+  const stats = useMemo(() => {
+    const uniqueCnics = new Set(allRows.map((r) => r.cnic).filter((c) => c && c !== 'N/A'));
+    return {
+      total:      allRows.length,
+      unique:     uniqueCnics.size || allRows.length,
+      published:  allRows.filter((r) => r.published_at).length,
+      pending:    allRows.filter((r) => !r.published_at).length,
+      centers:    new Set(allRows.map((r) => r.exam_center).filter(Boolean)).size,
+    };
+  }, [allRows]);
 
   // ── Columns ─────────────────────────────
   const columns = [
@@ -455,36 +460,42 @@ const RollNumberManagement = () => {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-100 rounded-lg"><Hash size={22} className="text-indigo-700" /></div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Applications & Roll Number Management</h1>
-              <p className="text-sm text-slate-500 mt-1">View all received applications and manage roll number slips.</p>
+              <h1 className="text-2xl font-bold text-slate-900">Roll Number Management</h1>
+              <p className="text-sm text-slate-500 mt-1">View and manage candidates with generated roll number slips.</p>
             </div>
           </div>
         </div>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-            <CardContent className="p-4">
-              <p className="text-xs text-blue-700 font-medium">Total Applications</p>
-              <h2 className="text-2xl font-bold text-blue-900 mt-1">{stats.total}</h2>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200">
             <CardContent className="p-4">
-              <p className="text-xs text-indigo-700 font-medium">Roll Numbers Generated</p>
-              <h2 className="text-2xl font-bold text-indigo-900 mt-1">{stats.withRoll}</h2>
+              <p className="text-xs text-indigo-700 font-medium">Unique Candidates</p>
+              <h2 className="text-2xl font-bold text-indigo-900 mt-1">{stats.unique}</h2>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200">
+          <Card className="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200">
             <CardContent className="p-4">
-              <p className="text-xs text-amber-700 font-medium">Awaiting Generation</p>
-              <h2 className="text-2xl font-bold text-amber-900 mt-1">{stats.withoutRoll}</h2>
+              <p className="text-xs text-violet-700 font-medium">Total Slips</p>
+              <h2 className="text-2xl font-bold text-violet-900 mt-1">{stats.total}</h2>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
             <CardContent className="p-4">
               <p className="text-xs text-emerald-700 font-medium">Slips Published</p>
               <h2 className="text-2xl font-bold text-emerald-900 mt-1">{stats.published}</h2>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200">
+            <CardContent className="p-4">
+              <p className="text-xs text-amber-700 font-medium">Slips Pending</p>
+              <h2 className="text-2xl font-bold text-amber-900 mt-1">{stats.pending}</h2>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
+            <CardContent className="p-4">
+              <p className="text-xs text-blue-700 font-medium">Exam Centers Used</p>
+              <h2 className="text-2xl font-bold text-blue-900 mt-1">{stats.centers}</h2>
             </CardContent>
           </Card>
         </div>
@@ -536,11 +547,11 @@ const RollNumberManagement = () => {
               <div className="p-4 bg-slate-100 rounded-full mb-4">
                 <Eye size={32} className="text-slate-400" />
               </div>
-              <p className="text-base font-semibold text-slate-700">No applications found</p>
+              <p className="text-base font-semibold text-slate-700">No roll number slips found</p>
               <p className="text-sm text-slate-400 mt-1 max-w-sm">
                 {allRows.length === 0
-                  ? 'Applications will appear here once candidates apply through the candidate portal.'
-                  : 'No applications match the current filters.'}
+                  ? 'Roll number slips will appear here once they are generated through the exam flow.'
+                  : 'No slips match the current filters.'}
               </p>
             </div>
           ) : (
@@ -569,6 +580,11 @@ const RollNumberManagement = () => {
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <MenuItem key="view-slip"
+          onClick={() => { const row = selectedRow; handleMenuClose(); if (row) navigate(`/dashboard/roll-numbers/slip/${encodeURIComponent(row.roll_number)}`); }}
+          disabled={!selectedRow?.roll_number}>
+          <FileText size={16} style={{ marginRight: '8px' }} className="text-emerald-600" /> View Slip
+        </MenuItem>
         <MenuItem key="view" onClick={handleView}>
           <Eye size={16} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
         </MenuItem>
