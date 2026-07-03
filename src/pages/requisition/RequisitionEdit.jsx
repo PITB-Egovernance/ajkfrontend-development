@@ -498,7 +498,7 @@ const RequisitionEdit = () => {
                 </ul>
               </div>
             )} */}
-            {/* {renderStepContent()} */}
+            {renderStepContent()}
           </div>
         )}
       </div>
