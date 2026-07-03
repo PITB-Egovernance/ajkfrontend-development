@@ -124,7 +124,9 @@ const CitiesManagement = () => {
       if (result.status === 200 || result.success) {
         const data = result.data?.data ?? result.data ?? [];
         const filtered = data.filter(
-          (d) => !EXCLUDED_DISTRICTS.includes((d.name || "").toLowerCase().trim())
+          (d) =>
+            String(d.status ?? "active").toLowerCase() === "active" &&
+            !EXCLUDED_DISTRICTS.includes((d.name || "").toLowerCase().trim())
         );
         setDistricts(filtered);
       }

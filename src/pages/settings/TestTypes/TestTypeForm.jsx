@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, MenuItem } from '@mui/material';
+import { TextField, MenuItem, Checkbox, FormControlLabel } from '@mui/material';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { hasPermission } from 'utils/permissions';
+import WrittenExamSubjectApi from 'api/writtenExamSubjectApi';
 
 const PERM = 'settings.test_types';
 const API_BASE = Config.apiUrl;
@@ -25,7 +26,7 @@ const EXAM_CATEGORIES = [
   { value: 'one_paper_mcq',          label: 'One Paper MCQ' },
   { value: 'two_paper_mcq',          label: 'Two Paper MCQ' },
   { value: 'written_exam',           label: 'Written Exam' },
-  { value: 'joint_competitive_exam', label: 'CCE Exam' },
+  { value: 'combined_competitive_exam', label: 'Combined Competitive Exam' },
 ];
 
 const EMPTY = {
@@ -42,8 +43,7 @@ const EMPTY = {
   interview_weightage_percentage: '',
   // Written exam (subjects scheme)
   total_subjects: '',
-  compulsory_subjects_total_marks: '',
-  optional_subjects_total_marks: '',
+  subject_ids: [],
   written_total_marks: '',
   passing_percentage_per_subject: '',
   aggregate_passing_percentage: '',
@@ -74,10 +74,18 @@ const buildFormFromData = (data) => {
   Object.keys(EMPTY).forEach((k) => {
     if (data[k] === undefined || data[k] === null) return;
     if (k === 'is_passing_required') merged[k] = !!data[k];
+    else if (k === 'subject_ids') return; // handled below
     else if (TEXT_KEYS.has(k)) merged[k] = data[k];
     else merged[k] = trimNum(data[k]);
   });
   merged.exam_category = data.exam_category || merged.exam_category;
+  // Saved subjects may come back as plain ids or as subject objects.
+  const rawSubjects = data.subject_ids ?? data.subjects ?? data.written_exam_subjects;
+  if (Array.isArray(rawSubjects)) {
+    merged.subject_ids = rawSubjects
+      .map((s) => String(s?.hash_id ?? s?.id ?? s ?? ''))
+      .filter(Boolean);
+  }
   return merged;
 };
 
@@ -127,6 +135,8 @@ const TestTypeForm = () => {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [subjects, setSubjects] = useState([]);            // active written exam subjects
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
 
   const set = (key, value) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -152,6 +162,46 @@ const TestTypeForm = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Active written exam subjects shown as checkboxes for the written exam scheme.
+  useEffect(() => {
+    if (cat !== 'written_exam' || subjects.length) return;
+    (async () => {
+      setSubjectsLoading(true);
+      try {
+        const result = await WrittenExamSubjectApi.getAll(1, 1000);
+        const pagination = result.data ?? {};
+        const data = pagination.data ?? result.data ?? [];
+        setSubjects(
+          (Array.isArray(data) ? data : [])
+            .filter((s) => String(s?.status ?? 'active').toLowerCase() === 'active')
+            .map((s) => ({
+              id: String(s.hash_id ?? s.id ?? ''),
+              name: s.subject_name ?? '',
+              marks: Number(s.subject_marks ?? s.total_marks ?? s.marks ?? 0),
+              designation: s?.designation?.name ?? s?.designation_name ?? '',
+            }))
+            .filter((s) => s.id && s.name)
+        );
+      } catch { toast.error('Failed to load written exam subjects'); }
+      finally { setSubjectsLoading(false); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cat]);
+
+  const toggleSubject = (subjectId) => {
+    setForm((f) => {
+      const selected = f.subject_ids.includes(subjectId)
+        ? f.subject_ids.filter((sid) => sid !== subjectId)
+        : [...f.subject_ids, subjectId];
+      return { ...f, subject_ids: selected };
+    });
+    setFieldErrors((fe) => ({ ...fe, subject_ids: undefined }));
+    setError('');
+  };
+
+  const selectedSubjects = subjects.filter((s) => form.subject_ids.includes(s.id));
+  const selectedSubjectsMarks = selectedSubjects.reduce((sum, s) => sum + (s.marks || 0), 0);
+
   /* ── validation per category → returns an errors object keyed by field ── */
   const validate = () => {
     const e = {};
@@ -167,13 +217,11 @@ const TestTypeForm = () => {
       req('paper1_weightage_percentage', 'Paper 1 Weightage is required.');
       req('paper2_weightage_percentage', 'Paper 2 Weightage is required.');
     } else if (cat === 'written_exam') {
+      req('written_total_marks', 'Total Marks is required.');
       req('total_subjects', 'Total Subjects is required.');
-      req('compulsory_subjects_total_marks', 'Compulsory Subjects Total Marks is required.');
-      req('optional_subjects_total_marks', 'Optional Subjects Total Marks is required.');
-      req('written_total_marks', 'Written Total Marks is required.');
-      req('passing_percentage_per_subject', 'Passing Percentage Per Subject is required.');
-      req('aggregate_passing_percentage', 'Aggregate Passing Percentage is required.');
-    } else if (cat === 'joint_competitive_exam') {
+      req('passing_percentage', 'Passing Marks (%) is required.');
+      if (!form.subject_ids.length) e.subject_ids = 'Please select at least one subject.';
+    } else if (cat === 'combined_competitive_exam') {
       req('screening_total_marks', 'Total Marks is required.');
       req('screening_passing_marks', 'Passing Marks is required.');
       req('screening_passing_percentage', 'Passing Percentage is required.');
@@ -206,11 +254,9 @@ const TestTypeForm = () => {
     } else if (cat === 'two_paper_mcq') {
       put(['total_marks', 'passing_percentage', 'paper1_weightage_percentage', 'paper2_weightage_percentage', 'interview_weightage_percentage']);
     } else if (cat === 'written_exam') {
-      put([
-        'total_subjects', 'compulsory_subjects_total_marks', 'optional_subjects_total_marks',
-        'written_total_marks', 'passing_percentage_per_subject', 'aggregate_passing_percentage',
-      ]);
-    } else if (cat === 'joint_competitive_exam') {
+      put(['written_total_marks', 'total_subjects', 'passing_percentage', 'qualification_marks_percentage', 'interview_percentage']);
+      base.subject_ids = form.subject_ids;
+    } else if (cat === 'combined_competitive_exam') {
       put([
         'screening_total_marks', 'screening_passing_marks', 'screening_passing_percentage',
         'qualification_marks_percentage', 'written_total_marks',
@@ -321,20 +367,59 @@ const TestTypeForm = () => {
               </div>
             )}
 
-            {/* ── WRITTEN EXAM (subjects scheme) ── */}
+            {/* ── WRITTEN EXAM ── */}
             {cat === 'written_exam' && (
-              <div className="row">
-                <NumberField label="Total Subjects" required value={form.total_subjects} onChange={(v) => set('total_subjects', v)} placeholder="e.g. 6" error={fieldErrors.total_subjects} />
-                <NumberField label="Compulsory Subjects Total Marks" required value={form.compulsory_subjects_total_marks} onChange={(v) => set('compulsory_subjects_total_marks', v)} placeholder="Enter marks" error={fieldErrors.compulsory_subjects_total_marks} />
-                <NumberField label="Optional Subjects Total Marks" required value={form.optional_subjects_total_marks} onChange={(v) => set('optional_subjects_total_marks', v)} placeholder="Enter marks" error={fieldErrors.optional_subjects_total_marks} />
-                <NumberField label="Written Total Marks" required value={form.written_total_marks} onChange={(v) => set('written_total_marks', v)} placeholder="Enter marks" error={fieldErrors.written_total_marks} />
-                <NumberField label="Passing Percentage Per Subject (%)" required max={100} value={form.passing_percentage_per_subject} onChange={(v) => set('passing_percentage_per_subject', v)} placeholder="0 - 100" error={fieldErrors.passing_percentage_per_subject} />
-                <NumberField label="Aggregate Passing Percentage (%)" required max={100} value={form.aggregate_passing_percentage} onChange={(v) => set('aggregate_passing_percentage', v)} placeholder="0 - 100" error={fieldErrors.aggregate_passing_percentage} />
-              </div>
+              <>
+                <div className="row">
+                  <NumberField label="Total Marks" required value={form.written_total_marks} onChange={(v) => set('written_total_marks', v)} placeholder="e.g. 1200" error={fieldErrors.written_total_marks} />
+                  <NumberField label="Total Subjects" required value={form.total_subjects} onChange={(v) => set('total_subjects', v)} placeholder="e.g. 6" error={fieldErrors.total_subjects} />
+                  <NumberField label="Passing Marks (%)" required max={100} value={form.passing_percentage} onChange={(v) => set('passing_percentage', v)} placeholder="0 - 100" error={fieldErrors.passing_percentage} />
+                  <NumberField label="Qualification Marks (%)" max={100} value={form.qualification_marks_percentage} onChange={(v) => set('qualification_marks_percentage', v)} placeholder="0 - 100" />
+                  <NumberField label="Interview (%)" max={100} value={form.interview_percentage} onChange={(v) => set('interview_percentage', v)} placeholder="0 - 100" />
+                </div>
+
+                {/* Active written exam subjects — pick which subjects this exam includes */}
+                <div className={`border rounded-xl p-5 mb-4 bg-slate-50/40 ${fieldErrors.subject_ids ? 'border-red-400' : 'border-slate-200'}`}>
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 className="font-bold text-slate-800">Subjects</h3>
+                    <span className="text-sm text-slate-500">
+                      Selected: {selectedSubjects.length} subject{selectedSubjects.length === 1 ? '' : 's'} — {selectedSubjectsMarks} marks
+                    </span>
+                  </div>
+                  {subjectsLoading ? (
+                    <p className="text-sm text-slate-500">Loading subjects…</p>
+                  ) : subjects.length === 0 ? (
+                    <p className="text-sm text-slate-500">No active written exam subjects found. Add them in Settings → Written Exam Subjects.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4">
+                      {subjects.map((s) => (
+                        <FormControlLabel
+                          key={s.id}
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={form.subject_ids.includes(s.id)}
+                              onChange={() => toggleSubject(s.id)}
+                              sx={{ color: '#064e3b', '&.Mui-checked': { color: '#064e3b' } }}
+                            />
+                          }
+                          label={
+                            <span className="text-lg text-slate-700">
+                              {s.name} <span className="font-semibold">({s.marks} marks)</span>
+                              {s.designation && <span className="text-slate-400"> — {s.designation}</span>}
+                            </span>
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {fieldErrors.subject_ids && <p className="text-red-600 text-sm mt-2">{fieldErrors.subject_ids}</p>}
+                </div>
+              </>
             )}
 
             {/* ── CCE EXAM (fixed 3 stages, no stage name, no add stage) ── */}
-            {cat === 'joint_competitive_exam' && (
+            {cat === 'combined_competitive_exam' && (
               <>
                 <Section index={1} title="Stage 1: Screening Test">
                   <div className="row">

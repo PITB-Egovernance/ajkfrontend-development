@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogActions,
   Switch,
+  Checkbox,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, FileText, Trash2, CheckCircle, XCircle } from "lucide-react";
@@ -48,11 +49,28 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
-const EMPTY_FORM = { designation_id: "", designation: "", subject_name: "", subject_marks: "", status: "active" };
+const EMPTY_FORM = { designation_ids: [], subject_name: "", subject_marks: "", status: "active" };
 
-const getDesignationId = (item) => item?.designation_id ?? item?.designation?.id ?? item?.designation?.hash_id ?? "";
-const getDesignationName = (item) =>
-  item?.designation?.name ?? item?.designation_name ?? item?.designation ?? item?.post ?? "";
+const getDesignationId = (item) => {
+  if (Array.isArray(item?.designations) && item.designations[0])
+    return item.designations[0]?.hash_id ?? item.designations[0]?.id ?? "";
+  return item?.designation_id ?? item?.designation?.id ?? item?.designation?.hash_id ?? "";
+};
+const getDesignationIds = (item) => {
+  if (Array.isArray(item?.designations) && item.designations.length)
+    return item.designations.map((d) => String(d?.hash_id ?? d?.id ?? "")).filter(Boolean);
+  const single = getDesignationId(item);
+  return single ? [single] : [];
+};
+const getDesignationNames = (item) => {
+  if (Array.isArray(item?.designations) && item.designations.length)
+    return item.designations.map((d) => d?.name ?? "").filter(Boolean);
+  const single =
+    item?.designation?.name ?? item?.designation_name ??
+    (typeof item?.designation === "string" ? item.designation : null) ??
+    item?.post ?? "";
+  return single ? [single] : [];
+};
 const getSubjectMarks = (item) => item?.subject_marks ?? item?.total_marks ?? item?.marks ?? "";
 
 const WrittenExamSubjectsManagement = () => {
@@ -90,14 +108,16 @@ const WrittenExamSubjectsManagement = () => {
       const data = pagination.data ?? result.data ?? [];
       setAllRows(
         (Array.isArray(data) ? data : []).map((item, i) => ({
-          id:            item.hash_id || item.id,
-          hash_id:       item.hash_id || item.id,
-          sr_no:         page * pageSize + i + 1,
-          designation_id: getDesignationId(item),
-          designation:   getDesignationName(item),
-          subject_name:  item.subject_name,
-          subject_marks: getSubjectMarks(item),
-          status:        item.status ?? "active",
+          id:               item.hash_id || item.id,
+          hash_id:          item.hash_id || item.id,
+          sr_no:            page * pageSize + i + 1,
+          designation_id:   getDesignationId(item),
+          designation_ids:  getDesignationIds(item),
+          designation:      getDesignationNames(item).join(", "),
+          designationNames: getDesignationNames(item),
+          subject_name:     item.subject_name,
+          subject_marks:    getSubjectMarks(item),
+          status:           item.status ?? "active",
         }))
       );
       setTotalRows(Number(pagination.total) || 0);
@@ -168,8 +188,14 @@ const WrittenExamSubjectsManagement = () => {
   const findDesignationById = (id) => designations.find((d) => String(d.id) === String(id));
   const findDesignationByName = (name) => designations.find((d) => d.name === name);
   const resolveDesignationId = (row) => row.designation_id || findDesignationByName(row.designation)?.id || "";
+  // Dropdown options — prepend the edited row's designation if it is no longer active.
+  const editingDesignationId = editingRow ? String(resolveDesignationId(editingRow) || "") : "";
+  const designationOptions =
+    editingDesignationId && !findDesignationById(editingDesignationId)
+      ? [{ id: editingDesignationId, name: editingRow.designation }, ...designations]
+      : designations;
   const buildPayload = (row) => ({
-    designation_id: String(resolveDesignationId(row)),
+    designation_ids: [String(resolveDesignationId(row))],
     subject_name: row.subject_name.trim(),
     subject_marks: Number(row.subject_marks),
     status: row.status,
@@ -183,14 +209,14 @@ const WrittenExamSubjectsManagement = () => {
   };
 
   const handleEdit = () => {
-    const designationId = resolveDesignationId(selectedRow);
     setEditingRow(selectedRow);
     setFormData({
-      designation_id: designationId,
-      designation:    selectedRow.designation,
-      subject_name:   selectedRow.subject_name,
-      subject_marks:  String(selectedRow.subject_marks),
-      status:         selectedRow.status ?? "active",
+      designation_ids: selectedRow.designation_ids?.length
+        ? selectedRow.designation_ids
+        : (resolveDesignationId(selectedRow) ? [String(resolveDesignationId(selectedRow))] : []),
+      subject_name:  selectedRow.subject_name,
+      subject_marks: String(selectedRow.subject_marks),
+      status:        selectedRow.status ?? "active",
     });
     setFormErrors({});
     setOpenModal(true);
@@ -200,7 +226,7 @@ const WrittenExamSubjectsManagement = () => {
   /* ── VALIDATION ── */
   const validate = () => {
     const errs = {};
-    if (!formData.designation_id) errs.designation_id = "Designation is required";
+    if (!formData.designation_ids.length) errs.designation_ids = "Select at least one designation";
     if (!formData.subject_name.trim()) errs.subject_name = "Subject name is required";
     if (!formData.subject_marks || isNaN(Number(formData.subject_marks)) || Number(formData.subject_marks) <= 0)
       errs.subject_marks = "Marks must be a positive number";
@@ -273,13 +299,22 @@ const WrittenExamSubjectsManagement = () => {
     if (!validate()) return;
     setSaving(true);
     try {
-      const payload = buildPayload(formData);
+      const payload = {
+        designation_ids: formData.designation_ids,
+        subject_name: formData.subject_name.trim(),
+        subject_marks: Number(formData.subject_marks),
+        status: formData.status,
+      };
       if (editingRow) {
         await WrittenExamSubjectApi.update(editingRow.hash_id, payload);
         toast.success("Written exam subject updated successfully");
       } else {
         await WrittenExamSubjectApi.create(payload);
-        toast.success("Written exam subject added successfully");
+        toast.success(
+          formData.designation_ids.length > 1
+            ? `Subject added for ${formData.designation_ids.length} designations`
+            : "Written exam subject added successfully"
+        );
       }
       setOpenModal(false);
       fetchAll();
@@ -292,10 +327,23 @@ const WrittenExamSubjectsManagement = () => {
 
   /* ── COLUMNS ── */
   const columns = [
-    { field: "sr_no",         headerName: "#",            width: 65  },
-    { field: "designation",   headerName: "Designation",  flex: 1    },
-    { field: "subject_name",  headerName: "Subject Name", flex: 1    },
-    { field: "subject_marks", headerName: "Marks",        width: 100 },
+    { field: "sr_no",        headerName: "#",            width: 65 },
+    { field: "subject_name", headerName: "Subject Name", flex: 1   },
+    {
+      field: "designation",
+      headerName: "Designation",
+      flex: 2,
+      renderCell: (p) => (
+        <div className="flex flex-wrap gap-1 items-center py-1">
+          {(p.row.designationNames ?? [p.value].filter(Boolean)).map((name) => (
+            <span key={name} className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-700">
+              {name}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    { field: "subject_marks", headerName: "Marks", width: 100 },
     {
       field: "status",
       headerName: "Status",
@@ -455,35 +503,6 @@ const WrittenExamSubjectsManagement = () => {
           </DialogTitle>
           <DialogContent>
             <TextField
-              select
-              fullWidth
-              label="Designation"
-              margin="normal"
-              size="small"
-              value={formData.designation_id}
-              onChange={(e) => {
-                const designation = findDesignationById(e.target.value);
-                setFormData((f) => ({
-                  ...f,
-                  designation_id: e.target.value,
-                  designation: designation?.name || "",
-                }));
-                if (e.target.value) setFormErrors((errs) => ({ ...errs, designation_id: undefined }));
-              }}
-              error={!!formErrors.designation_id}
-              helperText={formErrors.designation_id || "Select the designation"}
-            >
-              <MenuItem value="">— Select Designation —</MenuItem>
-              {/* Preserve a previously-saved designation that is no longer active. */}
-              {formData.designation_id && !findDesignationById(formData.designation_id) && (
-                <MenuItem value={formData.designation_id}>{formData.designation}</MenuItem>
-              )}
-              {designations.map((d) => (
-                <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
               fullWidth
               label="Subject Name"
               margin="normal"
@@ -497,6 +516,44 @@ const WrittenExamSubjectsManagement = () => {
               helperText={formErrors.subject_name}
               placeholder="e.g. General Knowledge"
             />
+
+            {/* Multi-select designation dropdown — checkboxes inside the menu. */}
+            <TextField
+              select
+              fullWidth
+              label="Designations"
+              margin="normal"
+              size="small"
+              value={formData.designation_ids}
+              onChange={(e) => {
+                const value = typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value;
+                setFormData((f) => ({ ...f, designation_ids: value }));
+                if (value.length) setFormErrors((errs) => ({ ...errs, designation_ids: undefined }));
+              }}
+              SelectProps={{
+                multiple: true,
+                renderValue: (selected) =>
+                  selected
+                    .map((did) => designationOptions.find((d) => String(d.id) === String(did))?.name || did)
+                    .join(", "),
+              }}
+              error={!!formErrors.designation_ids}
+              helperText={formErrors.designation_ids || "Select one or more designations — a record is created for each"}
+            >
+              {designationOptions.length === 0 && (
+                <MenuItem disabled>No active designations found</MenuItem>
+              )}
+              {designationOptions.map((d) => (
+                <MenuItem key={d.id} value={d.id}>
+                  <Checkbox
+                    size="small"
+                    checked={formData.designation_ids.includes(d.id)}
+                    sx={{ color: "#064e3b", "&.Mui-checked": { color: "#064e3b" }, py: 0, mr: 1 }}
+                  />
+                  {d.name}
+                </MenuItem>
+              ))}
+            </TextField>
 
             <TextField
               fullWidth

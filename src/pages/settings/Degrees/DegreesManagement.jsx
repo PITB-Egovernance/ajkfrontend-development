@@ -289,11 +289,11 @@ const DegreesManagement = () => {
               value={form.degree_name}
               onChange={(e) => setForm((f) => ({ ...f, degree_name: e.target.value }))}
               placeholder="e.g. BSCS" />
-            <TextField fullWidth label="Degree Group (optional)" margin="normal" size="small"
+            <TextField fullWidth label="Degree Group" margin="normal" size="small"
               value={form.degree_group}
               onChange={(e) => setForm((f) => ({ ...f, degree_group: e.target.value }))}
               placeholder="e.g. Computer Science"
-              helperText="Optional group name for categorizing this degree" />
+              helperText="Group name for categorizing this degree" />
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button onClick={() => setOpen(false)} disabled={saving}

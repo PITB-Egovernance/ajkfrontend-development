@@ -23,7 +23,7 @@ const EXAM_CATEGORIES = [
   { value: 'one_paper_mcq',         label: 'One Paper MCQ' },
   { value: 'two_paper_mcq',         label: 'Two Paper MCQ' },
   { value: 'written_exam',          label: 'Written Exam' },
-  { value: 'joint_competitive_exam', label: 'CCE Exam' },
+  { value: 'combined_competitive_exam', label: 'Combined Competitive Exam' },
 ];
 
 
@@ -109,8 +109,6 @@ const TestTypesManagement = () => {
     screening_passing_marks:        item.screening_passing_marks ?? '',
     screening_passing_percentage:   item.screening_passing_percentage ?? '',
     screening_include_in_merit:     !!item.screening_include_in_merit,
-    compulsory_subjects_total_marks: item.compulsory_subjects_total_marks ?? '',
-    optional_subjects_total_marks:  item.optional_subjects_total_marks ?? '',
     written_total_marks:            item.written_total_marks ?? '',
     passing_percentage_per_subject: item.passing_percentage_per_subject ?? '',
     aggregate_passing_percentage:   item.aggregate_passing_percentage ?? '',
