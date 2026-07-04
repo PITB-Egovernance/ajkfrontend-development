@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Download, Eye, Filter, Hash, MapPin, Plus, Search, Send, Users, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Download, Eye, Filter, Hash, MapPin, Search, Send, Users, X } from 'lucide-react';
 import { MenuItem, TextField } from '@mui/material';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
 import { Card, CardContent } from 'components/ui/Card';
 import { InlineLoader } from 'components/ui/Loader';
 import RollNumberApi from 'api/rollNumberApi';
-import WrittenExamSubjectApi from 'api/writtenExamSubjectApi';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 
@@ -172,8 +171,6 @@ const parseRollNumber = (roll) => {
   return { prefix: match[1], seq: parseInt(match[2], 10), padLen: match[2].length };
 };
 
-const newWrittenSchedule = () => ({ id: Date.now() + Math.random(), date: '', startTime: '10:00', duration: 90, subjectId: '' });
-
 const computeEndTime = (startTime, durationMinutes) => {
   if (!startTime || !durationMinutes) return '';
   const [h, m] = startTime.split(':').map(Number);
@@ -216,11 +213,6 @@ const RollNumberExamFlow = () => {
   const [scheduleTimes, setScheduleTimes] = useState(() => meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
   const [scheduleDurations, setScheduleDurations] = useState(() => meta.papers.map((_, i) => i === 1 ? 120 : 90));
   const [rollPrefix, setRollPrefix] = useState(() => DEFAULT_ROLL_PREFIXES[examType] ?? '');
-  const [writtenExamSchedules, setWrittenExamSchedules] = useState([]);
-  const [currentSchedule, setCurrentSchedule] = useState(() => newWrittenSchedule());
-  const [schedulesPage, setSchedulesPage] = useState(0);
-  const [writtenExamSubjects, setWrittenExamSubjects] = useState([]);
-  const [testTypeSubjectsMap, setTestTypeSubjectsMap] = useState({}); // testTypeId → subject[]
 
   // Reset schedule state when exam type changes (same component, different route param)
   useEffect(() => {
@@ -228,8 +220,6 @@ const RollNumberExamFlow = () => {
     setScheduleTimes(meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
     setScheduleDurations(meta.papers.map((_, i) => i === 1 ? 120 : 90));
     setRollPrefix(DEFAULT_ROLL_PREFIXES[examType] ?? '');
-    setWrittenExamSchedules([]);
-    setCurrentSchedule(newWrittenSchedule());
   }, [examType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [advertisements, setAdvertisements] = useState([]);
@@ -293,7 +283,7 @@ const RollNumberExamFlow = () => {
       };
       const candidateHeaders = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
 
-      const [adsResult, centersResult, testTypesRes, gradesRes, candidateApps, rollNumbersResult, utilizationResult, citiesRes, writtenSubjectsRes, designationsRes] = await Promise.all([
+      const [adsResult, centersResult, testTypesRes, gradesRes, candidateApps, rollNumbersResult, utilizationResult, citiesRes] = await Promise.all([
         RollNumberApi.getAdvertisementsWithJobs(200).catch((e) => { console.error('[RollNumberExamFlow] getAdvertisementsWithJobs failed:', e?.message); return {}; }),
         RollNumberApi.getExamCenters(500),
         fetch(`${Config.apiUrl}/settings/test-types?per_page=200`, { headers: adminHeaders }).then(r => r.json()).catch(() => ({})),
@@ -302,105 +292,16 @@ const RollNumberExamFlow = () => {
         RollNumberApi.getAdvertisements({ per_page: 200 }).catch(() => ({})),
         RollNumberApi.getCenterUtilization().catch(() => ({ data: {} })),
         fetch(`${Config.apiUrl}/settings/cities?per_page=1000`, { headers: adminHeaders }).then(r => r.json()).catch(() => ({})),
-        examType === 'written-exams'
-          ? WrittenExamSubjectApi.getAll(1, 1000).catch(() => ({}))
-          : Promise.resolve({}),
-        examType === 'written-exams'
-          ? WrittenExamSubjectApi.getDesignations().catch(() => ({}))
-          : Promise.resolve({}),
       ]);
-
-      // designation name (lowercase) → hash_id — used to match job.designation to subject.designation_ids
-      const designationNameMap = {};
-      const desList = designationsRes?.data?.data ?? designationsRes?.data ?? [];
-      (Array.isArray(desList) ? desList : []).forEach(d => {
-        const key = (d.name || d.designation_name || '').toLowerCase().trim();
-        if (key && d.hash_id) designationNameMap[key] = String(d.hash_id);
-      });
 
       const testTypeMap = {};
       const examCategoryMap = {}; // hash_id/id → exam_category (normalized)
-      const subjectIdsMap = {};   // hash_id/id → subject_ids[]
       const ttList = testTypesRes?.data?.data ?? testTypesRes?.data ?? [];
       (Array.isArray(ttList) ? ttList : []).forEach(tt => {
         const cat = (tt.exam_category || '').toLowerCase().replace(/[\s_]+/g, '-');
-        const sids = Array.isArray(tt.subject_ids) ? tt.subject_ids.map(String) : [];
-        if (tt.hash_id) { testTypeMap[tt.hash_id] = tt.name || ''; examCategoryMap[tt.hash_id] = cat; subjectIdsMap[tt.hash_id] = sids; }
-        if (tt.id)      { testTypeMap[String(tt.id)] = tt.name || ''; examCategoryMap[String(tt.id)] = cat; subjectIdsMap[String(tt.id)] = sids; }
+        if (tt.hash_id) { testTypeMap[tt.hash_id] = tt.name || ''; examCategoryMap[tt.hash_id] = cat; }
+        if (tt.id)      { testTypeMap[String(tt.id)] = tt.name || ''; examCategoryMap[String(tt.id)] = cat; }
       });
-      if (examType === 'written-exams') {
-        // Fetch individual test type details for every written_exam test type so we
-        // get the written_exam_subjects relationship (the list API omits it).
-        const writtenTtIds = (Array.isArray(ttList) ? ttList : [])
-          .filter(tt => {
-            const cat = (tt.exam_category || '').toLowerCase().replace(/[\s_]+/g, '-');
-            return cat === 'written-exam' || cat === 'written_exam';
-          })
-          .map(tt => tt.hash_id || String(tt.id || ''))
-          .filter(Boolean);
-
-        const ttDetailResults = writtenTtIds.length > 0
-          ? await Promise.all(
-              writtenTtIds.map(hid =>
-                fetch(`${Config.apiUrl}/settings/test-types/${hid}`, { headers: adminHeaders })
-                  .then(r => r.json())
-                  .catch(() => null)
-              )
-            )
-          : [];
-
-        const subjectsMap = {};
-        ttDetailResults.forEach((result, i) => {
-          if (!result) return;
-          const data = result.data ?? result;
-          const hid = writtenTtIds[i];
-          const numId = String(data.id ?? '');
-
-          const relSubjects = Array.isArray(data.subjects) ? data.subjects
-            : Array.isArray(data.written_exam_subjects) ? data.written_exam_subjects
-            : null;
-
-          let subjects = [];
-          if (relSubjects && relSubjects.length > 0) {
-            subjects = relSubjects
-              .filter(s => String(s?.status ?? 'active').toLowerCase() === 'active')
-              .map(s => ({
-                id: String(s.hash_id ?? s.id ?? ''),
-                name: s.subject_name ?? s.name ?? '',
-                marks: Number(s.subject_marks ?? s.total_marks ?? s.marks ?? 0),
-              }))
-              .filter(s => s.id && s.name);
-          }
-
-          // Key by both hash_id and numeric id so any testTypeId format resolves
-          if (hid) subjectsMap[hid] = subjects;
-          if (numId && numId !== hid) subjectsMap[numId] = subjects;
-        });
-
-        setTestTypeSubjectsMap(subjectsMap);
-
-        // Flat subjects list — includes designation_ids for filtering by selected post's designation
-        const subjectsList = writtenSubjectsRes?.data?.data ?? writtenSubjectsRes?.data ?? [];
-        setWrittenExamSubjects(
-          (Array.isArray(subjectsList) ? subjectsList : [])
-            .filter(s => String(s?.status ?? 'active').toLowerCase() === 'active')
-            .map(s => ({
-              id: String(s.hash_id ?? s.id ?? ''),
-              name: s.subject_name ?? '',
-              marks: Number(s.subject_marks ?? s.total_marks ?? s.marks ?? 0),
-              designationIds: Array.isArray(s.designation_ids) && s.designation_ids.length
-                ? s.designation_ids.map(String)
-                : Array.isArray(s.designations)
-                  ? s.designations.map(d => String(d?.hash_id ?? d?.id ?? '')).filter(Boolean)
-                  : [],
-            }))
-            .filter(s => s.id && s.name)
-        );
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('[WrittenExam] writtenSubjectsRes:', writtenSubjectsRes);
-          console.log('[WrittenExam] subjectsList length:', subjectsList.length);
-        }
-      }
 
       const gradeMap = {};
       const gradeList = gradesRes?.data?.data ?? gradesRes?.data ?? [];
@@ -485,12 +386,12 @@ const RollNumberExamFlow = () => {
       if (process.env.NODE_ENV !== 'production') {
         const dbg = allAds[0]?.job_details?.slice(0, 2).map(j => ({
           designation: j.designation,
-          designation_id: j.designation_id,
-          designation_hash_id: j.designation_hash_id,
-          job_hash_id: j.hash_id,
-          job_id: j.id,
           test_type: j.test_type,
+          resolved_name: j.resolved_test_type_name,
+          resolved_cat: j.resolved_test_type_exam_category,
           pivot_test_type: j.pivot?.test_type,
+          pivot_name: j.pivot?.test_type_name,
+          pivot_cat: j.pivot?.test_type_exam_category,
         }));
         console.group(`[RollNumberExamFlow] examType=${examType} matched ${matchedAds.length}/${allAds.length}`);
         console.log('testTypeMap:', JSON.stringify(testTypeMap));
@@ -535,13 +436,6 @@ const RollNumberExamFlow = () => {
               generatedCount,                // candidates with a roll number already
               totalApplicants: candidateAppsAvailable ? totalCount : perPostFallback,
               advertisementId: adKey,
-              testTypeId: String(job.pivot?.test_type || job.test_type || ''),
-              designationHashId: String(
-                job.designation_hash_id ??
-                job.designation_id ??
-                designationNameMap[(job.designation || '').toLowerCase().trim()] ??
-                ''
-              ),
             };
           }),
         };
@@ -687,42 +581,6 @@ const RollNumberExamFlow = () => {
 
   useEffect(() => { setCentersPage(0); }, [centers]);
 
-
-  // Subjects for the schedule dropdown — those whose designation_ids include
-  // the designation of any selected post. Falls back to all active subjects if
-  // designation hash_ids aren't available on the post objects.
-  const availableSubjectsForSchedule = useMemo(() => {
-    if (examType !== 'written-exams') return [];
-    const postDesignationIds = new Set(
-      selectedPosts.map(p => p.designationHashId).filter(Boolean)
-    );
-    if (postDesignationIds.size === 0) return writtenExamSubjects;
-    return writtenExamSubjects.filter(s =>
-      s.designationIds.some(dId => postDesignationIds.has(dId))
-    );
-  }, [examType, selectedPosts, writtenExamSubjects]);
-
-  const removeWrittenSchedule = (id) => {
-    setWrittenExamSchedules(s => {
-      const next = s.filter(sch => sch.id !== id);
-      const lastPage = Math.max(0, Math.ceil(next.length / 2) - 1);
-      setSchedulesPage(p => Math.min(p, lastPage));
-      return next;
-    });
-  };
-  const updateCurrentSchedule = (key, value) => setCurrentSchedule(s => ({ ...s, [key]: value }));
-  const commitCurrentSchedule = () => {
-    if (!currentSchedule.date)      { toast.error('Please enter a date'); return; }
-    if (!currentSchedule.startTime) { toast.error('Please enter a start time'); return; }
-    if (!currentSchedule.subjectId) { toast.error('Please select a subject'); return; }
-    setWrittenExamSchedules(s => {
-      const next = [...s, { ...currentSchedule, id: Date.now() + Math.random() }];
-      setSchedulesPage(Math.floor((next.length - 1) / 2)); // jump to last page
-      return next;
-    });
-    setCurrentSchedule(newWrittenSchedule());
-  };
-
   const togglePost = (postId) => setSelectedPostIds((current) => current.includes(postId) ? current.filter((id) => id !== postId) : [...current, postId]);
   const toggleCenter = (centerId) => setSelectedCenterIds((current) => current.includes(centerId) ? current.filter((id) => id !== centerId) : [...current, centerId]);
 
@@ -789,17 +647,9 @@ const RollNumberExamFlow = () => {
       if (!capacityPassed) { toast.error(`Center capacity is short by ${capacityShortage} seats. Select more centers.`); return; }
       if (selectedCenterIds.length === 0) { toast.error('Select at least one exam center'); return; }
     }
-    if (examType === 'written-exams') {
-      for (const sch of writtenExamSchedules) {
-        if (!sch.date)      { toast.error('All subject schedules must have a date'); return; }
-        if (!sch.startTime) { toast.error('All subject schedules must have a start time'); return; }
-        if (!sch.subjectId) { toast.error('Please select a subject for each schedule'); return; }
-      }
-    } else {
-      for (let i = 0; i < meta.papers.length; i++) {
-        if (!scheduleDates[i]) { toast.error(`${meta.papers[i]} Schedule: Start Date is required`); return; }
-        if (!scheduleTimes[i]) { toast.error(`${meta.papers[i]} Schedule: Start Time is required`); return; }
-      }
+    for (let i = 0; i < meta.papers.length; i++) {
+      if (!scheduleDates[i]) { toast.error(`${meta.papers[i]} Schedule: Start Date is required`); return; }
+      if (!scheduleTimes[i]) { toast.error(`${meta.papers[i]} Schedule: Start Time is required`); return; }
     }
 
     setGenerating(true);
@@ -825,30 +675,13 @@ const RollNumberExamFlow = () => {
         return;
       }
 
-      // Per-paper / per-subject schedule
-      const papers = examType === 'written-exams'
-        ? writtenExamSchedules.map(sch => ({
-            label: availableSubjectsForSchedule.find(s => s.id === sch.subjectId)?.name
-                || writtenExamSubjects.find(s => s.id === sch.subjectId)?.name
-                || sch.subjectId,
-            subject_id: sch.subjectId,
-            date: sch.date || null,
-            time: sch.startTime || null,
-            end_time: computeEndTime(sch.startTime, sch.duration) || null,
-          }))
-        : meta.papers.map((label, index) => ({
-            label,
-            date: scheduleDates[index] || null,
-            time: scheduleTimes[index] || null,
-            end_time: computeEndTime(scheduleTimes[index], scheduleDurations[index]) || null,
-          })).filter(p => p.date || p.time);
-
-      const firstExamDate = examType === 'written-exams'
-        ? (writtenExamSchedules[0]?.date || null)
-        : (scheduleDates[0] || null);
-      const firstExamTime = examType === 'written-exams'
-        ? (writtenExamSchedules[0]?.startTime || null)
-        : (scheduleTimes[0] || null);
+      // Per-paper schedule (multi-paper exams)
+      const papers = meta.papers.map((label, index) => ({
+        label,
+        date: scheduleDates[index] || null,
+        time: scheduleTimes[index] || null,
+        end_time: computeEndTime(scheduleTimes[index], scheduleDurations[index]) || null,
+      })).filter(p => p.date || p.time);
 
       // Reusable candidate object builder
       const buildCandidate = (app) => ({
@@ -889,7 +722,7 @@ const RollNumberExamFlow = () => {
             center: existing?.examCenter?.name || existing?.exam_center?.name || '',
             gender: (app.snapshot_data?.gender || '').toLowerCase(),
             preferred_cities: (app.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-            start_date: firstExamDate || '',
+            start_date: scheduleDates[0] || '',
           };
         };
 
@@ -965,8 +798,8 @@ const RollNumberExamFlow = () => {
               candidates: groupApps.map(buildCandidate),
               exam_center_id: Number(item.centerId),
               exam_type: examType,
-              exam_date: firstExamDate || null,
-              attendance_time: firstExamTime || null,
+              exam_date: scheduleDates[0] || null,
+              attendance_time: scheduleTimes[0] || null,
               papers: papers.length > 1 ? papers : undefined,
               allocation_method: allocationMethod,
               auto_allocate: true,
@@ -995,7 +828,7 @@ const RollNumberExamFlow = () => {
                   center: s.exam_center || item.centerName,
                   gender: (orig.snapshot_data?.gender || '').toLowerCase(),
                   preferred_cities: (orig.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-                  start_date: firstExamDate || '',
+                  start_date: scheduleDates[0] || '',
                 };
               }));
             }
@@ -1047,7 +880,7 @@ const RollNumberExamFlow = () => {
             center: existing?.examCenter?.name || existing?.exam_center?.name || '',
             gender: (app.snapshot_data?.gender || '').toLowerCase(),
             preferred_cities: (app.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-            start_date: firstExamDate || '',
+            start_date: scheduleDates[0] || '',
           };
         }));
         toast.success('All selected candidates already have roll numbers generated');
@@ -1084,7 +917,7 @@ const RollNumberExamFlow = () => {
           center: `${s.exam_center || ''}${s.exam_city ? ` ${s.exam_city}` : ''}`,
           gender: (orig.snapshot_data?.gender || '').toLowerCase(),
           preferred_cities: (orig.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-          start_date: firstExamDate || '',
+          start_date: scheduleDates[0] || '',
         };
       }));
       toast.success(`Generated ${count} roll number${count === 1 ? '' : 's'} successfully`);
@@ -1440,142 +1273,21 @@ const RollNumberExamFlow = () => {
             </div>
 
             {/* ── Schedule — shown in BOTH modes ── */}
-            {examType === 'written-exams' ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <CalendarDays size={17} className="text-emerald-700" />
-                  <h3 className="text-sm font-bold text-slate-900">Subject Schedules</h3>
-                  {writtenExamSchedules.length > 0 && (
-                    <span className="text-xs text-slate-400">{writtenExamSchedules.length} added</span>
-                  )}
-                </div>
-
-                {/* Input form */}
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-                    <TextField size="small" type="date" label="Date *" value={currentSchedule.date} onChange={e => updateCurrentSchedule('date', e.target.value)} InputLabelProps={{ shrink: true }} />
-                    <TextField size="small" type="time" label="Start Time *" value={currentSchedule.startTime} onChange={e => updateCurrentSchedule('startTime', e.target.value)} InputLabelProps={{ shrink: true }} />
-                    <TextField select size="small" label="Duration *" value={currentSchedule.duration} onChange={e => updateCurrentSchedule('duration', Number(e.target.value))} InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
-                      {[60, 90, 120, 150, 180].map(m => <MenuItem key={m} value={m}>{m} Minutes</MenuItem>)}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {meta.papers.map((paper, index) => (
+                <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                    <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                    <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleTimes((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                    <TextField select size="small" label="Duration *" value={scheduleDurations[index] ?? 90} onChange={(e) => { const v = Number(e.target.value); setScheduleDurations((cur) => { const a = [...cur]; while (a.length <= index) a.push(90); a[index] = v; return a; }); }} required InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
+                      {[60, 90, 120, 150, 180].map((m) => <MenuItem key={m} value={m}>{m} Minutes</MenuItem>)}
                     </TextField>
-                    <TextField size="small" label="End Time" value={computeEndTime(currentSchedule.startTime, currentSchedule.duration) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
-                    <TextField select size="small" label="Subject *" value={currentSchedule.subjectId} onChange={e => updateCurrentSchedule('subjectId', e.target.value)}>
-                      <MenuItem value="" disabled>— Select Subject —</MenuItem>
-                      {availableSubjectsForSchedule
-                        .filter(s => !writtenExamSchedules.some(sch => sch.subjectId === s.id))
-                        .map(s => <MenuItem key={s.id} value={s.id}>{s.name} ({s.marks} marks)</MenuItem>)
-                      }
-                    </TextField>
-                  </div>
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={commitCurrentSchedule}
-                      className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-800 transition-colors"
-                    >
-                      <Plus size={14} /> Add
-                    </button>
+                    <TextField size="small" label="End Time" value={computeEndTime(scheduleTimes[index], scheduleDurations[index]) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
                   </div>
                 </div>
-
-                {/* Added schedules table with pagination */}
-                {writtenExamSchedules.length > 0 && (() => {
-                  const PAGE_SIZE = 2;
-                  const totalPages = Math.ceil(writtenExamSchedules.length / PAGE_SIZE);
-                  const pageRows = writtenExamSchedules.slice(schedulesPage * PAGE_SIZE, (schedulesPage + 1) * PAGE_SIZE);
-                  return (
-                    <div className="rounded-lg border border-slate-200 overflow-hidden">
-                      <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-100 text-xs uppercase text-slate-500">
-                          <tr>
-                            <th className="px-4 py-2">#</th>
-                            <th className="px-4 py-2">Subject</th>
-                            <th className="px-4 py-2">Date</th>
-                            <th className="px-4 py-2">Start Time</th>
-                            <th className="px-4 py-2">Duration</th>
-                            <th className="px-4 py-2">End Time</th>
-                            <th className="px-4 py-2"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white">
-                          {pageRows.map((sch) => {
-                            const globalIdx = writtenExamSchedules.findIndex(s => s.id === sch.id);
-                            const subj = availableSubjectsForSchedule.find(s => s.id === sch.subjectId)
-                              || writtenExamSubjects.find(s => s.id === sch.subjectId);
-                            return (
-                              <tr key={sch.id} className="hover:bg-slate-50">
-                                <td className="px-4 py-2 text-slate-500">{globalIdx + 1}</td>
-                                <td className="px-4 py-2 font-medium text-slate-800">{subj?.name || sch.subjectId}</td>
-                                <td className="px-4 py-2 text-slate-600">{sch.date}</td>
-                                <td className="px-4 py-2 text-slate-600">{sch.startTime}</td>
-                                <td className="px-4 py-2 text-slate-600">{sch.duration} min</td>
-                                <td className="px-4 py-2 text-slate-600">{computeEndTime(sch.startTime, sch.duration)}</td>
-                                <td className="px-4 py-2 text-right">
-                                  <button type="button" onClick={() => removeWrittenSchedule(sch.id)} className="text-rose-500 hover:text-rose-700">
-                                    <X size={15} />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                      {totalPages > 1 && (
-                        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2">
-                          <span className="text-xs text-slate-500">
-                            {schedulesPage * PAGE_SIZE + 1}–{Math.min((schedulesPage + 1) * PAGE_SIZE, writtenExamSchedules.length)} of {writtenExamSchedules.length}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setSchedulesPage(p => Math.max(0, p - 1))}
-                              disabled={schedulesPage === 0}
-                              className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              <ChevronLeft size={14} />
-                            </button>
-                            {Array.from({ length: totalPages }, (_, i) => (
-                              <button
-                                key={i}
-                                type="button"
-                                onClick={() => setSchedulesPage(i)}
-                                className={`flex h-7 w-7 items-center justify-center rounded border text-xs font-medium transition-colors ${schedulesPage === i ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                              >
-                                {i + 1}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => setSchedulesPage(p => Math.min(totalPages - 1, p + 1))}
-                              disabled={schedulesPage >= totalPages - 1}
-                              className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              <ChevronRight size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {meta.papers.map((paper, index) => (
-                  <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-                      <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
-                      <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleTimes((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
-                      <TextField select size="small" label="Duration *" value={scheduleDurations[index] ?? 90} onChange={(e) => { const v = Number(e.target.value); setScheduleDurations((cur) => { const a = [...cur]; while (a.length <= index) a.push(90); a[index] = v; return a; }); }} required InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
-                        {[60, 90, 120, 150, 180].map((m) => <MenuItem key={m} value={m}>{m} Minutes</MenuItem>)}
-                      </TextField>
-                      <TextField size="small" label="End Time" value={computeEndTime(scheduleTimes[index], scheduleDurations[index]) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
 
             {/* ── Auto Selection: only method picker ── */}
             {centerSelectionMode === 'auto' && (
@@ -1692,10 +1404,8 @@ const RollNumberExamFlow = () => {
                 className="gap-2"
                 disabled={
                   generating ||
-                  (examType === 'written-exams'
-                    ? writtenExamSchedules.length === 0
-                    : (scheduleDates.some((d) => !d) || scheduleTimes.some((t) => !t))
-                  ) ||
+                  scheduleDates.some((d) => !d) ||
+                  scheduleTimes.some((t) => !t) ||
                   (centerSelectionMode === 'custom' && (!capacityPassed || selectedCenterIds.length === 0))
                 }
                 onClick={generateRollNumbers}
