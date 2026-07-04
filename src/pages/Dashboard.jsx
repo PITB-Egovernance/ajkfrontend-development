@@ -7,13 +7,12 @@ import AuthService from 'services/authService';
 import ApplicationApi from 'api/applicationApi';
 import { isAdminUser, hasModuleAccess, hasAnyModuleAccess } from 'utils/permissions';
 import {
-  FileText, Megaphone, Briefcase, Users, Clock, CheckCircle2,
-  BarChart3, PieChart, Send, Settings, Plus, Award, ArrowRight, TrendingUp,
+  Megaphone, Briefcase, Users, Clock, CheckCircle2,
+  BarChart3, PieChart, Settings, Plus, Award,
 } from 'lucide-react';
 import {
   BarChart, Bar, PieChart as RechartPieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  Area, AreaChart,
 } from 'recharts';
 
 const API_BASE           = Config.apiUrl;
@@ -88,12 +87,13 @@ const Dashboard = () => {
   const [liveStats,     setLiveStats]     = useState({
     totalApplicants: null, totalRequisitions: null,
     totalAdvertisements: null, pendingApprovals: null,
+    approvedRequisitions: null, rejectedRequisitions: null,
+    totalPostsApproved: null,
   });
   const [reqStatusChart, setReqStatusChart] = useState([]);
-  const [dispatchChart,  setDispatchChart]  = useState([]);
   const [overviewChart,  setOverviewChart]  = useState([]);
-  const [appTrendsChart, setAppTrendsChart] = useState([]);
   const [adStatusChart,  setAdStatusChart]  = useState([]);
+  const [summaryChart,   setSummaryChart]   = useState([]);
 
   useEffect(() => {
     try {
@@ -137,37 +137,18 @@ const Dashboard = () => {
     const fetchAll = async () => {
       setStatsLoading(true);
 
-      const [appR, pscReqR, advR, recR, sentR] = await Promise.allSettled([
+      const [appR, pscReqR, advR] = await Promise.allSettled([
         ApplicationApi.getAll({ per_page: 1000 }),
         fetchAllPages('/psc/requisitions'),
         fetchAllPages('/advertisements'),
-        fetch(`${API_BASE}/dispatch/received-forms?per_page=1`,   { headers: getAdminHeaders() }).then(r => r.json()),
-        fetch(`${API_BASE}/dispatch/dispatched-forms?per_page=1`, { headers: getAdminHeaders() }).then(r => r.json()),
       ]);
 
-      // ── Application Trends: applications vs shortlisted, all 12 months ──
-      if (appR.status === 'fulfilled') {
-        const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const monthly = MONTH_NAMES.map((m) => ({ month: m, applications: 0, shortlisted: 0 }));
-        const appList = appR.value?.data?.data ?? appR.value?.data ?? [];
-        if (Array.isArray(appList)) {
-          appList.forEach((app) => {
-            const dateStr = app.submitted_at || app.created_at;
-            if (!dateStr) return;
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return;
-            const idx = d.getMonth();
-            monthly[idx].applications += 1;
-            const adminStatus = (app._admin_status || '').toString().toLowerCase();
-            if (adminStatus === 'shortlisted') monthly[idx].shortlisted += 1;
-          });
-        }
-        setAppTrendsChart(monthly);
-      }
-
-      // ── PSC Requisitions: total + pending count + status chart from full list ──
+      // ── PSC Requisitions: total + status counts + status chart from full list ──
       let totalRequisitions = null;
       let pendingCount      = null;
+      let approvedCount     = null;
+      let rejectedCount     = null;
+      let totalPostsApproved = null;
       if (pscReqR.status === 'fulfilled') {
         totalRequisitions = pscReqR.value.total;
         const items = pscReqR.value.items;
@@ -179,12 +160,21 @@ const Dashboard = () => {
             acc[s] = (acc[s] || 0) + 1;
             return acc;
           }, {});
-          pendingCount = counts['Pending'] ?? 0;
+          pendingCount  = counts['Pending']  ?? 0;
+          approvedCount = counts['Approved'] ?? 0;
+          rejectedCount = counts['Rejected'] ?? 0;
           setReqStatusChart(
             Object.entries(counts).map(([name, value]) => ({
               name, value, color: STATUS_COLORS[name] || '#94a3b8',
             }))
           );
+
+          // Total posts (vacancies) requested across approved requisitions
+          totalPostsApproved = items.reduce((sum, r) => {
+            const raw = (r.status?.name ?? r.status ?? '').toString().trim().toLowerCase();
+            if (raw !== 'approved') return sum;
+            return sum + (Number(r.num_posts) || 0);
+          }, 0);
         }
       }
 
@@ -207,30 +197,34 @@ const Dashboard = () => {
         }
       }
 
-      // ── Dispatch overview chart ──
-      const recTotal  = recR.status  === 'fulfilled' ? (extractTotal(recR.value)  ?? 0) : 0;
-      const sentTotal = sentR.status === 'fulfilled' ? (extractTotal(sentR.value) ?? 0) : 0;
-      setDispatchChart([
-        { label: 'Received', count: recTotal  },
-        { label: 'Sent',     count: sentTotal },
-      ]);
-
       // ── Overview bar chart ──
       const appTotal = appR.status === 'fulfilled' ? (extractTotal(appR.value) ?? 0) : 0;
       setOverviewChart([
         { module: 'Applications',    count: appTotal              },
         { module: 'Requisitions',    count: totalRequisitions ?? 0 },
         { module: 'Advertisements',  count: totalAds ?? 0          },
-        { module: 'Disp. Received',  count: recTotal              },
-        { module: 'Disp. Sent',      count: sentTotal             },
       ]);
 
+      const totalCandidates = appR.status === 'fulfilled' ? extractTotal(appR.value) : null;
       setLiveStats({
-        totalApplicants:     appR.status === 'fulfilled' ? extractTotal(appR.value) : null,
+        totalApplicants:      totalCandidates,
         totalRequisitions,
-        totalAdvertisements: totalAds,
-        pendingApprovals:    pendingCount,
+        totalAdvertisements:  totalAds,
+        pendingApprovals:     pendingCount,
+        approvedRequisitions: approvedCount,
+        rejectedRequisitions: rejectedCount,
+        totalPostsApproved,
       });
+
+      // ── Recruitment summary chart: the 5 headline counts side by side ──
+      setSummaryChart([
+        { label: 'Candidates',    count: totalCandidates ?? 0,    color: '#8b5cf6' },
+        { label: 'Posts Approved',count: totalPostsApproved ?? 0, color: '#0ea5e9' },
+        { label: 'Requisitions',  count: totalRequisitions ?? 0,  color: '#10b981' },
+        { label: 'Approved',      count: approvedCount ?? 0,      color: '#3b82f6' },
+        { label: 'Rejected',      count: rejectedCount ?? 0,      color: '#ef4444' },
+      ]);
+
       setStatsLoading(false);
     };
 
@@ -247,9 +241,8 @@ const Dashboard = () => {
   // Each chart is tied to the main module(s) that own its data, so the graphs
   // shown adapt to the role's allowed modules (admin sees them all).
   const charts = {
-    appTrends:  canShow('candidates'),
+    summary:    canShowAny(['requisitions', 'candidates']),
     overview:   canShowAny(['requisitions', 'advertisement', 'candidates', 'result']),
-    dispatch:   canShow('requisitions'),
     reqStatus:  canShow('requisitions'),
     adStatus:   canShow('advertisement'),
   };
@@ -260,31 +253,18 @@ const Dashboard = () => {
     'Applications':   'candidates',
     'Requisitions':   'requisitions',
     'Advertisements': 'advertisement',
-    'Disp. Received': 'requisitions',
-    'Disp. Sent':     'requisitions',
   };
   const visibleOverviewChart = overviewChart.filter((o) => canShow(OVERVIEW_MODULE_MAP[o.module]));
 
   const statCards = [
-    { label: 'Total Requisitions',  value: liveStats.totalRequisitions,   icon: Briefcase,    iconBg: 'bg-emerald-500', module: 'requisitions'  },
-    { label: 'Pending Requisitions',value: liveStats.pendingApprovals,    icon: Clock,        iconBg: 'bg-amber-500',   module: 'requisitions'  },
-    { label: 'Advertisements',      value: liveStats.totalAdvertisements, icon: CheckCircle2, iconBg: 'bg-blue-500',    module: 'advertisement' },
-    { label: 'Total Applicants',    value: liveStats.totalApplicants,     icon: Users,        iconBg: 'bg-purple-500',  module: 'candidates'    },
+    { label: 'Total Candidates',      value: liveStats.totalApplicants,      icon: Users,        iconBg: 'bg-purple-500',  module: 'candidates',    link: '/dashboard/roll-numbers'          },
+    { label: 'Total Requisitions',    value: liveStats.totalRequisitions,    icon: Briefcase,    iconBg: 'bg-emerald-500', module: 'requisitions',  link: '/dashboard/requisitions'          },
+    { label: 'Pending Requisitions',  value: liveStats.pendingApprovals,     icon: Clock,        iconBg: 'bg-amber-500',   module: 'requisitions',  link: '/dashboard/psc-table'             },
+    { label: 'Approved Requisitions', value: liveStats.approvedRequisitions, icon: CheckCircle2, iconBg: 'bg-blue-500',    module: 'requisitions',  link: '/dashboard/approved-requisitions' },
+    { label: 'Rejected Requisitions', value: liveStats.rejectedRequisitions, icon: Clock,        iconBg: 'bg-rose-500',    module: 'requisitions',  link: '/dashboard/psc-table'             },
+    { label: 'Total Posts Approved',  value: liveStats.totalPostsApproved,   icon: Award,        iconBg: 'bg-sky-500',     module: 'requisitions',  link: '/dashboard/approved-requisitions' },
+    { label: 'Advertisements',        value: liveStats.totalAdvertisements,  icon: Megaphone,    iconBg: 'bg-indigo-500',  module: 'advertisement', link: '/dashboard/advertisement-records' },
   ].filter((s) => canShow(s.module));
-
-  const quickActions = [
-    { icon: FileText, title: 'Requisitions',   link: '/dashboard/requisitions',          iconBg: 'bg-emerald-500', count: statsLoading ? '…' : `${fmt(liveStats.totalRequisitions)} total`,       module: 'requisitions'  },
-    { icon: Megaphone,title: 'Advertisements', link: '/dashboard/advertisement-records', iconBg: 'bg-amber-500',   count: statsLoading ? '…' : `${fmt(liveStats.totalAdvertisements)} published`, module: 'advertisement' },
-    { icon: Award,    title: 'Award Lists',    link: '/dashboard/award-lists',           iconBg: 'bg-indigo-500',  count: 'Merit Lists',                                                           module: 'candidates'    },
-  ].filter((a) => canShow(a.module));
-
-  const quickLinks = [
-    { label: 'Candidates', icon: Users,     link: '/dashboard/roll-numbers',          iconBg: 'bg-emerald-500', module: 'candidates'   },
-    { label: 'Dispatch',   icon: Send,      link: '/dashboard/dispatch/received',     iconBg: 'bg-blue-500',    module: 'requisitions' },
-    { label: 'Submitted Requisitions',  icon: BarChart3, link: '/dashboard/psc-table',             iconBg: 'bg-purple-500',  module: 'requisitions' },
-    { label: 'Requisitions',    icon: PieChart,  link: '/dashboard/requisitions',          iconBg: 'bg-amber-500',   module: 'requisitions' },
-    { label: 'Approved Requisitions',  icon: Award,     link: '/dashboard/approved-requisitions', iconBg: 'bg-rose-500',    module: 'requisitions' },
-  ].filter((l) => canShow(l.module));
 
   return (
     <div className="min-h-screen p-2">
@@ -301,120 +281,61 @@ const Dashboard = () => {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map((stat) => (
-            <Card key={stat.label} className="border border-slate-200">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-500 mb-1">{stat.label}</p>
-                    {statsLoading
-                      ? <StatSkeleton />
-                      : <p className="text-2xl font-bold text-slate-900">{fmt(stat.value)}</p>
-                    }
+            <Link key={stat.label} to={stat.link}>
+              <Card className="border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-500 mb-1">{stat.label}</p>
+                      {statsLoading
+                        ? <StatSkeleton />
+                        : <p className="text-2xl font-bold text-slate-900">{fmt(stat.value)}</p>
+                      }
+                    </div>
+                    <div className={`p-2.5 rounded-lg ${stat.iconBg}`}>
+                      <stat.icon className="w-5 h-5 text-white" />
+                    </div>
                   </div>
-                  <div className={`p-2.5 rounded-lg ${stat.iconBg}`}>
-                    <stat.icon className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
-
-        {/* Main Content */}
-        {(quickActions.length > 0 || quickLinks.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {quickActions.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-semibold text-slate-900">Featured Modules</h2>
-            <div className="space-y-3">
-              {quickActions.map((action) => (
-                <Link key={action.title} to={action.link}>
-                  <Card className="border border-slate-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-lg ${action.iconBg}`}>
-                          <action.icon className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-slate-900 text-sm">{action.title}</h3>
-                          <p className="text-xs text-slate-500 mt-0.5">{action.count}</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-slate-400" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </div>
-          )}
-
-          {quickLinks.length > 0 && (
-          <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-base font-semibold text-slate-900">Quick Shortcuts</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {quickLinks.map((link) => (
-                <Link key={link.label} to={link.link}>
-                  <Card className="border border-slate-200">
-                    <CardContent className="p-4">
-                      <div className="flex flex-col items-center text-center">
-                        <div className={`p-3 rounded-lg ${link.iconBg} mb-3`}>
-                          <link.icon className="w-5 h-5 text-white" />
-                        </div>
-                        <p className="text-sm font-medium text-slate-700">{link.label}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </div>
-          )}
-        </div>
-        )}
 
         {/* Charts — each tied to its module; the grid reflows to whatever the role can see */}
         {anyChartVisible && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          {/* Application Trends — full-width row */}
-          {charts.appTrends && (
+          {/* Recruitment Summary — candidates, posts approved & requisition outcomes */}
+          {charts.summary && (
           <Card className="border border-slate-200 lg:col-span-2">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">Application Trends</h3>
-                  <p className="text-xs text-slate-500 mt-1">Monthly applications & shortlisted</p>
+                  <h3 className="text-base font-semibold text-slate-900">Recruitment Summary</h3>
+                  <p className="text-xs text-slate-500 mt-1">Candidates, posts & requisition outcomes</p>
                 </div>
-                <TrendingUp className="w-5 h-5 text-emerald-500" />
+                <BarChart3 className="w-5 h-5 text-indigo-500" />
               </div>
               {statsLoading ? (
                 <div className="h-[280px] flex items-center justify-center">
-                  <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : appTrendsChart.length > 0 ? (
+              ) : summaryChart.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={appTrendsChart}>
-                    <defs>
-                      <linearGradient id="gApp" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gShortlisted" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={summaryChart}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#64748b" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
                     <YAxis tick={{ fontSize: 12 }} stroke="#64748b" allowDecimals={false} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    <Area type="monotone" dataKey="applications" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#gApp)"  name="Applications" />
-                    <Area type="monotone" dataKey="shortlisted"  stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#gShortlisted)" name="Shortlisted" />
-                  </AreaChart>
+                    <Bar dataKey="count" name="Count" radius={[8, 8, 0, 0]}>
+                      {summaryChart.map((entry) => (
+                        <Cell key={entry.label} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
-              ) : <EmptyChart message="No application data yet" />}
+              ) : <EmptyChart message="No data available" />}
             </CardContent>
           </Card>
           )}
@@ -445,39 +366,6 @@ const Dashboard = () => {
                   </BarChart>
                 </ResponsiveContainer>
               ) : <EmptyChart message="No data available" />}
-            </CardContent>
-          </Card>
-          )}
-
-          {/* Dispatch Overview — real data */}
-          {charts.dispatch && (
-          <Card className="border border-slate-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Dispatch Overview</h3>
-                  <p className="text-xs text-slate-500 mt-1">Received vs sent</p>
-                </div>
-                <Send className="w-5 h-5 text-blue-500" />
-              </div>
-              {statsLoading ? (
-                <div className="h-[280px] flex items-center justify-center">
-                  <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={dispatchChart}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
-                    <YAxis tick={{ fontSize: 12 }} stroke="#64748b" allowDecimals={false} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="count" name="Documents" radius={[8, 8, 0, 0]}>
-                      <Cell fill="#3b82f6" />
-                      <Cell fill="#06b6d4" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
             </CardContent>
           </Card>
           )}

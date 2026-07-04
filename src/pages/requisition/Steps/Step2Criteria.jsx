@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { TextField, MenuItem, Box, Chip, Checkbox, ListItemText } from '@mui/material';
+import { TextField, MenuItem, Box, Chip, Checkbox, ListItemText, ListSubheader } from '@mui/material';
 import { useLocalSettings, localSettingsApi } from 'hooks/useLocalSettings';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
@@ -8,6 +8,12 @@ import toast from 'react-hot-toast';
 
 // Sentinel value used to detect "Other" selection in every dropdown.
 const OTHER = '__other__';
+
+// Ascending, natural-order sort — handles both plain alphabetical names and
+// numbered names (e.g. "Grade 2" before "Grade 10", which a plain string
+// sort would get wrong).
+const byNameAscending = (a, b) =>
+  String(a || '').localeCompare(String(b || ''), undefined, { numeric: true, sensitivity: 'base' });
 
 // Reusable "Other" reveal block. Declared at module scope (not inside the
 // component) so it keeps a stable identity and does NOT remount on every
@@ -264,6 +270,12 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
   const [openMinQualSelect,  setOpenMinQualSelect]  = useState(false);
   const [openProfessionalSelect, setOpenProfessionalSelect] = useState(false);
 
+  // Search text for each dropdown's in-menu search box — cleared on close.
+  const [searchAcademic,     setSearchAcademic]     = useState('');
+  const [searchProfessional, setSearchProfessional] = useState('');
+  const [searchMinQual,      setSearchMinQual]      = useState('');
+  const [searchDegree,       setSearchDegree]       = useState('');
+
   // Refs to the custom "Other" inputs so we can move the cursor into them once
   // the dropdown has fully closed (the menu's focus trap releases on close).
   const academicOtherRef = useRef(null);
@@ -366,6 +378,36 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       }
     }
   }, [allDegrees, formData.eligible_degrees]);
+
+  // Ascending, search-filtered option lists for the three checkbox dropdowns
+  // above. "Select All" / toggle handlers keep using the unfiltered
+  // `requiredQualifications` / `professionalQualifications` lists so search
+  // text never affects which items get bulk-selected.
+  const visibleRequiredQualifications = [...requiredQualifications]
+    .filter((q) => q.name.toLowerCase().includes(searchAcademic.trim().toLowerCase()))
+    .sort((a, b) => byNameAscending(a.name, b.name));
+  const visibleProfessionalQualifications = [...professionalQualifications]
+    .filter((q) => q.name.toLowerCase().includes(searchProfessional.trim().toLowerCase()))
+    .sort((a, b) => byNameAscending(a.name, b.name));
+  const visibleMinQualifications = [...requiredQualifications]
+    .filter((q) => q.name.toLowerCase().includes(searchMinQual.trim().toLowerCase()))
+    .sort((a, b) => byNameAscending(a.name, b.name));
+
+  // Ascending-sorted groups/degrees, filtered by the degree search box. Group
+  // and degree membership used by "Select All" / group-toggle stays based on
+  // the full `groupedDegrees` above — only what's *rendered* is filtered.
+  const visibleGroupedDegrees = useMemo(() => {
+    const needle = searchDegree.trim().toLowerCase();
+    const result = {};
+    Object.keys(groupedDegrees).sort(byNameAscending).forEach((groupName) => {
+      const items = [...groupedDegrees[groupName]].sort((a, b) => byNameAscending(a.name, b.name));
+      const filtered = needle
+        ? items.filter((d) => d.name.toLowerCase().includes(needle) || groupName.toLowerCase().includes(needle))
+        : items;
+      if (filtered.length > 0) result[groupName] = filtered;
+    });
+    return result;
+  }, [groupedDegrees, searchDegree]);
 
   // Degrees filtered to match the selected academic qualification.
   const filteredDegrees = activeDegrees.filter((d) => {
@@ -606,7 +648,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               multiple: true,
               open: openAcademicSelect,
               onOpen: () => setOpenAcademicSelect(true),
-              onClose: () => setOpenAcademicSelect(false),
+              onClose: () => { setOpenAcademicSelect(false); setSearchAcademic(''); },
               onChange: () => {},
               renderValue: (selected) => {
                 if (!selected || selected.length === 0) return '';
@@ -619,6 +661,15 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               MenuProps: { PaperProps: { sx: { maxHeight: 380 } }, disableRestoreFocus: true, disableEnforceFocus: true },
             }}
           >
+            <ListSubheader sx={{ p: 0.5 }} onClick={(e) => e.stopPropagation()}>
+              <TextField
+                fullWidth size="small" autoFocus
+                placeholder="Search…"
+                value={searchAcademic}
+                onChange={(e) => setSearchAcademic(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </ListSubheader>
             <MenuItem dense onClick={(e) => {
               e.preventDefault();
               const allNames = requiredQualifications.map((q) => q.name);
@@ -639,7 +690,10 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               />
               <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
             </MenuItem>
-            {requiredQualifications.map((q) => (
+            {visibleRequiredQualifications.length === 0 && (
+              <MenuItem disabled dense><ListItemText primary="No matches" /></MenuItem>
+            )}
+            {visibleRequiredQualifications.map((q) => (
               <MenuItem key={q.id} dense onClick={(e) => { e.preventDefault(); handleAcademicQualToggle(q.name); }}>
                 <Checkbox
                   size="small"
@@ -678,7 +732,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               multiple: true,
               open: openProfessionalSelect,
               onOpen: () => setOpenProfessionalSelect(true),
-              onClose: () => setOpenProfessionalSelect(false),
+              onClose: () => { setOpenProfessionalSelect(false); setSearchProfessional(''); },
               onChange: () => {},
               renderValue: (selected) => {
                 if (!selected || selected.length === 0) return '';
@@ -691,6 +745,15 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               MenuProps: { PaperProps: { sx: { maxHeight: 380 } }, disableRestoreFocus: true, disableEnforceFocus: true },
             }}
           >
+            <ListSubheader sx={{ p: 0.5 }} onClick={(e) => e.stopPropagation()}>
+              <TextField
+                fullWidth size="small" autoFocus
+                placeholder="Search…"
+                value={searchProfessional}
+                onChange={(e) => setSearchProfessional(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </ListSubheader>
             <MenuItem dense onClick={(e) => {
               e.preventDefault();
               const allNames = professionalQualifications.map((q) => q.name);
@@ -708,7 +771,10 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               />
               <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
             </MenuItem>
-            {professionalQualifications.map((q) => (
+            {visibleProfessionalQualifications.length === 0 && (
+              <MenuItem disabled dense><ListItemText primary="No matches" /></MenuItem>
+            )}
+            {visibleProfessionalQualifications.map((q) => (
               <MenuItem key={q.id} dense onClick={(e) => { e.preventDefault(); handleProfessionalQualToggle(q.name); }}>
                 <Checkbox
                   size="small"
@@ -778,6 +844,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
             SelectProps={{
               multiple: true,
               onChange: () => { /* manual state via item onClick to keep menu open */ },
+              onClose: () => setSearchDegree(''),
               renderValue: (selected) => {
                 if (!selected || selected.length === 0) return '';
                 if (selected.length <= 3) {
@@ -792,6 +859,16 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
             }}
           >
+            <ListSubheader sx={{ p: 0.5 }} onClick={(e) => e.stopPropagation()}>
+              <TextField
+                fullWidth size="small" autoFocus
+                placeholder="Search…"
+                value={searchDegree}
+                onChange={(e) => setSearchDegree(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </ListSubheader>
+
             {/* Master "Select All" */}
             <MenuItem dense onClick={(e) => { e.preventDefault(); handleToggleAll(); }} sx={{ borderBottom: '1px solid #e2e8f0' }}>
               <Checkbox size="small" checked={allSelected} indeterminate={someSelected}
@@ -799,8 +876,12 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
             </MenuItem>
 
-            {/* Groups with nested degree checkboxes */}
-            {Object.keys(groupedDegrees).sort().flatMap((groupName) => [
+            {Object.keys(visibleGroupedDegrees).length === 0 && (
+              <MenuItem disabled dense><ListItemText primary="No matches" /></MenuItem>
+            )}
+
+            {/* Groups with nested degree checkboxes — already ascending-sorted and search-filtered */}
+            {Object.keys(visibleGroupedDegrees).flatMap((groupName) => [
               <MenuItem
                 key={`grp-${groupName}`}
                 dense
@@ -815,7 +896,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
                 />
                 <ListItemText primary={groupName} primaryTypographyProps={{ fontSize: 12.5, fontWeight: 600, color: '#064e3b' }} />
               </MenuItem>,
-              ...groupedDegrees[groupName].map((d) => (
+              ...visibleGroupedDegrees[groupName].map((d) => (
                 <MenuItem
                   key={d.id ?? d.name}
                   dense
@@ -961,7 +1042,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               multiple: true,
               open: openMinQualSelect,
               onOpen: () => setOpenMinQualSelect(true),
-              onClose: () => setOpenMinQualSelect(false),
+              onClose: () => { setOpenMinQualSelect(false); setSearchMinQual(''); },
               onChange: () => {},
               renderValue: (selected) => {
                 if (!selected || selected.length === 0) return '';
@@ -974,6 +1055,15 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               MenuProps: { PaperProps: { sx: { maxHeight: 380 } }, disableRestoreFocus: true, disableEnforceFocus: true },
             }}
           >
+            <ListSubheader sx={{ p: 0.5 }} onClick={(e) => e.stopPropagation()}>
+              <TextField
+                fullWidth size="small" autoFocus
+                placeholder="Search…"
+                value={searchMinQual}
+                onChange={(e) => setSearchMinQual(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </ListSubheader>
             <MenuItem dense onClick={(e) => {
               e.preventDefault();
               const allNames = requiredQualifications.map((q) => q.name);
@@ -991,7 +1081,10 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
               />
               <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
             </MenuItem>
-            {requiredQualifications.map((q) => (
+            {visibleMinQualifications.length === 0 && (
+              <MenuItem disabled dense><ListItemText primary="No matches" /></MenuItem>
+            )}
+            {visibleMinQualifications.map((q) => (
               <MenuItem key={q.id} dense onClick={(e) => { e.preventDefault(); handleMinQualToggle(q.name); }}>
                 <Checkbox
                   size="small"

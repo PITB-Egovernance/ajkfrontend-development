@@ -1,9 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TextField, MenuItem, InputAdornment } from '@mui/material';
+import { TextField, Autocomplete, InputAdornment } from '@mui/material';
 import toast from 'react-hot-toast';
 
 const OTHER_DESIGNATION = '__other__';
+const OTHER_DESIGNATION_OPTION = { id: OTHER_DESIGNATION, name: 'Other (specify)' };
+
+// Ascending, natural-order sort — handles both plain alphabetical names
+// (departments, designations) and numbered scale names (e.g. "BPS-2" before
+// "BPS-10", which a plain string sort would get wrong).
+const byNameAscending = (a, b) =>
+  (a?.name || '').localeCompare(b?.name || '', undefined, { numeric: true, sensitivity: 'base' });
 
 const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, departmentOptions = [], gradeOptions = [], designationOptions = [] }) => {
   // Track the last data identity we've synced from. Only re-sync when the
@@ -266,6 +273,33 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
     return '';
   })();
 
+  // Ascending, searchable dropdown option lists (Autocomplete gives free-text
+  // filtering out of the box).
+  const sortedDepartmentOptions = useMemo(
+    () => [...departmentOptions].sort(byNameAscending),
+    [departmentOptions]
+  );
+  const sortedGradeOptions = useMemo(
+    () => [...gradeOptions].sort(byNameAscending),
+    [gradeOptions]
+  );
+  const sortedDesignationOptions = useMemo(
+    () => [...designationOptions].sort(byNameAscending),
+    [designationOptions]
+  );
+  // Designation list plus the "Other (specify)" sentinel, and — if the
+  // loaded value isn't in the configured list — the stale value itself, so
+  // the Autocomplete always has a matching option to display.
+  const designationSelectOptions = useMemo(() => {
+    const options = [...sortedDesignationOptions];
+    if (!isOtherDesignation && formData.designation
+        && !options.some((d) => d.name === formData.designation)) {
+      options.push({ id: formData.designation, name: formData.designation });
+      options.sort(byNameAscending);
+    }
+    return [...options, OTHER_DESIGNATION_OPTION];
+  }, [sortedDesignationOptions, formData.designation, isOtherDesignation]);
+
   // Gate the Next button on every required field in this step so the admin
   // can't advance with a half-filled form.
   const navigate = useNavigate();
@@ -327,29 +361,33 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
 
         {/* 1. Department */}
         <div className="col-md-6 form-group">
-<TextField
-             fullWidth
-             required
-             select
-             label="Department"
-             name="department"
-             value={formData.department ?? ''}
-             onChange={handleChange}
-             helperText={departmentOptions.length === 0 ? 'No departments configured in Settings yet' : ' '}
-           >
-            <MenuItem value="">Select Department</MenuItem>
-            {departmentOptions.map((d) => (
-              // The MenuItem value is the department's NAME string (so
-              // the wire format matches the live API curl example, which
-              // sends `department=Punjab Education Department` rather than
-              // a hash_id). The form state stores the name; on edit-mode
-              // load the data-sync useEffect looks the name up in
-              // `departmentOptions` and uses the matching id if needed.
-              <MenuItem key={d.id ?? d.hash_id ?? d.name} value={d.name || d.id || ''}>
-                {d.name || '(unnamed)'}
-              </MenuItem>
-            ))}
-          </TextField>
+          <Autocomplete
+            fullWidth
+            options={sortedDepartmentOptions}
+            getOptionLabel={(option) => option?.name || ''}
+            isOptionEqualToValue={(option, value) => option?.name === value?.name}
+            // The stored value is the department's NAME string (so the wire
+            // format matches the live API curl example, which sends
+            // `department=Punjab Education Department` rather than a
+            // hash_id) — resolve it back to an option object for display.
+            value={
+              formData.department
+                ? (sortedDepartmentOptions.find((d) => d.name === formData.department)
+                    || { name: formData.department })
+                : null
+            }
+            onChange={(_, newValue) => {
+              setFormData((prev) => ({ ...prev, department: newValue?.name || '' }));
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                required
+                label="Department"
+                helperText={departmentOptions.length === 0 ? 'No departments configured in Settings yet' : ' '}
+              />
+            )}
+          />
         </div>
 
         {/* 2. No of Posts */}
@@ -370,58 +408,72 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
 
         {/* 3. Scale of the Post — sourced dynamically from /settings/grades */}
         <div className="col-md-6 form-group">
-          <TextField
+          <Autocomplete
             fullWidth
-            required
-            select
-            label="Scale of the Post"
-            name="scale"
-            // Always coerce to a string — undefined / null would flip the
-            // controlled Select into uncontrolled mode and trigger MUI's
-            // "out-of-range value undefined" warning.
-            value={formData.scale ?? ''}
-            onChange={handleChange}
-            helperText={gradeOptions.length === 0 ? 'No grades configured in Settings yet' : ' '}
-          >
-            <MenuItem value="">Select Scale</MenuItem>
-            {gradeOptions.map((g) => (
-              <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>
-            ))}
-          </TextField>
+            options={sortedGradeOptions}
+            getOptionLabel={(option) => option?.name || ''}
+            isOptionEqualToValue={(option, value) => option?.id === value?.id}
+            value={
+              formData.scale
+                ? (sortedGradeOptions.find((g) => g.id === formData.scale)
+                    || { id: formData.scale, name: String(formData.scale) })
+                : null
+            }
+            onChange={(_, newValue) => {
+              setFormData((prev) => ({ ...prev, scale: newValue?.id || '' }));
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                required
+                label="Scale of the Post"
+                helperText={gradeOptions.length === 0 ? 'No grades configured in Settings yet' : ' '}
+              />
+            )}
+          />
         </div>
 
         {/* 4. Designation of post — sourced dynamically from /settings/designations */}
         <div className="col-md-6 form-group">
-          <TextField
+          <Autocomplete
             fullWidth
-            required
-            select
-            label="Designation or Nomenclature of the Post(s)"
-            name="designation"
-            value={isOtherDesignation ? OTHER_DESIGNATION : (formData.designation ?? '')}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === OTHER_DESIGNATION) {
-                setIsOtherDesignation(true);
+            options={designationSelectOptions}
+            getOptionLabel={(option) => option?.name || ''}
+            isOptionEqualToValue={(option, value) => option?.id === value?.id}
+            value={
+              isOtherDesignation
+                ? OTHER_DESIGNATION_OPTION
+                : (formData.designation
+                    ? designationSelectOptions.find((d) => d.name === formData.designation) || null
+                    : null)
+            }
+            onChange={(_, newValue) => {
+              if (!newValue || newValue.id === OTHER_DESIGNATION) {
+                setIsOtherDesignation(!!newValue);
+                if (!newValue) {
+                  setCustomDesignation('');
+                  setFormData((prev) => ({ ...prev, designation: '' }));
+                }
               } else {
                 setIsOtherDesignation(false);
                 setCustomDesignation('');
-                setFormData((prev) => ({ ...prev, designation: val }));
+                setFormData((prev) => ({ ...prev, designation: newValue.name }));
               }
             }}
-            helperText={designationOptions.length === 0 ? 'No designations configured in Settings yet' : ' '}
-          >
-            <MenuItem value="">Select Designation</MenuItem>
-            {designationOptions.map((d) => (
-              <MenuItem key={d.id} value={d.name}>{d.name}</MenuItem>
-            ))}
-            {!isOtherDesignation && !!formData.designation && !designationOptions.some((d) => d.name === formData.designation) && (
-              <MenuItem value={formData.designation}>{formData.designation}</MenuItem>
+            renderOption={(props, option) => (
+              <li {...props} key={option.id} style={option.id === OTHER_DESIGNATION ? { color: '#64748b', fontStyle: 'italic' } : undefined}>
+                {option.name}
+              </li>
             )}
-            <MenuItem value={OTHER_DESIGNATION} sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-              Other (specify)
-            </MenuItem>
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                required
+                label="Designation or Nomenclature of the Post(s)"
+                helperText={designationOptions.length === 0 ? 'No designations configured in Settings yet' : ' '}
+              />
+            )}
+          />
           {isOtherDesignation && (
             <div className="mt-2 flex gap-2 items-center animate-in fade-in duration-200">
               <TextField

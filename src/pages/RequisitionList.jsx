@@ -48,7 +48,8 @@ const getRequisitionSource = (status) => {
 
   if (
     normalized.includes("department") ||
-    normalized.includes("received from")
+    normalized.includes("received from") ||
+    normalized.includes("reject")
   ) {
     return "department";
   }
@@ -678,7 +679,7 @@ const RequisitionList = () => {
         <span
           className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(params.value)}`}
         >
-          {getReceivedLabel(params.value)}
+          {getReceivedLabel(params.value).toUpperCase()}
         </span>
       ),
     },
@@ -935,7 +936,7 @@ const RequisitionList = () => {
                   key={tab.value}
                   type="button"
                   onClick={() => handleSourceTabChange(tab.value)}
-                  className={`flex w-full items-center justify-center rounded-md px-5 py-3 text-sm font-semibold transition-all duration-200 ${
+                  className={`flex w-full items-center justify-center rounded-md px-5 py-3 text-lg font-semibold transition-all duration-200 ${
                     isActive
                       ? "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-sm"
                       : "bg-white text-emerald-900 hover:bg-emerald-50"
@@ -944,7 +945,7 @@ const RequisitionList = () => {
                   {tab.label}
 
                   <span
-                    className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
+                    className={`ml-2 rounded-full px-2 py-0.5 text-lg font-bold ${
                       isActive
                         ? "bg-white/20 text-white"
                         : "bg-emerald-100 text-emerald-900"

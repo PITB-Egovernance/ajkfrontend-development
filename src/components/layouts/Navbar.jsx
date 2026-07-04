@@ -26,8 +26,8 @@ const Navbar = ({ toggleSidebar }) => {
           <Menu size={20} />
         </button>
         {user && (
-          <span className="text-sm text-slate-600 hidden sm:inline">
-            Welcome, <span className="font-medium text-slate-800">{user.username || user.name || 'User'}</span>
+          <span className="text-xl text-red-800 hidden sm:inline">
+            Welcome, <span className="font-medium text-red-800">{user.username || user.name || 'User'}</span>
           </span>
         )}
       </div>
