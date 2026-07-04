@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import RequisitionApprovalApi from 'api/requisitionApprovalApi';
+import confirmDelete from 'components/ui/ConfirmDelete';
 
 // ─── StatusBadge ────────────────────────────────────────────────────────────
 
@@ -383,7 +384,16 @@ const ActionPanel = ({ hashId, canApprove, canReject, onActionComplete }) => {
           )}
           {canReject && (
             <button
-              onClick={() => { setMode('reject'); setError(''); }}
+              onClick={async () => {
+                const confirmed = await confirmDelete({
+                  title: 'Reject / Return Requisition',
+                  message: 'Are you sure you want to reject this requisition?',
+                  warning: 'This action will reject or return the requisition to the previous step.',
+                  confirmLabel: 'Yes, Reject',
+                  confirmColor: 'bg-rose-600 hover:bg-rose-700',
+                });
+                if (confirmed) { setMode('reject'); setError(''); }
+              }}
               className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-rose-600 text-white text-sm font-medium hover:bg-rose-700 transition-colors"
             >
               <XCircle className="w-4 h-4" />
