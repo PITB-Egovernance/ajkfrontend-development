@@ -1298,7 +1298,8 @@ const RollNumberExamFlow = () => {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {['Select Posts', 'Center Allocation & Generate'].map((label, index) => {
               const step = index + 1;
-              return <button key={label} type="button" onClick={() => setStage(step)} className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${stage === step ? 'border-emerald-700 bg-emerald-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/20 text-xs">{step}</span>{label}</button>;
+              const isDisabled = step === 2;
+              return <button key={label} type="button" disabled={isDisabled} onClick={() => { if (!isDisabled) setStage(step); }} className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${stage === step ? 'border-emerald-700 bg-emerald-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed`}><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/20 text-xs">{step}</span>{label}</button>;
             })}
           </div>
         )}

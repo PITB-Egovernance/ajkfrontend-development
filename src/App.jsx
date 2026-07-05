@@ -317,6 +317,8 @@ function App() {
           <Route
             path="/dashboard/settings/department-users/:hashId/edit"
             element={<CreateDepartmentUser />}
+          />
+          <Route
             path="results/shortlist/:jobId"
             element={
               <ProtectedRoute allowedRoles={['admin', 'director']}>
