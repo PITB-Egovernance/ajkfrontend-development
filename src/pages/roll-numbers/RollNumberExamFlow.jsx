@@ -10,6 +10,7 @@ import RollNumberApi from 'api/rollNumberApi';
 import WrittenExamSubjectApi from 'api/writtenExamSubjectApi';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { useGenerationGuard } from 'context/GenerationGuardContext';
 
 // ── AJK district → exam-center zone mapping ───────────────────────────────
 // Key: district name (lower-case) OR district code (string)
@@ -186,10 +187,40 @@ const computeEndTime = (startTime, durationMinutes) => {
   return `${hour12}:${String(endM).padStart(2, '0')} ${period}`;
 };
 
+// Roll number slip generation now runs as a backend queue job. This polls
+// the status endpoint until the job completes/fails, resolving with the same
+// { data: { generated_count, slips } } envelope the old synchronous call used
+// to return, so all downstream consumption code stays unchanged.
+const GENERATION_POLL_INTERVAL_MS = 2500;
+const GENERATION_POLL_TIMEOUT_MS = 35 * 60 * 1000; // slightly above the backend job's 30-minute timeout
+
+const pollGenerationStatus = (generationId) => new Promise((resolve, reject) => {
+  const startedAt = Date.now();
+  const check = async () => {
+    try {
+      const res = await RollNumberApi.getGenerationStatus(generationId);
+      const status = res?.data?.status;
+      if (status === 'completed') {
+        resolve(res);
+      } else if (status === 'failed') {
+        reject(new Error(res?.data?.message || 'Roll number slip generation failed'));
+      } else if (Date.now() - startedAt > GENERATION_POLL_TIMEOUT_MS) {
+        reject(new Error('Roll number slip generation is taking longer than expected. Please check back later or try again.'));
+      } else {
+        setTimeout(check, GENERATION_POLL_INTERVAL_MS);
+      }
+    } catch (err) {
+      reject(err);
+    }
+  };
+  check();
+});
+
 const RollNumberExamFlow = () => {
   const navigate = useNavigate();
   const { examType = 'one-paper-mcqs' } = useParams();
   const meta = examTypeMeta[examType] || examTypeMeta['one-paper-mcqs'];
+  const { setBusy } = useGenerationGuard();
 
   const [stage, setStage] = useState(1);
   const [search, setSearch] = useState('');
@@ -200,6 +231,19 @@ const RollNumberExamFlow = () => {
   const [centerSelectionMode, setCenterSelectionMode] = useState('auto');
   const [generating, setGenerating] = useState(false);
   const [generationQueue, setGenerationQueue] = useState([]); // [{zone,label,centerName,centerId,total,status,error}]
+
+  // Warn on tab close/refresh while roll number slip generation is in flight —
+  // the queue job keeps running server-side, but the admin should know a
+  // reload here won't show progress until they come back and re-check.
+  useEffect(() => {
+    if (!generating) return;
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [generating]);
 
   // Stage 3 filter + manual-update state
   const [s3Search, setS3Search] = useState('');
@@ -803,6 +847,7 @@ const RollNumberExamFlow = () => {
     }
 
     setGenerating(true);
+    setBusy(true, 'Roll number slip generation is in progress. Please wait until it finishes.');
     setGenerationQueue([]);
     try {
       // Collect matching candidate applications (client-side filter by selected posts)
@@ -960,7 +1005,7 @@ const RollNumberExamFlow = () => {
 
           try {
             const groupApps = zoneGroups[item.zone];
-            const result = await RollNumberApi.generateSlips({
+            const dispatch = await RollNumberApi.generateSlips({
               application_numbers: groupApps.map(a => a.application_number),
               candidates: groupApps.map(buildCandidate),
               exam_center_id: Number(item.centerId),
@@ -972,6 +1017,7 @@ const RollNumberExamFlow = () => {
               auto_allocate: true,
               prefix: rollPrefix.trim(),
             });
+            const result = await pollGenerationStatus(dispatch?.data?.generation_id);
 
             const slips = result?.data?.slips ?? [];
 
@@ -1056,7 +1102,7 @@ const RollNumberExamFlow = () => {
         return;
       }
 
-      const result = await RollNumberApi.generateSlips({
+      const dispatch = await RollNumberApi.generateSlips({
         application_numbers: uniqueApps.map(a => a.application_number),
         candidates: uniqueApps.map(buildCandidate),
         exam_center_id: Number(selectedCenterIds[0]),
@@ -1068,6 +1114,7 @@ const RollNumberExamFlow = () => {
         auto_allocate: false,
         prefix: rollPrefix.trim(),
       });
+      const result = await pollGenerationStatus(dispatch?.data?.generation_id);
       const slips = result?.data?.slips ?? [];
       const count = result?.data?.generated_count ?? slips.length;
       const appByNumberCustom = {};
@@ -1094,6 +1141,7 @@ const RollNumberExamFlow = () => {
       toast.error(err?.message || 'Failed to generate roll numbers');
     } finally {
       setGenerating(false);
+      setBusy(false);
     }
   };
 
@@ -1298,7 +1346,10 @@ const RollNumberExamFlow = () => {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {['Select Posts', 'Center Allocation & Generate'].map((label, index) => {
               const step = index + 1;
-              const isDisabled = step === 2;
+              // Both tabs lock while a generation job is running — without this,
+              // "Select Posts" stayed clickable mid-job and let the admin jump
+              // back to stage 1 and change the post selection underneath it.
+              const isDisabled = step === 2 || generating;
               return <button key={label} type="button" disabled={isDisabled} onClick={() => { if (!isDisabled) setStage(step); }} className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${stage === step ? 'border-emerald-700 bg-emerald-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed`}><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/20 text-xs">{step}</span>{label}</button>;
             })}
           </div>
@@ -1377,6 +1428,22 @@ const RollNumberExamFlow = () => {
         {stage === 2 && (
           <Card className="rounded-lg"><CardContent className="space-y-5 p-5">
             <StepHeader number="2" title="Center Allocation & Generate Roll Numbers" subtitle="Select centers, configure schedule, then generate roll numbers." />
+
+            {/* ── In-progress banner — shown for both auto and custom modes while the queue job runs ── */}
+            {generating && (
+              <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <div className="h-4 w-4 flex-shrink-0 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                <p className="text-sm font-semibold text-emerald-900">
+                  Roll number slip generation is in progress. Please wait — all selections on this screen are locked until it finishes.
+                </p>
+              </div>
+            )}
+
+            {/* Disables every form control in this step (radios, inputs, buttons)
+                while a generation job is running, so the admin can't change any
+                selection mid-job — the fieldset's native `disabled` cascades to
+                all descendants; `contents` keeps it out of the layout flow. */}
+            <fieldset disabled={generating} className="contents">
 
             {/* ── Selection mode ── */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1704,6 +1771,8 @@ const RollNumberExamFlow = () => {
                 <Send size={15} /> {generating ? 'Generating…' : 'Generate Roll Numbers'}
               </Button>
             </div>
+
+            </fieldset>
           </CardContent></Card>
         )}
 

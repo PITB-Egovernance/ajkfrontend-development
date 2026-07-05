@@ -47,12 +47,22 @@ const RollNumberApi = {
     return handleResponse(res);
   },
 
-  // Generate roll-number slips for selected applications
+  // Queue roll-number slip generation for selected applications.
+  // Returns { generation_id, status } — the actual slips are produced
+  // asynchronously by a queue job; poll getGenerationStatus() for completion.
   generateSlips: async (body) => {
     const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generate-slips`, {
       method:  'POST',
       headers: getAdminHeaders(),
       body:    JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
+  // Poll the status of a queued slip-generation batch.
+  getGenerationStatus: async (generationId) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generate-slips/status/${generationId}`, {
+      headers: getAdminHeaders(false),
     });
     return handleResponse(res);
   },

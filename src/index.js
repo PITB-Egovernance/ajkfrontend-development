@@ -6,6 +6,7 @@ import reportWebVitals from 'reportWebVitals';
 import ToastProvider from 'components/ToastProvider';
 import { AuthProvider } from 'context/AuthContext';
 import { SidebarProvider } from 'context/SidebarContext';
+import { GenerationGuardProvider } from 'context/GenerationGuardContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -13,7 +14,9 @@ root.render(
     <ToastProvider>
       <AuthProvider>
         <SidebarProvider>
-          <App />
+          <GenerationGuardProvider>
+            <App />
+          </GenerationGuardProvider>
         </SidebarProvider>
       </AuthProvider>
     </ToastProvider>

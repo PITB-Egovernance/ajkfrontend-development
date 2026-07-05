@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { MENU_ITEMS } from "config/sidebarMenu";
 // import { Link, useLocation } from "react-router-dom";
 import {
@@ -38,6 +39,7 @@ import {
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";
+import { useGenerationGuard } from "context/GenerationGuardContext";
 import { useAuth } from "context/AuthContext";
 import { isAdminUser, hasSubModuleAccess } from "utils/permissions";
 import { getRoutePermissionMap } from "config/permissionRegistry";
@@ -56,6 +58,16 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   const setIsOpen = propSetIsOpen !== undefined ? propSetIsOpen : sidebarContext.setIsOpen;
   const { openMenu, toggleMenu: contextToggleMenu } = sidebarContext;
   const { user } = useAuth();
+  const { isBusy, busyMessage } = useGenerationGuard();
+
+  // Blocks all sidebar navigation while a long-running queued process (e.g.
+  // roll number slip generation) is in progress.
+  const guardNavClick = (e) => {
+    if (isBusy) {
+      e.preventDefault();
+      toast.error(busyMessage);
+    }
+  };
 
   const [localOpenMenu, setLocalOpenMenu] = useState("");
   const location = useLocation();
@@ -134,6 +146,10 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
         >
           <button
             onClick={() => {
+              if (isBusy) {
+                toast.error(busyMessage);
+                return;
+              }
               toggleMenu(item.id);
               if (item.path) navigate(item.path);
             }}
@@ -169,6 +185,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
                 <Link
                   key={subItem.path}
                   to={subItem.path}
+                  onClick={guardNavClick}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
                     isSubActive(subItem.path)
@@ -212,6 +229,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
                     <Link
                       key={subItem.path}
                       to={subItem.path}
+                      onClick={guardNavClick}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 border-b border-emerald-700/20",
                         isSubActive(subItem.path)
@@ -246,7 +264,7 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     }
 
     return (
-      <Link to={item.path} title={!isOpen ? item.label : ""}>
+      <Link to={item.path} onClick={guardNavClick} title={!isOpen ? item.label : ""}>
         <div
           className={cn(
             "flex items-center justify-between rounded-xl transition-all duration-200 border-b border-emerald-700/20",
