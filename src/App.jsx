@@ -96,10 +96,13 @@ import MeritManagementPage from 'pages/results/MeritManagementPage';
 import PublicationPage from 'pages/results/PublicationPage';
 import ResultsDashboard from 'pages/results/ResultsDashboard';
 import ResultsViewPage from 'pages/results/ResultsViewPage';
-import ApprovalsPage from 'pages/results/ApprovalsPage';
 import ResultSearchPage from 'pages/results/ResultSearchPage';
 import CreateDepartmentUser from 'pages/settings/DepartmentUsers/EditDepartmentUser';
 import TermsAndConditionsManagement from "pages/settings/TermsAndConditions/TermsAndConditionsManagement";
+import VerificationPage from 'pages/results/VerificationPage';
+import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
+
+
 function App() {
   return (
     <Router>
@@ -259,10 +262,10 @@ function App() {
           <Route path="results/search" element={<ResultSearchPage />} />
           <Route path="results/view/:jobId?" element={<ResultsViewPage />} />
           <Route
-            path="results/approvals"
+            path="results/verification/:jobId?"
             element={
               <ProtectedRoute allowedRoles={['admin', 'chairman', 'secretary']}>
-                <ApprovalsPage />
+                <VerificationPage />
               </ProtectedRoute>
             }
           />
@@ -314,6 +317,12 @@ function App() {
           <Route
             path="/dashboard/settings/department-users/:hashId/edit"
             element={<CreateDepartmentUser />}
+            path="results/shortlist/:jobId"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'director']}>
+                <InterviewShortlistPage />
+              </ProtectedRoute>
+            }
           />
         </Route>
 

@@ -9,10 +9,55 @@ import PublicationChecklist from 'components/results/PublicationChecklist';
 import toast from 'react-hot-toast';
 import { formatDate } from 'utils/dateUtils';
 
-/**
- * PublicationPage
- * Implements the final result release workflow with safety gates and gazette generation
- */
+const confirmWithdraw = () => {
+  return new Promise((resolve) => {
+    let reasonText = '';
+    toast((t) => (
+      <div className="flex flex-col gap-3 min-w-[320px] p-1 text-left">
+        <div>
+          <p className="font-bold text-slate-800 text-sm">Emergency Withdrawal</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Provide a mandatory legal reason for taking these results offline:
+          </p>
+        </div>
+        <textarea
+          rows={3}
+          placeholder="Enter withdrawal reason..."
+          onChange={(e) => { reasonText = e.target.value; }}
+          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 bg-white"
+        />
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={() => {
+              toast.dismiss(t.id);
+              resolve(null);
+            }}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-105 hover:bg-slate-200 rounded-md transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              const trimmed = reasonText.trim();
+              if (!trimmed) {
+                toast.error("Withdrawal reason is mandatory.", { id: 'withdraw-validation' });
+                return;
+              }
+              toast.dismiss(t.id);
+              resolve(trimmed);
+            }}
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-md transition-colors"
+          >
+            Withdraw
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: Infinity,
+      position: 'top-center',
+    });
+  });
+};
 
 const PublicationPage = () => {
   const { jobId } = useParams();
@@ -116,8 +161,8 @@ const PublicationPage = () => {
   };
 
   const handleWithdraw = async () => {
-    const reason = window.prompt('EMERGENCY WITHDRAWAL: Provide a mandatory legal reason for taking these results offline:');
-    if (!reason || !reason.trim()) return;
+    const reason = await confirmWithdraw();
+    if (!reason) return;
 
     try {
       await ResultsApi.withdraw(jobId, reason);

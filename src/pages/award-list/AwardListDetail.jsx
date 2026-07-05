@@ -27,18 +27,25 @@ const getHeaders = () => ({
 const STATUS_OPTIONS = [
   { value: 'pending',      label: 'Pending',      color: 'default' },
   { value: 'selected',     label: 'Selected',     color: 'success' },
+  { value: 'SELECTED',     label: 'Selected',     color: 'success' },
+  { value: 'not_selected', label: 'Not Selected', color: 'error' },
+  { value: 'NOT SELECTED', label: 'Not Selected', color: 'error' },
   { value: 'provisional',  label: 'Provisional',  color: 'info' },
   { value: 'replacement',  label: 'Replacement',  color: 'warning' },
   { value: 'declined',     label: 'Declined',     color: 'error' },
   { value: 'absent',       label: 'Absent',       color: 'error' },
+  { value: 'ABSENT',       label: 'Absent',       color: 'error' },
   { value: 'disqualified', label: 'Disqualified', color: 'error' },
 ];
 
 const statusColor = (s) => STATUS_OPTIONS.find((o) => o.value === s)?.color ?? 'default';
 
 const emptyMarks = {
-  marks_matric: '', marks_inter: '', marks_grad: '', marks_masters: '', marks_board_pos: '',
+  marks_matric: '', marks_inter: '', marks_grad: '', marks_masters: '', marks_bs: '', marks_board_pos: '',
+  board_uni_pos: 0, mphil_phd: 0,
+  marks_written: '',
   marks_pak_studies: '', marks_islamic: '', marks_current_aff: '',
+  status: 'present',
   notes: '',
 };
 
@@ -88,15 +95,32 @@ export default function AwardListDetail() {
 
   const openMarks = (entry) => {
     setMarksEntry(entry);
+    const isAbsent = entry.status === 'absent' || entry.status === 'ABSENT';
+    const marks_board_pos = Number(entry.marks_board_pos ?? 0);
+    let board_uni_pos = 0;
+    let mphil_phd = 0;
+    if (marks_board_pos === 1) {
+      board_uni_pos = 1;
+    } else if (marks_board_pos === 2) {
+      mphil_phd = 2;
+    } else if (marks_board_pos >= 3) {
+      board_uni_pos = 1;
+      mphil_phd = 2;
+    }
     setMarksForm({
       marks_matric:      entry.marks_matric ?? '',
       marks_inter:       entry.marks_inter ?? '',
       marks_grad:        entry.marks_grad ?? '',
       marks_masters:     entry.marks_masters ?? '',
-      marks_board_pos:   entry.marks_board_pos ?? '',
+      marks_bs:          entry.marks_bs ?? '',
+      marks_board_pos:   marks_board_pos,
+      board_uni_pos:     board_uni_pos,
+      mphil_phd:         mphil_phd,
+      marks_written:     entry.marks_written ?? '',
       marks_pak_studies: entry.marks_pak_studies ?? '',
       marks_islamic:     entry.marks_islamic ?? '',
       marks_current_aff: entry.marks_current_aff ?? '',
+      status:            isAbsent ? 'absent' : 'present',
       notes:             entry.notes ?? '',
     });
     setMarksOpen(true);
@@ -105,10 +129,17 @@ export default function AwardListDetail() {
   const saveMarks = async () => {
     setMarksSaving(true);
     try {
+      const calculatedBoardPos = Number(marksForm.board_uni_pos ?? 0) + Number(marksForm.mphil_phd ?? 0);
+      const payload = {
+        ...marksForm,
+        marks_board_pos: calculatedBoardPos,
+        marks_islamic: 0,
+        marks_current_aff: 0,
+      };
       await fetch(`${API_BASE}/award-lists/entries/${marksEntry.id}/marks`, {
         method: 'PUT',
         headers: getHeaders(),
-        body: JSON.stringify(marksForm),
+        body: JSON.stringify(payload),
       });
       setMarksOpen(false);
       fetchDetail();
@@ -116,6 +147,16 @@ export default function AwardListDetail() {
     } finally {
       setMarksSaving(false);
     }
+  };
+
+  const handleAttendanceChange = (val) => {
+    setMarksForm((f) => ({
+      ...f,
+      status: val,
+      marks_pak_studies: val === 'absent' ? 0 : f.marks_pak_studies,
+      marks_islamic: val === 'absent' ? 0 : f.marks_islamic,
+      marks_current_aff: val === 'absent' ? 0 : f.marks_current_aff,
+    }));
   };
 
   const openStatus = (entry) => {
@@ -170,52 +211,85 @@ export default function AwardListDetail() {
   };
 
   const handlePublish = async () => {
-    if (!await confirmDelete({ title: 'Publish Results', message: 'Publish results? Candidates will be able to view their status.', warning: '' })) return;
+    if (!await confirmDelete({
+      title: 'Publish Results',
+      message: 'Publish results? Candidates will be able to view their status.',
+      warning: 'This action will finalize the merit list and make results public.',
+      confirmLabel: 'Publish',
+      confirmColor: 'bg-emerald-600 hover:bg-emerald-700',
+    })) return;
     setPublishing(true);
     setActionMsg('');
     await runAction(`${API_BASE}/award-lists/${id}/publish`, 'POST', 'Results published successfully.');
     setPublishing(false);
   };
 
+  const isMcq = list?.advertisement?.test_type === 1 || list?.advertisement?.test_type === '1';
+  const writtenLabel = isMcq ? 'Test (B/45)' : 'Written (B/45)';
+  const combinedLabel = isMcq ? 'Acad+Test (70)' : 'Acad+Written (70)';
+
   const entryColumns = [
-    { field: 'merit_position', headerName: 'Merit', width: 70, align: 'center', headerAlign: 'center' },
-    { field: 'roll_number', headerName: 'Roll No.', width: 110 },
-    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1, minWidth: 160 },
+    { field: 'merit_position', headerName: 'Rank', width: 60, align: 'center', headerAlign: 'center' },
+    { field: 'roll_number', headerName: 'Roll No', width: 90 },
+    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1, minWidth: 140 },
     {
       field: 'part_a_total',
-      headerName: 'Part-A',
-      width: 80,
+      headerName: 'Acad (A/25)',
+      width: 100,
       align: 'right',
       headerAlign: 'right',
-      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '—',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'marks_written',
+      headerName: writtenLabel,
+      width: 110,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'academic_written_combined',
+      headerName: combinedLabel,
+      width: 120,
+      align: 'right',
+      headerAlign: 'right',
+      valueGetter: (params) => {
+        const partA = Number(params.row.part_a_total ?? 0);
+        const written = Number(params.row.marks_written ?? 0);
+        return (partA + written).toFixed(2);
+      }
     },
     {
       field: 'part_b_total',
-      headerName: 'Part-B',
-      width: 80,
+      headerName: 'Interview (C/30)',
+      width: 120,
       align: 'right',
       headerAlign: 'right',
-      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '—',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
     },
     {
       field: 'grand_total',
-      headerName: 'Grand Total',
-      width: 100,
+      headerName: 'Grand Total (100)',
+      width: 140,
       align: 'right',
       headerAlign: 'right',
       renderCell: ({ value }) => (
         <Typography variant="body2" fontWeight={700}>
-          {value != null ? Number(value).toFixed(2) : '—'}
+          {value != null ? Number(value).toFixed(2) : '0.00'}
         </Typography>
       ),
     },
     {
       field: 'status',
       headerName: 'Status',
-      width: 120,
-      renderCell: ({ value }) => (
-        <Chip label={value ?? 'pending'} color={statusColor(value)} size="small" />
-      ),
+      width: 110,
+      renderCell: ({ value }) => {
+        const displayLabel = STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value ?? 'Pending';
+        return (
+          <Chip label={displayLabel} color={statusColor(value)} size="small" />
+        );
+      },
     },
     {
       field: 'actions',
@@ -308,9 +382,9 @@ export default function AwardListDetail() {
         {[
           { label: 'Total Posts', value: list.total_posts },
           { label: 'Entries', value: entries.length },
-          { label: 'Selected', value: entries.filter((e) => e.status === 'selected').length },
-          { label: 'Provisional', value: entries.filter((e) => e.status === 'provisional').length },
-          { label: 'Pending', value: entries.filter((e) => e.status === 'pending').length },
+          { label: 'Selected', value: entries.filter((e) => e.status === 'selected' || e.status === 'SELECTED').length },
+          { label: 'Provisional', value: entries.filter((e) => e.status === 'provisional' || e.status === 'PROVISIONAL').length },
+          { label: 'Pending', value: entries.filter((e) => e.status === 'pending' || e.status === 'PENDING').length },
         ].map((s) => (
           <Grid item xs={6} sm={4} md={2} key={s.label}>
             <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2 }} elevation={1}>
@@ -421,15 +495,16 @@ export default function AwardListDetail() {
         <DialogContent>
           <Box sx={{ pt: 1 }}>
             <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-              Part A — Academic Qualifications (max 25 each · Board Position max 5)
+              Part A — Academic Qualifications & Written (max scaling scores as per AJKPSC rules)
             </Typography>
-            <Grid container spacing={2}>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
               {[
-                { key: 'marks_matric',    label: 'Matric',       max: 25 },
-                { key: 'marks_inter',     label: 'Intermediate', max: 25 },
-                { key: 'marks_grad',      label: 'Graduation',   max: 25 },
-                { key: 'marks_masters',   label: 'Masters',      max: 25 },
-                { key: 'marks_board_pos', label: 'Board Pos.',   max: 5  },
+                { key: 'marks_matric',    label: 'Matric',       max: 2 },
+                { key: 'marks_inter',     label: 'Intermediate', max: 3 },
+                { key: 'marks_grad',      label: 'Graduation',   max: 4 },
+                { key: 'marks_masters',   label: 'Masters',      max: 11 },
+                { key: 'marks_bs',        label: 'BS (4 Years)',  max: 15 },
+                { key: 'marks_written',   label: 'Written/MCQ',  max: 45 },
               ].map(({ key, label, max }) => (
                 <Grid item xs={6} key={key}>
                   <TextField
@@ -443,32 +518,70 @@ export default function AwardListDetail() {
                   />
                 </Grid>
               ))}
+              <Grid item xs={6}>
+                <TextField
+                  select
+                  label="Board / Uni 1st Position"
+                  size="small"
+                  fullWidth
+                  value={marksForm.board_uni_pos}
+                  onChange={(e) => setMarksForm((f) => ({ ...f, board_uni_pos: Number(e.target.value) }))}
+                >
+                  <MenuItem value={0}>None (0)</MenuItem>
+                  <MenuItem value={1}>1st Position (1 Mark)</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  select
+                  label="MPhil / PhD Qualification"
+                  size="small"
+                  fullWidth
+                  value={marksForm.mphil_phd}
+                  onChange={(e) => setMarksForm((f) => ({ ...f, mphil_phd: Number(e.target.value) }))}
+                >
+                  <MenuItem value={0}>None (0)</MenuItem>
+                  <MenuItem value={1}>MPhil (1 Mark)</MenuItem>
+                  <MenuItem value={2}>PhD (2 Marks)</MenuItem>
+                </TextField>
+              </Grid>
             </Grid>
 
             <Divider sx={{ my: 2 }} />
 
             <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-              Part B — General Knowledge (max 10 each)
+              Interview Attendance
             </Typography>
-            <Grid container spacing={2}>
-              {[
-                { key: 'marks_pak_studies', label: 'Pak Studies',     max: 10 },
-                { key: 'marks_islamic',     label: 'Islamic Studies', max: 10 },
-                { key: 'marks_current_aff', label: 'Current Affairs', max: 10 },
-              ].map(({ key, label, max }) => (
-                <Grid item xs={6} key={key}>
-                  <TextField
-                    label={`${label} (0–${max})`}
-                    type="number"
-                    size="small"
-                    fullWidth
-                    value={marksForm[key]}
-                    onChange={(e) => setMarksForm((f) => ({ ...f, [key]: e.target.value }))}
-                    inputProps={{ min: 0, max, step: 0.01 }}
-                  />
-                </Grid>
-              ))}
-            </Grid>
+            <TextField
+              select
+              label="Attendance"
+              size="small"
+              fullWidth
+              sx={{ mb: 2 }}
+              value={marksForm.status}
+              onChange={(e) => handleAttendanceChange(e.target.value)}
+            >
+              <MenuItem value="present">Present</MenuItem>
+              <MenuItem value="absent">Absent</MenuItem>
+            </TextField>
+
+            <Divider sx={{ my: 2 }} />
+
+            <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+              Part B — Interview / Viva Voce Marks (max 30)
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                label="Interview / Viva Voce Marks (0–30)"
+                type="number"
+                size="small"
+                fullWidth
+                disabled={marksForm.status === 'absent'}
+                value={marksForm.marks_pak_studies}
+                onChange={(e) => setMarksForm((f) => ({ ...f, marks_pak_studies: e.target.value }))}
+                inputProps={{ min: 0, max: 30, step: 0.01 }}
+              />
+            </Box>
 
             <Divider sx={{ my: 2 }} />
 
