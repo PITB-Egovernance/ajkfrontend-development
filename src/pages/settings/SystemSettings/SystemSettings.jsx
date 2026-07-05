@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DataGrid } from '@mui/x-data-grid';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import toast from 'react-hot-toast';
 import { Search, ArrowLeft, UserCog } from 'lucide-react';
 import { Card, CardContent } from 'components/ui/Card';
@@ -184,7 +184,7 @@ const SystemSettings = () => {
 
         {/* Table */}
         <div className="bg-white rounded-lg shadow-sm p-4">
-          <DataGrid
+          <TooltipDataGrid
             rows={filteredEmployees}
             columns={columns}
             loading={loading}
