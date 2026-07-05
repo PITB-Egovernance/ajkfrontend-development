@@ -49,7 +49,7 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
-const EMPTY_FORM = { designation_ids: [], subject_name: "", subject_marks: "", status: "active" };
+const EMPTY_FORM = { designation_ids: [], subject_name: "", subject_marks: "", passing_marks_percentage: "", status: "active" };
 
 const getDesignationId = (item) => {
   if (Array.isArray(item?.designations) && item.designations[0])
@@ -116,7 +116,8 @@ const WrittenExamSubjectsManagement = () => {
           designation:      getDesignationNames(item).join(", "),
           designationNames: getDesignationNames(item),
           subject_name:     item.subject_name,
-          subject_marks:    getSubjectMarks(item),
+          subject_marks:    getSubjectMarks(item) !== '' && getSubjectMarks(item) !== null ? Number(getSubjectMarks(item)) : '',
+          passing_marks_percentage: item.passing_marks_percentage !== null && item.passing_marks_percentage !== undefined && item.passing_marks_percentage !== '' ? Number(item.passing_marks_percentage) : '',
           status:           item.status ?? "active",
         }))
       );
@@ -198,6 +199,7 @@ const WrittenExamSubjectsManagement = () => {
     designation_ids: [String(resolveDesignationId(row))],
     subject_name: row.subject_name.trim(),
     subject_marks: Number(row.subject_marks),
+    passing_marks_percentage: row.passing_marks_percentage ? Number(row.passing_marks_percentage) : null,
     status: row.status,
   });
 
@@ -216,6 +218,7 @@ const WrittenExamSubjectsManagement = () => {
         : (resolveDesignationId(selectedRow) ? [String(resolveDesignationId(selectedRow))] : []),
       subject_name:  selectedRow.subject_name,
       subject_marks: String(selectedRow.subject_marks),
+      passing_marks_percentage: String(selectedRow.passing_marks_percentage ?? ""),
       status:        selectedRow.status ?? "active",
     });
     setFormErrors({});
@@ -303,6 +306,7 @@ const WrittenExamSubjectsManagement = () => {
         designation_ids: formData.designation_ids,
         subject_name: formData.subject_name.trim(),
         subject_marks: Number(formData.subject_marks),
+        passing_marks_percentage: formData.passing_marks_percentage ? Number(formData.passing_marks_percentage) : null,
         status: formData.status,
       };
       if (editingRow) {
@@ -344,6 +348,7 @@ const WrittenExamSubjectsManagement = () => {
       ),
     },
     { field: "subject_marks", headerName: "Marks", width: 100 },
+    { field: "passing_marks_percentage", headerName: "Passing %", width: 110, renderCell: (p) => p.value !== "" && p.value !== null && p.value !== undefined ? `${p.value}%` : "—" },
     {
       field: "status",
       headerName: "Status",
@@ -570,6 +575,19 @@ const WrittenExamSubjectsManagement = () => {
               error={!!formErrors.subject_marks}
               helperText={formErrors.subject_marks || "Total marks for this subject"}
               placeholder="e.g. 100"
+            />
+
+            <TextField
+              fullWidth
+              label="Passing Marks Percentage"
+              margin="normal"
+              size="small"
+              type="number"
+              inputProps={{ min: 0, max: 100 }}
+              value={formData.passing_marks_percentage}
+              onChange={(e) => setFormData((f) => ({ ...f, passing_marks_percentage: e.target.value }))}
+              helperText="Minimum percentage required to pass (optional)"
+              placeholder="e.g. 50"
             />
           </DialogContent>
 

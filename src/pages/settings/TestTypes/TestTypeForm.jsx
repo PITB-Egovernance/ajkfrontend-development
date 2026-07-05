@@ -49,9 +49,10 @@ const EMPTY = {
   aggregate_passing_percentage: '',
   // CCE — Screening
   screening_total_marks: '',
-  screening_passing_marks: '',
   screening_passing_percentage: '',
   // CCE — Written
+  compulsory_marks: '',
+  optional_marks: '',
   qualification_marks_percentage: '',
   // CCE — Interview
   interview_total_marks: '',
@@ -223,10 +224,10 @@ const TestTypeForm = () => {
       if (!form.subject_ids.length) e.subject_ids = 'Please select at least one subject.';
     } else if (cat === 'combined_competitive_exam') {
       req('screening_total_marks', 'Total Marks is required.');
-      req('screening_passing_marks', 'Passing Marks is required.');
       req('screening_passing_percentage', 'Passing Percentage is required.');
+      req('compulsory_marks', 'Total Compulsory Marks is required.');
+      req('optional_marks', 'Total Optional Marks is required.');
       req('qualification_marks_percentage', 'Qualification Marks (%) is required.');
-      req('written_total_marks', 'Written Total Marks is required.');
       req('interview_total_marks', 'Total Marks is required.');
       req('interview_passing_percentage', 'Passing Percentage is required.');
     }
@@ -258,8 +259,9 @@ const TestTypeForm = () => {
       base.subject_ids = form.subject_ids;
     } else if (cat === 'combined_competitive_exam') {
       put([
-        'screening_total_marks', 'screening_passing_marks', 'screening_passing_percentage',
-        'qualification_marks_percentage', 'written_total_marks',
+        'screening_total_marks', 'screening_passing_percentage',
+        'compulsory_marks', 'optional_marks',
+        'qualification_marks_percentage',
         'interview_total_marks', 'interview_passing_percentage', 'interview_percentage',
       ]);
     }
@@ -337,9 +339,9 @@ const TestTypeForm = () => {
             </TextField>
           </div>
           <div className="col-md-6 form-group">
-            <TextField fullWidth label="Description (optional)"
+            <TextField fullWidth label="Description"
               value={form.description} onChange={(e) => set('description', e.target.value)}
-              placeholder="Enter description (optional)" />
+              placeholder="Enter description" />
           </div>
         </div>
 
@@ -424,14 +426,14 @@ const TestTypeForm = () => {
                 <Section index={1} title="Stage 1: Screening Test">
                   <div className="row">
                     <NumberField label="Total Marks" required value={form.screening_total_marks} onChange={(v) => set('screening_total_marks', v)} placeholder="Enter total marks" error={fieldErrors.screening_total_marks} />
-                    <NumberField label="Passing Marks" required value={form.screening_passing_marks} onChange={(v) => set('screening_passing_marks', v)} placeholder="Enter passing marks" error={fieldErrors.screening_passing_marks} />
                     <NumberField label="Passing Percentage (%)" required max={100} value={form.screening_passing_percentage} onChange={(v) => set('screening_passing_percentage', v)} placeholder="Enter percentage" error={fieldErrors.screening_passing_percentage} />
                   </div>
                 </Section>
 
                 <Section index={2} title="Stage 2: Written Examination">
                   <div className="row">
-                    <NumberField label="Written Total Marks" required value={form.written_total_marks} onChange={(v) => set('written_total_marks', v)} placeholder="Enter marks" error={fieldErrors.written_total_marks} />
+                    <NumberField required label="Total Compulsory Marks" value={form.compulsory_marks} onChange={(v) => set('compulsory_marks', v)} placeholder="Enter compulsory marks" error={fieldErrors.compulsory_marks} />
+                    <NumberField required label="Total Optional Marks" value={form.optional_marks} onChange={(v) => set('optional_marks', v)} placeholder="Enter optional marks" error={fieldErrors.optional_marks} />
                     <NumberField label="Qualification Marks (%)" required max={100} value={form.qualification_marks_percentage} onChange={(v) => set('qualification_marks_percentage', v)} placeholder="0 - 100" error={fieldErrors.qualification_marks_percentage} />
                   </div>
                 </Section>

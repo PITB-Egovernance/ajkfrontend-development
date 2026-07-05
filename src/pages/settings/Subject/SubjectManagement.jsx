@@ -51,7 +51,7 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
   </button>
 );
 
-const EMPTY_FORM = { subject_name: "", total_marks: "", subject_type: "compulsory", subject_group: "", status: "active" };
+const EMPTY_FORM = { subject_name: "", total_marks: "", passing_marks_percentage: "", subject_type: "compulsory", subject_group: "", status: "active" };
 const FILTERED_PAGE_SIZE = 100;
 
 const mapSubjectRows = (data, startIndex = 0) =>
@@ -64,7 +64,8 @@ const mapSubjectRows = (data, startIndex = 0) =>
     // one without a group is compulsory.
     subject_type:  item.subject_group ? "optional" : "compulsory",
     subject_group: item.subject_group,
-    total_marks:   item.total_marks,
+    total_marks:   item.total_marks !== null && item.total_marks !== undefined && item.total_marks !== '' ? Number(item.total_marks) : '',
+    passing_marks_percentage: item.passing_marks_percentage !== null && item.passing_marks_percentage !== undefined && item.passing_marks_percentage !== '' ? Number(item.passing_marks_percentage) : '',
     status:        item.status ?? "active",
   }));
 
@@ -223,6 +224,7 @@ const SubjectManagement = () => {
     setFormData({
       subject_name:  selectedRow.subject_name,
       total_marks:   String(selectedRow.total_marks),
+      passing_marks_percentage: String(selectedRow.passing_marks_percentage ?? ""),
       subject_type:  selectedRow.subject_type ?? "compulsory",
       subject_group: selectedRow.subject_group,
       status:        selectedRow.status ?? "active",
@@ -326,6 +328,7 @@ const SubjectManagement = () => {
         subject_type:  formData.subject_type,
         subject_group: formData.subject_type === "optional" ? formData.subject_group : "",
         total_marks:   Number(formData.total_marks),
+        passing_marks_percentage: formData.passing_marks_percentage ? Number(formData.passing_marks_percentage) : null,
         status:        formData.status,
       };
       if (editingRow) {
@@ -367,6 +370,7 @@ const SubjectManagement = () => {
       },
     },
     { field: "total_marks",   headerName: "Marks",        width: 100 },
+    { field: "passing_marks_percentage", headerName: "Passing %", width: 110, renderCell: (p) => p.value !== "" && p.value !== null && p.value !== undefined ? `${p.value}%` : "—" },
     {
       field: "status",
       headerName: "Status",
@@ -556,6 +560,19 @@ const SubjectManagement = () => {
               error={!!formErrors.total_marks}
               helperText={formErrors.total_marks || "Total marks for this subject"}
               placeholder="e.g. 100"
+            />
+
+            <TextField
+              fullWidth
+              label="Passing Marks Percentage"
+              margin="normal"
+              size="small"
+              type="number"
+              inputProps={{ min: 0, max: 100 }}
+              value={formData.passing_marks_percentage}
+              onChange={(e) => setFormData((f) => ({ ...f, passing_marks_percentage: e.target.value }))}
+              helperText="Minimum percentage required to pass (optional)"
+              placeholder="e.g. 50"
             />
 
             <div className="mt-3">

@@ -260,9 +260,8 @@ const RollNumberExamFlow = () => {
   const [scheduleTimes, setScheduleTimes] = useState(() => meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
   const [scheduleDurations, setScheduleDurations] = useState(() => meta.papers.map((_, i) => i === 1 ? 120 : 90));
   const [rollPrefix, setRollPrefix] = useState(() => DEFAULT_ROLL_PREFIXES[examType] ?? '');
-  const [writtenExamSchedules, setWrittenExamSchedules] = useState([]);
-  const [currentSchedule, setCurrentSchedule] = useState(() => newWrittenSchedule());
-  const [schedulesPage, setSchedulesPage] = useState(0);
+  // subjectId → { selected, date, startTime, duration }
+  const [subjectSchedules, setSubjectSchedules] = useState({});
   const [writtenExamSubjects, setWrittenExamSubjects] = useState([]);
   const [testTypeSubjectsMap, setTestTypeSubjectsMap] = useState({}); // testTypeId → subject[]
 
@@ -272,8 +271,7 @@ const RollNumberExamFlow = () => {
     setScheduleTimes(meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
     setScheduleDurations(meta.papers.map((_, i) => i === 1 ? 120 : 90));
     setRollPrefix(DEFAULT_ROLL_PREFIXES[examType] ?? '');
-    setWrittenExamSchedules([]);
-    setCurrentSchedule(newWrittenSchedule());
+    setSubjectSchedules({});
   }, [examType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [advertisements, setAdvertisements] = useState([]);
@@ -746,26 +744,18 @@ const RollNumberExamFlow = () => {
     );
   }, [examType, selectedPosts, writtenExamSubjects]);
 
-  const removeWrittenSchedule = (id) => {
-    setWrittenExamSchedules(s => {
-      const next = s.filter(sch => sch.id !== id);
-      const lastPage = Math.max(0, Math.ceil(next.length / 2) - 1);
-      setSchedulesPage(p => Math.min(p, lastPage));
-      return next;
-    });
-  };
-  const updateCurrentSchedule = (key, value) => setCurrentSchedule(s => ({ ...s, [key]: value }));
-  const commitCurrentSchedule = () => {
-    if (!currentSchedule.date)      { toast.error('Please enter a date'); return; }
-    if (!currentSchedule.startTime) { toast.error('Please enter a start time'); return; }
-    if (!currentSchedule.subjectId) { toast.error('Please select a subject'); return; }
-    setWrittenExamSchedules(s => {
-      const next = [...s, { ...currentSchedule, id: Date.now() + Math.random() }];
-      setSchedulesPage(Math.floor((next.length - 1) / 2)); // jump to last page
-      return next;
-    });
-    setCurrentSchedule(newWrittenSchedule());
-  };
+  const updateSubjectSchedule = (subjectId, key, value) =>
+    setSubjectSchedules(prev => ({
+      ...prev,
+      [subjectId]: { selected: false, date: '', startTime: '10:00', duration: 90, ...prev[subjectId], [key]: value },
+    }));
+
+  // Derived list of selected subject schedules — used for validation and payload
+  const writtenExamSchedules = useMemo(() =>
+    Object.entries(subjectSchedules)
+      .filter(([, sch]) => sch.selected)
+      .map(([subjectId, sch]) => ({ subjectId, ...sch })),
+  [subjectSchedules]);
 
   const togglePost = (postId) => setSelectedPostIds((current) => current.includes(postId) ? current.filter((id) => id !== postId) : [...current, postId]);
   const toggleCenter = (centerId) => setSelectedCenterIds((current) => current.includes(centerId) ? current.filter((id) => id !== centerId) : [...current, centerId]);
@@ -1514,118 +1504,88 @@ const RollNumberExamFlow = () => {
                   <CalendarDays size={17} className="text-emerald-700" />
                   <h3 className="text-sm font-bold text-slate-900">Subject Schedules</h3>
                   {writtenExamSchedules.length > 0 && (
-                    <span className="text-xs text-slate-400">{writtenExamSchedules.length} added</span>
+                    <span className="text-xs text-emerald-600 font-medium">{writtenExamSchedules.length} selected</span>
                   )}
                 </div>
 
-                {/* Input form */}
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-                    <TextField size="small" type="date" label="Date *" value={currentSchedule.date} onChange={e => updateCurrentSchedule('date', e.target.value)} InputLabelProps={{ shrink: true }} />
-                    <TextField size="small" type="time" label="Start Time *" value={currentSchedule.startTime} onChange={e => updateCurrentSchedule('startTime', e.target.value)} InputLabelProps={{ shrink: true }} />
-                    <TextField select size="small" label="Duration *" value={currentSchedule.duration} onChange={e => updateCurrentSchedule('duration', Number(e.target.value))} InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
-                      {[60, 90, 120, 150, 180].map(m => <MenuItem key={m} value={m}>{m} Minutes</MenuItem>)}
-                    </TextField>
-                    <TextField size="small" label="End Time" value={computeEndTime(currentSchedule.startTime, currentSchedule.duration) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
-                    <TextField select size="small" label="Subject *" value={currentSchedule.subjectId} onChange={e => updateCurrentSchedule('subjectId', e.target.value)}>
-                      <MenuItem value="" disabled>— Select Subject —</MenuItem>
-                      {availableSubjectsForSchedule
-                        .filter(s => !writtenExamSchedules.some(sch => sch.subjectId === s.id))
-                        .map(s => <MenuItem key={s.id} value={s.id}>{s.name} ({s.marks} marks)</MenuItem>)
-                      }
-                    </TextField>
+                {availableSubjectsForSchedule.length === 0 ? (
+                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
+                    No subjects found for the selected posts. Please check written exam subjects configuration.
                   </div>
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={commitCurrentSchedule}
-                      className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-800 transition-colors"
-                    >
-                      <Plus size={14} /> Add
-                    </button>
+                ) : (
+                  <div className="rounded-lg border border-slate-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 text-xs uppercase text-slate-500">
+                        <tr>
+                          <th className="w-10 px-4 py-3"></th>
+                          <th className="px-4 py-3 text-left">Subject</th>
+                          <th className="px-4 py-3 text-left">Date</th>
+                          <th className="px-4 py-3 text-left">Start Time</th>
+                          <th className="px-4 py-3 text-left">Duration</th>
+                          <th className="px-4 py-3 text-left">End Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {availableSubjectsForSchedule.map(subj => {
+                          const sch = subjectSchedules[subj.id] ?? { selected: false, date: '', startTime: '10:00', duration: 90 };
+                          const isSelected = !!sch.selected;
+                          return (
+                            <tr key={subj.id} className={isSelected ? 'bg-emerald-50/60' : 'hover:bg-slate-50'}>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={e => updateSubjectSchedule(subj.id, 'selected', e.target.checked)}
+                                  className="h-4 w-4 accent-emerald-700 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-slate-700'}`}>{subj.name}</p>
+                                <p className="text-xs text-slate-400">{subj.marks} marks</p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <TextField
+                                  size="small" type="date"
+                                  disabled={!isSelected}
+                                  value={sch.date}
+                                  onChange={e => updateSubjectSchedule(subj.id, 'date', e.target.value)}
+                                  InputLabelProps={{ shrink: true }}
+                                  error={isSelected && !sch.date}
+                                  sx={{ width: 150 }}
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <TextField
+                                  size="small" type="time"
+                                  disabled={!isSelected}
+                                  value={sch.startTime}
+                                  onChange={e => updateSubjectSchedule(subj.id, 'startTime', e.target.value)}
+                                  InputLabelProps={{ shrink: true }}
+                                  sx={{ width: 130 }}
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <TextField
+                                  select size="small"
+                                  disabled={!isSelected}
+                                  value={sch.duration}
+                                  onChange={e => updateSubjectSchedule(subj.id, 'duration', Number(e.target.value))}
+                                  InputProps={{ startAdornment: <Clock3 size={14} className="mr-1 text-slate-400" /> }}
+                                  sx={{ width: 140 }}
+                                >
+                                  {[60, 90, 120, 150, 180].map(m => <MenuItem key={m} value={m}>{m} min</MenuItem>)}
+                                </TextField>
+                              </td>
+                              <td className="px-4 py-3 text-slate-500 text-sm">
+                                {isSelected ? (computeEndTime(sch.startTime, sch.duration) || '—') : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-
-                {/* Added schedules table with pagination */}
-                {writtenExamSchedules.length > 0 && (() => {
-                  const PAGE_SIZE = 2;
-                  const totalPages = Math.ceil(writtenExamSchedules.length / PAGE_SIZE);
-                  const pageRows = writtenExamSchedules.slice(schedulesPage * PAGE_SIZE, (schedulesPage + 1) * PAGE_SIZE);
-                  return (
-                    <div className="rounded-lg border border-slate-200 overflow-hidden">
-                      <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-100 text-xs uppercase text-slate-500">
-                          <tr>
-                            <th className="px-4 py-2">#</th>
-                            <th className="px-4 py-2">Subject</th>
-                            <th className="px-4 py-2">Date</th>
-                            <th className="px-4 py-2">Start Time</th>
-                            <th className="px-4 py-2">Duration</th>
-                            <th className="px-4 py-2">End Time</th>
-                            <th className="px-4 py-2"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white">
-                          {pageRows.map((sch) => {
-                            const globalIdx = writtenExamSchedules.findIndex(s => s.id === sch.id);
-                            const subj = availableSubjectsForSchedule.find(s => s.id === sch.subjectId)
-                              || writtenExamSubjects.find(s => s.id === sch.subjectId);
-                            return (
-                              <tr key={sch.id} className="hover:bg-slate-50">
-                                <td className="px-4 py-2 text-slate-500">{globalIdx + 1}</td>
-                                <td className="px-4 py-2 font-medium text-slate-800">{subj?.name || sch.subjectId}</td>
-                                <td className="px-4 py-2 text-slate-600">{sch.date}</td>
-                                <td className="px-4 py-2 text-slate-600">{sch.startTime}</td>
-                                <td className="px-4 py-2 text-slate-600">{sch.duration} min</td>
-                                <td className="px-4 py-2 text-slate-600">{computeEndTime(sch.startTime, sch.duration)}</td>
-                                <td className="px-4 py-2 text-right">
-                                  <button type="button" onClick={() => removeWrittenSchedule(sch.id)} className="text-rose-500 hover:text-rose-700">
-                                    <X size={15} />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                      {totalPages > 1 && (
-                        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2">
-                          <span className="text-xs text-slate-500">
-                            {schedulesPage * PAGE_SIZE + 1}–{Math.min((schedulesPage + 1) * PAGE_SIZE, writtenExamSchedules.length)} of {writtenExamSchedules.length}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setSchedulesPage(p => Math.max(0, p - 1))}
-                              disabled={schedulesPage === 0}
-                              className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              <ChevronLeft size={14} />
-                            </button>
-                            {Array.from({ length: totalPages }, (_, i) => (
-                              <button
-                                key={i}
-                                type="button"
-                                onClick={() => setSchedulesPage(i)}
-                                className={`flex h-7 w-7 items-center justify-center rounded border text-xs font-medium transition-colors ${schedulesPage === i ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                              >
-                                {i + 1}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => setSchedulesPage(p => Math.min(totalPages - 1, p + 1))}
-                              disabled={schedulesPage >= totalPages - 1}
-                              className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              <ChevronRight size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
