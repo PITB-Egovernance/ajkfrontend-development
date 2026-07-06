@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TextField, MenuItem } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import { TextField } from '@mui/material';
 import { ArrowLeft, Save, Hash, Building2, Calendar, Clock } from 'lucide-react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -162,20 +163,23 @@ const RollSlipEditor = () => {
             helperText="e.g. AJK-001001" />
 
           <h2 className="font-semibold text-slate-800 mt-4 mb-1 flex items-center gap-2"><Building2 size={16} /> Centre Allocation</h2>
-          <TextField select fullWidth required label="Exam Center" margin="normal" size="small"
-            name="exam_center_id" value={formData.exam_center_id} onChange={handleFormChange}>
-            <MenuItem key="none" value="">— Select center —</MenuItem>
-            {centers.map((c) => {
-              // Prefer numeric id (works with current backend validation);
-              // fall back to hash_id once the backend decodes hash ids too.
-              const value = c.id != null ? String(c.id) : c.hash_id;
-              return (
-                <MenuItem key={value} value={value}>
-                  {c.name} {c.city ? `(${c.city})` : ''}
-                </MenuItem>
-              );
-            })}
-          </TextField>
+          <div style={{ marginTop: 16 }}>
+            <SearchableSelect
+              required
+              label="Exam Center"
+              name="exam_center_id"
+              value={formData.exam_center_id}
+              onChange={handleFormChange}
+              options={[
+                { value: '', label: '— Select center —' },
+                ...centers.map((c) => {
+                  const value = c.id != null ? String(c.id) : c.hash_id;
+                  return { value, label: `${c.name}${c.city ? ` (${c.city})` : ''}` };
+                }),
+              ]}
+              placeholder="— Select center —"
+            />
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <TextField fullWidth label="Seat Number (optional)" margin="normal" size="small"

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useGridApiRef } from '@mui/x-data-grid';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
-import { IconButton, Menu, MenuItem, TextField, MenuItem as SelectItem } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import { IconButton, Menu, MenuItem, TextField } from '@mui/material';
 import { Eye, CheckCircle, XCircle, MoreVertical, RefreshCw, FilterX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from 'components/ui/Loader';
@@ -488,43 +489,81 @@ const ApplicationsList = () => {
               value={filters.search} onChange={handleFilterChange} sx={{ flex: '1 1 160px', minWidth: 140 }} />
             <TextField label="Ref ID" variant="outlined" size="small" name="ref_id"
               value={filters.ref_id} onChange={handleFilterChange} sx={{ width: 110 }} />
-            <TextField select label="Job Advertisement" variant="outlined" size="small" name="job_id"
-              value={filters.job_id} onChange={handleFilterChange} sx={{ flex: '1 1 140px', minWidth: 130 }}>
-              <SelectItem value="">All Jobs</SelectItem>
-              {jobs.map(job => (
-                <SelectItem key={job.advertisement_no} value={job.advertisement_no}>{job.title}</SelectItem>
-              ))}
-            </TextField>
+            <div style={{ flex: '1 1 140px', minWidth: 130 }}>
+              <SearchableSelect
+                name="job_id"
+                label="Job Advertisement"
+                value={filters.job_id}
+                onChange={handleFilterChange}
+                options={[
+                  { value: '', label: 'All Jobs' },
+                  ...jobs.map(job => ({ value: job.advertisement_no, label: job.title })),
+                ]}
+                placeholder="All Jobs"
+              />
+            </div>
             <TextField label="Advertisement No" variant="outlined" size="small" name="advertisement_no"
               value={filters.advertisement_no} onChange={handleFilterChange} sx={{ width: 140 }} />
-            <TextField select label="Status" variant="outlined" size="small" name="status"
-              value={filters.status} onChange={handleFilterChange} sx={{ width: 130 }}>
-              <SelectItem value="">All Statuses</SelectItem>
-              <SelectItem value={UNREVIEWED_SENTINEL}>Unreviewed</SelectItem>
-              <SelectItem value="Shortlisted">Shortlisted</SelectItem>
-              <SelectItem value="Interview">Interview</SelectItem>
-              <SelectItem value="Rejected">Rejected</SelectItem>
-            </TextField>
-            <TextField select label="Payment Status" variant="outlined" size="small" name="payment_status"
-              value={filters.payment_status} onChange={handleFilterChange} sx={{ width: 135 }}>
-              <SelectItem value="">All Payments</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="unpaid">Unpaid</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-            </TextField>
-            <TextField select label="OCR Verification" variant="outlined" size="small" name="ocr_batch"
-              value={filters.ocr_batch} onChange={handleFilterChange} sx={{ width: 145 }}>
-              <SelectItem value="">All Batches</SelectItem>
-              <SelectItem value="green">OCR Verified</SelectItem>
-              <SelectItem value="yellow">Partially Verified</SelectItem>
-              <SelectItem value="red">Not Verified</SelectItem>
-            </TextField>
-            <TextField select label="Disability" variant="outlined" size="small" name="disability"
-              value={filters.disability} onChange={handleFilterChange} sx={{ width: 125 }}>
-              <SelectItem value="">All</SelectItem>
-              <SelectItem value="yes">Disabled</SelectItem>
-              <SelectItem value="no">Not Disabled</SelectItem>
-            </TextField>
+            <div style={{ width: 130 }}>
+              <SearchableSelect
+                name="status"
+                label="Status"
+                value={filters.status}
+                onChange={handleFilterChange}
+                options={[
+                  { value: '', label: 'All Statuses' },
+                  { value: UNREVIEWED_SENTINEL, label: 'Unreviewed' },
+                  { value: 'Shortlisted', label: 'Shortlisted' },
+                  { value: 'Interview', label: 'Interview' },
+                  { value: 'Rejected', label: 'Rejected' },
+                ]}
+                placeholder="All Statuses"
+              />
+            </div>
+            <div style={{ width: 135 }}>
+              <SearchableSelect
+                name="payment_status"
+                label="Payment Status"
+                value={filters.payment_status}
+                onChange={handleFilterChange}
+                options={[
+                  { value: '', label: 'All Payments' },
+                  { value: 'paid', label: 'Paid' },
+                  { value: 'unpaid', label: 'Unpaid' },
+                  { value: 'pending', label: 'Pending' },
+                ]}
+                placeholder="All Payments"
+              />
+            </div>
+            <div style={{ width: 145 }}>
+              <SearchableSelect
+                name="ocr_batch"
+                label="OCR Verification"
+                value={filters.ocr_batch}
+                onChange={handleFilterChange}
+                options={[
+                  { value: '', label: 'All Batches' },
+                  { value: 'green', label: 'OCR Verified' },
+                  { value: 'yellow', label: 'Partially Verified' },
+                  { value: 'red', label: 'Not Verified' },
+                ]}
+                placeholder="All Batches"
+              />
+            </div>
+            <div style={{ width: 125 }}>
+              <SearchableSelect
+                name="disability"
+                label="Disability"
+                value={filters.disability}
+                onChange={handleFilterChange}
+                options={[
+                  { value: '', label: 'All' },
+                  { value: 'yes', label: 'Disabled' },
+                  { value: 'no', label: 'Not Disabled' },
+                ]}
+                placeholder="All"
+              />
+            </div>
             <TextField type="date" label="Applied At (From)" InputLabelProps={{ shrink: true }}
               variant="outlined" size="small" name="start_date"
               value={filters.start_date} onChange={handleFilterChange} sx={{ width: 170 }} />

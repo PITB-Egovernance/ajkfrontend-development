@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogActions,
   Switch,
-  Checkbox,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, FileText, Trash2, CheckCircle, XCircle } from "lucide-react";
@@ -20,6 +19,7 @@ import confirmDelete from "components/ui/ConfirmDelete";
 import confirmStatus from "components/ui/confirmStatus";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import SearchableMultiSelect from "components/ui/SearchableMultiSelect";
 import { hasPermission } from "utils/permissions";
 import WrittenExamSubjectApi from "api/writtenExamSubjectApi";
 
@@ -522,43 +522,25 @@ const WrittenExamSubjectsManagement = () => {
               placeholder="e.g. General Knowledge"
             />
 
-            {/* Multi-select designation dropdown — checkboxes inside the menu. */}
-            <TextField
-              select
-              fullWidth
-              label="Designations"
-              margin="normal"
-              size="small"
-              value={formData.designation_ids}
-              onChange={(e) => {
-                const value = typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value;
-                setFormData((f) => ({ ...f, designation_ids: value }));
-                if (value.length) setFormErrors((errs) => ({ ...errs, designation_ids: undefined }));
-              }}
-              SelectProps={{
-                multiple: true,
-                renderValue: (selected) =>
-                  selected
-                    .map((did) => designationOptions.find((d) => String(d.id) === String(did))?.name || did)
-                    .join(", "),
-              }}
-              error={!!formErrors.designation_ids}
-              helperText={formErrors.designation_ids || "Select one or more designations — a record is created for each"}
-            >
-              {designationOptions.length === 0 && (
-                <MenuItem disabled>No active designations found</MenuItem>
-              )}
-              {designationOptions.map((d) => (
-                <MenuItem key={d.id} value={d.id}>
-                  <Checkbox
-                    size="small"
-                    checked={formData.designation_ids.includes(d.id)}
-                    sx={{ color: "#064e3b", "&.Mui-checked": { color: "#064e3b" }, py: 0, mr: 1 }}
-                  />
-                  {d.name}
-                </MenuItem>
-              ))}
-            </TextField>
+            <div style={{ marginTop: 16 }}>
+              <SearchableMultiSelect
+                label="Designations"
+                required
+                value={formData.designation_ids}
+                onChange={(vals) => {
+                  setFormData((f) => ({ ...f, designation_ids: vals }));
+                  if (vals.length) setFormErrors((errs) => ({ ...errs, designation_ids: undefined }));
+                }}
+                options={
+                  designationOptions.length === 0
+                    ? []
+                    : designationOptions.map((d) => ({ value: d.id, label: d.name }))
+                }
+                placeholder="Select designations..."
+                error={formErrors.designation_ids}
+                hint="Select one or more designations — a record is created for each"
+              />
+            </div>
 
             <TextField
               fullWidth

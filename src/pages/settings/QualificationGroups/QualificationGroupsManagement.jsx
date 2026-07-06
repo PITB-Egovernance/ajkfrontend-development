@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import {
-  TextField, IconButton, MenuItem, Dialog, DialogTitle,
-  DialogContent, DialogActions, Switch, Checkbox,
-  FormControlLabel, Divider, Chip,
+  TextField, IconButton, Dialog, DialogTitle,
+  DialogContent, DialogActions, Checkbox,
+  FormControlLabel, Chip,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, Trash2, Layers } from 'lucide-react';
@@ -308,15 +309,19 @@ const QualificationGroupsManagement = () => {
               placeholder="e.g. Bachelor's Group" />
 
             {/* Qualification Select */}
-            <TextField select fullWidth label="Qualification" margin="normal" size="small"
-              value={form.qualification_id}
-              onChange={(e) => setForm((f) => ({ ...f, qualification_id: e.target.value, degree_ids: [] }))}
-              helperText="Select a qualification — degrees will appear below">
-              <MenuItem value="">— Select Qualification —</MenuItem>
-              {qualifications.map((q) => (
-                <MenuItem key={q.id} value={q.id}>{q.name}</MenuItem>
-              ))}
-            </TextField>
+            <div style={{ marginTop: 16 }}>
+              <SearchableSelect
+                label="Qualification"
+                value={form.qualification_id}
+                onChange={(e) => setForm((f) => ({ ...f, qualification_id: e.target.value, degree_ids: [] }))}
+                options={[
+                  { value: '', label: '— Select Qualification —' },
+                  ...qualifications.map((q) => ({ value: q.id, label: q.name })),
+                ]}
+                placeholder="— Select Qualification —"
+                hint="Select a qualification — degrees will appear below"
+              />
+            </div>
 
             {/* Degree checkboxes */}
             {form.qualification_id && (

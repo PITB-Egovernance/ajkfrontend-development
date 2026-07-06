@@ -11,6 +11,7 @@ import {
   DialogActions,
   Switch,
 } from "@mui/material";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, MapPin, Trash2, CheckCircle, XCircle, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -410,20 +411,15 @@ const CitiesManagement = () => {
               onChange={(e) => setFormData((f) => ({ ...f, city_name: e.target.value }))}
               placeholder="e.g. Muzaffarabad"
             />
-            <TextField
-              select fullWidth label="District" margin="normal" size="small"
+            <SearchableSelect
+              label="District"
               value={formData.district_id}
               onChange={(e) => setFormData((f) => ({ ...f, district_id: e.target.value }))}
+              options={districts.map((d) => ({ value: d.hash_id || d.id, label: d.name }))}
+              placeholder="— Select District —"
               disabled={loadingDistricts}
-              helperText={loadingDistricts ? "Loading districts…" : "Link this city to a district"}
-            >
-              <MenuItem value="">— Select District —</MenuItem>
-              {districts.map((d) => (
-                <MenuItem key={d.hash_id || d.id} value={d.hash_id || d.id}>
-                  {d.name}
-                </MenuItem>
-              ))}
-            </TextField>
+              hint={loadingDistricts ? "Loading districts…" : "Link this city to a district"}
+            />
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button type="button" onClick={() => setOpenModal(false)} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">Cancel</button>

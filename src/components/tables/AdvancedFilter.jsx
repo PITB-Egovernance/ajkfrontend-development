@@ -4,6 +4,7 @@ import {
   Button,
   Chip
 } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import {
   Filter,
   X
@@ -66,26 +67,15 @@ const AdvancedFilter = ({
 
             case 'select':
               return (
-                <TextField
+                <SearchableSelect
                   key={config.name}
-                  select
                   label={config.label}
-                  variant="outlined"
-                  size="small"
                   name={config.name}
                   value={filters[config.name] || ''}
                   onChange={(e) => handleFilterChange(config.name, e.target.value)}
-                  fullWidth
-                  SelectProps={{ native: true }}
-                  InputLabelProps={{ shrink: true }}
-                >
-                  <option value="">All {config.label}</option>
-                  {config.options?.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </TextField>
+                  options={config.options || []}
+                  placeholder={`All ${config.label}`}
+                />
               );
 
             case 'date':

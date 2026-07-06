@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
+import {
+  X,
   Calculator,
   Save,
   Calendar,
@@ -9,6 +9,7 @@ import {
   Edit3
 } from 'lucide-react';
 import Button from 'components/ui/Button';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -190,16 +191,18 @@ const MarkEntryModal = ({ isOpen, onClose, candidate, jobId, onSuccess }) => {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <Building size={14} className="text-indigo-500" /> Exam Center
                 </label>
-                <select 
-                  className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl text-sm font-bold transition-all outline-none appearance-none"
-                  value={formData.exam_center}
-                  onChange={e => setFormData(prev => ({ ...prev, exam_center: e.target.value }))}
-                >
-                  <option value="">Select Center...</option>
-                  <option value="Muzaffarabad">Muzaffarabad Main Center</option>
-                  <option value="Mirpur">Mirpur District Center</option>
-                  <option value="Rawalakot">Rawalakot Center</option>
-                </select>
+                <div className="w-full">
+                  <SearchableSelect
+                    value={formData.exam_center}
+                    onChange={e => setFormData(prev => ({ ...prev, exam_center: e.target.value }))}
+                    options={[
+                      { value: 'Muzaffarabad', label: 'Muzaffarabad Main Center' },
+                      { value: 'Mirpur', label: 'Mirpur District Center' },
+                      { value: 'Rawalakot', label: 'Rawalakot Center' },
+                    ]}
+                    placeholder="Select Center..."
+                  />
+                </div>
               </div>
             </div>
 

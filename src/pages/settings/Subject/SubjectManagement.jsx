@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField,
@@ -605,29 +606,23 @@ const SubjectManagement = () => {
             </div>
 
             {formData.subject_type === "optional" && (
-              <TextField
-                select
-                fullWidth
+              <SearchableSelect
                 label="Group"
-                margin="normal"
-                size="small"
                 value={formData.subject_group}
                 onChange={(e) => {
                   setFormData((f) => ({ ...f, subject_group: e.target.value }));
                   if (e.target.value) setFormErrors((errs) => ({ ...errs, subject_group: undefined }));
                 }}
-                error={!!formErrors.subject_group}
-                helperText={formErrors.subject_group || "Select the subject group"}
-              >
-                <MenuItem value="">— Select Group —</MenuItem>
-                {/* Preserve a previously-saved group that is no longer active. */}
-                {formData.subject_group && !groups.includes(formData.subject_group) && (
-                  <MenuItem value={formData.subject_group}>{formData.subject_group}</MenuItem>
-                )}
-                {groups.map((g) => (
-                  <MenuItem key={g} value={g}>{g}</MenuItem>
-                ))}
-              </TextField>
+                options={[
+                  ...(formData.subject_group && !groups.includes(formData.subject_group)
+                    ? [{ value: formData.subject_group, label: formData.subject_group }]
+                    : []),
+                  ...groups.map((g) => ({ value: g, label: g })),
+                ]}
+                placeholder="— Select Group —"
+                error={formErrors.subject_group}
+                hint={formErrors.subject_group ? undefined : "Select the subject group"}
+              />
             )}
 
           </DialogContent>

@@ -1,13 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import SearchableMultiSelect from 'components/ui/SearchableMultiSelect';
 import {
   TextField,
-  MenuItem,
-  Autocomplete,
-  Checkbox,
-  ListItemText,
-  Chip,
-  Box,
   InputAdornment,
   IconButton,
 } from '@mui/material';
@@ -595,7 +591,7 @@ const EmployeeRegistrationForm = ({
   ]);
 
   const fieldSx = {
-    '& .MuiOutlinedInput-input': { padding: '8.5px 14px' },
+    '& .MuiOutlinedInput-input': { padding: '' },
   };
 
   const handleSubmit = async (e) => {
@@ -720,6 +716,7 @@ const EmployeeRegistrationForm = ({
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
+                    size="small"
                     label="Username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -733,6 +730,7 @@ const EmployeeRegistrationForm = ({
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
+                    size="small"
                     label="CNIC"
                     placeholder="13 digits e.g. 3740512345671"
                     value={cnic}
@@ -757,6 +755,7 @@ const EmployeeRegistrationForm = ({
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
+                    size="small"
                     label="Email Address"
                     type="email"
                     value={email}
@@ -771,6 +770,7 @@ const EmployeeRegistrationForm = ({
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
+                    size="small"
                     label="Father/Husband Name"
                     value={fatherHusbandName}
                     onChange={(e) => setFatherHusbandName(e.target.value)}
@@ -787,6 +787,7 @@ const EmployeeRegistrationForm = ({
                   <div style={{ position: 'relative' }}>
                     <TextField
                       fullWidth
+                      size="small"
                       label="Date of Birth"
                       placeholder="dd mm yyyy"
                       value={dobInput}
@@ -873,27 +874,15 @@ const EmployeeRegistrationForm = ({
                 </div>
 
                 <div className="col-md-6 form-group">
-                  <TextField
-                    select
-                    fullWidth
+                  <SearchableSelect
                     label="Gender"
                     value={gender}
                     onChange={(e) => setGender(e.target.value)}
                     required
-                    sx={fieldSx}
-                    error={!!fieldErrors?.gender}
-                    helperText={fieldErrors?.gender?.join(', ')}
-                  >
-                    <MenuItem value="">
-                      <em>— Select Gender —</em>
-                    </MenuItem>
-
-                    {GENDER_OPTIONS.map((g) => (
-                      <MenuItem key={g} value={g}>
-                        {g}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    options={GENDER_OPTIONS.map((g) => ({ value: g, label: g }))}
+                    placeholder="— Select Gender —"
+                    error={fieldErrors?.gender?.join(', ')}
+                  />
                 </div>
               </div>
 
@@ -901,6 +890,7 @@ const EmployeeRegistrationForm = ({
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
+                    size="small"
                     label="Mobile Number"
                     placeholder="11 digits e.g. 03001234567"
                     value={mobile}
@@ -922,71 +912,38 @@ const EmployeeRegistrationForm = ({
                 </div>
 
                 <div className="col-md-6 form-group">
-                  <Autocomplete
-                    options={districtOptions}
-                    getOptionLabel={(option) => option.name || ''}
-                    isOptionEqualToValue={(option, value) =>
-                      option?.id === value?.id
-                    }
-                    value={district}
-                    onChange={(_, newValue) => setDistrict(newValue)}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Domicile District"
-                        required
-                        sx={fieldSx}
-                        error={!!fieldErrors?.domicile_district}
-                        helperText={fieldErrors?.domicile_district?.join(', ')}
-                      />
-                    )}
+                  <SearchableSelect
+                    required
+                    label="Domicile District"
+                    value={district?.id || ''}
+                    onChange={(e) => setDistrict(districtOptions.find((d) => d.id === e.target.value) || null)}
+                    options={districtOptions.map((d) => ({ value: d.id, label: d.name }))}
+                    placeholder="— Select District —"
+                    error={fieldErrors?.domicile_district?.join(', ')}
                   />
                 </div>
               </div>
 
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <Autocomplete
-                    options={designationOptions}
-                    getOptionLabel={(o) =>
-                      o.wingName ? `${o.name} — ${o.wingName}` : o.name || ''
-                    }
-                    isOptionEqualToValue={(o, v) => o?.id === v?.id}
-                    value={designation}
-                    onChange={(_, v) => setDesignation(v)}
-                    renderOption={(props, option) => (
-                      <li {...props} key={option.id}>
-                        <span>{option.name}</span>
-
-                        {option.wingName && (
-                          <span
-                            style={{
-                              marginLeft: 8,
-                              color: '#64748b',
-                              fontSize: '0.85em',
-                            }}
-                          >
-                            — {option.wingName}
-                          </span>
-                        )}
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Designation"
-                        required
-                        sx={fieldSx}
-                        error={!!fieldErrors?.designation}
-                        helperText={fieldErrors?.designation?.join(', ')}
-                      />
-                    )}
+                  <SearchableSelect
+                    required
+                    label="Designation"
+                    value={designation?.id || ''}
+                    onChange={(e) => setDesignation(designationOptions.find((d) => d.id === e.target.value) || null)}
+                    options={designationOptions.map((o) => ({
+                      value: o.id,
+                      label: o.wingName ? `${o.name} — ${o.wingName}` : o.name,
+                    }))}
+                    placeholder="— Select Designation —"
+                    error={fieldErrors?.designation?.join(', ')}
                   />
                 </div>
 
                 <div className="col-md-6 form-group">
                   <TextField
                     fullWidth
+                    size="small"
                     label="Grade"
                     value={designation?.gradeName || ''}
                     InputProps={{ readOnly: true }}
@@ -1005,139 +962,15 @@ const EmployeeRegistrationForm = ({
 
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <TextField
-                    fullWidth
-                    required
-                    select
+                  <SearchableMultiSelect
                     label="Wing"
+                    required
                     value={selectedWings}
-                    error={!!fieldErrors?.wing}
-                    helperText={fieldErrors?.wing?.join(', ')}
-                    SelectProps={{
-                      multiple: true,
-                      onChange: () => {},
-                      renderValue: (selected) => {
-                        if (!selected || selected.length === 0) return '';
-
-                        return (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {selected.map((id) => {
-                              const opt = wingOptions.find((w) => w.id === id);
-
-                              return (
-                                <Chip
-                                  key={id}
-                                  label={opt?.name || id}
-                                  size="small"
-                                  sx={{
-                                    backgroundColor: '#ecfdf5',
-                                    color: '#065f46',
-                                    fontWeight: 500,
-                                  }}
-                                />
-                              );
-                            })}
-                          </Box>
-                        );
-                      },
-                      MenuProps: {
-                        PaperProps: {
-                          sx: {
-                            maxHeight: 380,
-                          },
-                        },
-                      },
-                    }}
-                    sx={{
-                      ...fieldSx,
-                      '& .MuiOutlinedInput-root': {
-                        minHeight: 64,
-                        height: 'auto',
-                      },
-                    }}
-                  >
-                    <MenuItem
-                      dense
-                      onClick={(e) => {
-                        e.preventDefault();
-
-                        const allIds = wingOptions.map((w) => w.id);
-                        const allSelected =
-                          allIds.length > 0 &&
-                          allIds.every((id) => selectedWings.includes(id));
-
-                        setSelectedWings(allSelected ? [] : allIds);
-                      }}
-                      sx={{
-                        borderBottom: '1px solid #e2e8f0',
-                      }}
-                    >
-                      <Checkbox
-                        size="small"
-                        checked={
-                          wingOptions.length > 0 &&
-                          wingOptions.every((w) => selectedWings.includes(w.id))
-                        }
-                        indeterminate={
-                          wingOptions.some((w) => selectedWings.includes(w.id)) &&
-                          !wingOptions.every((w) => selectedWings.includes(w.id))
-                        }
-                        sx={{
-                          p: 0.5,
-                          color: '#10b981',
-                          '&.Mui-checked': {
-                            color: '#059669',
-                          },
-                          '&.MuiCheckbox-indeterminate': {
-                            color: '#059669',
-                          },
-                        }}
-                      />
-
-                      <ListItemText
-                        primary="Select All"
-                        primaryTypographyProps={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                        }}
-                      />
-                    </MenuItem>
-
-                    {wingOptions.map((w) => (
-                      <MenuItem
-                        key={w.id}
-                        dense
-                        onClick={(e) => {
-                          e.preventDefault();
-
-                          setSelectedWings((prev) =>
-                            prev.includes(w.id)
-                              ? prev.filter((id) => id !== w.id)
-                              : [...prev, w.id]
-                          );
-                        }}
-                      >
-                        <Checkbox
-                          size="small"
-                          checked={selectedWings.includes(w.id)}
-                          sx={{
-                            p: 0.5,
-                            color: '#10b981',
-                            '&.Mui-checked': {
-                              color: '#059669',
-                            },
-                          }}
-                        />
-
-                        <ListItemText
-                          primary={w.name}
-                          primaryTypographyProps={{
-                            fontSize: 13,
-                          }}
-                        />
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    onChange={(vals) => setSelectedWings(vals)}
+                    options={wingOptions.map((w) => ({ value: w.id, label: w.name }))}
+                    placeholder="Select wings..."
+                    error={fieldErrors?.wing?.join(', ')}
+                  />
                 </div>
               </div>
             </div>
@@ -1184,32 +1017,19 @@ const EmployeeRegistrationForm = ({
               {rolePermTab === 'roles' && (
                 <div className="row">
                   <div className="col-md-6 form-group">
-                    <Autocomplete
-                      options={roleOptions}
-                      getOptionLabel={(o) => o.name || ''}
-                      isOptionEqualToValue={(o, v) => o?.id === v?.id}
-                      value={selectedRole}
-                      onChange={(_, v) => {
-                        setSelectedRole(v);
-
-                        setPermissions(
-                          v
-                            ? buildPerms(v.rawPermissions)
-                            : buildEmptyPermissionsFrom(PERMISSION_MODULES)
-                        );
-
-                        if (v) setRolePermTab('permissions');
+                    <SearchableSelect
+                      required
+                      label="Role"
+                      value={selectedRole?.id || ''}
+                      onChange={(e) => {
+                        const opt = roleOptions.find((r) => r.id === e.target.value) || null;
+                        setSelectedRole(opt);
+                        setPermissions(opt ? buildPerms(opt.rawPermissions) : buildEmptyPermissionsFrom(PERMISSION_MODULES));
+                        if (opt) setRolePermTab('permissions');
                       }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Role"
-                          required
-                          sx={fieldSx}
-                          error={!!fieldErrors?.role}
-                          helperText={fieldErrors?.role?.join(', ')}
-                        />
-                      )}
+                      options={roleOptions.map((r) => ({ value: r.id, label: r.name }))}
+                      placeholder="— Select Role —"
+                      error={fieldErrors?.role?.join(', ')}
                     />
                   </div>
                 </div>

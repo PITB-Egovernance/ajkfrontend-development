@@ -1,3 +1,5 @@
+import SearchableSelect from 'components/ui/SearchableSelect';
+
 export default function Step4({ data, change, errors }) {
   const testCenters = [
     "Islamabad", "Lahore", "Karachi", "Peshawar", "Quetta",
@@ -44,17 +46,17 @@ export default function Step4({ data, change, errors }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
-        <select
+        <SearchableSelect
+          label="Payment Status"
           name="payment_status"
           value={data.payment_status}
           onChange={change}
-          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
-          <option value="active">Active</option>
-          <option value="pending">Pending</option>
-          <option value="inactive">Inactive</option>
-        </select>
+          options={[
+            { value: 'active', label: 'Active' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'inactive', label: 'Inactive' },
+          ]}
+        />
       </div>
 
       <div className="md:col-span-2">

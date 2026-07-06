@@ -11,6 +11,7 @@ import {
   DialogActions,
   Switch,
 } from "@mui/material";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
 import { Plus, ArrowLeft, MoreVertical } from "lucide-react";
@@ -455,25 +456,24 @@ const CompaniesManagement = () => {
                 setFormData({ ...formData, name: e.target.value })
               }
             />
-            <TextField
-              select
-              fullWidth
+            <SearchableSelect
               label="Company Type"
-              margin="normal"
               value={formData.company_type}
               onChange={(e) =>
                 setFormData({ ...formData, company_type: e.target.value })
               }
-            >
-              <MenuItem value="Government">Government</MenuItem>
-              <MenuItem value="Construction">Construction</MenuItem>
-              <MenuItem value="IT Services">IT Services</MenuItem>
-              <MenuItem value="Consulting">Consulting</MenuItem>
-              <MenuItem value="Engineering">Engineering</MenuItem>
-              <MenuItem value="Supply & Services">Supply &amp; Services</MenuItem>
-              <MenuItem value="Maintenance">Maintenance</MenuItem>
-              <MenuItem value="Other">Other</MenuItem>
-            </TextField>
+              options={[
+                { value: "Government", label: "Government" },
+                { value: "Construction", label: "Construction" },
+                { value: "IT Services", label: "IT Services" },
+                { value: "Consulting", label: "Consulting" },
+                { value: "Engineering", label: "Engineering" },
+                { value: "Supply & Services", label: "Supply & Services" },
+                { value: "Maintenance", label: "Maintenance" },
+                { value: "Other", label: "Other" },
+              ]}
+              placeholder="Select Company Type"
+            />
             <TextField
               fullWidth
               label="Contact Person"

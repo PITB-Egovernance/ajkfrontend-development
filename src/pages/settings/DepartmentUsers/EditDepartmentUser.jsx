@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  Autocomplete,
-  TextField,
-} from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import { TextField } from '@mui/material';
 import { Building2, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -249,25 +247,17 @@ const CreateDepartmentUser = () => {
             <div className="mb-8 p-6 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full">
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <Autocomplete
-                    options={departmentOptions}
-                    getOptionLabel={(option) => option?.name || ''}
-                    isOptionEqualToValue={(option, value) => option?.id === value?.id}
-                    value={selectedDepartment}
-                    onChange={(_, value) => {
-                      setSelectedDepartment(value);
+                  <SearchableSelect
+                    required
+                    label="Department"
+                    value={selectedDepartment?.id || ''}
+                    onChange={(e) => {
+                      setSelectedDepartment(departmentOptions.find((d) => d.id === e.target.value) || null);
                       setFieldErrors((prev) => ({ ...prev, department: null }));
                     }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Department"
-                        required
-                        sx={fieldSx}
-                        error={!!fieldErrors?.department}
-                        helperText={fieldErrors?.department?.join(', ')}
-                      />
-                    )}
+                    options={departmentOptions.map((d) => ({ value: d.id, label: d.name }))}
+                    placeholder="— Select Department —"
+                    error={fieldErrors?.department?.join(', ')}
                   />
                 </div>
 

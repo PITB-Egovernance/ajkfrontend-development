@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { 
-  Send, 
-  X, 
-  CheckCircle2, 
-  AlertCircle, 
-  FileText, 
+import {
+  Send,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
   ShieldCheck,
   BellRing
 } from 'lucide-react';
 import Button from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -84,15 +85,15 @@ const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
             <div className="space-y-6">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Publication Type</label>
-                <select
+                <SearchableSelect
                   value={pubType}
                   onChange={(e) => setPubType(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border-2 border-slate-100 focus:border-indigo-500 rounded-2xl text-sm font-bold transition-all outline-none appearance-none"
-                >
-                  <option value="final_merit">Official Final Merit List</option>
-                  <option value="written_test">Written Examination Result</option>
-                  <option value="interview">Interview/Viva Voce Result</option>
-                </select>
+                  options={[
+                    { value: 'final_merit', label: 'Official Final Merit List' },
+                    { value: 'written_test', label: 'Written Examination Result' },
+                    { value: 'interview', label: 'Interview/Viva Voce Result' },
+                  ]}
+                />
               </div>
 
               <div>

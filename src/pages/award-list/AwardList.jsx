@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent,
-  DialogTitle, TextField, MenuItem, Typography, CircularProgress,
+  DialogTitle, TextField, Typography, CircularProgress,
   InputAdornment, IconButton, Tooltip,
 } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { DataGrid } from '@mui/x-data-grid';
 import { Plus, Search, X, RefreshCw, ExternalLink, Download, Edit2 } from 'lucide-react';
 import Config from 'config/baseUrl';
@@ -311,22 +312,20 @@ export default function AwardList() {
           {formError && (
             <Typography color="error" variant="body2">{formError}</Typography>
           )}
-          <TextField
-            select
+          <SearchableSelect
             label="Advertisement"
             value={form.advertisement_id}
             onChange={(e) => setForm((f) => ({ ...f, advertisement_id: e.target.value }))}
             required
-            fullWidth
-            size="small"
-          >
-            <MenuItem value="">— Select Advertisement —</MenuItem>
-            {ads.map((ad, i) => (
-              <MenuItem key={ad.hash_id} value={ad.hash_id}>
-                {ad.adv_number ? `Adv #${ad.adv_number}` : `Advertisement #${i + 1}`}
-              </MenuItem>
-            ))}
-          </TextField>
+            options={[
+              { value: '', label: '— Select Advertisement —' },
+              ...ads.map((ad, i) => ({
+                value: ad.hash_id,
+                label: ad.adv_number ? `Adv #${ad.adv_number}` : `Advertisement #${i + 1}`,
+              })),
+            ]}
+            placeholder="— Select Advertisement —"
+          />
           <TextField
             label="Post Title"
             value={form.post_title}

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, MenuItem, Autocomplete, CircularProgress,
+  TextField, MenuItem, CircularProgress,
   Checkbox, ListItemText, Chip, Box,
 } from '@mui/material';
 import { Pencil, X } from 'lucide-react';
@@ -184,20 +185,46 @@ const DepartmentUserDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
               <TextField fullWidth label="Email" type="email" value={form.email} onChange={handleChange('email')} sx={fieldSx} />
               <TextField fullWidth label="Father/Husband Name" value={form.father_husband_name} onChange={handleChange('father_husband_name')} sx={fieldSx} />
               <TextField fullWidth label="Date of Birth" type="date" value={form.date_of_birth} onChange={handleChange('date_of_birth')} InputLabelProps={{ shrink: true }} sx={fieldSx} />
-              <TextField select fullWidth label="Gender" value={form.gender} onChange={handleChange('gender')} sx={fieldSx}>
-                <MenuItem value=""><em>— Select —</em></MenuItem>
-                {GENDER_OPTIONS.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
-              </TextField>
+              <SearchableSelect
+                label="Gender"
+                value={form.gender}
+                onChange={handleChange('gender')}
+                options={[
+                  { value: '', label: '— Select —' },
+                  ...GENDER_OPTIONS.map((g) => ({ value: g, label: g })),
+                ]}
+                placeholder="— Select —"
+              />
               <TextField fullWidth label="Mobile" value={form.mobile} onChange={handleChange('mobile')} sx={fieldSx} />
-              <Autocomplete options={districtOptions} getOptionLabel={(o) => o.name || ''} isOptionEqualToValue={(o, v) => o.id === v.id}
-                value={selectedDistrict} onChange={(_, v) => { setSelectedDistrict(v); setForm((p) => ({ ...p, domicile: v?.name || '' })); }}
-                renderInput={(params) => <TextField {...params} label="Domicile" sx={fieldSx} />} />
-              <Autocomplete options={departmentOptions} getOptionLabel={(o) => o.name || ''} isOptionEqualToValue={(o, v) => o.id === v.id}
-                value={selectedDepartment} onChange={(_, v) => { setSelectedDepartment(v); setForm((p) => ({ ...p, department: v?.name || '' })); }}
-                renderInput={(params) => <TextField {...params} label="Department" sx={fieldSx} />} />
-              <TextField select fullWidth label="Status" value={form.status} onChange={handleChange('status')} sx={fieldSx}>
-                {STATUS_OPTIONS.map((o) => <MenuItem key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</MenuItem>)}
-              </TextField>
+              <SearchableSelect
+                label="Domicile"
+                value={selectedDistrict?.id || ''}
+                onChange={(e) => {
+                  const opt = districtOptions.find((d) => d.id === e.target.value);
+                  setSelectedDistrict(opt || null);
+                  setForm((p) => ({ ...p, domicile: opt?.name || '' }));
+                }}
+                options={districtOptions.map((d) => ({ value: d.id, label: d.name }))}
+                placeholder="— Select District —"
+              />
+              <SearchableSelect
+                label="Department"
+                value={selectedDepartment?.id || ''}
+                onChange={(e) => {
+                  const opt = departmentOptions.find((d) => d.id === e.target.value);
+                  setSelectedDepartment(opt || null);
+                  setForm((p) => ({ ...p, department: opt?.name || '' }));
+                }}
+                options={departmentOptions.map((d) => ({ value: d.id, label: d.name }))}
+                placeholder="— Select Department —"
+              />
+              <SearchableSelect
+                label="Status"
+                value={form.status}
+                onChange={handleChange('status')}
+                options={STATUS_OPTIONS.map((o) => ({ value: o, label: o.charAt(0).toUpperCase() + o.slice(1) }))}
+                placeholder="— Select Status —"
+              />
 
               {/* Role */}
               <TextField fullWidth select label="Role" value={selectedRoles}

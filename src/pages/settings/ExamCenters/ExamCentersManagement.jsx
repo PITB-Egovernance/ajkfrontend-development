@@ -22,6 +22,7 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import SearchableSelect from "components/ui/SearchableSelect";
 import { hasPermission } from "utils/permissions";
 import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 const PERM = "settings.exam_centers";
@@ -506,16 +507,19 @@ const ExamCentersManagement = () => {
               onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
               placeholder="e.g. Govt School XYZ"
             />
-            <TextField
-              fullWidth select label="City" margin="normal" size="small"
-              value={formData.city}
-              onChange={(e) => handleCityChange(e.target.value)}
-            >
-              <MenuItem value=""><em>Select a city</em></MenuItem>
-              {cities.length > 0
-                ? cities.map((c) => <MenuItem key={c.hash_id} value={c.city}>{c.city}</MenuItem>)
-                : <MenuItem disabled value="">No cities — add cities first</MenuItem>}
-            </TextField>
+            <div style={{ marginTop: 16 }}>
+              <SearchableSelect
+                label="City"
+                value={formData.city}
+                onChange={(e) => handleCityChange(e.target.value)}
+                placeholder="Select a city"
+                options={
+                  cities.length > 0
+                    ? cities.map((c) => ({ value: c.city, label: c.city }))
+                    : [{ value: '', label: 'No cities — add cities first', disabled: true }]
+                }
+              />
+            </div>
             <TextField
               fullWidth label="Capacity (seats)" margin="normal" size="small"
               type="number" inputProps={{ min: 1 }}

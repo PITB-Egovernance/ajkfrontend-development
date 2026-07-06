@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Checkbox, TextField, MenuItem } from "@mui/material";
+import { Checkbox, TextField } from "@mui/material";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { FileEdit, CheckCircle2, Plus, Trash2, Save, Send, X } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
@@ -1102,9 +1103,7 @@ const AdvertisementEditForm = () => {
 
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <TextField
-                    select
-                    fullWidth
+                  <SearchableSelect
                     label="Status"
                     value={status}
                     onChange={(e) => {
@@ -1115,20 +1114,13 @@ const AdvertisementEditForm = () => {
                         setExtendDate("");
                       }
                     }}
-                    sx={fieldSx}
-                    error={!!fieldErrors?.status}
-                    helperText={
+                    error={
                       Array.isArray(fieldErrors?.status)
                         ? fieldErrors.status.join(", ")
                         : fieldErrors?.status
                     }
-                  >
-                    {STATUS_OPTIONS.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    options={STATUS_OPTIONS}
+                  />
                 </div>
                 {status === "active" && (
                   <div className="col-md-6 form-group">
@@ -1417,9 +1409,7 @@ const AdvertisementEditForm = () => {
                       </h6>
                       <div className="row">
                         <div className="col-md-6 form-group">
-                          <TextField
-                            select
-                            fullWidth
+                          <SearchableSelect
                             label="Test Type"
                             value={jobConfigs[jobId]?.testType || ""}
                             onChange={(e) => {
@@ -1445,16 +1435,12 @@ const AdvertisementEditForm = () => {
                                 return next;
                               });
                             }}
-                            sx={fieldSx}
-                            helperText="Choose the test type — fee auto-fills"
-                          >
-                            <MenuItem value=""><em>— Select Test Type —</em></MenuItem>
-                            {testTypeOptions.map((t) => (
-                              <MenuItem key={t.hash_id} value={t.hash_id}>
-                                {t.name}
-                              </MenuItem>
-                            ))}
-                          </TextField>
+                            hint="Choose the test type — fee auto-fills"
+                            options={[
+                              { value: '', label: '— Select Test Type —' },
+                              ...testTypeOptions.map((t) => ({ value: t.hash_id, label: t.name })),
+                            ]}
+                          />
                         </div>
                         <div className="col-md-6 form-group">
                           <TextField

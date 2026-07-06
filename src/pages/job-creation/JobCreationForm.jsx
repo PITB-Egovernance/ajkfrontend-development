@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { TextField, MenuItem } from '@mui/material';
+import { TextField } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Briefcase, GraduationCap, UserCheck, FileText, ClipboardList } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
@@ -824,21 +825,15 @@ const TextAreaField = ({ label, name, value, onChange, error, required }) => (
 
 const SelectField = ({ label, name, value, onChange, error, options, required }) => (
   <div className="col-md-6 form-group">
-    <TextField
-      select
-      fullWidth
+    <SearchableSelect
       label={label}
       name={name}
       value={value}
       onChange={onChange}
       required={required}
-      error={!!error}
-      helperText={error}
-    >
-      {options.map(opt => (
-        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-      ))}
-    </TextField>
+      error={error}
+      options={options}
+    />
   </div>
 );
 

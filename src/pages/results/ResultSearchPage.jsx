@@ -16,6 +16,7 @@ import AdvertisementApi from 'api/advertisementApi';
 import Button from 'components/ui/Button';
 import { Card, CardContent } from 'components/ui/Card';
 import Input from 'components/ui/Input';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import toast from 'react-hot-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from 'components/ui/Dialog';
 
@@ -119,18 +120,18 @@ const ResultSearchPage = () => {
           <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Job Post</label>
-              <select
+              <SearchableSelect
                 value={selectedJob}
                 onChange={(e) => setSelectedJob(e.target.value)}
-                className="w-full h-12 px-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700"
-              >
-                <option value="">Choose a job...</option>
-                {jobs.map(job => (
-                  <option key={job.hash_id} value={job.hash_id}>
-                    {job.adv_number ? `#${job.adv_number} - ` : ''}{job.designation}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'Choose a job...' },
+                  ...jobs.map(job => ({
+                    value: job.hash_id,
+                    label: `${job.adv_number ? `#${job.adv_number} - ` : ''}${job.designation}`,
+                  })),
+                ]}
+                placeholder="Choose a job..."
+              />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Roll No / CNIC</label>

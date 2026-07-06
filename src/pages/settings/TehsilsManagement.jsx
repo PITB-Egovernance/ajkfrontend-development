@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TextField, MenuItem } from '@mui/material';
+import { TextField } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { 
@@ -319,18 +320,15 @@ const TehsilsManagement = () => {
                     }}
                   />
                 </div>
-                <TextField
-                  select
-                  fullWidth
+                <SearchableSelect
                   value={filterDistrict}
                   onChange={(e) => setFilterDistrict(e.target.value)}
                   placeholder="Filter by district"
-                >
-                  <MenuItem value="">All Districts</MenuItem>
-                  {districts.filter(d => d.status === 'active').map(district => (
-                    <MenuItem key={district.id} value={district.id}>{district.name}</MenuItem>
-                  ))}
-                </TextField>
+                  options={[
+                    { value: '', label: 'All Districts' },
+                    ...districts.filter(d => d.status === 'active').map(district => ({ value: district.id, label: district.name }))
+                  ]}
+                />
               </div>
             </CardContent>
           </Card>
@@ -498,21 +496,15 @@ const TehsilsManagement = () => {
                   </div>
 
                   <div>
-                    <TextField
-                      select
-                      fullWidth
+                    <SearchableSelect
                       label="District"
-                      id="district_id"
                       name="district_id"
                       value={formData.district_id}
                       onChange={handleInputChange}
+                      options={districts.filter(d => d.status === 'active').map(district => ({ value: district.id, label: district.name }))}
+                      placeholder="Select District"
                       required
-                    >
-                      <MenuItem value="">Select District</MenuItem>
-                      {districts.filter(d => d.status === 'active').map(district => (
-                        <MenuItem key={district.id} value={district.id}>{district.name}</MenuItem>
-                      ))}
-                    </TextField>
+                    />
                   </div>
 
                 </div>

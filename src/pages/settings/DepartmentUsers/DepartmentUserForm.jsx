@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TextField, MenuItem, Autocomplete, Checkbox, ListItemText, Chip, Box } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import { TextField } from '@mui/material';
 import { Building2, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
@@ -167,13 +168,15 @@ const DepartmentUserForm = () => {
               {/* Row 1: Username + CNIC */}
               <div className="row">
                 <div className="col-md-6 form-group">
-                  <Autocomplete options={departmentOptions} getOptionLabel={(o) => o.name || ''}
-                    isOptionEqualToValue={(o, v) => o.id === v.id} value={selectedDepartment}
-                    onChange={(_, v) => setSelectedDepartment(v)}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Department" required sx={fieldSx}
-                        error={!!fieldErrors?.department} helperText={fieldErrors?.department?.join(', ')} />
-                    )} />
+                  <SearchableSelect
+                    required
+                    label="Department"
+                    value={selectedDepartment?.id || ''}
+                    onChange={(e) => setSelectedDepartment(departmentOptions.find((d) => d.id === e.target.value) || null)}
+                    options={departmentOptions.map((d) => ({ value: d.id, label: d.name }))}
+                    placeholder="— Select Department —"
+                    error={fieldErrors?.department?.join(', ')}
+                  />
                 </div>
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Focal Person" value={username}

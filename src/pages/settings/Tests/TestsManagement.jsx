@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import {
   TextField, IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, Menu, MenuItem, Switch,
@@ -435,21 +436,17 @@ const TestsManagement = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <TextField
-              select
-              size="small"
-              label="Test Type"
+            <SearchableSelect
               name="test_type_id"
+              label="Test Type"
               value={filters.test_type_id}
               onChange={handleFilterChange}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            >
-              <MenuItem value="">All Test Type</MenuItem>
-              {examTypes.map((type) => (
-                <MenuItem key={type.hash_id} value={type.hash_id}>{type.name}</MenuItem>
-              ))}
-            </TextField>
+              options={[
+                { value: '', label: 'All Test Type' },
+                ...examTypes.map((type) => ({ value: type.hash_id, label: type.name })),
+              ]}
+              placeholder="All Test Type"
+            />
             <TextField
               size="small"
               label="Test Fee"
@@ -460,20 +457,18 @@ const TestsManagement = () => {
               InputLabelProps={{ shrink: true }}
               fullWidth
             />
-            <TextField
-              select
-              size="small"
-              label="Status"
+            <SearchableSelect
               name="status"
+              label="Status"
               value={filters.status}
               onChange={handleFilterChange}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            >
-              <MenuItem value="">All Status</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
+              options={[
+                { value: '', label: 'All Status' },
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+              ]}
+              placeholder="All Status"
+            />
           </div>
         </div>
 
@@ -519,14 +514,20 @@ const TestsManagement = () => {
           <DialogTitle className="font-bold">{editing ? 'Update Exam Fee' : 'Add Exam Fee'}</DialogTitle>
           <DialogContent>
             {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
-            <TextField fullWidth select required autoFocus label="Test Type" margin="normal" size="small"
-              value={formData.test_type_id}
-              onChange={(e) => { setFormData((f) => ({ ...f, test_type_id: e.target.value })); setFormError(''); }}
-              disabled={loadingTypes}
-              helperText={loadingTypes ? 'Loading test types…' : ''}>
-              <MenuItem value="">— Select Test Type —</MenuItem>
-              {examTypes.map((t) => (<MenuItem key={t.hash_id} value={t.hash_id}>{t.name}</MenuItem>))}
-            </TextField>
+            <div style={{ marginTop: 16 }}>
+              <SearchableSelect
+                required
+                label="Test Type"
+                value={formData.test_type_id}
+                onChange={(e) => { setFormData((f) => ({ ...f, test_type_id: e.target.value })); setFormError(''); }}
+                disabled={loadingTypes}
+                options={[
+                  { value: '', label: loadingTypes ? 'Loading test types…' : '— Select Test Type —' },
+                  ...examTypes.map((t) => ({ value: t.hash_id, label: t.name })),
+                ]}
+                placeholder="— Select Test Type —"
+              />
+            </div>
             <TextField fullWidth required type="number" label="Test Fee (PKR)" margin="normal" size="small"
               value={formData.test_fees}
               onChange={(e) => { setFormData((f) => ({ ...f, test_fees: e.target.value })); setFormError(''); }}

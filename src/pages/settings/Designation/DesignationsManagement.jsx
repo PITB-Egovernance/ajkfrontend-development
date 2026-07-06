@@ -10,7 +10,9 @@ import {
   DialogContent,
   DialogActions,
   Switch,
+  Box
 } from "@mui/material";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
 import { Plus, ArrowLeft, MoreVertical } from "lucide-react";
@@ -657,49 +659,38 @@ const DesignationsManagement = () => {
             />
 
             {/* Grade Dropdown */}
-            <TextField
-              select
-              fullWidth
+            <Box mt={2}>
+            <SearchableSelect
               label="Grade"
-              margin="normal"
               value={formData.grade_id}
               onChange={(e) =>
                 setFormData({ ...formData, grade_id: e.target.value })
               }
-            >
-              {Array.isArray(grades) &&
-                grades
-                  .filter((grade) => (grade.status ?? "active").toLowerCase() === "active")
-                  .map((grade) => (
-                  <MenuItem
-                    key={grade.id}
-                    value={String(grade.id)}
-                  >
-                    {grade.name}
-                  </MenuItem>
-              ))}
-            </TextField>
+              options={
+                Array.isArray(grades)
+                  ? grades
+                      .filter((grade) => (grade.status ?? "active").toLowerCase() === "active")
+                      .map((grade) => ({ value: String(grade.id), label: grade.name }))
+                  : []
+              }
+              placeholder="Select Grade"
+            />
+            </Box>
 
             {/* Designation Type Dropdown */}
-            <TextField
-              select
-              required
-              fullWidth
+            <Box mt={2}>
+            <SearchableSelect
               label="Designation Type"
-              margin="normal"
+              required
               value={formData.type}
               onChange={(e) =>
                 setFormData({ ...formData, type: e.target.value })
               }
-            >
-              {DESIGNATION_TYPE_OPTIONS.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
+              options={DESIGNATION_TYPE_OPTIONS}
+              placeholder="Select Designation Type"
+            />
 
-
+          </Box>
             {/* Status is now managed only via the row Switch toggle in the
                 grid — hidden from the edit modal to keep the form focused. */}
 

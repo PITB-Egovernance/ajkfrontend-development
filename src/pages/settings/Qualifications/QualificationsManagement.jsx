@@ -4,6 +4,7 @@ import {
   TextField, IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, Switch, Menu, MenuItem,
 } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, MoreVertical, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -292,22 +293,19 @@ const QualificationsManagement = () => {
               }))}
               placeholder="e.g. Bachelor's Degree"
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} />
-            <TextField
-              select
-              fullWidth
+            <SearchableSelect
               label="Type"
-              margin="normal"
-              size="small"
               value={form.qualification_type}
               onChange={(e) => setForm((current) => ({
                 ...current,
                 qualification_type: e.target.value,
               }))}
-            >
-              <MenuItem value="" disabled>— Select Type —</MenuItem>
-              <MenuItem value="required">Required</MenuItem>
-              <MenuItem value="professional">Professional</MenuItem>
-            </TextField>
+              options={[
+                { value: 'required', label: 'Required' },
+                { value: 'professional', label: 'Professional' },
+              ]}
+              placeholder="— Select Type —"
+            />
           </DialogContent>
           <DialogActions className="px-4 pb-4 gap-2">
             <button onClick={() => setOpen(false)} disabled={saving}

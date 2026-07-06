@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Button, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, Divider, Grid, IconButton, MenuItem,
+  DialogContent, DialogTitle, Divider, Grid, IconButton,
   Paper, Tab, Tabs, TextField, Tooltip, Typography, Alert,
 } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   ArrowLeft, RefreshCw, Upload, Calculator, Download,
@@ -519,31 +520,27 @@ export default function AwardListDetail() {
                 </Grid>
               ))}
               <Grid item xs={6}>
-                <TextField
-                  select
+                <SearchableSelect
                   label="Board / Uni 1st Position"
-                  size="small"
-                  fullWidth
                   value={marksForm.board_uni_pos}
                   onChange={(e) => setMarksForm((f) => ({ ...f, board_uni_pos: Number(e.target.value) }))}
-                >
-                  <MenuItem value={0}>None (0)</MenuItem>
-                  <MenuItem value={1}>1st Position (1 Mark)</MenuItem>
-                </TextField>
+                  options={[
+                    { value: 0, label: 'None (0)' },
+                    { value: 1, label: '1st Position (1 Mark)' },
+                  ]}
+                />
               </Grid>
               <Grid item xs={6}>
-                <TextField
-                  select
+                <SearchableSelect
                   label="MPhil / PhD Qualification"
-                  size="small"
-                  fullWidth
                   value={marksForm.mphil_phd}
                   onChange={(e) => setMarksForm((f) => ({ ...f, mphil_phd: Number(e.target.value) }))}
-                >
-                  <MenuItem value={0}>None (0)</MenuItem>
-                  <MenuItem value={1}>MPhil (1 Mark)</MenuItem>
-                  <MenuItem value={2}>PhD (2 Marks)</MenuItem>
-                </TextField>
+                  options={[
+                    { value: 0, label: 'None (0)' },
+                    { value: 1, label: 'MPhil (1 Mark)' },
+                    { value: 2, label: 'PhD (2 Marks)' },
+                  ]}
+                />
               </Grid>
             </Grid>
 
@@ -552,18 +549,17 @@ export default function AwardListDetail() {
             <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
               Interview Attendance
             </Typography>
-            <TextField
-              select
-              label="Attendance"
-              size="small"
-              fullWidth
-              sx={{ mb: 2 }}
-              value={marksForm.status}
-              onChange={(e) => handleAttendanceChange(e.target.value)}
-            >
-              <MenuItem value="present">Present</MenuItem>
-              <MenuItem value="absent">Absent</MenuItem>
-            </TextField>
+            <div style={{ marginBottom: '16px' }}>
+              <SearchableSelect
+                label="Attendance"
+                value={marksForm.status}
+                onChange={(e) => handleAttendanceChange(e.target.value)}
+                options={[
+                  { value: 'present', label: 'Present' },
+                  { value: 'absent', label: 'Absent' },
+                ]}
+              />
+            </div>
 
             <Divider sx={{ my: 2 }} />
 
@@ -613,18 +609,12 @@ export default function AwardListDetail() {
       <Dialog open={statusOpen} onClose={() => setStatusOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Change Status — {statusEntry?.candidate_name}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          <TextField
-            select
+          <SearchableSelect
             label="Status"
             value={newStatus}
             onChange={(e) => setNewStatus(e.target.value)}
-            fullWidth
-            size="small"
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
-            ))}
-          </TextField>
+            options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          />
           <TextField
             label="Note (optional)"
             multiline

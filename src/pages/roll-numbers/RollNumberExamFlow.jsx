@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Download, Eye, Filter, Hash, MapPin, Plus, Search, Send, Users, X } from 'lucide-react';
-import { MenuItem, TextField } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import { TextField } from '@mui/material';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
 import { Card, CardContent } from 'components/ui/Card';
@@ -1350,9 +1351,42 @@ const RollNumberExamFlow = () => {
             <StepHeader number="1" title="Select Advertisement, Posts, Departments & Applicants" subtitle="Select the posts you want to include in this roll number generation batch." />
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
               <TextField size="small" label="Search" value={search} onChange={(event) => setSearch(event.target.value)} className="lg:col-span-3" InputProps={{ startAdornment: <Search size={16} className="mr-2 text-slate-400" /> }} />
-              <TextField select size="small" label="Advertisement" value={filterAdvertisement} onChange={(e) => setFilterAdvertisement(e.target.value)} className="lg:col-span-3"><MenuItem value="all">All Advertisements</MenuItem>{availableAdvertisements.map((ad) => <MenuItem key={ad.id} value={ad.id}>{ad.advertisement}</MenuItem>)}</TextField>
-              <TextField select size="small" label="Department" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)} className="lg:col-span-3"><MenuItem value="all">All Departments</MenuItem>{availableDepartments.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}</TextField>
-              <TextField select size="small" label="Post" value={filterPost} onChange={(e) => setFilterPost(e.target.value)} className="lg:col-span-2"><MenuItem value="all">All Posts</MenuItem>{availablePosts.map((post) => <MenuItem key={post.id} value={post.id}>{post.post}</MenuItem>)}</TextField>
+              <div className="lg:col-span-3">
+                <SearchableSelect
+                  label="Advertisement"
+                  value={filterAdvertisement}
+                  onChange={(e) => setFilterAdvertisement(e.target.value)}
+                  options={[
+                    { value: 'all', label: 'All Advertisements' },
+                    ...availableAdvertisements.map((ad) => ({ value: ad.id, label: ad.advertisement })),
+                  ]}
+                  placeholder="All Advertisements"
+                />
+              </div>
+              <div className="lg:col-span-3">
+                <SearchableSelect
+                  label="Department"
+                  value={filterDepartment}
+                  onChange={(e) => setFilterDepartment(e.target.value)}
+                  options={[
+                    { value: 'all', label: 'All Departments' },
+                    ...availableDepartments.map((d) => ({ value: d, label: d })),
+                  ]}
+                  placeholder="All Departments"
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <SearchableSelect
+                  label="Post"
+                  value={filterPost}
+                  onChange={(e) => setFilterPost(e.target.value)}
+                  options={[
+                    { value: 'all', label: 'All Posts' },
+                    ...availablePosts.map((post) => ({ value: post.id, label: post.post })),
+                  ]}
+                  placeholder="All Posts"
+                />
+              </div>
               <Button variant="outline" className="h-10 gap-2 bg-white lg:col-span-1" onClick={() => { setSearch(''); setFilterAdvertisement('all'); setFilterPost('all'); setFilterDepartment('all'); }}><Filter size={15} /> Reset</Button>
             </div>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -1565,16 +1599,15 @@ const RollNumberExamFlow = () => {
                                 />
                               </td>
                               <td className="px-4 py-3">
-                                <TextField
-                                  select size="small"
-                                  disabled={!isSelected}
-                                  value={sch.duration}
-                                  onChange={e => updateSubjectSchedule(subj.id, 'duration', Number(e.target.value))}
-                                  InputProps={{ startAdornment: <Clock3 size={14} className="mr-1 text-slate-400" /> }}
-                                  sx={{ width: 140 }}
-                                >
-                                  {[60, 90, 120, 150, 180].map(m => <MenuItem key={m} value={m}>{m} min</MenuItem>)}
-                                </TextField>
+                                <div style={{ width: 140 }}>
+                                  <SearchableSelect
+                                    disabled={!isSelected}
+                                    value={String(sch.duration)}
+                                    onChange={e => updateSubjectSchedule(subj.id, 'duration', Number(e.target.value))}
+                                    options={[60, 90, 120, 150, 180].map(m => ({ value: String(m), label: `${m} min` }))}
+                                    placeholder="Duration"
+                                  />
+                                </div>
                               </td>
                               <td className="px-4 py-3 text-slate-500 text-sm">
                                 {isSelected ? (computeEndTime(sch.startTime, sch.duration) || '—') : '—'}
@@ -1595,9 +1628,14 @@ const RollNumberExamFlow = () => {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                       <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
                       <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleTimes((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
-                      <TextField select size="small" label="Duration *" value={scheduleDurations[index] ?? 90} onChange={(e) => { const v = Number(e.target.value); setScheduleDurations((cur) => { const a = [...cur]; while (a.length <= index) a.push(90); a[index] = v; return a; }); }} required InputProps={{ startAdornment: <Clock3 size={15} className="mr-2 text-slate-400" /> }}>
-                        {[60, 90, 120, 150, 180].map((m) => <MenuItem key={m} value={m}>{m} Minutes</MenuItem>)}
-                      </TextField>
+                      <SearchableSelect
+                        required
+                        label="Duration *"
+                        value={String(scheduleDurations[index] ?? 90)}
+                        onChange={(e) => { const v = Number(e.target.value); setScheduleDurations((cur) => { const a = [...cur]; while (a.length <= index) a.push(90); a[index] = v; return a; }); }}
+                        options={[60, 90, 120, 150, 180].map((m) => ({ value: String(m), label: `${m} Minutes` }))}
+                        placeholder="Select Duration"
+                      />
                       <TextField size="small" label="End Time" value={computeEndTime(scheduleTimes[index], scheduleDurations[index]) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
                     </div>
                   </div>
@@ -1815,39 +1853,35 @@ const RollNumberExamFlow = () => {
                     value={s3Search} onChange={(e) => setS3Search(e.target.value)}
                     InputProps={{ startAdornment: <Search size={14} className="mr-2 text-slate-400" /> }}
                   />
-                  <TextField
-                    size="small" label="District / Zone"
-                    value={s3District} onChange={(e) => setS3District(e.target.value)}
-                    SelectProps={{ native: true }} InputLabelProps={{ shrink: true }}
-                    select
-                  >
-                    <option value="">All Districts</option>
-                    {s3UniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-                  </TextField>
-                  <TextField
-                    size="small" label="Gender"
-                    value={s3Gender} onChange={(e) => setS3Gender(e.target.value)}
-                    SelectProps={{ native: true }} InputLabelProps={{ shrink: true }}
-                    select
-                  >
-                    <option value="">All Genders</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </TextField>
+                  <SearchableSelect
+                    label="District / Zone"
+                    value={s3District}
+                    onChange={(e) => setS3District(e.target.value)}
+                    options={s3UniqueDistricts.map(d => ({ value: d, label: d }))}
+                    placeholder="All Districts"
+                  />
+                  <SearchableSelect
+                    label="Gender"
+                    value={s3Gender}
+                    onChange={(e) => setS3Gender(e.target.value)}
+                    options={[
+                      { value: 'male', label: 'Male' },
+                      { value: 'female', label: 'Female' },
+                      { value: 'other', label: 'Other' },
+                    ]}
+                    placeholder="All Genders"
+                  />
                   <TextField
                     size="small" label="CNIC" placeholder="e.g. 3110470679173"
                     value={s3CnicFilter} onChange={(e) => setS3CnicFilter(e.target.value)}
                   />
-                  <TextField
-                    size="small" label="Preference"
-                    value={s3Preference} onChange={(e) => setS3Preference(e.target.value)}
-                    SelectProps={{ native: true }} InputLabelProps={{ shrink: true }}
-                    select
-                  >
-                    <option value="">All Preferences</option>
-                    {examCities.map(p => <option key={p} value={p}>{p}</option>)}
-                  </TextField>
+                  <SearchableSelect
+                    label="Preference"
+                    value={s3Preference}
+                    onChange={(e) => setS3Preference(e.target.value)}
+                    options={examCities.map(p => ({ value: p, label: p }))}
+                    placeholder="All Preferences"
+                  />
                 </div>
                 <p className="text-xs text-slate-400">
                   Showing {s3FilteredCandidates.length} of {s3UniqueCandidateCount} candidate{s3UniqueCandidateCount !== 1 ? 's' : ''}
@@ -1980,20 +2014,14 @@ const RollNumberExamFlow = () => {
                     InputLabelProps={{ shrink: true }}
                     helperText="Auto-calculated from selection"
                   />
-                  <TextField
-                    size="small" label="Exam Center"
+                  <SearchableSelect
+                    label="Exam Center"
                     value={manualUpdateCenterId}
                     onChange={(e) => setManualUpdateCenterId(e.target.value)}
-                    SelectProps={{ native: true }}
-                    InputLabelProps={{ shrink: true }}
-                    helperText="Center to assign to selected candidates"
-                    select
-                  >
-                    <option value="">Select Center</option>
-                    {centers.map(c => (
-                      <option key={c.id} value={c.id}>{c.center}{c.district ? ` — ${c.district}` : ''}</option>
-                    ))}
-                  </TextField>
+                    options={centers.map(c => ({ value: c.id, label: c.center + (c.district ? ` — ${c.district}` : '') }))}
+                    placeholder="Select Center"
+                    hint="Center to assign to selected candidates"
+                  />
                   <Button
                     className="h-10 mb-[22px]"
                     disabled={updating || s3SelectedList.length === 0 || !rollStartSeq || !manualUpdateCenterId}

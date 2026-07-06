@@ -6,9 +6,9 @@ import {
   TextField,
   Typography,
   Grid,
-  MenuItem,
   Alert,
 } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
@@ -252,34 +252,32 @@ export default function DispatchAddNew() {
 
           {/* Priority & Confidentiality */}
           <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              fullWidth
+            <SearchableSelect
               label="Priority"
               name="priority"
               value={formData.priority}
               onChange={handleChange}
-            >
-              <MenuItem value="Normal">Normal</MenuItem>
-              <MenuItem value="High">High</MenuItem>
-              <MenuItem value="Medium">Medium</MenuItem>
-              <MenuItem value="Low">Low</MenuItem>
-            </TextField>
+              options={[
+                { value: 'Normal', label: 'Normal' },
+                { value: 'High', label: 'High' },
+                { value: 'Medium', label: 'Medium' },
+                { value: 'Low', label: 'Low' },
+              ]}
+            />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              fullWidth
+            <SearchableSelect
               label="Confidentiality Level"
               name="confidentiality_level"
               value={formData.confidentiality_level}
               onChange={handleChange}
-            >
-              <MenuItem value="Normal">Normal</MenuItem>
-              <MenuItem value="Confidential">Confidential</MenuItem>
-              <MenuItem value="Secret">Secret</MenuItem>
-              <MenuItem value="Top Secret">Top Secret</MenuItem>
-            </TextField>
+              options={[
+                { value: 'Normal', label: 'Normal' },
+                { value: 'Confidential', label: 'Confidential' },
+                { value: 'Secret', label: 'Secret' },
+                { value: 'Top Secret', label: 'Top Secret' },
+              ]}
+            />
           </Grid>
 
           {/* Subject */}
@@ -349,18 +347,17 @@ export default function DispatchAddNew() {
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              fullWidth
+            <SearchableSelect
               label="Status"
               name="status"
               value={formData.status}
               onChange={handleChange}
-            >
-              <MenuItem value="Open">Open</MenuItem>
-              <MenuItem value="In progress">In progress</MenuItem>
-              <MenuItem value="Closed">Closed</MenuItem>
-            </TextField>
+              options={[
+                { value: 'Open', label: 'Open' },
+                { value: 'In progress', label: 'In progress' },
+                { value: 'Closed', label: 'Closed' },
+              ]}
+            />
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField

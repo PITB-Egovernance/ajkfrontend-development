@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, DoorOpen, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -267,19 +268,18 @@ const ExamHallsManagement = () => {
               onChange={(e) => { setSearchTerm(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }}
               sx={{ width: 260 }}
             />
-            <TextField
-              select
-              size="small"
-              label="Filter by Center"
-              value={filterCenterId}
-              onChange={(e) => { setFilterCenterId(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }}
-              sx={{ width: 220 }}
-            >
-              <MenuItem value="">All Centers</MenuItem>
-              {centers.map((c) => (
-                <MenuItem key={c.id || c.hash_id} value={String(c.id)}>{c.name}</MenuItem>
-              ))}
-            </TextField>
+            <div style={{ width: 220 }}>
+              <SearchableSelect
+                label="Filter by Center"
+                value={filterCenterId}
+                onChange={(e) => { setFilterCenterId(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }}
+                options={[
+                  { value: '', label: 'All Centers' },
+                  ...centers.map((c) => ({ value: String(c.id), label: c.name }))
+                ]}
+                placeholder="All Centers"
+              />
+            </div>
           </div>
 
           {selectionModel.length > 0 && (
@@ -322,16 +322,13 @@ const ExamHallsManagement = () => {
         <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="sm">
           <DialogTitle className="font-bold">{editingHall ? "Edit Exam Hall" : "Add Exam Hall"}</DialogTitle>
           <DialogContent>
-            <TextField
-              fullWidth select label="Exam Center" margin="normal" size="small"
+            <SearchableSelect
+              label="Exam Center"
               value={formData.exam_center_id}
               onChange={(e) => setFormData((p) => ({ ...p, exam_center_id: e.target.value }))}
-            >
-              <MenuItem value=""><em>Select exam center</em></MenuItem>
-              {centers.map((c) => (
-                <MenuItem key={c.id || c.hash_id} value={String(c.id)}>{c.name} — {c.city}</MenuItem>
-              ))}
-            </TextField>
+              options={centers.map((c) => ({ value: String(c.id), label: `${c.name} — ${c.city}` }))}
+              placeholder="Select exam center"
+            />
             <TextField
               fullWidth label="Hall Name" margin="normal" size="small" autoFocus
               value={formData.name}

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { TextField, MenuItem } from "@mui/material";
+import { TextField } from "@mui/material";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { FileText, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
@@ -694,10 +695,7 @@ const AdvertisementCreateForm = () => {
 
                   <div className="row">
                     <div className="col-md-6 form-group">
-                      <TextField
-                        select
-                        fullWidth
-                        required
+                      <SearchableSelect
                         label="Test Type"
                         value={jobConfigs[jobId]?.testType || ""}
                         onChange={(e) => {
@@ -733,30 +731,20 @@ const AdvertisementCreateForm = () => {
                             return next;
                           });
                         }}
-                        sx={fieldSx}
-                        error={!!fieldErrors?.[`test_type_${jobId}`]}
-                        helperText={
+                        required
+                        error={
                           fieldErrors?.[`test_type_${jobId}`]
-                            ? Array.isArray(
-                                fieldErrors[`test_type_${jobId}`]
-                              )
-                              ? fieldErrors[
-                                  `test_type_${jobId}`
-                                ].join(", ")
+                            ? Array.isArray(fieldErrors[`test_type_${jobId}`])
+                              ? fieldErrors[`test_type_${jobId}`].join(", ")
                               : fieldErrors[`test_type_${jobId}`]
-                            : "Choose the test type — fee auto-fills"
+                            : undefined
                         }
-                      >
-                        <MenuItem value="">
-                          <em>— Select Test Type —</em>
-                        </MenuItem>
-
-                        {testTypeOptions.map((t) => (
-                          <MenuItem key={t.hash_id} value={t.hash_id}>
-                            {t.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
+                        hint="Choose the test type — fee auto-fills"
+                        options={[
+                          { value: '', label: '— Select Test Type —' },
+                          ...testTypeOptions.map((t) => ({ value: t.hash_id, label: t.name })),
+                        ]}
+                      />
                     </div>
 
                     <div className="col-md-6 form-group">

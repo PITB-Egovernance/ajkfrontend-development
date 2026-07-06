@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TextField, MenuItem } from '@mui/material';
+import { TextField } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { 
@@ -315,18 +316,15 @@ const ContractorsManagement = () => {
             />
           </div>
 
-          <TextField
-            select
-            fullWidth
+          <SearchableSelect
             value={expertiseFilter}
             onChange={(e) => setExpertiseFilter(e.target.value)}
             placeholder="Filter by expertise"
-          >
-            <MenuItem value="all">All Expertise Areas</MenuItem>
-            {expertiseAreas.map(area => (
-              <MenuItem key={area} value={area}>{area}</MenuItem>
-            ))}
-          </TextField>
+            options={[
+              { value: 'all', label: 'All Expertise Areas' },
+              ...expertiseAreas.map(area => ({ value: area, label: area }))
+            ]}
+          />
         </motion.div>
 
         {/* Contractors Grid */}
@@ -506,19 +504,14 @@ const ContractorsManagement = () => {
                     </div>
 
                     <div>
-                      <TextField
-                        select
-                        fullWidth
+                      <SearchableSelect
                         label="Expertise Area"
-                        id="expertise"
                         name="expertise"
                         value={formData.expertise}
                         onChange={handleInputChange}
-                      >
-                        {expertiseAreas.map(area => (
-                          <MenuItem key={area} value={area}>{area}</MenuItem>
-                        ))}
-                      </TextField>
+                        options={expertiseAreas.map(area => ({ value: area, label: area }))}
+                        placeholder="Select Expertise Area"
+                      />
                     </div>
 
                     <div>

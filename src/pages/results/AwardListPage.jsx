@@ -18,6 +18,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Button from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 import Input from 'components/ui/Input';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { toast } from 'react-hot-toast';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
@@ -555,31 +556,24 @@ const AwardListPage = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Job Post</label>
-                <select
+                <SearchableSelect
                   value={selectedJob}
                   onChange={(e) => setSelectedJob(e.target.value)}
-                  className="w-full h-10 px-2 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700 text-[10px]"
-                >
-                  <option value="">Select Job...</option>
-                  {jobs.map(job => (
-                    <option key={job.hash_id || job.id} value={job.hash_id || job.id}>
-                      {job.display_name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'Select Job...' },
+                    ...jobs.map(job => ({ value: job.hash_id || job.id, label: job.display_name })),
+                  ]}
+                  placeholder="Select Job..."
+                />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">District</label>
-                <select
+                <SearchableSelect
                   value={selectedDistrict}
                   onChange={(e) => setSelectedDistrict(e.target.value)}
-                  className="w-full h-10 px-2 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700 text-[10px]"
-                >
-                  {districts.map(d => (
-                    <option key={d} value={d}>{d === 'all' ? 'All Districts' : d}</option>
-                  ))}
-                </select>
+                  options={districts.map(d => ({ value: d, label: d === 'all' ? 'All Districts' : d }))}
+                />
               </div>
 
               <div className="space-y-1">
@@ -832,14 +826,14 @@ const AwardListPage = () => {
                             {/* Pathway Selection */}
                             <div className="flex items-center gap-2 my-1">
                               <span className="text-[8px] font-black text-slate-400 uppercase">Path:</span>
-                              <select
+                              <SearchableSelect
                                 value={row.bs_4yr_total > 0 || row.pathway === 'bs' ? 'bs' : 'traditional'}
                                 onChange={(e) => handleMarkChange(row.id, 'pathway', e.target.value)}
-                                className="h-7 text-[10px] font-black text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 focus:border-blue-400 focus:ring-0 cursor-pointer"
-                              >
-                                <option value="traditional">Traditional (BA/BSc + MA/MSc)</option>
-                                <option value="bs">BS 4-Years</option>
-                              </select>
+                                options={[
+                                  { value: 'traditional', label: 'Traditional (BA/BSc + MA/MSc)' },
+                                  { value: 'bs', label: 'BS 4-Years' },
+                                ]}
+                              />
                             </div>
 
                             {/* Degree Inputs Conditional */}

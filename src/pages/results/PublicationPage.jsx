@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/Card';
 import Button from 'components/ui/Button';
-import { TextField, MenuItem, Switch, FormControlLabel, IconButton } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import { TextField, Switch, FormControlLabel, IconButton } from '@mui/material';
 import { ArrowLeft, Send, Download, AlertTriangle, CheckCircle2, History, Trash2, ShieldCheck, FileText, Info } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
 import PublicationChecklist from 'components/results/PublicationChecklist';
@@ -226,18 +227,17 @@ const PublicationPage = () => {
             <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white">
               <CardContent className="p-10 space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <TextField
-                    select
+                  <SearchableSelect
                     label="Publication Type"
-                    fullWidth
                     value={formData.pub_type}
                     onChange={(e) => setFormData(prev => ({ ...prev, pub_type: e.target.value }))}
                     disabled={isPublished}
-                  >
-                    <MenuItem value="provisional">Provisional (Subject to Objections)</MenuItem>
-                    <MenuItem value="final">Final (Official Release)</MenuItem>
-                    <MenuItem value="supplementary">Supplementary (Addendum)</MenuItem>
-                  </TextField>
+                    options={[
+                      { value: 'provisional', label: 'Provisional (Subject to Objections)' },
+                      { value: 'final', label: 'Final (Official Release)' },
+                      { value: 'supplementary', label: 'Supplementary (Addendum)' },
+                    ]}
+                  />
                   <TextField
                     label="Gazette Reference"
                     fullWidth

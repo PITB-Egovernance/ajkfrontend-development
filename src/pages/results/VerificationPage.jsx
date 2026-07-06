@@ -24,6 +24,7 @@ import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
 import Button from 'components/ui/Button';
 import { Card, CardContent } from 'components/ui/Card';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import toast from 'react-hot-toast';
 import { getJobRouteId } from 'utils/jobMapper';
 
@@ -260,24 +261,18 @@ const VerificationPage = () => {
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
             {/* Job Selection Dropdown */}
-            <div className="relative min-w-[280px]">
-              <select
+            <div className="min-w-[280px]">
+              <SearchableSelect
                 value={selectedJobId}
                 onChange={handleJobChange}
-                className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-4 pr-10 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm appearance-none cursor-pointer h-9"
-              >
-                {jobs.map((j, idx) => {
+                options={jobs.map((j, idx) => {
                   const val = getJobRouteId(j) || (j.id ? j.id.toString() : '') || idx;
-                  return (
-                    <option key={val} value={val}>
-                      {j.designation} (Adv: {j.advertisements?.[0]?.adv_number || 'N/A'})
-                    </option>
-                  );
+                  return {
+                    value: val,
+                    label: `${j.designation} (Adv: ${j.advertisements?.[0]?.adv_number || 'N/A'})`,
+                  };
                 })}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                <SlidersHorizontal size={14} />
-              </div>
+              />
             </div>
           </div>
         </div>

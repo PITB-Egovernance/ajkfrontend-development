@@ -11,6 +11,7 @@ import {
   DialogActions,
   Switch,
 } from "@mui/material";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, PenTool, Trash2, CheckCircle, XCircle, Upload, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -762,13 +763,8 @@ const DigitalSignatureManagement = () => {
               ))}
             </TextField> */}
 
-            <TextField
-              select
-              fullWidth
+            <SearchableSelect
               label="Designation"
-              margin="normal"
-              size="small"
-              autoFocus
               value={formData.designation}
               onChange={(e) => {
                 const designationHashId = e.target.value;
@@ -794,19 +790,10 @@ const DigitalSignatureManagement = () => {
 
                 fetchActiveEmployees(designationHashId);
               }}
-              error={!!formErrors.designation}
-              helperText={formErrors.designation}
-              SelectProps={{ native: true }}
-              InputLabelProps={{ shrink: true }}
-            >
-              <option value="">— Select Designation —</option>
-
-              {designations.map((d) => (
-                <option key={d.hash_id ?? d.id} value={d.hash_id}>
-                  {d.name}
-                </option>
-              ))}
-            </TextField>
+              options={designations.map((d) => ({ value: d.hash_id ?? d.id, label: d.name }))}
+              placeholder="— Select Designation —"
+              error={formErrors.designation}
+            />
 
             {/* Name — populated from employees matching the selected designation */}
             {/* <TextField
@@ -848,12 +835,8 @@ const DigitalSignatureManagement = () => {
               })}
             </TextField> */}
 
-            <TextField
-              select
-              fullWidth
+            <SearchableSelect
               label="Name"
-              margin="normal"
-              size="small"
               value={formData.name}
               onChange={(e) => {
                 setFormData((f) => ({ ...f, name: e.target.value }));
@@ -862,35 +845,25 @@ const DigitalSignatureManagement = () => {
                   setFormErrors((errs) => ({ ...errs, name: undefined }));
                 }
               }}
-              error={!!formErrors.name}
-              helperText={formErrors.name}
-              disabled={!formData.designation || loadingEmployees}
-              SelectProps={{ native: true }}
-              InputLabelProps={{ shrink: true }}
-            >
-              <option value="">
-                {loadingEmployees
+              options={employees.map((emp) => {
+                const empName =
+                  emp.first_name && emp.last_name
+                    ? `${emp.first_name} ${emp.last_name}`
+                    : emp.username || emp.name || emp.full_name || emp.employee_name || "-";
+                return { value: empName, label: empName };
+              })}
+              placeholder={
+                loadingEmployees
                   ? "Loading employees…"
                   : !formData.designation
                   ? "Select designation first"
                   : employees.length === 0
                   ? "No employees found"
-                  : "— Select Name —"}
-              </option>
-
-              {employees.map((emp) => {
-                const empName =
-                  emp.first_name && emp.last_name
-                    ? `${emp.first_name} ${emp.last_name}`
-                    : emp.username || emp.name || emp.full_name || emp.employee_name || "-";
-
-                return (
-                  <option key={emp.hash_id ?? emp.id} value={empName}>
-                    {empName}
-                  </option>
-                );
-              })}
-            </TextField>
+                  : "— Select Name —"
+              }
+              error={formErrors.name}
+              disabled={!formData.designation || loadingEmployees}
+            />
             {/* Signature Image Upload */}
             <div className="mt-3 mb-1">
               <p className="text-xs text-slate-500 mb-1">

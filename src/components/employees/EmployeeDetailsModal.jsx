@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import {
   Dialog,
   DialogTitle,
@@ -6,7 +7,6 @@ import {
   DialogActions,
   TextField,
   MenuItem,
-  Autocomplete,
   CircularProgress,
   Checkbox,
   ListItemText,
@@ -416,19 +416,13 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
               />
 
               {/* Gender */}
-              <TextField
-                select
-                fullWidth
+              <SearchableSelect
                 label="Gender"
                 value={form.gender}
                 onChange={handleChange('gender')}
-                sx={fieldSx}
-              >
-                <MenuItem value=""><em>— Select Gender —</em></MenuItem>
-                {GENDER_OPTIONS.map((g) => (
-                  <MenuItem key={g} value={g}>{g}</MenuItem>
-                ))}
-              </TextField>
+                options={GENDER_OPTIONS.map((g) => ({ value: g, label: g }))}
+                placeholder="— Select Gender —"
+              />
 
               {/* Mobile */}
               <TextField
@@ -441,65 +435,52 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
               />
 
               {/* Domicile District */}
-              <Autocomplete
-                options={districtOptions}
-                getOptionLabel={(o) => o.name || ''}
-                isOptionEqualToValue={(o, v) => o.id === v.id}
-                value={selectedDistrict}
-                onChange={(_, v) => {
-                  setSelectedDistrict(v);
-                  setForm((p) => ({ ...p, domicile: v?.name || '' }));
+              <SearchableSelect
+                label="Domicile District"
+                value={selectedDistrict?.id || ''}
+                onChange={(e) => {
+                  const opt = districtOptions.find((d) => d.id === e.target.value) || null;
+                  setSelectedDistrict(opt);
+                  setForm((p) => ({ ...p, domicile: opt?.name || '' }));
                 }}
-                renderInput={(params) => (
-                  <TextField {...params} label="Domicile District" sx={fieldSx} />
-                )}
+                options={districtOptions.map((d) => ({ value: d.id, label: d.name }))}
+                placeholder="— Select District —"
               />
 
               {/* Designation */}
-              <Autocomplete
-                options={designationOptions}
-                getOptionLabel={(o) => o.name || ''}
-                isOptionEqualToValue={(o, v) => o.id === v.id}
-                value={selectedDesignation}
-                onChange={(_, v) => {
-                  setSelectedDesignation(v);
-                  setForm((p) => ({ ...p, designation: v?.name || '' }));
+              <SearchableSelect
+                label="Designation"
+                value={selectedDesignation?.id || ''}
+                onChange={(e) => {
+                  const opt = designationOptions.find((d) => d.id === e.target.value) || null;
+                  setSelectedDesignation(opt);
+                  setForm((p) => ({ ...p, designation: opt?.name || '' }));
                 }}
-                renderInput={(params) => (
-                  <TextField {...params} label="Designation" sx={fieldSx} />
-                )}
+                options={designationOptions.map((d) => ({ value: d.id, label: d.name }))}
+                placeholder="— Select Designation —"
               />
 
               {/* Scale / Grade */}
-              <Autocomplete
-                options={gradeOptions}
-                getOptionLabel={(o) => o.name || ''}
-                isOptionEqualToValue={(o, v) => o.id === v.id}
-                value={selectedGrade}
-                onChange={(_, v) => {
-                  setSelectedGrade(v);
-                  setForm((p) => ({ ...p, scale: v?.name || '' }));
+              <SearchableSelect
+                label="Scale / Grade"
+                value={selectedGrade?.id || ''}
+                onChange={(e) => {
+                  const opt = gradeOptions.find((g) => g.id === e.target.value) || null;
+                  setSelectedGrade(opt);
+                  setForm((p) => ({ ...p, scale: opt?.name || '' }));
                 }}
-                renderInput={(params) => (
-                  <TextField {...params} label="Scale / Grade" sx={fieldSx} />
-                )}
+                options={gradeOptions.map((g) => ({ value: g.id, label: g.name }))}
+                placeholder="— Select Grade —"
               />
 
               {/* Status */}
-              <TextField
-                select
-                fullWidth
+              <SearchableSelect
                 label="Account Status"
                 value={form.status}
                 onChange={handleChange('status')}
-                sx={fieldSx}
-              >
-                {STATUS_OPTIONS.map((o) => (
-                  <MenuItem key={o} value={o}>
-                    {o.charAt(0).toUpperCase() + o.slice(1)}
-                  </MenuItem>
-                ))}
-              </TextField>
+                options={STATUS_OPTIONS.map((o) => ({ value: o, label: o.charAt(0).toUpperCase() + o.slice(1) }))}
+                placeholder="— Select Status —"
+              />
 
               {/* Role */}
               <TextField

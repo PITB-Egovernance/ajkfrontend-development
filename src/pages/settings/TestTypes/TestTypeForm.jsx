@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, MenuItem, Checkbox, FormControlLabel } from '@mui/material';
+import { TextField, Checkbox, FormControlLabel } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -327,16 +328,16 @@ const TestTypeForm = () => {
         {/* EXAM NAME (dropdown — this is the exam name) + DESCRIPTION */}
         <div className="row">
           <div className="col-md-6 form-group">
-            <TextField
-              select fullWidth required label="Exam Name"
+            <SearchableSelect
+              label="Exam Name"
               value={cat}
               onChange={(e) => set('exam_category', e.target.value)}
+              required
               disabled={isEdit}
-              helperText={isEdit ? 'Exam cannot be changed after creation' : 'Select the exam'}
-            >
-              <MenuItem value="" disabled>— Select Exam —</MenuItem>
-              {EXAM_CATEGORIES.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
-            </TextField>
+              options={EXAM_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+              placeholder="— Select Exam —"
+              hint={isEdit ? 'Exam cannot be changed after creation' : 'Select the exam'}
+            />
           </div>
           <div className="col-md-6 form-group">
             <TextField fullWidth label="Description"

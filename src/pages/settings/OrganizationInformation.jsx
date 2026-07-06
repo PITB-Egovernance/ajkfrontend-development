@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TextField, MenuItem } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { 
@@ -546,58 +547,38 @@ const OrganizationInformation = () => {
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 mb-4">Leadership</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <TextField
-                        select
-                        fullWidth
+                      <SearchableSelect
                         label="Chairman"
                         name="chairman_id"
                         value={formData.chairman_id}
                         onChange={handleInputChange}
-                      >
-                        <MenuItem value="">Select Chairman</MenuItem>
-                        {employees.map(emp => (
-                          <MenuItem key={emp.id} value={emp.id}>{emp.name}</MenuItem>
-                        ))}
-                      </TextField>
-                      <TextField
-                        select
-                        fullWidth
+                        options={employees.map(emp => ({ value: emp.id, label: emp.name }))}
+                        placeholder="Select Chairman"
+                      />
+                      <SearchableSelect
                         label="Alternate Chairman"
                         name="chairman_alternate_id"
                         value={formData.chairman_alternate_id}
                         onChange={handleInputChange}
-                      >
-                        <MenuItem value="">Select Alternate</MenuItem>
-                        {employees.map(emp => (
-                          <MenuItem key={emp.id} value={emp.id}>{emp.name}</MenuItem>
-                        ))}
-                      </TextField>
-                      <TextField
-                        select
-                        fullWidth
+                        options={employees.map(emp => ({ value: emp.id, label: emp.name }))}
+                        placeholder="Select Alternate"
+                      />
+                      <SearchableSelect
                         label="Secretary"
                         name="secretary_id"
                         value={formData.secretary_id}
                         onChange={handleInputChange}
-                      >
-                        <MenuItem value="">Select Secretary</MenuItem>
-                        {employees.map(emp => (
-                          <MenuItem key={emp.id} value={emp.id}>{emp.name}</MenuItem>
-                        ))}
-                      </TextField>
-                      <TextField
-                        select
-                        fullWidth
+                        options={employees.map(emp => ({ value: emp.id, label: emp.name }))}
+                        placeholder="Select Secretary"
+                      />
+                      <SearchableSelect
                         label="Alternate Secretary"
                         name="secretary_alternate_id"
                         value={formData.secretary_alternate_id}
                         onChange={handleInputChange}
-                      >
-                        <MenuItem value="">Select Alternate</MenuItem>
-                        {employees.map(emp => (
-                          <MenuItem key={emp.id} value={emp.id}>{emp.name}</MenuItem>
-                        ))}
-                      </TextField>
+                        options={employees.map(emp => ({ value: emp.id, label: emp.name }))}
+                        placeholder="Select Alternate"
+                      />
                     </div>
                   </div>
 

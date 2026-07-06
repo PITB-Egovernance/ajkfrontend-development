@@ -4,12 +4,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  MenuItem,
   IconButton,
   Tooltip,
 } from '@mui/material';
 import Button from 'components/ui/Button';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import {
   Info,
   X,
@@ -241,32 +240,26 @@ const ColumnMapperModal = ({
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-lg border border-slate-200">
-            <TextField
-              select
+            <SearchableSelect
               label="Identifier Key Type"
-              fullWidth
               value={mappings.identifier_type}
               onChange={(e) => handleIdentifierTypeChange(e.target.value)}
-              variant="outlined"
-            >
-              <MenuItem value="roll_number">Roll Number</MenuItem>
-              <MenuItem value="application_id">Application ID</MenuItem>
-            </TextField>
+              options={[
+                { value: 'roll_number', label: 'Roll Number' },
+                { value: 'application_id', label: 'Application ID' },
+              ]}
+            />
 
-            <TextField
-              select
+            <SearchableSelect
               label="CSV Column Match"
-              fullWidth
               value={mappings.identifier_column}
               onChange={(e) => handleIdentifierColumnChange(e.target.value)}
-              error={!mappings.identifier_column}
-              helperText={!mappings.identifier_column ? "Please select corresponding CSV column" : ""}
-            >
-              <MenuItem value="">-- Select Column --</MenuItem>
-              {csvHeaders.map((header) => (
-                <MenuItem key={header} value={header}>{header}</MenuItem>
-              ))}
-            </TextField>
+              options={[
+                { value: '', label: '-- Select Column --' },
+                ...csvHeaders.map((header) => ({ value: header, label: header })),
+              ]}
+              error={!mappings.identifier_column ? "Please select corresponding CSV column" : undefined}
+            />
           </div>
         </div>
 
@@ -340,21 +333,17 @@ const ColumnMapperModal = ({
                     </div>
 
                     <div className="w-full md:w-80">
-                      <TextField
-                        select
-                        size="small"
-                        label={`Maps to Column`}
-                        fullWidth
+                      <SearchableSelect
+                        label="Maps to Column"
                         value={mappedVal}
                         onChange={(e) => handleSubjectMappingChange(subject.subject_name, e.target.value)}
-                      >
-                        <MenuItem value="">-- Skip / Map Later --</MenuItem>
-                        {csvHeaders
-                          .filter((h) => !h.toLowerCase().includes('attendance'))
-                          .map((header) => (
-                            <MenuItem key={header} value={header}>{header}</MenuItem>
-                          ))}
-                      </TextField>
+                        options={[
+                          { value: '', label: '-- Skip / Map Later --' },
+                          ...csvHeaders
+                            .filter((h) => !h.toLowerCase().includes('attendance'))
+                            .map((header) => ({ value: header, label: header })),
+                        ]}
+                      />
                     </div>
                   </div>
                 );

@@ -1,3 +1,5 @@
+import SearchableSelect from 'components/ui/SearchableSelect';
+
 export default function Step3({ data, change, errors }) {
   const educationalOptions = [
     "Second Class or Grade C Master’s degree in Computer Science/IT/Software Engineering",
@@ -106,31 +108,27 @@ export default function Step3({ data, change, errors }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nationality</label>
-        <select
+        <SearchableSelect
+          label="Nationality"
           name="nationality"
           value={data.nationality}
           onChange={change}
-          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
-          <option value="Pakistani">Pakistani</option>
-          <option value="Dual National">Dual National</option>
-        </select>
+          options={[
+            { value: 'Pakistani', label: 'Pakistani' },
+            { value: 'Dual National', label: 'Dual National' },
+          ]}
+        />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Domicile</label>
-        <select
+        <SearchableSelect
+          label="Domicile"
           name="domicile"
           value={data.domicile}
           onChange={change}
-          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
-          <option value="">Select Domicile</option>
-          {domicileOptions.map((dom) => (
-            <option key={dom} value={dom}>{dom}</option>
-          ))}
-        </select>
+          options={[{ value: '', label: 'Select Domicile' }, ...domicileOptions.map(d => ({ value: d, label: d }))]}
+          placeholder="Select Domicile"
+        />
       </div>
 
       <div>
@@ -154,18 +152,18 @@ export default function Step3({ data, change, errors }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Medical Requirement</label>
-        <select
+        <SearchableSelect
+          label="Medical Requirement"
           name="medical_requirement"
           value={data.medical_requirement}
           onChange={change}
-          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
-          <option value="Medically Fit">Medically Fit</option>
-          <option value="Fit">Fit</option>
-          <option value="Unfit">Unfit</option>
-          <option value="Not Required">Not Required</option>
-        </select>
+          options={[
+            { value: 'Medically Fit', label: 'Medically Fit' },
+            { value: 'Fit', label: 'Fit' },
+            { value: 'Unfit', label: 'Unfit' },
+            { value: 'Not Required', label: 'Not Required' },
+          ]}
+        />
       </div>
 
       <div>

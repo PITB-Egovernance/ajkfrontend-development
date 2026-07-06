@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  ArrowLeft, 
-  Search, 
-  Save, 
-  FileDown, 
-  Award, 
-  Filter, 
-  Printer, 
+import {
+  ArrowLeft,
+  Search,
+  Save,
+  FileDown,
+  Award,
+  Filter,
+  Printer,
   AlertCircle,
   CheckCircle2,
   ChevronRight,
@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import Button from 'components/ui/Button';
 import Card from 'components/ui/Card';
 import Input from 'components/ui/Input';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { toast } from 'react-hot-toast';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
@@ -237,29 +238,24 @@ const InterviewAwardManagement = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Job Post</label>
-                <select 
+                <SearchableSelect
                   value={selectedJob}
                   onChange={(e) => setSelectedJob(e.target.value)}
-                  className="w-full h-14 px-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700"
-                >
-                  <option value="">Select Job...</option>
-                  {jobs.map(job => (
-                    <option key={job.id} value={job.id}>{job.designation}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'Select Job...' },
+                    ...jobs.map(job => ({ value: job.id, label: job.designation })),
+                  ]}
+                  placeholder="Select Job..."
+                />
               </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">District</label>
-                <select 
+                <SearchableSelect
                   value={selectedDistrict}
                   onChange={(e) => setSelectedDistrict(e.target.value)}
-                  className="w-full h-14 px-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:ring-0 transition-all font-bold text-slate-700"
-                >
-                  {districts.map(d => (
-                    <option key={d} value={d}>{d === 'all' ? 'All Districts' : d}</option>
-                  ))}
-                </select>
+                  options={districts.map(d => ({ value: d, label: d === 'all' ? 'All Districts' : d }))}
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-4">

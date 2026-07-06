@@ -1,3 +1,5 @@
+import SearchableSelect from 'components/ui/SearchableSelect';
+
 export default function Step1({ data, change, errors }) {
   const departments = [
     'Information Technology Board',
@@ -93,72 +95,57 @@ export default function Step1({ data, change, errors }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
-        <select
+        <SearchableSelect
+          label="Job Type"
           name="job_type"
           value={data.job_type}
           onChange={change}
-          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
-          <option value="Regular">Regular</option>
-          <option value="Contract">Contract</option>
-          <option value="Ad Hoc">Ad Hoc</option>
-          <option value="Temporary">Temporary</option>
-        </select>
+          options={[
+            { value: 'Regular', label: 'Regular' },
+            { value: 'Contract', label: 'Contract' },
+            { value: 'Ad Hoc', label: 'Ad Hoc' },
+            { value: 'Temporary', label: 'Temporary' },
+          ]}
+        />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
-        <select
+        <SearchableSelect
+          label="Department"
           name="department"
           value={data.department}
           onChange={change}
-          className={`w-full px-4 py-2.5 rounded-lg border ${errors.department ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
-        >
-          <option value="">Select Department</option>
-          {departments.map((dept) => (
-            <option key={dept} value={dept}>{dept}</option>
-          ))}
-        </select>
-        {errors.department && (
-          <p className="mt-1 text-sm text-red-600">{errors.department}</p>
-        )}
+          options={[{ value: '', label: 'Select Department' }, ...departments.map(d => ({ value: d, label: d }))]}
+          placeholder="Select Department"
+          required
+          error={errors.department}
+        />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Designation *</label>
-        <select
+        <SearchableSelect
+          label="Designation"
           name="designation"
           value={data.designation}
           onChange={change}
-          className={`w-full px-4 py-2.5 rounded-lg border ${errors.designation ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
-        >
-          <option value="">Select Designation</option>
-          {designations.map((designation) => (
-            <option key={designation} value={designation}>{designation}</option>
-          ))}
-        </select>
-        {errors.designation && (
-          <p className="mt-1 text-sm text-red-600">{errors.designation}</p>
-        )}
+          options={[{ value: '', label: 'Select Designation' }, ...designations.map(d => ({ value: d, label: d }))]}
+          placeholder="Select Designation"
+          required
+          error={errors.designation}
+        />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Grade BPS *</label>
-        <select
+        <SearchableSelect
+          label="Grade BPS"
           name="grade_bps"
           value={data.grade_bps}
           onChange={change}
-          className={`w-full px-4 py-2.5 rounded-lg border ${errors.grade_bps ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
-        >
-          <option value="">Select Grade</option>
-          {grades.map((grade) => (
-            <option key={grade} value={grade}>{grade}</option>
-          ))}
-        </select>
-        {errors.grade_bps && (
-          <p className="mt-1 text-sm text-red-600">{errors.grade_bps}</p>
-        )}
+          options={[{ value: '', label: 'Select Grade' }, ...grades.map(g => ({ value: g, label: g }))]}
+          placeholder="Select Grade"
+          required
+          error={errors.grade_bps}
+        />
       </div>
 
       <div>

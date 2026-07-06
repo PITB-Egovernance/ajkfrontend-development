@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TextField, MenuItem } from '@mui/material';
+import { TextField } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { 
@@ -465,40 +466,33 @@ const OrganizationalHierarchy = () => {
                   </div>
 
                   <div>
-                    <TextField
-                      select
-                      fullWidth
+                    <SearchableSelect
                       label="Parent Branch (Optional)"
-                      id="parent_id"
                       name="parent_id"
                       value={formData.parent_id}
                       onChange={handleInputChange}
-                    >
-                      <MenuItem value="">None (Top Level)</MenuItem>
-                      {branches
-                        .filter(b => !editingBranch || b.id !== editingBranch.id)
-                        .map(branch => (
-                          <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>
-                        ))
-                      }
-                    </TextField>
+                      options={[
+                        { value: '', label: 'None (Top Level)' },
+                        ...branches
+                          .filter(b => !editingBranch || b.id !== editingBranch.id)
+                          .map(branch => ({ value: branch.id, label: branch.name }))
+                      ]}
+                      placeholder="None (Top Level)"
+                    />
                   </div>
 
                   <div>
-                    <TextField
-                      select
-                      fullWidth
+                    <SearchableSelect
                       label="Head of Branch"
-                      id="head_id"
                       name="head_id"
                       value={formData.head_id}
                       onChange={handleInputChange}
-                    >
-                      <MenuItem value="">Not Assigned</MenuItem>
-                      {employees.map(emp => (
-                        <MenuItem key={emp.id} value={emp.id}>{emp.name}</MenuItem>
-                      ))}
-                    </TextField>
+                      options={[
+                        { value: '', label: 'Not Assigned' },
+                        ...employees.map(emp => ({ value: emp.id, label: emp.name }))
+                      ]}
+                      placeholder="Not Assigned"
+                    />
                   </div>
 
                   <div>
@@ -515,18 +509,17 @@ const OrganizationalHierarchy = () => {
 
                   {editingBranch && (
                     <div>
-                      <TextField
-                        select
-                        fullWidth
+                      <SearchableSelect
                         label="Status"
-                        id="status"
                         name="status"
                         value={formData.status}
                         onChange={handleInputChange}
-                      >
-                        <MenuItem value="active">Active</MenuItem>
-                        <MenuItem value="inactive">Inactive</MenuItem>
-                      </TextField>
+                        options={[
+                          { value: 'active', label: 'Active' },
+                          { value: 'inactive', label: 'Inactive' },
+                        ]}
+                        placeholder="Select Status"
+                      />
                     </div>
                   )}
                 </div>

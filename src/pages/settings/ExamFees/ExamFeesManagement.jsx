@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import {
   TextField, IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, Menu, MenuItem,
@@ -324,21 +325,17 @@ const ExamFeesManagement = () => {
               InputLabelProps={{ shrink: true }}
               fullWidth
             />
-            <TextField
-              select
-              size="small"
-              label="Test Type"
+            <SearchableSelect
               name="test_type"
+              label="Test Type"
               value={filters.test_type}
               onChange={handleFilterChange}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            >
-              <MenuItem value="">All Test Type</MenuItem>
-              {TEST_TYPES.map((type) => (
-                <MenuItem key={type} value={type}>{type}</MenuItem>
-              ))}
-            </TextField>
+              options={[
+                { value: '', label: 'All Test Type' },
+                ...TEST_TYPES.map((type) => ({ value: type, label: type })),
+              ]}
+              placeholder="All Test Type"
+            />
             <TextField
               size="small"
               label="Fee Amount"
@@ -349,20 +346,18 @@ const ExamFeesManagement = () => {
               InputLabelProps={{ shrink: true }}
               fullWidth
             />
-            <TextField
-              select
-              size="small"
-              label="Status"
+            <SearchableSelect
               name="status"
+              label="Status"
               value={filters.status}
               onChange={handleFilterChange}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            >
-              <MenuItem value="">All Status</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </TextField>
+              options={[
+                { value: '', label: 'All Status' },
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+              ]}
+              placeholder="All Status"
+            />
           </div>
         </div>
 
@@ -391,11 +386,16 @@ const ExamFeesManagement = () => {
           <DialogTitle className="font-bold">{editing ? 'Edit Exam Fee' : 'Add Exam Fee'}</DialogTitle>
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
-            <TextField fullWidth select required label="Test Type" margin="normal" size="small"
-              value={formData.test_type}
-              onChange={(e) => { setFormData((f) => ({ ...f, test_type: e.target.value })); setFormError(''); }}>
-              {TEST_TYPES.map((t) => (<MenuItem key={t} value={t}>{t}</MenuItem>))}
-            </TextField>
+            <div style={{ marginTop: 16 }}>
+              <SearchableSelect
+                required
+                label="Test Type"
+                value={formData.test_type}
+                onChange={(e) => { setFormData((f) => ({ ...f, test_type: e.target.value })); setFormError(''); }}
+                options={TEST_TYPES.map((t) => ({ value: t, label: t }))}
+                placeholder="— Select Test Type —"
+              />
+            </div>
             <TextField fullWidth label="Label (optional)" margin="normal" size="small"
               value={formData.label}
               onChange={(e) => setFormData((f) => ({ ...f, label: e.target.value }))}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import TooltipDataGrid from "components/ui/TooltipDataGrid";
+import SearchableSelect from "components/ui/SearchableSelect";
 import {
   TextField, MenuItem, IconButton, Menu, Dialog, DialogTitle,
   DialogContent, DialogActions, Switch, FormControlLabel, Chip,
@@ -399,16 +400,30 @@ const NewsManagement = () => {
         <div className="flex gap-3 mb-4 flex-wrap">
           <TextField size="small" placeholder="Search by title..."
             value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 280 }} />
-          <TextField select size="small" label="Type" value={filterType}
-            onChange={(e) => setFilterType(e.target.value)} sx={{ minWidth: 180 }}>
-            <MenuItem value="">All Types</MenuItem>
-            {NEWS_TYPES.map((t) => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
-          </TextField>
-          <TextField select size="small" label="Status" value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)} sx={{ minWidth: 160 }}>
-            <MenuItem value="">All Status</MenuItem>
-            {STATUSES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
-          </TextField>
+          <div style={{ minWidth: 180 }}>
+            <SearchableSelect
+              label="Type"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              options={[
+                { value: "", label: "All Types" },
+                ...NEWS_TYPES,
+              ]}
+              placeholder="All Types"
+            />
+          </div>
+          <div style={{ minWidth: 160 }}>
+            <SearchableSelect
+              label="Status"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              options={[
+                { value: "", label: "All Status" },
+                ...STATUSES,
+              ]}
+              placeholder="All Status"
+            />
+          </div>
         </div>
 
         {/* GRID */}
@@ -441,23 +456,34 @@ const NewsManagement = () => {
                 helperText="Slug is auto-generated from the title" />
 
               {/* Category */}
-              <TextField select fullWidth label="Category" margin="dense" size="small"
-                value={form.category} onChange={(e) => setField("category", e.target.value)}>
-                <MenuItem value="">— None —</MenuItem>
-                {NEWS_CATEGORIES.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </TextField>
+              <SearchableSelect
+                label="Category"
+                value={form.category}
+                onChange={(e) => setField("category", e.target.value)}
+                options={[
+                  { value: "", label: "— None —" },
+                  ...NEWS_CATEGORIES.map((c) => ({ value: c, label: c })),
+                ]}
+                placeholder="— None —"
+              />
 
               {/* News type */}
-              <TextField select fullWidth label="News Type" margin="dense" size="small"
-                value={form.news_type} onChange={(e) => setField("news_type", e.target.value)}>
-                {NEWS_TYPES.map((t) => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
-              </TextField>
+              <SearchableSelect
+                label="News Type"
+                value={form.news_type}
+                onChange={(e) => setField("news_type", e.target.value)}
+                options={NEWS_TYPES}
+                placeholder="— Select News Type —"
+              />
 
               {/* Display type */}
-              <TextField select fullWidth label="Display Type" margin="dense" size="small"
-                value={form.display_type} onChange={(e) => setField("display_type", e.target.value)}>
-                {DISPLAY_TYPES.map((t) => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
-              </TextField>
+              <SearchableSelect
+                label="Display Type"
+                value={form.display_type}
+                onChange={(e) => setField("display_type", e.target.value)}
+                options={DISPLAY_TYPES}
+                placeholder="— Select Display Type —"
+              />
 
               {/* Short description */}
               <TextField fullWidth label="Short Description" margin="dense" size="small" multiline minRows={2}
@@ -488,10 +514,13 @@ const NewsManagement = () => {
                 className="md:col-span-2" />
 
               {/* Status */}
-              <TextField select fullWidth label="Status" margin="dense" size="small"
-                value={form.status} onChange={(e) => setField("status", e.target.value)}>
-                {STATUSES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
-              </TextField>
+              <SearchableSelect
+                label="Status"
+                value={form.status}
+                onChange={(e) => setField("status", e.target.value)}
+                options={STATUSES}
+                placeholder="— Select Status —"
+              />
             </div>
 
             {/* Primary attachment (single) */}

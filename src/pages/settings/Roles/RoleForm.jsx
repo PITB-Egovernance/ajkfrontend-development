@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { TextField, Checkbox } from "@mui/material";
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
 import { ArrowLeft, Save, ShieldCheck, Pencil } from "lucide-react";
@@ -239,16 +240,17 @@ const RoleForm = () => {
                 InputProps={{ readOnly }}
               />
               {isView && (
-                <TextField
-                  select fullWidth label="Status" value={status}
+                <SearchableSelect
+                  label="Status"
+                  value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  SelectProps={{ native: true }}
-                  InputLabelProps={{ shrink: true }}
-                  InputProps={{ readOnly }}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </TextField>
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                  ]}
+                  placeholder="Select Status"
+                  disabled={readOnly}
+                />
               )}
             </div>
           </CardContent>

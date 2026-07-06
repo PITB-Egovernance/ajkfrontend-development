@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import TooltipDataGrid from "components/ui/TooltipDataGrid";
+import SearchableSelect from "components/ui/SearchableSelect";
 import {
-  TextField, MenuItem, IconButton, Menu, Dialog, DialogTitle,
+  MenuItem, IconButton, Menu, Dialog, DialogTitle,
   DialogContent, DialogActions, Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
@@ -322,16 +323,30 @@ const RollNumberSlipInstructions = () => {
 
         {/* FILTERS */}
         <div className="flex gap-3 mb-4 flex-wrap">
-          <TextField select size="small" label="Slip Text Type" value={filterType}
-            onChange={(e) => setFilterType(e.target.value)} sx={{ minWidth: 220 }}>
-            <MenuItem value="">All Types</MenuItem>
-            {SLIP_TEXT_TYPES.map((t) => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
-          </TextField>
-          <TextField select size="small" label="Status" value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)} sx={{ minWidth: 160 }}>
-            <MenuItem value="">All Status</MenuItem>
-            {STATUSES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
-          </TextField>
+          <div style={{ minWidth: 220 }}>
+            <SearchableSelect
+              label="Slip Text Type"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              options={[
+                { value: "", label: "All Types" },
+                ...SLIP_TEXT_TYPES,
+              ]}
+              placeholder="All Types"
+            />
+          </div>
+          <div style={{ minWidth: 160 }}>
+            <SearchableSelect
+              label="Status"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              options={[
+                { value: "", label: "All Status" },
+                ...STATUSES,
+              ]}
+              placeholder="All Status"
+            />
+          </div>
         </div>
 
         {/* GRID */}
@@ -357,11 +372,13 @@ const RollNumberSlipInstructions = () => {
 
           <DialogContent>
             <div className="mt-1">
-              <TextField select fullWidth label="Slip Text Type" margin="dense" size="small"
-                value={form.slip_text_type} onChange={(e) => setField("slip_text_type", e.target.value)}>
-                <MenuItem value="" disabled>Select Slip Text Type</MenuItem>
-                {SLIP_TEXT_TYPES.map((t) => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
-              </TextField>
+              <SearchableSelect
+                label="Slip Text Type"
+                value={form.slip_text_type}
+                onChange={(e) => setField("slip_text_type", e.target.value)}
+                options={SLIP_TEXT_TYPES}
+                placeholder="— Select Slip Text Type —"
+              />
             </div>
 
             {/* Rich text editor */}

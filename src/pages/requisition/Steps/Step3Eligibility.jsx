@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { TextField, MenuItem } from '@mui/material';
+import { TextField } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
 import { Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
@@ -581,26 +582,23 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
         </div>
 
         <div className="col-md-6 form-group">
-          <TextField
-            fullWidth
-            required
-            select
+          <SearchableSelect
             label="Age Relaxation"
             name="age_relaxation"
             value={formData.age_relaxation}
             onChange={handleChange}
-          >
-            <MenuItem value="Yes">Yes</MenuItem>
-            <MenuItem value="No">No</MenuItem>
-          </TextField>
+            required
+            options={[
+              { value: 'Yes', label: 'Yes' },
+              { value: 'No', label: 'No' },
+            ]}
+          />
         </div>
 
         {showRelaxation && (
           <>
             <div className="col-md-6 form-group">
-              <TextField
-                fullWidth
-                select
+              <SearchableSelect
                 label="Reason for Age Relaxation"
                 name="relaxation_reason"
                 value={isOtherRelaxation ? '__other__' : formData.relaxation_reason}
@@ -614,15 +612,14 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
                     setFormData((prev) => ({ ...prev, relaxation_reason: val }));
                   }
                 }}
-              >
-                <MenuItem value="Government Employee">Government Employee</MenuItem>
-                {!isOtherRelaxation && formData.relaxation_reason && formData.relaxation_reason !== 'Government Employee' && (
-                  <MenuItem value={formData.relaxation_reason}>{formData.relaxation_reason}</MenuItem>
-                )}
-                <MenuItem value="__other__" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-                  Other (specify)
-                </MenuItem>
-              </TextField>
+                options={[
+                  { value: 'Government Employee', label: 'Government Employee' },
+                  ...(!isOtherRelaxation && formData.relaxation_reason && formData.relaxation_reason !== 'Government Employee'
+                    ? [{ value: formData.relaxation_reason, label: formData.relaxation_reason }]
+                    : []),
+                  { value: '__other__', label: 'Other (specify)' },
+                ]}
+              />
               {isOtherRelaxation && (
                 <div className="mt-2 flex gap-2 items-center animate-in fade-in duration-200">
                   <TextField
@@ -688,35 +685,32 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
         )}
 
         <div className="col-md-6 form-group">
-          <TextField
-            fullWidth
-            required
-            select
+          <SearchableSelect
             label="Nationality"
             name="nationality"
             value={formData.nationality}
             onChange={handleChange}
-          >
-            <MenuItem value="">Select Nationality</MenuItem>
-            {nationalities.map((n) => (
-              <MenuItem key={n} value={n}>{n}</MenuItem>
-            ))}
-          </TextField>
+            required
+            placeholder="Select Nationality"
+            options={[
+              { value: '', label: 'Select Nationality' },
+              ...nationalities.map((n) => ({ value: n, label: n })),
+            ]}
+          />
         </div>
 
         <div className="col-md-6 form-group">
-          <TextField
-            fullWidth
-            select
+          <SearchableSelect
             label="Gender"
             name="gender_basis"
             value={formData.gender_basis}
             onChange={handleChange}
-          >
-            <MenuItem value="Male">Male</MenuItem>
-            <MenuItem value="Female">Female</MenuItem>
-            <MenuItem value="Male/Female">Male and Female</MenuItem>
-          </TextField>
+            options={[
+              { value: 'Male', label: 'Male' },
+              { value: 'Female', label: 'Female' },
+              { value: 'Male/Female', label: 'Male and Female' },
+            ]}
+          />
         </div>
 
         <div className="col-md-6 form-group">
@@ -787,45 +781,31 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
             {formData.district.map((_, index) => (
               <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                 <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
-                  <TextField
-                    fullWidth
-                    required
-                    select
+                  <SearchableSelect
                     label="Select Districts"
-                    size="small"
                     value={formData.district[index] || ''}
                     onChange={(e) =>
                       handleArrayChange(index, 'district', e.target.value)
                     }
-                    error={!!rowErrors[index]?.district}
-                    helperText={rowErrors[index]?.district || ' '}
-                  >
-                    <MenuItem value="">Select District</MenuItem>
-
-                    {districtOptions
-                      .filter((district) => {
-                        const selectedInOtherRows = formData.district
-                          .filter((_, i) => i !== index)
-                          .includes(district.id);
-                        return !selectedInOtherRows;
-                      })
-                      .map((district) => (
-                        <MenuItem key={district.id} value={district.id}>
-                          {district.name}
-                        </MenuItem>
-                      ))}
-
-                    {/* Fallback so a previously-saved value that doesn't match any
-                        districtOptions entry (e.g. the backend returned the district
-                        name instead of its hash_id) still renders as selected instead
-                        of leaving the Select blank. Picking a real option replaces it. */}
-                    {formData.district[index] &&
-                      !districtOptions.some((district) => district.id === formData.district[index]) && (
-                        <MenuItem value={formData.district[index]}>
-                          {formData.district[index]}
-                        </MenuItem>
-                    )}
-                  </TextField>
+                    required
+                    error={rowErrors[index]?.district}
+                    placeholder="Select District"
+                    options={[
+                      { value: '', label: 'Select District' },
+                      ...districtOptions
+                        .filter((district) => {
+                          const selectedInOtherRows = formData.district
+                            .filter((_, i) => i !== index)
+                            .includes(district.id);
+                          return !selectedInOtherRows;
+                        })
+                        .map((district) => ({ value: district.id, label: district.name })),
+                      // Fallback for previously-saved value that doesn't match any option
+                      ...(formData.district[index] && !districtOptions.some((d) => d.id === formData.district[index])
+                        ? [{ value: formData.district[index], label: formData.district[index] }]
+                        : []),
+                    ]}
+                  />
                 </td>
                 {/* <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
                   <TextField

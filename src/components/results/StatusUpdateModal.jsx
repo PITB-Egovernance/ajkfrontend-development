@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, X, AlertTriangle } from 'lucide-react';
 import Button from 'components/ui/Button';
+import SearchableSelect from 'components/ui/SearchableSelect';
 
 const StatusUpdateModal = ({ isOpen, award, onClose, onConfirm }) => {
   const [reasonCode, setReasonCode] = useState('OFFER_DECLINED');
@@ -56,15 +57,11 @@ const StatusUpdateModal = ({ isOpen, award, onClose, onConfirm }) => {
           <div className="space-y-6">
             <div>
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block px-1">Reason Code</label>
-              <select
+              <SearchableSelect
                 value={reasonCode}
                 onChange={(e) => setReasonCode(e.target.value)}
-                className="w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 text-sm font-bold text-slate-700 focus:border-indigo-500 focus:outline-none transition-all appearance-none"
-              >
-                {reasonCodes.map(code => (
-                  <option key={code.value} value={code.value}>{code.label}</option>
-                ))}
-              </select>
+                options={reasonCodes}
+              />
             </div>
 
             <div>

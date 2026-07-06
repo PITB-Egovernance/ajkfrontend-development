@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TextField, Autocomplete, InputAdornment } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import { TextField, InputAdornment } from '@mui/material';
 import toast from 'react-hot-toast';
 
 const OTHER_DESIGNATION = '__other__';
@@ -361,32 +362,14 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
 
         {/* 1. Department */}
         <div className="col-md-6 form-group">
-          <Autocomplete
-            fullWidth
-            options={sortedDepartmentOptions}
-            getOptionLabel={(option) => option?.name || ''}
-            isOptionEqualToValue={(option, value) => option?.name === value?.name}
-            // The stored value is the department's NAME string (so the wire
-            // format matches the live API curl example, which sends
-            // `department=Punjab Education Department` rather than a
-            // hash_id) — resolve it back to an option object for display.
-            value={
-              formData.department
-                ? (sortedDepartmentOptions.find((d) => d.name === formData.department)
-                    || { name: formData.department })
-                : null
-            }
-            onChange={(_, newValue) => {
-              setFormData((prev) => ({ ...prev, department: newValue?.name || '' }));
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                required
-                label="Department"
-                helperText={departmentOptions.length === 0 ? 'No departments configured in Settings yet' : ' '}
-              />
-            )}
+          <SearchableSelect
+            required
+            label="Department"
+            value={formData.department || ''}
+            onChange={(e) => setFormData((prev) => ({ ...prev, department: e.target.value }))}
+            options={sortedDepartmentOptions.map((d) => ({ value: d.name, label: d.name }))}
+            placeholder="— Select Department —"
+            hint={departmentOptions.length === 0 ? 'No departments configured in Settings yet' : ''}
           />
         </div>
 
@@ -408,71 +391,41 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
 
         {/* 3. Scale of the Post — sourced dynamically from /settings/grades */}
         <div className="col-md-6 form-group">
-          <Autocomplete
-            fullWidth
-            options={sortedGradeOptions}
-            getOptionLabel={(option) => option?.name || ''}
-            isOptionEqualToValue={(option, value) => option?.id === value?.id}
-            value={
-              formData.scale
-                ? (sortedGradeOptions.find((g) => g.id === formData.scale)
-                    || { id: formData.scale, name: String(formData.scale) })
-                : null
-            }
-            onChange={(_, newValue) => {
-              setFormData((prev) => ({ ...prev, scale: newValue?.id || '' }));
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                required
-                label="Scale of the Post"
-                helperText={gradeOptions.length === 0 ? 'No grades configured in Settings yet' : ' '}
-              />
-            )}
+          <SearchableSelect
+            required
+            label="Scale of the Post"
+            value={formData.scale || ''}
+            onChange={(e) => setFormData((prev) => ({ ...prev, scale: e.target.value }))}
+            options={sortedGradeOptions.map((g) => ({ value: g.id, label: g.name }))}
+            placeholder="— Select Grade —"
+            hint={gradeOptions.length === 0 ? 'No grades configured in Settings yet' : ''}
           />
         </div>
 
         {/* 4. Designation of post — sourced dynamically from /settings/designations */}
         <div className="col-md-6 form-group">
-          <Autocomplete
-            fullWidth
-            options={designationSelectOptions}
-            getOptionLabel={(option) => option?.name || ''}
-            isOptionEqualToValue={(option, value) => option?.id === value?.id}
-            value={
-              isOtherDesignation
-                ? OTHER_DESIGNATION_OPTION
-                : (formData.designation
-                    ? designationSelectOptions.find((d) => d.name === formData.designation) || null
-                    : null)
-            }
-            onChange={(_, newValue) => {
-              if (!newValue || newValue.id === OTHER_DESIGNATION) {
-                setIsOtherDesignation(!!newValue);
-                if (!newValue) {
+          <SearchableSelect
+            required
+            label="Designation or Nomenclature of the Post(s)"
+            value={isOtherDesignation ? OTHER_DESIGNATION : (formData.designation ? (designationSelectOptions.find((d) => d.name === formData.designation)?.id || '') : '')}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (!val || val === OTHER_DESIGNATION) {
+                setIsOtherDesignation(!!val);
+                if (!val) {
                   setCustomDesignation('');
                   setFormData((prev) => ({ ...prev, designation: '' }));
                 }
               } else {
                 setIsOtherDesignation(false);
                 setCustomDesignation('');
-                setFormData((prev) => ({ ...prev, designation: newValue.name }));
+                const opt = designationSelectOptions.find((d) => d.id === val);
+                setFormData((prev) => ({ ...prev, designation: opt?.name || '' }));
               }
             }}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id} style={option.id === OTHER_DESIGNATION ? { color: '#64748b', fontStyle: 'italic' } : undefined}>
-                {option.name}
-              </li>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                required
-                label="Designation or Nomenclature of the Post(s)"
-                helperText={designationOptions.length === 0 ? 'No designations configured in Settings yet' : ' '}
-              />
-            )}
+            options={designationSelectOptions.map((d) => ({ value: d.id, label: d.name }))}
+            placeholder="— Select Designation —"
+            hint={designationOptions.length === 0 ? 'No designations configured in Settings yet' : ''}
           />
           {isOtherDesignation && (
             <div className="mt-2 flex gap-2 items-center animate-in fade-in duration-200">

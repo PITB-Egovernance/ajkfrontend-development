@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
-import { TextField, MenuItem, IconButton, Switch, FormControlLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import SearchableSelect from 'components/ui/SearchableSelect';
+import { TextField, IconButton, Switch, FormControlLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { Save, ArrowLeft, CheckCircle2, AlertCircle, Loader2, Search, ChevronRight, ChevronLeft, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ResultsApi from 'api/resultsApi';
@@ -280,23 +281,21 @@ const MarkEntryPage = () => {
         <Card className="shadow-sm border-slate-200">
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <TextField
-                select
+              <SearchableSelect
                 label="Job Post"
-                fullWidth
                 value={selectedJob}
                 onChange={(e) => setSelectedJob(e.target.value)}
-                variant="outlined"
-              >
-                <MenuItem value="">Select a post...</MenuItem>
-                {jobs.flatMap(adv =>
-                  (adv.job_details || adv.jobDetails || []).map(job => (
-                    <MenuItem key={job.hash_id || job.id} value={job.hash_id || job.id}>
-                      {job.designation} ({adv.adv_number})
-                    </MenuItem>
-                  ))
-                )}
-              </TextField>
+                options={[
+                  { value: '', label: 'Select a post...' },
+                  ...jobs.flatMap(adv =>
+                    (adv.job_details || adv.jobDetails || []).map(job => ({
+                      value: job.hash_id || job.id,
+                      label: `${job.designation} (${adv.adv_number})`,
+                    }))
+                  ),
+                ]}
+                placeholder="Select a post..."
+              />
 
               <TextField
                 type="date"
@@ -391,16 +390,16 @@ const MarkEntryPage = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        <select
-                          className="bg-transparent border-none text-sm font-bold focus:ring-0 cursor-pointer"
+                        <SearchableSelect
                           value={c.local_status}
                           onChange={(e) => handleStatusChange(c.app_id, e.target.value)}
-                        >
-                          <option value="pass">PASS</option>
-                          <option value="fail">FAIL</option>
-                          <option value="absent">ABSENT</option>
-                          <option value="withheld">WITHHELD</option>
-                        </select>
+                          options={[
+                            { value: 'pass', label: 'PASS' },
+                            { value: 'fail', label: 'FAIL' },
+                            { value: 'absent', label: 'ABSENT' },
+                            { value: 'withheld', label: 'WITHHELD' },
+                          ]}
+                        />
                       </TableCell>
                        {subjectTemplates.map(t => (
                          <TableCell key={t.id} align="center">
