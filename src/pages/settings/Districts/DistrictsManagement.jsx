@@ -28,8 +28,7 @@ import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 
-const PERM = "settings.districts"; // permission scope for this module
-const FILTER_FETCH_PAGE_SIZE = 100;
+const PERM = "settings.districts";
 
 const gridSx = {
   border: "none",
@@ -153,78 +152,22 @@ const DistrictsManagement = () => {
     return true;
   };
 
-  const fetchDistrictPage = async (page, pageSize) => {
-    const response = await fetch(
-      `${API_BASE}/settings/districts?page=${page}&per_page=${pageSize}`,
-      { headers: getHeaders() }
-    );
-    const result = await response.json();
-
-    if (!(response.ok || result.status === 200 || result.success)) {
-      throw new Error(result.message || "Failed to load districts");
-    }
-
-    const payload = result.data ?? {};
-    const data = payload.data ?? result.data ?? [];
-
-    return {
-      data: Array.isArray(data) ? data : [],
-      total: Number(payload.total ?? 0),
-      lastPage: Number(payload.last_page ?? 0),
-    };
-  };
-
-  const fetchFilteredDistricts = async (page, pageSize) => {
-    const firstPage = await fetchDistrictPage(1, FILTER_FETCH_PAGE_SIZE);
-    const totalRows = firstPage.total || firstPage.data.length;
-    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
-
-    const remainingPages = lastPage > 1
-      ? await Promise.all(
-          Array.from({ length: lastPage - 1 }, (_, i) =>
-            fetchDistrictPage(i + 2, FILTER_FETCH_PAGE_SIZE)
-          )
-        )
-      : [];
-
-    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
-    const filteredRows = formatDistrictRows(allRows).filter(matchesFilters);
-    const startIndex = page * pageSize;
-
-    setRows(filteredRows.slice(startIndex, startIndex + pageSize));
-    setTotal(filteredRows.length);
-  };
-
   /* ===============================
-     FETCH DISTRICTS (SERVER PAGINATION)
+     FETCH DISTRICTS
   =============================== */
-  const fetchDistricts = async (page = 0, pageSize = 15) => {
+  const fetchDistricts = async () => {
     setLoading(true);
     try {
-      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
-      if (hasActiveFilters) {
-        await fetchFilteredDistricts(page, pageSize);
-        return;
-      }
-
       const response = await fetch(
-        `${API_BASE}/settings/districts?page=${page + 1}&per_page=${pageSize}`,
+        `${API_BASE}/settings/districts?per_page=500`,
         { headers: getHeaders() }
       );
-
       const result = await response.json();
-
-      // Accept either the local-backend response shape ({ status: 200, data: { data: [...], total } })
-      // or the live-style shape ({ success: true, data: { data: [...], total } }).
       if (response.ok || result.status === 200 || result.success) {
-        const payload    = result.data ?? {};
-        const data       = payload.data ?? result.data ?? [];
-        const totalCount = payload.total ?? data.length ?? 0;
-
-        const formatted = formatDistrictRows(Array.isArray(data) ? data : []);
-
-        setRows(formatted);
-        setTotal(totalCount);
+        const payload = result.data ?? {};
+        const data = payload.data ?? result.data ?? [];
+        setRows(formatDistrictRows(Array.isArray(data) ? data : []));
+        setTotal(Number(payload.total ?? data.length ?? 0));
       } else {
         toast.error(result.message || "Failed to load districts");
       }
@@ -236,9 +179,9 @@ const DistrictsManagement = () => {
   };
 
   useEffect(() => {
-    fetchDistricts(paginationModel.page, paginationModel.pageSize);
+    fetchDistricts();
     // eslint-disable-next-line
-  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.code, filters.status]);
+  }, []);
 
   /* ===============================
      ACTION MENU
@@ -285,7 +228,7 @@ const DistrictsManagement = () => {
 
       if (response.ok || result.status === 200 || result.success) {
         toast.success("Deleted successfully");
-        fetchDistricts(paginationModel.page, paginationModel.pageSize);
+        fetchDistricts();
       } else {
         toast.error(result.message || "Delete failed");
       }
@@ -342,7 +285,7 @@ const DistrictsManagement = () => {
       }
 
       setOpenModal(false);
-      fetchDistricts(paginationModel.page, paginationModel.pageSize);
+      fetchDistricts();
     } catch {
       toast.error("Operation failed");
     } finally {
@@ -362,7 +305,7 @@ const DistrictsManagement = () => {
       const result = await res.json();
       if (res.ok || result.status === 200 || result.success) {
         toast.success(`District marked as ${newStatus}`);
-        fetchDistricts(paginationModel.page, paginationModel.pageSize);
+        fetchDistricts();
       } else {
         toast.error(result.message || "Status update failed");
       }
@@ -407,6 +350,8 @@ const DistrictsManagement = () => {
       ),
     }] : []),
   ];
+
+  const filteredRows = rows.filter(matchesFilters);
 
   if (loading && rows.length === 0) {
     return  <InlineLoader text="Loading districts..." variant="ring" size="lg" />;
@@ -506,14 +451,14 @@ const DistrictsManagement = () => {
 
       {/* DATAGRID */}
       <TooltipDataGrid
-        rows={rows}
+        rows={filteredRows}
         columns={columns}
         getRowId={(row) => row.id}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[15, 25, 50]}
-        paginationMode="server"
-        rowCount={total}
+        paginationMode="client"
+        rowCount={filteredRows.length}
         loading={loading}
         autoHeight
         sx={gridSx}

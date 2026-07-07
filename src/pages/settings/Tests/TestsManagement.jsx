@@ -20,7 +20,6 @@ import { GRID_SX } from 'utils/gridStyles';
 const PERM = 'settings.tests';
 
 const API_BASE = Config.apiUrl;
-const FILTER_FETCH_PAGE_SIZE = 100;
 
 const getHeaders = (json = true) => {
   const h = {
@@ -114,74 +113,16 @@ const TestsManagement = () => {
     finally { setLoadingTypes(false); }
   };
 
-  const fetchTestPage = async (page, pageSize) => {
-    const res = await fetch(
-      `${API_BASE}/settings/tests?page=${page}&per_page=${pageSize}`,
-      { headers: getHeaders() }
-    );
-    const result = await res.json();
-    if (!(res.ok || result.success || result.status === 200)) {
-      throw new Error(result.message || 'Failed to load tests');
-    }
-
-    const payload = result.data ?? {};
-    const data = payload.data ?? result.data ?? [];
-    return {
-      data: Array.isArray(data) ? data : [],
-      total: Number(payload.total ?? 0),
-      lastPage: Number(payload.last_page ?? 0),
-    };
-  };
-
-  const fetchFilteredTests = async (page, pageSize) => {
-    const testTypeId = String(filters.test_type_id || '').trim();
-    const testFees = String(filters.test_fees || '').trim().toLowerCase();
-    const status = String(filters.status || '').trim().toLowerCase();
-    const firstPage = await fetchTestPage(1, FILTER_FETCH_PAGE_SIZE);
-    const totalRows = firstPage.total || firstPage.data.length;
-    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
-
-    const remainingPages = lastPage > 1
-      ? await Promise.all(
-          Array.from({ length: lastPage - 1 }, (_, i) =>
-            fetchTestPage(i + 2, FILTER_FETCH_PAGE_SIZE)
-          )
-        )
-      : [];
-
-    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
-    const filteredRows = formatTestRows(allRows).filter((row) => {
-      if (testTypeId && String(row.test_type_id) !== testTypeId) return false;
-      if (testFees && !String(row.test_fees ?? '').toLowerCase().includes(testFees)) return false;
-      if (status && String(row.status || '').toLowerCase() !== status) return false;
-      return true;
-    });
-    const startIndex = page * pageSize;
-
-    setRows(
-      filteredRows
-        .slice(startIndex, startIndex + pageSize)
-        .map((row, i) => ({ ...row, sr_no: startIndex + i + 1 }))
-    );
-    setTotal(filteredRows.length);
-  };
-
-  const fetchAll = async (page = 0, pageSize = 15) => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
-      if (hasActiveFilters) {
-        await fetchFilteredTests(page, pageSize);
-        return;
-      }
-
-      const res    = await fetch(`${API_BASE}/settings/tests?page=${page + 1}&per_page=${pageSize}`, { headers: getHeaders() });
+      const res = await fetch(`${API_BASE}/settings/tests?per_page=500`, { headers: getHeaders() });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         const payload = result.data ?? {};
         const data = result.data?.data ?? result.data ?? [];
         const dataArray = Array.isArray(data) ? data : [];
-        setRows(formatTestRows(dataArray, page * pageSize));
+        setRows(formatTestRows(dataArray));
         setTotal(Number(payload.total ?? dataArray.length ?? 0));
       } else {
         toast.error(result.message || 'Failed to load tests');
@@ -191,14 +132,7 @@ const TestsManagement = () => {
   };
 
   useEffect(() => { fetchExamTypes(); }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchAll(paginationModel.page, paginationModel.pageSize);
-    }, 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize, filters.test_type_id, filters.test_fees, filters.status]);
+  useEffect(() => { fetchAll(); }, []);
 
   // Resolve a test-type display name — prefer the name from the list, fall back to the dropdown options
   const typeNameById = (id) => examTypes.find((t) => t.hash_id === id)?.name || '';
@@ -214,7 +148,7 @@ const TestsManagement = () => {
       if (res.ok || r.status === 200 || r.success) {
         toast.success(r.success || successMsg);
         setSelectionModel([]);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         toast.error(r.message || 'Action failed');
       }
@@ -279,7 +213,7 @@ const TestsManagement = () => {
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Test fee updated successfully' : 'Test fee added successfully');
         setOpen(false);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         toast.error(result.message || (isUpdate ? 'Failed to update test fee' : 'Failed to add test fee'));
       }
@@ -301,7 +235,7 @@ const TestsManagement = () => {
         if (rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
         } else {
-          fetchAll(paginationModel.page, paginationModel.pageSize);
+          fetchAll();
         }
       } else {
         toast.error(result.message || 'Failed to delete test');
@@ -327,7 +261,7 @@ const TestsManagement = () => {
       const r = await res.json();
       if (res.ok || r.status === 200 || r.success) {
         toast.success(`Test fee marked as ${newStatus}`);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         // Show backend validation messages if present (Laravel returns { errors: { field: [..] } })
         const fieldErrors = r.errors ? Object.values(r.errors).flat().join(', ') : '';
@@ -367,6 +301,16 @@ const TestsManagement = () => {
       ),
     }] : []),
   ];
+
+  const filteredRows = rows.filter((row) => {
+    const testTypeId = String(filters.test_type_id || '').trim();
+    const testFees = String(filters.test_fees || '').trim().toLowerCase();
+    const status = String(filters.status || '').trim().toLowerCase();
+    if (testTypeId && String(row.test_type_id) !== testTypeId) return false;
+    if (testFees && !String(row.test_fees ?? '').toLowerCase().includes(testFees)) return false;
+    if (status && String(row.status || '').toLowerCase() !== status) return false;
+    return true;
+  });
 
   if (loading && rows.length === 0) return <InlineLoader text="Loading tests..." variant="ring" size="lg" />;
 
@@ -487,14 +431,14 @@ const TestsManagement = () => {
         </div>
 
         <TooltipDataGrid
-          rows={rows}
+          rows={filteredRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
-          paginationMode="server"
-          rowCount={total}
+          paginationMode="client"
+          rowCount={filteredRows.length}
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           loading={loading}
           autoHeight

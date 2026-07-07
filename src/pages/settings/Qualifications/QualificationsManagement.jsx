@@ -16,7 +16,6 @@ import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
-import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 const PERM = 'settings.qualifications';
 
 const API_BASE = Config.apiUrl;
@@ -54,35 +53,16 @@ const QualificationsManagement = () => {
   const [search,   setSearch]   = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const fetchAll = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const hasSearch = Boolean(search.trim());
-
-      if (hasSearch) {
-        const data = await fetchPaginatedApiList(`${API_BASE}/settings/qualifications`, {
-          headers: getHeaders(),
-          perPage: 200,
-        });
-        setRows(data.map((item, i) => ({
-          id:       item.hash_id || item.id,
-          sr_no:    i + 1,
-          hash_id:  item.hash_id,
-          name:     item.qualification_name || item.name,
-          type:     String(item.type || 'required').toLowerCase(),
-          status:   String(item.status || 'active').toLowerCase(),
-        })));
-        setTotalRows(data.length);
-        return;
-      }
-
-      const res    = await fetch(`${API_BASE}/settings/qualifications?page=${page + 1}&per_page=${pageSize}`, { headers: getHeaders() });
+      const res    = await fetch(`${API_BASE}/settings/qualifications?per_page=500`, { headers: getHeaders() });
       const result = await res.json();
       if (result.success || result.status === 200) {
         const data = result.data?.data ?? result.data ?? [];
         setRows(data.map((item, i) => ({
           id:       item.hash_id || item.id,
-          sr_no:    page * pageSize + i + 1,
+          sr_no:    i + 1,
           hash_id:  item.hash_id,
           name:     item.qualification_name || item.name,
           type:     String(item.type || 'required').toLowerCase(),
@@ -98,7 +78,7 @@ const QualificationsManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(paginationModel.page, paginationModel.pageSize); }, [paginationModel.page, paginationModel.pageSize, search]);
+  useEffect(() => { fetchAll(); }, []);
 
 
   const filtered = rows.filter((r) =>
@@ -143,7 +123,7 @@ const QualificationsManagement = () => {
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Updated successfully' : 'Qualification added');
         setOpen(false);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         toast.error(result.message || 'Operation failed');
       }
@@ -163,7 +143,7 @@ const QualificationsManagement = () => {
         if (rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
         } else {
-          fetchAll(paginationModel.page, paginationModel.pageSize);
+          fetchAll();
         }
       } else {
         toast.error(result.message || 'Delete failed');
@@ -185,7 +165,7 @@ const QualificationsManagement = () => {
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         toast.success(`Marked as ${newStatus}`);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         toast.error(result.message || 'Status update failed');
       }
@@ -271,8 +251,8 @@ const QualificationsManagement = () => {
 
         <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          paginationMode={search.trim() ? 'client' : 'server'}
-          rowCount={search.trim() ? filtered.length : totalRows}
+          paginationMode="client"
+          rowCount={filtered.length}
           pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
           loading={loading} />
 

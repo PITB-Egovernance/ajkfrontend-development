@@ -30,7 +30,6 @@ import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 const PERM = "settings.designations";
 
 const API_BASE = Config.apiUrl;
-const FILTER_FETCH_PAGE_SIZE = 100;
 
 const DESIGNATION_TYPE_OPTIONS = [
   { value: "Internal", label: "Internal" },
@@ -174,87 +173,23 @@ const DesignationsManagement = () => {
     return true;
   };
 
-  const fetchDesignationPage = async (page, pageSize) => {
-    const response = await fetch(
-      `${API_BASE}/settings/designations?page=${page}&per_page=${pageSize}`,
-      { headers: getHeaders(false) }
-    );
-    const result = await response.json();
-
-    if (!(response.ok || result.success === true || result.status === 200)) {
-      throw new Error(result.message || "Failed to load designations");
-    }
-
-    const data = Array.isArray(result.data?.data)
-      ? result.data.data
-      : (Array.isArray(result.data) ? result.data : []);
-
-    return {
-      data,
-      total:    Number(result.data?.total     ?? result.meta?.total     ?? result.total     ?? data.length),
-      lastPage: Number(result.data?.last_page  ?? result.meta?.last_page ?? result.last_page ?? 0),
-    };
-  };
-
-  const fetchFilteredDesignations = async (page, pageSize) => {
-    const firstPage = await fetchDesignationPage(1, FILTER_FETCH_PAGE_SIZE);
-    const totalRows = firstPage.total || firstPage.data.length;
-    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
-
-    const remainingPages = lastPage > 1
-      ? await Promise.all(
-          Array.from({ length: lastPage - 1 }, (_, i) =>
-            fetchDesignationPage(i + 2, FILTER_FETCH_PAGE_SIZE)
-          )
-        )
-      : [];
-
-    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
-    const filteredRows = formatDesignationRows(allRows).filter(matchesFilters);
-    const startIndex = page * pageSize;
-
-    setRows(filteredRows.slice(startIndex, startIndex + pageSize));
-    setTotal(filteredRows.length);
-  };
-
   /* ===============================
      FETCH DESIGNATIONS
   =============================== */
-  const fetchDesignations = async (page = 0, pageSize = 15) => {
+  const fetchDesignations = async () => {
     setLoading(true);
-
     try {
-      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
-      if (hasActiveFilters) {
-        await fetchFilteredDesignations(page, pageSize);
-        return;
-      }
-
       const response = await fetch(
-        `${API_BASE}/settings/designations?page=${page + 1}&per_page=${pageSize}`,
-        {
-          headers: getHeaders(false),
-        }
+        `${API_BASE}/settings/designations?per_page=500`,
+        { headers: getHeaders(false) }
       );
-
       const result = await response.json();
-
       if (result.success === true || result.status === 200) {
         const dataArray = Array.isArray(result.data?.data)
           ? result.data.data
           : (Array.isArray(result.data) ? result.data : []);
-
-        const formatted = formatDesignationRows(dataArray);
-
-        // Total can live in several places depending on how the API serialises
-        // the paginator: paginator-style (result.data.total) or API-Resource
-        // collection style (result.meta.total). Fall back to the row count.
-        const totalCount = Number(
-          result.data?.total ?? result.meta?.total ?? result.total ?? formatted.length
-        );
-
-        setRows(formatted);
-        setTotal(totalCount);
+        setRows(formatDesignationRows(dataArray));
+        setTotal(Number(result.data?.total ?? result.meta?.total ?? result.total ?? dataArray.length));
       } else {
         toast.error(result.message || "Failed to load designations");
       }
@@ -265,7 +200,7 @@ const DesignationsManagement = () => {
     }
   };
 
- const fetchGrades = async () => {
+  const fetchGrades = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/grades?per_page=1000`, {
         headers: getHeaders(false),
@@ -299,9 +234,9 @@ const DesignationsManagement = () => {
   }, []);
 
   useEffect(() => {
-    fetchDesignations(paginationModel.page, paginationModel.pageSize);
+    fetchDesignations();
     // eslint-disable-next-line
-  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.grade_id, filters.status]);
+  }, []);
 
   /* ===============================
      STATUS COUNTS
@@ -385,7 +320,7 @@ const DesignationsManagement = () => {
 
       setOpenModal(false);
       setEditingDesignation(null);
-      fetchDesignations(paginationModel.page, paginationModel.pageSize);
+      fetchDesignations();
     } else {
       toast.error(result.message || (isUpdate ? "Failed to update designation" : "Failed to create designation"));
     }
@@ -417,7 +352,7 @@ const DesignationsManagement = () => {
 
       if (result.success === true || result.status === 200) {
         toast.success("Designation deleted successfully");
-        fetchDesignations(paginationModel.page, paginationModel.pageSize);
+        fetchDesignations();
       } else {
         toast.error(result.message || "Failed to delete designation");
       }
@@ -443,7 +378,7 @@ const DesignationsManagement = () => {
       const result = await res.json();
       if (res.ok || result.status === 200 || result.success) {
         toast.success(`Designation marked as ${newStatus}`);
-        fetchDesignations(paginationModel.page, paginationModel.pageSize);
+        fetchDesignations();
       } else {
         toast.error(result.message || "Failed to update designation status");
       }
@@ -499,6 +434,8 @@ const DesignationsManagement = () => {
     ),
   }] : []),
 ];
+
+  const filteredRows = rows.filter(matchesFilters);
 
   if (loading && rows.length === 0) {
     return <InlineLoader text="Loading designations..." variant="ring" />;
@@ -590,13 +527,13 @@ const DesignationsManagement = () => {
 
         {/* TABLE */}
         <TooltipDataGrid
-          rows={rows}
+          rows={filteredRows}
           columns={columns}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
-          paginationMode="server"
-          rowCount={total}
+          paginationMode="client"
+          rowCount={filteredRows.length}
           loading={loading}
           autoHeight
           sx={GRID_SX}

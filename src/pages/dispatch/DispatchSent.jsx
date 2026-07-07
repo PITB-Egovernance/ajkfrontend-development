@@ -72,20 +72,13 @@ const DispatchSent = () => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFilters(prev => ({ ...prev, [name]: value }));
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
-    setFilters({
-      to: '',
-      subject: '',
-      diary_outward_no: '',
-      date: '',
-      priority: ''
-    });
+    setFilters({ to: '', subject: '', diary_outward_no: '', date: '', priority: '' });
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   const API_BASE = Config.apiUrl;
@@ -147,9 +140,9 @@ const DispatchSent = () => {
   };
 
   useEffect(() => {
-    fetchForms(paginationModel.page, paginationModel.pageSize);
+    fetchForms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, []);
 
   useEffect(() => {
     const filtered = forms.filter((row) => {
@@ -225,8 +218,8 @@ const DispatchSent = () => {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[10, 25, 50, 75, 100]}
-          rowCount={totalRows}
-          paginationMode="server"
+          rowCount={filteredForms.length}
+          paginationMode="client"
           loading={loading}
           disableSelectionOnClick
           autoHeight

@@ -69,11 +69,11 @@ const CompaniesManagement = () => {
   /* ===============================
      FETCH COMPANIES
   =============================== */
-  const fetchCompanies = async (page = 0, pageSize = 15) => {
+  const fetchCompanies = async () => {
     setLoading(true);
 
     try {
-      const url = `${API_BASE}/settings/company?page=${page + 1}&per_page=${pageSize}`;
+      const url = `${API_BASE}/settings/company?per_page=500`;
 
       const response = await fetch(url, {
         method: "GET",
@@ -91,25 +91,23 @@ const CompaniesManagement = () => {
       const result = await response.json();
 
       if (result.success == true) {
-        const dataArray =
-          result.data?.data || [];
+        const dataArray = result.data?.data || [];
 
         const formatted = dataArray.map((item) => ({
           id: item.hash_id,
           hash_id: item.hash_id,
           name: item.company_name,
-          type: item.type, // ✅ added
+          type: item.type,
           contact_person: item.contact_person,
           contact_number: item.contact_number,
           ntn: item.ntn,
           email: item.email,
           address: item.address,
           status: item.status ?? "active",
-
         }));
 
         setRows(formatted);
-        setTotal(result.data?.total || formatted.length);
+        setTotal(formatted.length);
       } else {
         toast.error(result.message || "Failed to load companies");
       }
@@ -121,9 +119,9 @@ const CompaniesManagement = () => {
   };
 
   useEffect(() => {
-    fetchCompanies(paginationModel.page, paginationModel.pageSize);
+    fetchCompanies();
     // eslint-disable-next-line
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, []);
 
   /* ===============================
      STATUS COUNTS
@@ -190,7 +188,7 @@ const CompaniesManagement = () => {
         toast.success(isUpdate ? "Company updated successfully" : "Company created successfully");
         setOpenModal(false);
         setEditingCompany(null);
-        fetchCompanies(paginationModel.page, paginationModel.pageSize);
+        fetchCompanies();
       } else {
         toast.error(result.message || "Operation failed");
       }
@@ -226,7 +224,7 @@ const CompaniesManagement = () => {
 
       if (result.success === true) {
         toast.success("Company deleted successfully");
-        fetchCompanies(paginationModel.page, paginationModel.pageSize);
+        fetchCompanies();
       } else {
         toast.error(result.message || "Delete failed");
       }
@@ -250,7 +248,7 @@ const CompaniesManagement = () => {
       const result = await res.json();
       if (res.ok || result.success === true || result.status === 200) {
         toast.success(`Company marked as ${newStatus}`);
-        fetchCompanies(paginationModel.page, paginationModel.pageSize);
+        fetchCompanies();
       } else {
         toast.error(result.message || "Status update failed");
       }
@@ -387,7 +385,7 @@ const CompaniesManagement = () => {
             fullWidth
             placeholder="Search companies..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); }}
           />
         </div>
 
@@ -398,8 +396,8 @@ const CompaniesManagement = () => {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="server"
-          rowCount={total}
+          paginationMode="client"
+          rowCount={filteredRows.length}
           loading={loading}
           autoHeight
           sx={GRID_SX}

@@ -48,22 +48,13 @@ const ApprovedRequisitions = () => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFilters(prev => ({ ...prev, [name]: value }));
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
-    setFilters({
-      hash_id: '',
-      designation: '',
-      department: '',
-      scale: '',
-      quota_percentage: '',
-      num_posts: '',
-      vacancy_date: '',
-    });
+    setFilters({ hash_id: '', designation: '', department: '', scale: '', quota_percentage: '', num_posts: '', vacancy_date: '' });
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   const API_BASE = Config.apiUrl;
@@ -75,7 +66,7 @@ const ApprovedRequisitions = () => {
     setError(null);
     try {
       // Fetch from advertisements endpoint
-      const adsRes = await fetch(`${API_BASE}/advertisements/approved-requisitions?page=${pageNum + 1}`, {
+      const adsRes = await fetch(`${API_BASE}/advertisements/approved-requisitions?per_page=500`, {
         headers: {
           'Accept': 'application/json',
           'X-API-KEY': API_KEY,
@@ -236,9 +227,9 @@ const ApprovedRequisitions = () => {
   }, []);
 
   useEffect(() => {
-    fetchApproved(paginationModel.page);
+    fetchApproved();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page]);
+  }, []);
 
   const filteredRows = rows.filter((row) => {
     if (filters.hash_id && !row.hash_id?.toLowerCase().includes(filters.hash_id.toLowerCase())) {
@@ -376,8 +367,8 @@ const ApprovedRequisitions = () => {
             onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[10, 25, 50, 75, 100]}
             pagination
-            paginationMode="server"
-            rowCount={total}
+            paginationMode="client"
+            rowCount={filteredRows.length}
             loading={loading}
             disableSelectionOnClick
             checkboxSelection

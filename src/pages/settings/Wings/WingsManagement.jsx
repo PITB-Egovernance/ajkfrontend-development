@@ -90,16 +90,15 @@ const WingsManagement = () => {
   const [formData, setFormData] = useState({ name: "", status: "active" });
 
   /* ───────────────────────── FETCH ───────────────────────── */
-  const fetchWings = async (page = 0, pageSize = 15) => {
+  const fetchWings = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/wings?page=${page + 1}&per_page=${pageSize}`, { headers: headers(false) });
+      const res    = await fetch(`${API_BASE}/settings/wings?per_page=500`, { headers: headers(false) });
       const result = await res.json();
 
       if (res.ok || result.status === 200 || result.success) {
         const payload = result.data ?? {};
         const data    = payload.data ?? result.data ?? [];
-        const total   = payload.total ?? data.length ?? 0;
 
         const formatted = data.map((item) => ({
           id:          item.hash_id,
@@ -113,7 +112,7 @@ const WingsManagement = () => {
         }));
 
         setRows(formatted);
-        setTotal(total);
+        setTotal(formatted.length);
       } else {
         toast.error(result.message || "Failed to load wings");
       }
@@ -141,9 +140,9 @@ const WingsManagement = () => {
 
   useEffect(() => {
     fetchSecretaryId();
-    fetchWings(paginationModel.page, paginationModel.pageSize);
+    fetchWings();
     // eslint-disable-next-line
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, []);
 
   /* ───────────────────────── FILTER ───────────────────────── */
   const filteredRows = rows.filter((row) => {
@@ -183,7 +182,7 @@ const WingsManagement = () => {
         toast.success(isUpdate ? "Updated successfully" : "Created successfully");
         setOpenModal(false);
         setEditingWing(null);
-        fetchWings(paginationModel.page, paginationModel.pageSize);
+        fetchWings();
       } else {
         toast.error(result.message || (isUpdate ? "Update failed" : "Create failed"));
       }
@@ -206,7 +205,7 @@ const WingsManagement = () => {
 
       if (res.ok || result.status === 200 || result.success) {
         toast.success("Deleted successfully");
-        fetchWings(paginationModel.page, paginationModel.pageSize);
+        fetchWings();
       } else {
         toast.error(result.message || "Delete failed");
       }
@@ -226,7 +225,7 @@ const WingsManagement = () => {
 
       if (res.ok || result.status === 200 || result.success) {
         toast.success(`Marked as ${newStatus}`);
-        fetchWings(paginationModel.page, paginationModel.pageSize);
+        fetchWings();
       } else {
         toast.error(result.message || "Status update failed");
       }
@@ -337,8 +336,12 @@ const WingsManagement = () => {
           onFilterChange={(e) => {
             const { name, value } = e.target;
             setFilters((prev) => ({ ...prev, [name]: value }));
+            setPaginationModel((prev) => ({ ...prev, page: 0 }));
           }}
-          onClearFilters={() => setFilters({ name: "", code: "", status: "" })}
+          onClearFilters={() => {
+            setFilters({ name: "", code: "", status: "" });
+            setPaginationModel((prev) => ({ ...prev, page: 0 }));
+          }}
           filterConfig={filterConfig}
           title="Filter Wings / Sections"
         />
@@ -349,7 +352,7 @@ const WingsManagement = () => {
             type="text"
             placeholder="Search by name or code..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); }}
             className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
           />
         </div>
@@ -362,8 +365,8 @@ const WingsManagement = () => {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="server"
-          rowCount={total}
+          paginationMode="client"
+          rowCount={filteredRows.length}
           loading={loading}
           autoHeight
           sx={gridSx}

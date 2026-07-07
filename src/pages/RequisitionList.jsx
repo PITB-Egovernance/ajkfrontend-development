@@ -125,20 +125,13 @@ const RequisitionList = () => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
-    setFilters({
-      id: "",
-      designation: "",
-      department: "",
-      scale: "",
-      status: "",
-    });
+    setFilters({ id: "", designation: "", department: "", scale: "", status: "" });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const [paginationModel, setPaginationModel] = useState({
@@ -218,7 +211,7 @@ const RequisitionList = () => {
     setLoading(true);
     setError(null);
     try {
-      const url = `${API_BASE}/requisitions?page=${pageNum + 1}&per_page=${pageSize}`;
+      const url = `${API_BASE}/requisitions?per_page=500`;
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
@@ -288,9 +281,9 @@ const RequisitionList = () => {
   };
 
   useEffect(() => {
-    fetchRequisitions(paginationModel.page, paginationModel.pageSize);
+    fetchRequisitions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, []);
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -603,7 +596,7 @@ const RequisitionList = () => {
 
       if (result.success) {
         toast.success(result.message || "Requisition deleted successfully");
-        fetchRequisitions(paginationModel.page, paginationModel.pageSize);
+        fetchRequisitions();
       } else {
         toast.error(
           result.error || result.message || "Failed to delete requisition",
@@ -977,8 +970,8 @@ const RequisitionList = () => {
                 paginationModel={paginationModel}
                 onPaginationModelChange={setPaginationModel}
                 pageSizeOptions={[10, 25, 50]}
-                paginationMode="server"
-                rowCount={total}
+                paginationMode="client"
+                rowCount={filteredRows.length}
                 loading={loading}
                 disableRowSelectionOnClick
                 autoHeight

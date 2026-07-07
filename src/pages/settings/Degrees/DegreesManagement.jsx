@@ -54,30 +54,36 @@ const DegreesManagement = () => {
   const [filters, setFilters] = useState({ degree_name: '', degree_group: '', status: '' });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const fetchAll = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
+  const mapDegreeRow = (item, i) => ({
+    id:           item.hash_id || item.id,
+    sr_no:        i + 1,
+    hash_id:      item.hash_id,
+    degree_name:  item.degree_name || item.name || '',
+    degree_group: item.degree_group || '',
+    status:       String(item.status || 'active').toLowerCase(),
+  });
+
+  const matchesFilters = (row) => {
+    const name = filters.degree_name.trim().toLowerCase();
+    if (name && !String(row.degree_name || '').toLowerCase().includes(name)) return false;
+    if (filters.degree_group && row.degree_group !== filters.degree_group) return false;
+    if (filters.status && String(row.status || '').toLowerCase() !== filters.status) return false;
+    return true;
+  };
+
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page + 1), per_page: String(pageSize) });
-      const degRes  = await fetch(`${API_BASE}/settings/degrees?${params.toString()}`, { headers: getHeaders() });
-      const degData = await degRes.json();
-
-      if (degData.success || degData.status === 200) {
-        const pagination = degData.data ?? {};
-        const data = pagination.data ?? degData.data ?? [];
-        const mapped = (Array.isArray(data) ? data : [])
-          .filter(Boolean)
-          .map((item, i) => ({
-            id:           item.hash_id || item.id,
-            sr_no:        page * pageSize + i + 1,
-            hash_id:      item.hash_id,
-            degree_name:  item.degree_name || item.name || '',
-            degree_group: item.degree_group || '',
-            status:       String(item.status || 'active').toLowerCase(),
-          }));
+      const res  = await fetch(`${API_BASE}/settings/degrees?per_page=500`, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success || data.status === 200) {
+        const list = data.data?.data ?? data.data ?? [];
+        const mapped = (Array.isArray(list) ? list : []).filter(Boolean).map(mapDegreeRow);
         setRows(mapped);
-        setTotalRows(Number(pagination.total) || mapped.length);
+        setTotalRows(Number(data.data?.total) || mapped.length);
+        setGroups([...new Set(mapped.map((d) => d.degree_group).filter(Boolean))]);
       } else {
-        toast.error(degData.message || 'Failed to load degrees');
+        toast.error(data.message || 'Failed to load degrees');
         setRows([]);
         setTotalRows(0);
       }
@@ -85,24 +91,7 @@ const DegreesManagement = () => {
     finally { setLoading(false); }
   };
 
-  // Full group list for the filter dropdown — independent of the currently loaded page.
-  const fetchGroups = async () => {
-    try {
-      const res  = await fetch(`${API_BASE}/settings/degrees?per_page=1000`, { headers: getHeaders() });
-      const data = await res.json();
-      if (data.success || data.status === 200) {
-        const list = data.data?.data ?? data.data ?? [];
-        setGroups([...new Set((Array.isArray(list) ? list : []).map((d) => d.degree_group).filter(Boolean))]);
-      }
-    } catch { /* non-critical — group filter stays empty */ }
-  };
-
-  useEffect(() => {
-    fetchAll(paginationModel.page, paginationModel.pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize]);
-
-  useEffect(() => { fetchGroups(); }, []);
+  useEffect(() => { fetchAll(); }, []);
 
   const filterConfig = [
     { name: 'degree_name',  label: 'Degree Name',  type: 'text',   placeholder: 'Filter by degree name' },
@@ -113,9 +102,13 @@ const DegreesManagement = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const handleClearFilters = () => setFilters({ degree_name: '', degree_group: '', status: '' });
+  const handleClearFilters = () => {
+    setFilters({ degree_name: '', degree_group: '', status: '' });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
 
   const filtered = rows.filter((r) => {
     const matchName  = !filters.degree_name.trim() || r.degree_name?.toLowerCase().includes(filters.degree_name.toLowerCase());
@@ -157,7 +150,6 @@ const DegreesManagement = () => {
         toast.success(isUpdate ? 'Updated successfully' : 'Degree added');
         setOpen(false);
         fetchAll();
-        fetchGroups();
       } else {
         toast.error(result.message || 'Operation failed');
       }
@@ -297,7 +289,7 @@ const DegreesManagement = () => {
 
         <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={GRID_PAGE_SIZE_OPTIONS} paginationMode="server" rowCount={totalRows}
+          pageSizeOptions={GRID_PAGE_SIZE_OPTIONS} paginationMode="client" rowCount={filtered.length}
           loading={loading} autoHeight disableRowSelectionOnClick sx={GRID_SX} />
 
         {/* 3-dot action menu */}

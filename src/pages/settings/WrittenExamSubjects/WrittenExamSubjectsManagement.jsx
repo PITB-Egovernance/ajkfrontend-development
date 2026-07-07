@@ -96,31 +96,29 @@ const WrittenExamSubjectsManagement = () => {
   const [formData,    setFormData]    = useState(EMPTY_FORM);
   const [formErrors,  setFormErrors]  = useState({});
 
+  /* ── ROW MAPPER ── */
+  const mapSubjectRow = (item, i) => ({
+    id:               item.hash_id || item.id,
+    hash_id:          item.hash_id || item.id,
+    sr_no:            i + 1,
+    designation_id:   getDesignationId(item),
+    designation_ids:  getDesignationIds(item),
+    designation:      getDesignationNames(item).join(", "),
+    designationNames: getDesignationNames(item),
+    subject_name:     item.subject_name,
+    subject_marks:    getSubjectMarks(item) !== '' && getSubjectMarks(item) !== null ? Number(getSubjectMarks(item)) : '',
+    passing_marks_percentage: item.passing_marks_percentage !== null && item.passing_marks_percentage !== undefined && item.passing_marks_percentage !== '' ? Number(item.passing_marks_percentage) : '',
+    status:           item.status ?? "active",
+  });
+
   /* ── FETCH ── */
-  const fetchAll = async (
-    page = paginationModel.page,
-    pageSize = paginationModel.pageSize
-  ) => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const result = await WrittenExamSubjectApi.getAll(page + 1, pageSize);
+      const result = await WrittenExamSubjectApi.getAll(1, 500);
       const pagination = result.data ?? {};
       const data = pagination.data ?? result.data ?? [];
-      setAllRows(
-        (Array.isArray(data) ? data : []).map((item, i) => ({
-          id:               item.hash_id || item.id,
-          hash_id:          item.hash_id || item.id,
-          sr_no:            page * pageSize + i + 1,
-          designation_id:   getDesignationId(item),
-          designation_ids:  getDesignationIds(item),
-          designation:      getDesignationNames(item).join(", "),
-          designationNames: getDesignationNames(item),
-          subject_name:     item.subject_name,
-          subject_marks:    getSubjectMarks(item) !== '' && getSubjectMarks(item) !== null ? Number(getSubjectMarks(item)) : '',
-          passing_marks_percentage: item.passing_marks_percentage !== null && item.passing_marks_percentage !== undefined && item.passing_marks_percentage !== '' ? Number(item.passing_marks_percentage) : '',
-          status:           item.status ?? "active",
-        }))
-      );
+      setAllRows((Array.isArray(data) ? data : []).map(mapSubjectRow));
       setTotalRows(Number(pagination.total) || 0);
     } catch {
       toast.error("Failed to load written exam subjects");
@@ -150,10 +148,7 @@ const WrittenExamSubjectsManagement = () => {
     }
   };
 
-  useEffect(() => {
-    fetchAll(paginationModel.page, paginationModel.pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize]);
+  useEffect(() => { fetchAll(); }, []);
 
   useEffect(() => { fetchDesignations(); }, []);
 
@@ -167,9 +162,13 @@ const WrittenExamSubjectsManagement = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const handleClearFilters = () => setFilters({ designation: "", subject_name: "", status: "" });
+  const handleClearFilters = () => {
+    setFilters({ designation: "", subject_name: "", status: "" });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
 
   /* ── CLIENT-SIDE FILTER ── */
   const filteredRows = allRows.filter((row) => {
@@ -484,8 +483,8 @@ const WrittenExamSubjectsManagement = () => {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="server"
-          rowCount={totalRows}
+          paginationMode="client"
+          rowCount={filteredRows.length}
           loading={loading}
           autoHeight
           checkboxSelection

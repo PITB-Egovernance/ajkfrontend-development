@@ -26,7 +26,6 @@ import { GRID_SX } from 'utils/gridStyles';
 import { hasPermission } from "utils/permissions";
 
 const PERM = "settings.grades";
-const FILTER_FETCH_PAGE_SIZE = 100;
 
 const GradesManagement = () => {
   const navigate = useNavigate();
@@ -130,81 +129,21 @@ const GradesManagement = () => {
     return true;
   };
 
-  const fetchGradePage = async (page, pageSize) => {
-    const response = await fetch(
-      `${API_BASE}/settings/grades?page=${page}&per_page=${pageSize}`,
-      { headers: headers() }
-    );
-    const result = await response.json();
-
-    if (!(response.ok || result.status === 200 || result.success === true)) {
-      throw new Error(result.message || "Failed to load grades");
-    }
-
-    const data = Array.isArray(result.data?.data)
-      ? result.data.data
-      : (Array.isArray(result.data) ? result.data : []);
-
-    return {
-      data,
-      total:    Number(result.data?.total     ?? result.meta?.total     ?? result.total     ?? data.length),
-      lastPage: Number(result.data?.last_page  ?? result.meta?.last_page ?? result.last_page ?? 0),
-    };
-  };
-
-  const fetchFilteredGrades = async (page, pageSize) => {
-    const firstPage = await fetchGradePage(1, FILTER_FETCH_PAGE_SIZE);
-    const totalRows = firstPage.total || firstPage.data.length;
-    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
-
-    const remainingPages = lastPage > 1
-      ? await Promise.all(
-          Array.from({ length: lastPage - 1 }, (_, i) =>
-            fetchGradePage(i + 2, FILTER_FETCH_PAGE_SIZE)
-          )
-        )
-      : [];
-
-    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
-    const filteredRows = formatGradeRows(allRows).filter(matchesFilters);
-    const startIndex = page * pageSize;
-
-    setRows(filteredRows.slice(startIndex, startIndex + pageSize));
-    setTotal(filteredRows.length);
-  };
-
   /* ================= FETCH ================= */
-  const fetchGrades = async (page = 0, pageSize = 15) => {
+  const fetchGrades = async () => {
     setLoading(true);
     try {
-      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
-      if (hasActiveFilters) {
-        await fetchFilteredGrades(page, pageSize);
-        return;
-      }
-
       const response = await fetch(
-        `${API_BASE}/settings/grades?page=${page + 1}&per_page=${pageSize}`,
+        `${API_BASE}/settings/grades?per_page=500`,
         { headers: headers() }
       );
-
       const result = await response.json();
-      // console.log('Result', result)
       if (result.status === 200 || result.success === true) {
         const dataArray = Array.isArray(result.data?.data)
           ? result.data.data
           : (Array.isArray(result.data) ? result.data : []);
-
-        const formatted = formatGradeRows(dataArray);
-
-        // Total can live in result.data.total (paginator) or result.meta.total
-        // (API-Resource collection). Fall back to the row count.
-        const totalCount = Number(
-          result.data?.total ?? result.meta?.total ?? result.total ?? formatted.length
-        );
-
-        setRows(formatted);
-        setTotal(totalCount);
+        setRows(formatGradeRows(dataArray));
+        setTotal(Number(result.data?.total ?? result.meta?.total ?? result.total ?? dataArray.length));
       } else {
         toast.error(result.message || "Failed to load grades");
       }
@@ -216,9 +155,9 @@ const GradesManagement = () => {
   };
 
   useEffect(() => {
-    fetchGrades(paginationModel.page, paginationModel.pageSize);
+    fetchGrades();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.status]);
+  }, []);
 
   // ── Workaround for live backend unique-name bug ──────────────────────────
   // The live UpdateGradeRequest ignores null instead of the grade's own ID,
@@ -292,7 +231,7 @@ const GradesManagement = () => {
         toast.success("Grade updated successfully");
         setOpenModal(false);
         setEditingGrade(null);
-        fetchGrades(paginationModel.page, paginationModel.pageSize);
+        fetchGrades();
       } else {
         // Create — no unique issue, just POST
         const res    = await fetch(`${LIVE}/settings/grades/create`, {
@@ -303,7 +242,7 @@ const GradesManagement = () => {
         if (res.ok || result.status === 201 || result.success) {
           toast.success("Grade created successfully");
           setOpenModal(false);
-          fetchGrades(paginationModel.page, paginationModel.pageSize);
+          fetchGrades();
         } else {
           toast.error(result.message || "Failed to create grade");
         }
@@ -336,7 +275,7 @@ const GradesManagement = () => {
 
       if (result.status === 200 || result.success === true) {
         toast.success("Grade deleted successfully");
-        fetchGrades(paginationModel.page, paginationModel.pageSize);
+        fetchGrades();
       } else {
         toast.error(result.message || "Failed to delete grade");
       }
@@ -357,7 +296,7 @@ const GradesManagement = () => {
         row.name,   // same name → triggers two-step update
       );
       toast.success(`Grade marked as ${newStatus}`);
-      fetchGrades(paginationModel.page, paginationModel.pageSize);
+      fetchGrades();
     } catch (err) {
       toast.error(err.message || "Failed to update grade status");
     }
@@ -398,6 +337,8 @@ const GradesManagement = () => {
       ),
     }] : []),
   ];
+
+  const filteredRows = rows.filter(matchesFilters);
 
   if (loading && rows.length === 0) {
     return <InlineLoader text="Loading grades..." variant="ring" />;
@@ -481,13 +422,13 @@ const GradesManagement = () => {
 
         {/* TABLE */}
         <TooltipDataGrid
-          rows={rows}
+          rows={filteredRows}
           columns={columns}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="server"
-          rowCount={total}
+          paginationMode="client"
+          rowCount={filteredRows.length}
           loading={loading}
           autoHeight
           sx={GRID_SX}

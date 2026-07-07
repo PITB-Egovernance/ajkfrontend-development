@@ -20,7 +20,6 @@ import { GRID_SX } from 'utils/gridStyles';
 const PERM = 'settings.nationalities';
 
 const API_BASE = Config.apiUrl;
-const FILTER_FETCH_PAGE_SIZE = 100;
 
 const getHeaders = (json = true) => {
   const h = {
@@ -100,73 +99,16 @@ const NationalitiesManagement = () => {
     status:           item.status ?? 'active',
   }));
 
-  const fetchNationalityPage = async (page, pageSize) => {
-    const res = await fetch(
-      `${API_BASE}/settings/nationalities?page=${page}&per_page=${pageSize}`,
-      { headers: getHeaders() }
-    );
-    const result = await res.json();
-    if (!(res.ok || result.success || result.status === 200)) {
-      throw new Error(result.message || 'Failed to load nationalities');
-    }
-
-    const payload = result.data ?? {};
-    const data = payload.data ?? result.data ?? [];
-
-    return {
-      data: Array.isArray(data) ? data : [],
-      total: Number(payload.total ?? 0),
-      lastPage: Number(payload.last_page ?? 0),
-    };
-  };
-
-  const fetchFilteredNationalities = async (page, pageSize) => {
-    const name = filters.name.trim().toLowerCase();
-    const status = filters.status.trim().toLowerCase();
-    const firstPage = await fetchNationalityPage(1, FILTER_FETCH_PAGE_SIZE);
-    const totalRows = firstPage.total || firstPage.data.length;
-    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
-
-    const remainingPages = lastPage > 1
-      ? await Promise.all(
-          Array.from({ length: lastPage - 1 }, (_, i) =>
-            fetchNationalityPage(i + 2, FILTER_FETCH_PAGE_SIZE)
-          )
-        )
-      : [];
-
-    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
-    const filteredRows = formatNationalityRows(allRows).filter((row) => {
-      if (name && !String(row.nationality_name || '').toLowerCase().includes(name)) return false;
-      if (status && String(row.status || '').toLowerCase() !== status) return false;
-      return true;
-    });
-    const startIndex = page * pageSize;
-
-    setRows(
-      filteredRows
-        .slice(startIndex, startIndex + pageSize)
-        .map((row, i) => ({ ...row, sr_no: startIndex + i + 1 }))
-    );
-    setTotal(filteredRows.length);
-  };
-
-  const fetchAll = async (page = 0, pageSize = 15) => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
-      if (hasActiveFilters) {
-        await fetchFilteredNationalities(page, pageSize);
-        return;
-      }
-
-      const res    = await fetch(`${API_BASE}/settings/nationalities?page=${page + 1}&per_page=${pageSize}`, { headers: getHeaders() });
+      const res = await fetch(`${API_BASE}/settings/nationalities?per_page=500`, { headers: getHeaders() });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         const payload = result.data ?? {};
         const data = result.data?.data ?? result.data ?? [];
         const dataArray = Array.isArray(data) ? data : [];
-        setRows(formatNationalityRows(dataArray, page * pageSize));
+        setRows(formatNationalityRows(dataArray));
         setTotal(Number(payload.total ?? dataArray.length ?? 0));
       } else {
         toast.error(result.message || 'Failed to load nationalities');
@@ -175,13 +117,7 @@ const NationalitiesManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchAll(paginationModel.page, paginationModel.pageSize);
-    }, 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.status]);
+  useEffect(() => { fetchAll(); }, []);
 
   const activeCount   = rows.filter((r) => (r.status ?? 'active') === 'active').length;
   const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
@@ -194,7 +130,7 @@ const NationalitiesManagement = () => {
       if (res.ok || r.status === 200 || r.success) {
         toast.success(r.success || successMsg);
         setSelectionModel([]);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         const fieldErrors = r.errors ? Object.values(r.errors).flat().join(', ') : '';
         toast.error(fieldErrors || r.message || 'Action failed');
@@ -235,7 +171,7 @@ const NationalitiesManagement = () => {
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Nationality updated successfully' : 'Nationality added successfully');
         setOpen(false);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         const fieldErrors = result.errors ? Object.values(result.errors).flat().join(', ') : '';
         toast.error(fieldErrors || result.message || (isUpdate ? 'Failed to update nationality' : 'Failed to add nationality'));
@@ -258,7 +194,7 @@ const NationalitiesManagement = () => {
         if (rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
         } else {
-          fetchAll(paginationModel.page, paginationModel.pageSize);
+          fetchAll();
         }
       } else {
         toast.error(result.message || 'Failed to delete nationality');
@@ -282,7 +218,7 @@ const NationalitiesManagement = () => {
       const r = await res.json();
       if (res.ok || r.status === 200 || r.success) {
         toast.success(`Nationality marked as ${newStatus}`);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         const fieldErrors = r.errors ? Object.values(r.errors).flat().join(', ') : '';
         toast.error(fieldErrors || r.message || 'Status update failed');
@@ -317,6 +253,14 @@ const NationalitiesManagement = () => {
       ),
     }] : []),
   ];
+
+  const filteredRows = rows.filter((row) => {
+    const name = filters.name.trim().toLowerCase();
+    const status = filters.status.trim().toLowerCase();
+    if (name && !String(row.nationality_name || '').toLowerCase().includes(name)) return false;
+    if (status && String(row.status || '').toLowerCase() !== status) return false;
+    return true;
+  });
 
   if (loading && rows.length === 0) return <InlineLoader text="Loading nationalities..." variant="ring" size="lg" />;
 
@@ -391,14 +335,14 @@ const NationalitiesManagement = () => {
         </div>
 
         <TooltipDataGrid
-          rows={rows}
+          rows={filteredRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
-          paginationMode="server"
-          rowCount={total}
+          paginationMode="client"
+          rowCount={filteredRows.length}
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           loading={loading}
           autoHeight

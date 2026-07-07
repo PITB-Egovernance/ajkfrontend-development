@@ -71,21 +71,13 @@ export default function DispatchReceived() {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFilters(prev => ({ ...prev, [name]: value }));
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
-    setFilters({
-      ref: '',
-      from: '',
-      to: '',
-      subject: '',
-      date: '',
-      priority: ''
-    });
+    setFilters({ ref: '', from: '', to: '', subject: '', date: '', priority: '' });
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
   };
 
   const [detailedDispatch, setDetailedDispatch] = useState(null);
@@ -178,8 +170,9 @@ export default function DispatchReceived() {
   };
 
   useEffect(() => {
-    fetchReceivedForms(paginationModel.page + 1, paginationModel.pageSize);
-  }, [paginationModel.page, paginationModel.pageSize]);
+    fetchReceivedForms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const filtered = rows.filter((row) => {
@@ -275,9 +268,9 @@ export default function DispatchReceived() {
           columns={columns}
           getRowId={(row) => row.id}
           loading={loading}
-          rowCount={rowCount}
+          rowCount={filteredRows.length}
           pageSizeOptions={[10, 25, 50, 75, 100]}
-          paginationMode="server"
+          paginationMode="client"
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           disableRowSelectionOnClick

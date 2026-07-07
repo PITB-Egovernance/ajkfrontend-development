@@ -18,7 +18,6 @@ import { hasPermission } from 'utils/permissions';
 const PERM = 'settings.exam_test_fee';
 
 const API_BASE = Config.apiUrl;
-const FILTER_FETCH_PAGE_SIZE = 100;
 
 const TEST_TYPES = ['MCQs', 'Written Exam'];
 
@@ -87,76 +86,16 @@ const ExamFeesManagement = () => {
     status:    item.status ?? 'active',
   }));
 
-  const fetchExamFeePage = async (page, pageSize) => {
-    const res = await fetch(
-      `${API_BASE}/settings/exam-fees?page=${page}&per_page=${pageSize}`,
-      { headers: getHeaders() }
-    );
-    const result = await res.json();
-    if (!(res.ok || result.success || result.status === 200)) {
-      throw new Error(result.message || 'Failed to load exam fees');
-    }
-
-    const payload = result.data ?? {};
-    const data = payload.data ?? result.data ?? [];
-    return {
-      data: Array.isArray(data) ? data : [],
-      total: Number(payload.total ?? 0),
-      lastPage: Number(payload.last_page ?? 0),
-    };
-  };
-
-  const fetchFilteredExamFees = async (page, pageSize) => {
-    const label = filters.label.trim().toLowerCase();
-    const testType = filters.test_type.trim();
-    const amount = filters.amount.trim().toLowerCase();
-    const status = filters.status.trim().toLowerCase();
-    const firstPage = await fetchExamFeePage(1, FILTER_FETCH_PAGE_SIZE);
-    const totalRows = firstPage.total || firstPage.data.length;
-    const lastPage = firstPage.lastPage || Math.max(1, Math.ceil(totalRows / FILTER_FETCH_PAGE_SIZE));
-
-    const remainingPages = lastPage > 1
-      ? await Promise.all(
-          Array.from({ length: lastPage - 1 }, (_, i) =>
-            fetchExamFeePage(i + 2, FILTER_FETCH_PAGE_SIZE)
-          )
-        )
-      : [];
-
-    const allRows = [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data);
-    const filteredRows = formatExamFeeRows(allRows).filter((row) => {
-      if (label && !String(row.label || '').toLowerCase().includes(label)) return false;
-      if (testType && row.test_type !== testType) return false;
-      if (amount && !String(row.amount ?? '').toLowerCase().includes(amount)) return false;
-      if (status && String(row.status || '').toLowerCase() !== status) return false;
-      return true;
-    });
-    const startIndex = page * pageSize;
-
-    setRows(
-      filteredRows
-        .slice(startIndex, startIndex + pageSize)
-        .map((row, i) => ({ ...row, sr_no: startIndex + i + 1 }))
-    );
-    setTotal(filteredRows.length);
-  };
-
-  const fetchAll = async (page = 0, pageSize = 15) => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const hasActiveFilters = Object.values(filters).some((value) => String(value || '').trim());
-      if (hasActiveFilters) {
-        await fetchFilteredExamFees(page, pageSize);
-        return;
-      }
-
-      const res    = await fetch(`${API_BASE}/settings/exam-fees?page=${page + 1}&per_page=${pageSize}`, { headers: getHeaders() });
+      const res = await fetch(`${API_BASE}/settings/exam-fees?per_page=500`, { headers: getHeaders() });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         const payload = result.data ?? {};
         const data = result.data?.data ?? result.data ?? [];
         const dataArray = Array.isArray(data) ? data : [];
-        setRows(formatExamFeeRows(dataArray, page * pageSize));
+        setRows(formatExamFeeRows(dataArray));
         setTotal(Number(payload.total ?? dataArray.length ?? 0));
       } else {
         toast.error(result.message || 'Failed to load exam fees');
@@ -165,13 +104,7 @@ const ExamFeesManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchAll(paginationModel.page, paginationModel.pageSize);
-    }, 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize, filters.label, filters.test_type, filters.amount, filters.status]);
+  useEffect(() => { fetchAll(); }, []);
 
   const openAdd  = () => { setEditing(null); setFormData(emptyForm); setFormError(''); setOpen(true); };
   const openEdit = (row) => {
@@ -211,7 +144,7 @@ const ExamFeesManagement = () => {
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Exam fee updated successfully' : 'Exam fee added successfully');
         setOpen(false);
-        fetchAll(paginationModel.page, paginationModel.pageSize);
+        fetchAll();
       } else {
         toast.error(result.message || (isUpdate ? 'Failed to update exam fee' : 'Failed to add exam fee'));
       }
@@ -232,7 +165,7 @@ const ExamFeesManagement = () => {
         if (rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
         } else {
-          fetchAll(paginationModel.page, paginationModel.pageSize);
+          fetchAll();
         }
       } else {
         toast.error(result.message || 'Failed to delete exam fee');
@@ -259,6 +192,18 @@ const ExamFeesManagement = () => {
       ),
     }] : []),
   ];
+
+  const filteredRows = rows.filter((row) => {
+    const label = filters.label.trim().toLowerCase();
+    const testType = filters.test_type.trim();
+    const amount = filters.amount.trim().toLowerCase();
+    const status = filters.status.trim().toLowerCase();
+    if (label && !String(row.label || '').toLowerCase().includes(label)) return false;
+    if (testType && row.test_type !== testType) return false;
+    if (amount && !String(row.amount ?? '').toLowerCase().includes(amount)) return false;
+    if (status && String(row.status || '').toLowerCase() !== status) return false;
+    return true;
+  });
 
   if (loading && rows.length === 0) return <InlineLoader text="Loading exam fees..." variant="ring" size="lg" />;
 
@@ -362,14 +307,14 @@ const ExamFeesManagement = () => {
         </div>
 
         <TooltipDataGrid
-          rows={rows}
+          rows={filteredRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
-          paginationMode="server"
-          rowCount={total}
+          paginationMode="client"
+          rowCount={filteredRows.length}
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           loading={loading}
           autoHeight
