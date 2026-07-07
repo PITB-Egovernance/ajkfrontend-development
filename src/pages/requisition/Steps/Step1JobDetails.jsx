@@ -616,6 +616,22 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
                 ? 'Service Rule (Text) is required'
                 : 'Enter service rule details here'
             }
+            sx={{
+    '& .MuiInputBase-root': {
+      fontSize: '1rem',
+      lineHeight: '1.5',
+    },
+    '& .MuiInputBase-multiline': {
+      minHeight: '80px',
+      padding: '8px 8px',
+      fontSize: '1rem',
+      lineHeight: '1.5',
+    },
+    '& .MuiInputBase-inputMultiline': {
+      fontSize: '1rem !important',
+      lineHeight: '1.5 !important',
+    }
+  }}
           />
           {/* Footnote */}
           <div className="footnote-container" style={{ marginTop: '12px', marginBottom: '8px' }}>

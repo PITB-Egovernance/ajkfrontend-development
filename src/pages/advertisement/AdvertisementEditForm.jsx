@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Checkbox, TextField } from "@mui/material";
 import SearchableSelect from 'components/ui/SearchableSelect';
+import { formFieldSx } from 'components/ui/formFieldSx';
 import { FileEdit, CheckCircle2, Plus, Trash2, Save, Send, X } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
@@ -969,21 +970,6 @@ const AdvertisementEditForm = () => {
     await saveAdvertisement(payload);
   };
 
-  const fieldSx = {
-    "& .MuiOutlinedInput-root": {
-      minHeight: 56,
-    },
-    "& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)": {
-      height: 56,
-    },
-    "& .MuiOutlinedInput-input": {
-      padding: "14px",
-    },
-    "& .MuiOutlinedInput-inputMultiline": {
-      padding: "14px",
-    },
-  };
-
   if (fetching) {
     return (
       <div className="job-creation-container">
@@ -1031,7 +1017,7 @@ const AdvertisementEditForm = () => {
                     InputLabelProps={{ shrink: true }}
                     inputProps={{ readOnly: true, style: { height: 28 }, placeholder: "DD-MM-YYYY" }}
                     disabled
-                    sx={fieldSx}
+                    sx={formFieldSx}
                   />
                 </div>
                 <div className="col-md-6 form-group">
@@ -1040,7 +1026,7 @@ const AdvertisementEditForm = () => {
                     label="Advertisement Number"
                     value={advNumber}
                     disabled
-                    sx={fieldSx}
+                    sx={formFieldSx}
                   />
                 </div>
               </div>
@@ -1059,7 +1045,7 @@ const AdvertisementEditForm = () => {
                     }}
                     required
                     InputLabelProps={{ shrink: true }}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     inputProps={{ style: { height: 28 } }}
                     error={!!fieldErrors?.closing_date}
                     helperText={
@@ -1090,7 +1076,7 @@ const AdvertisementEditForm = () => {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Optional note"
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.note}
                     helperText={
                       Array.isArray(fieldErrors?.note)
@@ -1159,7 +1145,7 @@ const AdvertisementEditForm = () => {
                         setExtendDateInput(formatDateForDisplay(nextValue));
                       }}
                       InputLabelProps={{ shrink: true }}
-                      sx={fieldSx}
+                      sx={formFieldSx}
                       inputProps={{ style: { height: 28 } }}
                       error={!!fieldErrors?.extend_date}
                       helperText={
@@ -1462,7 +1448,7 @@ const AdvertisementEditForm = () => {
                             placeholder="Auto-filled from Test Type"
                             inputProps={{ min: 0, step: "0.01" }}
                             sx={{
-                              ...fieldSx,
+                              ...formFieldSx,
                               "& .MuiInputBase-input": {
                                 backgroundColor: "#f8fafc",
                               },
@@ -1505,7 +1491,7 @@ const AdvertisementEditForm = () => {
                     label="Important Notes"
                     value={importantNotes}
                     onChange={(e) => setImportantNotes(e.target.value)}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.important_notes}
                     helperText={
                       Array.isArray(fieldErrors?.important_notes)
@@ -1547,7 +1533,7 @@ const AdvertisementEditForm = () => {
                         label={`Term ${idx + 1}`}
                         value={term}
                         onChange={(e) => updateTerm(idx, e.target.value)}
-                        sx={fieldSx}
+                        sx={formFieldSx}
                       />
                       {termsConditions.length > 1 && (
                         <button

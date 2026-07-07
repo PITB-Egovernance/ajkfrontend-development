@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { TextField } from "@mui/material";
 import SearchableSelect from 'components/ui/SearchableSelect';
+import { formFieldSx } from 'components/ui/formFieldSx';
 import { FileText, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
@@ -454,21 +455,6 @@ const AdvertisementCreateForm = () => {
     }
   };
 
-  const fieldSx = {
-    "& .MuiOutlinedInput-root": {
-      minHeight: 56,
-    },
-    "& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)": {
-      height: 56,
-    },
-    "& .MuiOutlinedInput-input": {
-      padding: "14px",
-    },
-    "& .MuiOutlinedInput-inputMultiline": {
-      padding: "14px",
-    },
-  };
-
   return (
     <div className="job-creation-container">
       <div className="container">
@@ -500,7 +486,7 @@ const AdvertisementCreateForm = () => {
                     InputLabelProps={{ shrink: true }}
                     onChange={(e) => updateDateFieldValue(e.target.value, setAdvDate, setAdvDateInput)}
                     inputProps={{ style: { height: 28 }, placeholder: "DD-MM-YYYY" }}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                   />
                 </div>
 
@@ -534,7 +520,7 @@ const AdvertisementCreateForm = () => {
                         });
                       }
                     }}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.adv_number}
                     helperText={
                       Array.isArray(fieldErrors?.adv_number)
@@ -596,7 +582,7 @@ const AdvertisementCreateForm = () => {
                     }}
                     required
                     InputLabelProps={{ shrink: true }}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     inputProps={{
                       style: { height: 28 },
                     }}
@@ -646,7 +632,7 @@ const AdvertisementCreateForm = () => {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Optional note"
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.note}
                     helperText={
                       Array.isArray(fieldErrors?.note)
@@ -767,7 +753,7 @@ const AdvertisementCreateForm = () => {
                         placeholder="Auto-filled from Test Type"
                         inputProps={{ min: 0, step: "0.01" }}
                         sx={{
-                          ...fieldSx,
+                          ...formFieldSx,
                           "& .MuiInputBase-input": {
                             backgroundColor: "#f8fafc",
                           },
@@ -809,7 +795,7 @@ const AdvertisementCreateForm = () => {
                     label="Important Notes"
                     value={importantNotes}
                     onChange={(e) => setImportantNotes(e.target.value)}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.important_notes}
                     helperText={
                       Array.isArray(fieldErrors?.important_notes)
@@ -852,7 +838,7 @@ const AdvertisementCreateForm = () => {
                         label={`Term ${idx + 1}`}
                         value={term}
                         onChange={(e) => updateTerm(idx, e.target.value)}
-                        sx={fieldSx}
+                        sx={formFieldSx}
                       />
 
                       {termsConditions.length > 1 && (

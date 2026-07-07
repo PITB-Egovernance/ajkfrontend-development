@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { TextField } from '@mui/material';
 import { Building2, Save } from 'lucide-react';
+import { formFieldSx, formFieldAutoHeightSx } from 'components/ui/formFieldSx';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
@@ -83,12 +84,6 @@ const DepartmentUserForm = () => {
     };
     fetchOptions();
   }, []);
-
-  const fieldSx = {
-    '& .MuiOutlinedInput-root': { minHeight: 56 },
-    '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 56 },
-    '& .MuiOutlinedInput-input': { padding: '14px' },
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -180,7 +175,7 @@ const DepartmentUserForm = () => {
                 </div>
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Focal Person" value={username}
-                    onChange={(e) => setUsername(e.target.value)} required sx={fieldSx}
+                    onChange={(e) => setUsername(e.target.value)} required sx={formFieldSx}
                     error={!!fieldErrors?.username} helperText={fieldErrors?.username?.join(', ')} />
                 </div>
                
@@ -192,7 +187,7 @@ const DepartmentUserForm = () => {
                 
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Father/Husband Name" value={fatherHusbandName}
-                    onChange={(e) => setFatherHusbandName(e.target.value)} required sx={fieldSx}
+                    onChange={(e) => setFatherHusbandName(e.target.value)} required sx={formFieldSx}
                     error={!!fieldErrors?.father_husband_name} helperText={fieldErrors?.father_husband_name?.join(', ')} />
                 </div>
               </div> */}
@@ -201,13 +196,13 @@ const DepartmentUserForm = () => {
               <div className="row">
                  <div className="col-md-6 form-group">
                   <TextField fullWidth label="Email Address" type="email" value={email}
-                    onChange={(e) => setEmail(e.target.value)} required sx={fieldSx}
+                    onChange={(e) => setEmail(e.target.value)} required sx={formFieldSx}
                     error={!!fieldErrors?.email} helperText={fieldErrors?.email?.join(', ')} />
                 </div>
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Mobile Number" placeholder="11 digits e.g. 03001234567"
                     value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                    required inputProps={{ maxLength: 11, inputMode: 'numeric' }} sx={fieldSx}
+                    required inputProps={{ maxLength: 11, inputMode: 'numeric' }} sx={formFieldSx}
                     error={!!fieldErrors?.mobile} helperText={fieldErrors?.mobile?.join(', ') || `${mobile.length}/11 digits`} />
                 </div>
                
@@ -218,7 +213,7 @@ const DepartmentUserForm = () => {
               <div className="row">
                 <div className="col-md-6 form-group">
                   <TextField fullWidth label="Designation" value={designation}
-                    onChange={(e) => setDesignation(e.target.value)} required sx={fieldSx}
+                    onChange={(e) => setDesignation(e.target.value)} required sx={formFieldSx}
                     error={!!fieldErrors?.designation} helperText={fieldErrors?.designation?.join(', ')} />
                 </div>
                 {/* <div className="col-md-6 form-group">
@@ -239,7 +234,7 @@ const DepartmentUserForm = () => {
                       },
                       MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
                     }}
-                    sx={{ ...fieldSx, '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' } }}>
+                    sx={formFieldAutoHeightSx}>
                     <MenuItem dense onClick={(e) => {
                       e.preventDefault();
                       const allIds = roleOptions.map((r) => r.id);

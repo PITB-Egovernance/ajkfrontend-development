@@ -12,6 +12,7 @@ import DepartmentUserService from 'services/DepartmentUserService';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { fetchPaginatedApiList } from 'utils';
+import { formFieldSx, formFieldAutoHeightSx } from 'components/ui/formFieldSx';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const STATUS_OPTIONS = ['active', 'inactive'];
@@ -27,12 +28,6 @@ const toDisplayDate = (isoStr) => {
   if (!isoStr) return '';
   const [y, m, d] = String(isoStr).slice(0, 10).split('-');
   return y && m && d ? `${d}/${m}/${y}` : isoStr;
-};
-
-const fieldSx = {
-  '& .MuiOutlinedInput-root': { minHeight: 56 },
-  '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 56 },
-  '& .MuiOutlinedInput-input': { padding: '14px' },
 };
 
 const DepartmentUserDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
@@ -180,11 +175,11 @@ const DepartmentUserDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
           <div className="pt-2 space-y-4">
             {optionsLoading && <div className="flex items-center gap-2 text-sm text-slate-400 pb-1"><CircularProgress size={14} /><span>Loading options...</span></div>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <TextField fullWidth label="Full Name" value={form.full_name} onChange={handleChange('full_name')} sx={fieldSx} />
-              <TextField fullWidth label="CNIC" value={form.cnic} onChange={(e) => setForm((p) => ({ ...p, cnic: e.target.value.replace(/\D/g, '').slice(0, 13) }))} inputProps={{ maxLength: 13 }} sx={fieldSx} />
-              <TextField fullWidth label="Email" type="email" value={form.email} onChange={handleChange('email')} sx={fieldSx} />
-              <TextField fullWidth label="Father/Husband Name" value={form.father_husband_name} onChange={handleChange('father_husband_name')} sx={fieldSx} />
-              <TextField fullWidth label="Date of Birth" type="date" value={form.date_of_birth} onChange={handleChange('date_of_birth')} InputLabelProps={{ shrink: true }} sx={fieldSx} />
+              <TextField fullWidth label="Full Name" value={form.full_name} onChange={handleChange('full_name')} sx={formFieldSx} />
+              <TextField fullWidth label="CNIC" value={form.cnic} onChange={(e) => setForm((p) => ({ ...p, cnic: e.target.value.replace(/\D/g, '').slice(0, 13) }))} inputProps={{ maxLength: 13 }} sx={formFieldSx} />
+              <TextField fullWidth label="Email" type="email" value={form.email} onChange={handleChange('email')} sx={formFieldSx} />
+              <TextField fullWidth label="Father/Husband Name" value={form.father_husband_name} onChange={handleChange('father_husband_name')} sx={formFieldSx} />
+              <TextField fullWidth label="Date of Birth" type="date" value={form.date_of_birth} onChange={handleChange('date_of_birth')} InputLabelProps={{ shrink: true }} sx={formFieldSx} />
               <SearchableSelect
                 label="Gender"
                 value={form.gender}
@@ -195,7 +190,7 @@ const DepartmentUserDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
                 ]}
                 placeholder="— Select —"
               />
-              <TextField fullWidth label="Mobile" value={form.mobile} onChange={handleChange('mobile')} sx={fieldSx} />
+              <TextField fullWidth label="Mobile" value={form.mobile} onChange={handleChange('mobile')} sx={formFieldSx} />
               <SearchableSelect
                 label="Domicile"
                 value={selectedDistrict?.id || ''}
@@ -238,7 +233,7 @@ const DepartmentUserDetailsModal = ({ open, hashId, onClose, onUpdated }) => {
                   },
                   MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
                 }}
-                sx={{ ...fieldSx, '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' } }}>
+                sx={formFieldAutoHeightSx}>
                 <MenuItem dense onClick={(e) => {
                   e.preventDefault();
                   const allIds = roleOptions.map((r) => r.id);

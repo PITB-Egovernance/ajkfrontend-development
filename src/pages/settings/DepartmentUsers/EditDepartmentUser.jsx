@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { TextField } from '@mui/material';
+import { formFieldSx } from 'components/ui/formFieldSx';
 import { Building2, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -9,26 +10,6 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import DepartmentUserService from 'services/DepartmentUserService';
 import { fetchPaginatedApiList } from 'utils';
-
-const fieldSx = {
-  '& .MuiOutlinedInput-root': {
-    borderRadius: '10px',
-    backgroundColor: '#fff',
-    '& fieldset': {
-      borderColor: '#cbd5e1',
-    },
-    '&:hover fieldset': {
-      borderColor: '#059669',
-    },
-    '&.Mui-focused fieldset': {
-      borderColor: '#059669',
-      borderWidth: '2px',
-    },
-  },
-  '& .MuiInputLabel-root.Mui-focused': {
-    color: '#047857',
-  },
-};
 
 const CreateDepartmentUser = () => {
   const navigate = useNavigate();
@@ -271,7 +252,7 @@ const CreateDepartmentUser = () => {
                       setFieldErrors((prev) => ({ ...prev, username: null }));
                     }}
                     required
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.username}
                     helperText={fieldErrors?.username?.join(', ')}
                   />
@@ -290,7 +271,7 @@ const CreateDepartmentUser = () => {
                       setFieldErrors((prev) => ({ ...prev, email: null }));
                     }}
                     required
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.email}
                     helperText={fieldErrors?.email?.join(', ')}
                   />
@@ -311,7 +292,7 @@ const CreateDepartmentUser = () => {
                       maxLength: 11,
                       inputMode: 'numeric',
                     }}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.mobile}
                     helperText={fieldErrors?.mobile?.join(', ') || `${mobile.length}/11 digits`}
                   />
@@ -329,7 +310,7 @@ const CreateDepartmentUser = () => {
                       setFieldErrors((prev) => ({ ...prev, designation: null }));
                     }}
                     required
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.designation}
                     helperText={fieldErrors?.designation?.join(', ')}
                   />

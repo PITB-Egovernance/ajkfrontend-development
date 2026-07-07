@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import SearchableMultiSelect from 'components/ui/SearchableMultiSelect';
+import { formFieldSx } from 'components/ui/formFieldSx';
 import {
   TextField,
   InputAdornment,
@@ -590,10 +591,6 @@ const EmployeeRegistrationForm = ({
     wingOptions,
   ]);
 
-  const fieldSx = {
-    '& .MuiOutlinedInput-input': { padding: '' },
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -721,7 +718,7 @@ const EmployeeRegistrationForm = ({
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.username}
                     helperText={fieldErrors?.username?.join(', ')}
                   />
@@ -742,7 +739,7 @@ const EmployeeRegistrationForm = ({
                       maxLength: 13,
                       inputMode: 'numeric',
                     }}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.cnic}
                     helperText={
                       fieldErrors?.cnic?.join(', ') || `${cnic.length}/13 digits`
@@ -761,7 +758,7 @@ const EmployeeRegistrationForm = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.email}
                     helperText={fieldErrors?.email?.join(', ')}
                   />
@@ -775,7 +772,7 @@ const EmployeeRegistrationForm = ({
                     value={fatherHusbandName}
                     onChange={(e) => setFatherHusbandName(e.target.value)}
                     required
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.father_husband_name}
                     helperText={fieldErrors?.father_husband_name?.join(', ')}
                   />
@@ -840,7 +837,7 @@ const EmployeeRegistrationForm = ({
                           </InputAdornment>
                         ),
                       }}
-                      sx={fieldSx}
+                      sx={formFieldSx}
                       error={!!fieldErrors?.dob}
                       helperText={
                         fieldErrors?.dob?.join(', ') || 'Format: dd mm yyyy'
@@ -902,7 +899,7 @@ const EmployeeRegistrationForm = ({
                       maxLength: 11,
                       inputMode: 'numeric',
                     }}
-                    sx={fieldSx}
+                    sx={formFieldSx}
                     error={!!fieldErrors?.mobile}
                     helperText={
                       fieldErrors?.mobile?.join(', ') ||
@@ -948,7 +945,7 @@ const EmployeeRegistrationForm = ({
                     value={designation?.gradeName || ''}
                     InputProps={{ readOnly: true }}
                     sx={{
-                      ...fieldSx,
+                      ...formFieldSx,
                       '& .MuiOutlinedInput-root': {
                         backgroundColor: '#f8fafc',
                       },

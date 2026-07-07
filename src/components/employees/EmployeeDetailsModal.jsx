@@ -19,6 +19,7 @@ import Button from 'components/ui/Button';
 import EmployeeService from 'services/EmployeeService';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { formFieldSx, formFieldAutoHeightSx } from 'components/ui/formFieldSx';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const STATUS_OPTIONS = ['active', 'inactive'];
@@ -73,12 +74,6 @@ const toDisplayDate = (isoStr) => {
   return `${d}/${m}/${y}`;
 };
 
-
-const fieldSx = {
-  '& .MuiOutlinedInput-root': { minHeight: 56 },
-  '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': { height: 56 },
-  '& .MuiOutlinedInput-input': { padding: '14px' },
-};
 
 const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing = false }) => {
   const [loading,        setLoading]        = useState(false);
@@ -367,7 +362,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
                 label="Full Name"
                 value={form.full_name}
                 onChange={handleChange('full_name')}
-                sx={fieldSx}
+                sx={formFieldSx}
               />
 
               {/* CNIC */}
@@ -381,7 +376,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
                 }
                 inputProps={{ maxLength: 13, inputMode: 'numeric' }}
                 helperText={`${(form.cnic || '').length}/13 digits`}
-                sx={fieldSx}
+                sx={formFieldSx}
               />
 
               {/* Email */}
@@ -391,7 +386,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
                 type="email"
                 value={form.email}
                 onChange={handleChange('email')}
-                sx={fieldSx}
+                sx={formFieldSx}
               />
 
               {/* Father/Husband Name */}
@@ -400,7 +395,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
                 label="Father/Husband Name"
                 value={form.father_husband_name}
                 onChange={handleChange('father_husband_name')}
-                sx={fieldSx}
+                sx={formFieldSx}
               />
 
               {/* Date of Birth */}
@@ -412,7 +407,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
                 onChange={handleChange('date_of_birth')}
                 InputLabelProps={{ shrink: true }}
                 inputProps={{ style: { height: 28 } }}
-                sx={fieldSx}
+                sx={formFieldSx}
               />
 
               {/* Gender */}
@@ -431,7 +426,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
                 placeholder="+923XXXXXXXXX"
                 value={form.mobile}
                 onChange={handleChange('mobile')}
-                sx={fieldSx}
+                sx={formFieldSx}
               />
 
               {/* Domicile District */}
@@ -504,10 +499,7 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
                     },
                     MenuProps: { PaperProps: { sx: { maxHeight: 380 } } },
                   }}
-                  sx={{
-                    ...fieldSx,
-                    '& .MuiOutlinedInput-root': { minHeight: 56, height: 'auto' },
-                  }}
+                  sx={formFieldAutoHeightSx}
                 >
                   <MenuItem dense onClick={(e) => {
                     e.preventDefault();
