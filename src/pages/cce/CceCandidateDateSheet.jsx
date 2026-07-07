@@ -58,7 +58,8 @@ const CceCandidateDateSheet = () => {
         const res = await CceScreeningApi.advertisements();
         const list = res?.data ?? [];
         setAdvertisements(Array.isArray(list) ? list : []);
-        if (list.length > 0) setAdvertisementId(list[0].hash_id || list[0].id);
+        // No default selection — the list loads for every CCE advertisement
+        // until the admin narrows it down to one.
       } catch (err) {
         toast.error(err?.message || 'Failed to load advertisements');
       } finally {
@@ -87,7 +88,6 @@ const CceCandidateDateSheet = () => {
   }, [hallsByCenter]);
 
   const loadCandidates = useCallback(async () => {
-    if (!advertisementId) return;
     setLoading(true);
     try {
       const res = await CceDateSheetApi.getEligibleCandidates(advertisementId, {
@@ -120,20 +120,20 @@ const CceCandidateDateSheet = () => {
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  // const loadSubjectsFor = useCallback(async (applicationNumber) => {
-  //   setSubjectsLoading(true);
-  //   try {
-  //     const res = await CceDateSheetApi.getCandidateSubjects(applicationNumber, advertisementId);
-  //     const list = res?.data ?? [];
-  //     setSubjectRows(Array.isArray(list) ? list : []);
-  //     (Array.isArray(list) ? list : []).forEach((r) => { if (r.exam_center_id) loadHallsFor(r.exam_center_id); });
-  //   } catch (err) {
-  //     toast.error(err?.message || 'Failed to load candidate subjects');
-  //     setSubjectRows([]);
-  //   } finally {
-  //     setSubjectsLoading(false);
-  //   }
-  // }, [advertisementId, loadHallsFor]);
+  const loadSubjectsFor = useCallback(async (applicationNumber) => {
+    setSubjectsLoading(true);
+    try {
+      const res = await CceDateSheetApi.getCandidateSubjects(applicationNumber, advertisementId);
+      const list = res?.data ?? [];
+      setSubjectRows(Array.isArray(list) ? list : []);
+      (Array.isArray(list) ? list : []).forEach((r) => { if (r.exam_center_id) loadHallsFor(r.exam_center_id); });
+    } catch (err) {
+      toast.error(err?.message || 'Failed to load candidate subjects');
+      setSubjectRows([]);
+    } finally {
+      setSubjectsLoading(false);
+    }
+  }, [advertisementId, loadHallsFor]);
 
   // Candidate's own group-wise optional-subject selection — data lives in the
   // candidate portal's own database, so this reads it straight from the
@@ -167,7 +167,7 @@ const CceCandidateDateSheet = () => {
       return;
     }
     setExpandedApplicationNumber(applicationNumber);
-    // loadSubjectsFor(applicationNumber);
+    loadSubjectsFor(applicationNumber);
     loadSubjectSelectionFor(row.roll_number);
   };
 
@@ -199,7 +199,7 @@ const CceCandidateDateSheet = () => {
         }))
       );
       toast.success('Candidate date sheet saved successfully');
-      // await loadSubjectsFor(expandedApplicationNumber);
+      await loadSubjectsFor(expandedApplicationNumber);
       await loadCandidates();
     } catch (err) {
       toast.error(err?.message || 'Failed to save candidate date sheet');
@@ -223,7 +223,7 @@ const CceCandidateDateSheet = () => {
     try {
       await CceDateSheetApi.publish([row.hash_id]);
       toast.success('Paper published successfully');
-      // await loadSubjectsFor(expandedApplicationNumber);
+      await loadSubjectsFor(expandedApplicationNumber);
       await loadCandidates();
     } catch (err) {
       toast.error(err?.message || 'Failed to publish');
@@ -247,7 +247,7 @@ const CceCandidateDateSheet = () => {
     try {
       await CceDateSheetApi.unpublish([row.hash_id]);
       toast.success('Paper unpublished successfully');
-      // await loadSubjectsFor(expandedApplicationNumber);
+      await loadSubjectsFor(expandedApplicationNumber);
       await loadCandidates();
     } catch (err) {
       toast.error(err?.message || 'Failed to unpublish');
@@ -337,6 +337,7 @@ const CceCandidateDateSheet = () => {
               onChange={(e) => { setAdvertisementId(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); setExpandedApplicationNumber(null); }}
               sx={{ minWidth: 260, backgroundColor: 'white' }}
             >
+              <MenuItem value="">All Advertisements</MenuItem>
               {advertisements.map((ad) => (
                 <MenuItem key={ad.hash_id || ad.id} value={ad.hash_id || ad.id}>
                   {ad.adv_number || ad.title || `Advertisement #${ad.id}`}

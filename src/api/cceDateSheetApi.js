@@ -60,18 +60,18 @@ const CceDateSheetApi = {
   },
 
   // ── Candidate Date Sheet ─────────────────────────────────────────────────
-  // getEligibleCandidates: async (advertisementId, params = {}) => {
-  //   const search = new URLSearchParams();
-  //   search.set('advertisement_id', advertisementId);
-  //   if (params.search)   search.set('search',   params.search);
-  //   if (params.per_page) search.set('per_page', String(params.per_page));
-  //   if (params.page)     search.set('page',     String(params.page));
+  getEligibleCandidates: async (advertisementId, params = {}) => {
+    const search = new URLSearchParams();
+    if (advertisementId) search.set('advertisement_id', advertisementId);
+    if (params.search)   search.set('search',   params.search);
+    if (params.per_page) search.set('per_page', String(params.per_page));
+    if (params.page)     search.set('page',     String(params.page));
 
-  //   const res = await fetch(`${ADMIN_API_BASE}/cce/candidate-date-sheet/candidates?${search}`, {
-  //     headers: getAdminHeaders(false),
-  //   });
-  //   return handleResponse(res);
-  // },
+    const res = await fetch(`${ADMIN_API_BASE}/cce/candidate-date-sheet/candidates?${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
 
   // Candidate's own group-wise optional-subject selection (submitted via the
   // candidate portal), looked up by roll number rather than application number.
