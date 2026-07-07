@@ -32,14 +32,21 @@ const handleResponse = async (response) => {
 };
 
 const RollNumberApi = {
-  // List shortlisted applications eligible for slip generation
+  // List shortlisted applications eligible for slip generation. Filtering,
+  // sorting and pagination all happen server-side (see RollNumberController::shortlisted) —
+  // pass every active filter here rather than fetching everything and filtering client-side.
   getShortlisted: async (params = {}) => {
     const search    = new URLSearchParams();
-    if (params.per_page)         search.set('per_page',         String(params.per_page));
-    if (params.page)             search.set('page',             String(params.page));
-    if (params.search)           search.set('search',           params.search);
-    if (params.advertisement_no) search.set('advertisement_no', params.advertisement_no);
-    if (params.status)           search.set('status',           params.status);
+    if (params.per_page)            search.set('per_page',            String(params.per_page));
+    if (params.page)                search.set('page',                String(params.page));
+    if (params.search)              search.set('search',              params.search);
+    if (params.advertisement_no)    search.set('advertisement_no',    params.advertisement_no);
+    if (params.status)              search.set('status',              params.status);
+    if (params.payment_status)      search.set('payment_status',      params.payment_status);
+    if (params.exam_center_id)      search.set('exam_center_id',      params.exam_center_id);
+    if (params.preferred_exam_city) search.set('preferred_exam_city', params.preferred_exam_city);
+    if (params.slip_status)         search.set('slip_status',         params.slip_status);
+    if (params.has_roll_number)     search.set('has_roll_number',     '1');
 
     const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/shortlisted?${search}`, {
       headers: getAdminHeaders(false),
@@ -77,6 +84,17 @@ const RollNumberApi = {
   // JSON slip data for the in-app viewer looked up by roll number (fast — skips PDF rendering)
   getSlipViewData: async (rollNumber) => {
     const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/roll-slip/${encodeURIComponent(rollNumber)}/view-data`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  // JSON slip data looked up by application number — includes raw editable
+  // fields (exam_center_id, exam_date, attendance_time) used to pre-fill the
+  // "Edit Slip" form, unlike the roll-number-keyed view above which is
+  // display-only.
+  getSlipEditData: async (applicationNumber) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/slip/${encodeURIComponent(applicationNumber)}/view-data`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);
@@ -170,6 +188,27 @@ const RollNumberApi = {
   getAdvertisementsWithJobs: async (perPage = 100) => {
     const res = await fetch(`${ADMIN_API_BASE}/advertisements?per_page=${perPage}`, {
       headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  // Publish/unpublish roll number slips so they become visible/hidden to
+  // candidates. applicationNumbers is optional — omit to affect every
+  // eligible slip for the advertisement.
+  publishSlips: async (advertisementId, applicationNumbers) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/${advertisementId}/publish`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify(applicationNumbers?.length ? { application_numbers: applicationNumbers } : {}),
+    });
+    return handleResponse(res);
+  },
+
+  unpublishSlips: async (advertisementId, applicationNumbers) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/${advertisementId}/unpublish`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify(applicationNumbers?.length ? { application_numbers: applicationNumbers } : {}),
     });
     return handleResponse(res);
   },

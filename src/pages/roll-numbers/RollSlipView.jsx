@@ -114,6 +114,9 @@ const RollSlipView = () => {
                 <div style={{ display: 'block', fontSize: '14px', fontWeight: 700, lineHeight: 1.2, marginTop: '4px', textTransform: 'none' }}>Jalalabad, Muzaffarabad.</div>
                 <div className="mt-3">
                   <span className="text-base font-black underline text-emerald-900 tracking-widest">Admission Letter For Test/Examination</span>
+                  {data.examType === 'cce-exams' && (
+                    <div className="text-sm font-bold text-emerald-900 mt-0.5">(CCE Screening Test)</div>
+                  )}
                 </div>
               </div>
             </div>

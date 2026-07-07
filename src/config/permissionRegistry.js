@@ -102,7 +102,12 @@ export const getSidebarEntries = () => {
 
   MENU_ITEMS.forEach((item) => {
     if (Array.isArray(item.submenu)) {
-      item.submenu.forEach((s) => add(s.path, s.label, item));
+      item.submenu.forEach((s) => {
+        add(s.path, s.label, item);
+        if (Array.isArray(s.children)) {
+          s.children.forEach((c) => add(c.path, c.label, s));
+        }
+      });
     } else if (item.path) {
       add(item.path, item.label, null);
     }

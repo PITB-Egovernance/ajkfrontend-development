@@ -1619,7 +1619,7 @@ const AdvertisementDetail = () => {
                               </span>
                               <span className="kv">
                                 <b>Exam Type:</b> {renderChangedValue(examTypeName, examTypeChange)}
-                                {isCceExamType ? ` (${cceStageName})` : ''}
+                                {isCceExamType && cceStageName !== 'N/A' ? ` (${cceStageName})` : ''}
                               </span>
                               <span className="kv">
                                 <b>Fee:</b>{' '}

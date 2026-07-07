@@ -17,6 +17,12 @@ const candidateApiUrl = "/candidate-api/api/candidate";
 // Production:
 // const candidateApiUrl = "https://api-candidate-ajkpsc.punjab.gov.pk/api/candidate";
 
+// Candidate portal — admin-scoped endpoints (e.g. CCE subject selection lookup
+// by roll number). Same backend/proxy as candidateApiUrl above, different prefix.
+const candidateAdminApiUrl = "/candidate-api/api/admin";
+// Production:
+// const candidateAdminApiUrl = "https://api-candidate-ajkpsc.punjab.gov.pk/api/admin";
+
 const candidateApiKey = "admin-secret-key-123";
 
 const Config = {
@@ -25,6 +31,7 @@ const Config = {
   productionUrl,
   localUrl,
   candidateApiUrl,
+  candidateAdminApiUrl,
   candidateApiKey,
 };
 

@@ -70,6 +70,12 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   };
 
   const [localOpenMenu, setLocalOpenMenu] = useState("");
+  // Which nested SubGroup (by its path) is expanded. Lifted up here — rather than
+  // local state inside SubGroup — because SubGroup is defined inline inside this
+  // component and gets a new type identity (and therefore remounts, resetting any
+  // local state) every time Sidebar re-renders, which happens immediately after
+  // the group header's own navigate() call fires.
+  const [openSubMenu, setOpenSubMenu] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -95,7 +101,9 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     // Only treat as active via prefix if no other submenu item is a more
     // specific (longer) match for the current path.
     if (!location.pathname.startsWith(path + '/')) return false;
-    const allSubPaths = MENU_ITEMS.flatMap((m) => (m.submenu || []).map((s) => s.path));
+    const allSubPaths = MENU_ITEMS.flatMap((m) => (m.submenu || []).flatMap(
+      (s) => [s.path, ...(Array.isArray(s.children) ? s.children.map((c) => c.path) : [])]
+    ));
     const moreSpecific = allSubPaths.some(
       (p) => p !== path && p.startsWith(path + '/') && (location.pathname === p || location.pathname.startsWith(p + '/'))
     );
@@ -118,19 +126,95 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   const allowedMenuItems = menuItems.filter((item) => {
     if (admin) return true;
     if (ALWAYS_VISIBLE_IDS.has(item.id)) return true;
-    // Parent with sub-tabs → visible if any child is visible.
-    if (Array.isArray(item.submenu)) return item.submenu.some((s) => canSeePath(s.path));
+    // Parent with sub-tabs → visible if any child (including nested grandchildren) is visible.
+    if (Array.isArray(item.submenu)) return item.submenu.some((s) =>
+      canSeePath(s.path) || (Array.isArray(s.children) && s.children.some((c) => canSeePath(c.path)))
+    );
     // Standalone page → gated by its own permission key.
     return canSeePath(item.path);
   });
 
+  // A second-level nested group inside a submenu (e.g. "Combined Competitive
+  // Exams" holding "CCE Screening Results" / "CCE Master Date Sheet" / ...).
+  // Collapsed by default; auto-expands when one of its children is the active route.
+  const SubGroup = ({ subItem }) => {
+    const hasActiveChild = subItem.children.some((c) => isSubActive(c.path));
+    // Explicit toggle wins; otherwise auto-expand when a child route is active.
+    const expanded = openSubMenu ? openSubMenu === subItem.path : hasActiveChild;
+
+    return (
+      <div>
+        <button
+          onClick={() => {
+            if (isBusy) {
+              toast.error(busyMessage);
+              return;
+            }
+            setOpenSubMenu((prev) => (prev === subItem.path ? "" : subItem.path));
+            navigate(subItem.path);
+          }}
+          className={cn(
+            "w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
+            isSubActive(subItem.path)
+              ? "bg-white text-emerald-800 shadow-md font-semibold"
+              : "text-emerald-200 hover:text-white hover:bg-white/5"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <subItem.icon
+              size={16}
+              className={cn("flex-shrink-0", isSubActive(subItem.path) ? "text-emerald-700" : "text-emerald-400")}
+            />
+            <span>{subItem.label}</span>
+          </div>
+          <ChevronDown
+            size={14}
+            className={cn("flex-shrink-0 transition-transform duration-200", expanded ? "rotate-180" : "")}
+          />
+        </button>
+        {expanded && (
+          <div className="mt-1 ml-4 pl-3 space-y-1 border-l-2 border-emerald-700/30">
+            {subItem.children.map((child) => (
+              <Link
+                key={child.path}
+                to={child.path}
+                onClick={guardNavClick}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                  isSubActive(child.path)
+                    ? "bg-white text-emerald-800 shadow-md font-semibold"
+                    : "text-emerald-200 hover:text-white hover:bg-white/5"
+                )}
+              >
+                <child.icon
+                  size={14}
+                  className={cn("flex-shrink-0", isSubActive(child.path) ? "text-emerald-700" : "text-emerald-400")}
+                />
+                <span>{child.label}</span>
+                {isSubActive(child.path) && <ChevronRight size={14} className="ml-auto text-emerald-700" />}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const NavItem = ({ item }) => {
     // Show only the sub-tabs the role can access (admin sees all; unmapped items stay visible).
-    const submenu = (item.submenu || []).filter((sub) => canSeePath(sub.path));
+    // A nested group stays visible if its own path is permitted OR at least one of its
+    // children is; children the role can't see are filtered out individually.
+    const submenu = (item.submenu || [])
+      .map((sub) => (Array.isArray(sub.children)
+        ? { ...sub, children: sub.children.filter((c) => canSeePath(c.path)) }
+        : sub))
+      .filter((sub) => canSeePath(sub.path) || (Array.isArray(sub.children) && sub.children.length > 0));
     const hasSubmenu = submenu.length > 0;
-    // A submenu is open if explicitly toggled OR one of its children is the
-    // active route (so the parent auto-expands and the item shows nested).
-    const hasActiveChild = hasSubmenu && submenu.some((s) => isActive(s.path));
+    // A submenu is open if explicitly toggled OR one of its children (or a nested
+    // grandchild) is the active route (so the parent auto-expands and shows nested).
+    const hasActiveChild = hasSubmenu && submenu.some((s) =>
+      isActive(s.path) || (Array.isArray(s.children) && s.children.some((c) => isActive(c.path)))
+    );
     // Accordion: an explicit selection wins (only that menu is open). Fall back
     // to auto-expanding the active route's parent only when nothing is explicitly open.
     const isMenuOpen = currentOpenMenu ? currentOpenMenu === item.id : hasActiveChild;
@@ -182,34 +266,38 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
           {isMenuOpen && isOpen && (
             <div className="mt-1 mb-1 ml-5 pl-3 space-y-1 overflow-hidden border-l-2 border-emerald-700/40" style={{ height: 'auto' }}>
               {submenu.map((subItem) => (
-                <Link
-                  key={subItem.path}
-                  to={subItem.path}
-                  onClick={guardNavClick}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
-                    isSubActive(subItem.path)
-                      ? "bg-white text-emerald-800 shadow-md font-semibold"
-                      : "text-emerald-200 hover:text-white hover:bg-white/5"
-                  )}
-                >
-                  <subItem.icon
-                    size={16}
+                Array.isArray(subItem.children) && subItem.children.length > 0 ? (
+                  <SubGroup key={subItem.path} subItem={subItem} />
+                ) : (
+                  <Link
+                    key={subItem.path}
+                    to={subItem.path}
+                    onClick={guardNavClick}
                     className={cn(
-                      "flex-shrink-0",
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
                       isSubActive(subItem.path)
-                        ? "text-emerald-700"
-                        : "text-emerald-400"
+                        ? "bg-white text-emerald-800 shadow-md font-semibold"
+                        : "text-emerald-200 hover:text-white hover:bg-white/5"
                     )}
-                  />
-                  <span>{subItem.label}</span>
-                  {isSubActive(subItem.path) && (
-                    <ChevronRight
-                      size={14}
-                      className="ml-auto text-emerald-700"
+                  >
+                    <subItem.icon
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0",
+                        isSubActive(subItem.path)
+                          ? "text-emerald-700"
+                          : "text-emerald-400"
+                      )}
                     />
-                  )}
-                </Link>
+                    <span>{subItem.label}</span>
+                    {isSubActive(subItem.path) && (
+                      <ChevronRight
+                        size={14}
+                        className="ml-auto text-emerald-700"
+                      />
+                    )}
+                  </Link>
+                )
               ))}
             </div>
           )}
@@ -226,34 +314,64 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
                 </div>
                 <div className="space-y-1">
                   {submenu.map((subItem) => (
-                    <Link
-                      key={subItem.path}
-                      to={subItem.path}
-                      onClick={guardNavClick}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 border-b border-emerald-700/20",
-                        isSubActive(subItem.path)
-                          ? "bg-white text-emerald-800 shadow-md font-semibold"
-                          : "text-emerald-200 hover:text-white hover:bg-white/5"
-                      )}
-                    >
-                      <subItem.icon
-                        size={16}
+                    <div key={subItem.path}>
+                      <Link
+                        to={subItem.path}
+                        onClick={guardNavClick}
                         className={cn(
-                          "flex-shrink-0",
+                          "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 border-b border-emerald-700/20",
                           isSubActive(subItem.path)
-                            ? "text-emerald-700"
-                            : "text-emerald-400"
+                            ? "bg-white text-emerald-800 shadow-md font-semibold"
+                            : "text-emerald-200 hover:text-white hover:bg-white/5"
                         )}
-                      />
-                      <span>{subItem.label}</span>
-                      {isSubActive(subItem.path) && (
-                        <ChevronRight
-                          size={14}
-                          className="ml-auto text-emerald-700"
+                      >
+                        <subItem.icon
+                          size={16}
+                          className={cn(
+                            "flex-shrink-0",
+                            isSubActive(subItem.path)
+                              ? "text-emerald-700"
+                              : "text-emerald-400"
+                          )}
                         />
+                        <span>{subItem.label}</span>
+                        {isSubActive(subItem.path) && (
+                          <ChevronRight
+                            size={14}
+                            className="ml-auto text-emerald-700"
+                          />
+                        )}
+                      </Link>
+                      {Array.isArray(subItem.children) && subItem.children.length > 0 && (
+                        <div className="ml-4 pl-3 space-y-1 border-l-2 border-emerald-700/30">
+                          {subItem.children.map((child) => (
+                            <Link
+                              key={child.path}
+                              to={child.path}
+                              onClick={guardNavClick}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                                isSubActive(child.path)
+                                  ? "bg-white text-emerald-800 shadow-md font-semibold"
+                                  : "text-emerald-200 hover:text-white hover:bg-white/5"
+                              )}
+                            >
+                              <child.icon
+                                size={14}
+                                className={cn(
+                                  "flex-shrink-0",
+                                  isSubActive(child.path) ? "text-emerald-700" : "text-emerald-400"
+                                )}
+                              />
+                              <span>{child.label}</span>
+                              {isSubActive(child.path) && (
+                                <ChevronRight size={14} className="ml-auto text-emerald-700" />
+                              )}
+                            </Link>
+                          ))}
+                        </div>
                       )}
-                    </Link>
+                    </div>
                   ))}
                 </div>
               </div>

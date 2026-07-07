@@ -59,24 +59,32 @@ const RollSlipEditor = () => {
     }
   }, [row, navigate]);
 
-  // Initial load: centers + pre-fill form from row state
+  // Initial load: centers + the slip's current editable values.
+  // The list row only carries display fields (exam_center name, no id) so
+  // the actual center/seat/date/time come from the edit-data endpoint —
+  // relying on `row` alone left everything but roll_number blank.
   useEffect(() => {
     if (!row) return;
     let alive = true;
     (async () => {
       setLoading(true);
       try {
-        const r    = await RollNumberApi.getExamCenters(500);
-        const list = r.data?.data ?? r.data ?? [];
+        const [centersRes, slipRes] = await Promise.all([
+          RollNumberApi.getExamCenters(500),
+          RollNumberApi.getSlipEditData(applicationNumber),
+        ]);
         if (!alive) return;
+
+        const list = centersRes.data?.data ?? centersRes.data ?? [];
         setCenters(Array.isArray(list) ? list : []);
 
+        const slip = slipRes.data ?? {};
         setFormData({
-          roll_number:     row.roll_number ?? '',
-          exam_center_id:  row.exam_center_id ? String(row.exam_center_id) : '',
-          seat_number:     row.seat_number ?? '',
-          exam_date:       row.exam_date ?? '',
-          attendance_time: parseTime24h(row.attendance_time ?? ''),
+          roll_number:     slip.rollNo ?? row.roll_number ?? '',
+          exam_center_id:  slip.examCenterId ? String(slip.examCenterId) : '',
+          seat_number:     slip.seatNumber ?? '',
+          exam_date:       slip.examDateRaw ?? '',
+          attendance_time: parseTime24h(slip.attendanceTime ?? ''),
         });
       } catch (err) {
         toast.error(err?.status === 401
@@ -87,7 +95,7 @@ const RollSlipEditor = () => {
       }
     })();
     return () => { alive = false; };
-  }, [row]);
+  }, [row, applicationNumber]);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;

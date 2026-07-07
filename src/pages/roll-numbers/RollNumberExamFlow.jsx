@@ -77,7 +77,7 @@ const examTypeMeta = {
   'one-paper-mcqs': { title: 'One Paper MCQs Roll Number Management', badge: 'One Paper MCQs', description: 'Club one or multiple posts and generate one common roll number slip per candidate.', papers: ['One Paper'], testTypeFilter: (tt) => /mcq/i.test(tt) && !/two/i.test(tt) },
   'two-paper-mcqs': { title: 'Two Paper MCQs Roll Number Management', badge: 'Two Paper MCQs', description: 'Paper 1 and Paper 2 schedules remain separate, while selected jobs can be clubbed under one roll number.', papers: ['Paper 1', 'Paper 2'], testTypeFilter: (tt) => /mcq/i.test(tt) && /two/i.test(tt) },
   'written-exams': { title: 'Written Exams Roll Number Management', badge: 'Written Exams', description: 'Written exams roll number generation following the same allocation pattern.', papers: ['Written Exam'], testTypeFilter: (tt) => /written/i.test(tt) },
-  'cce-exams': { title: 'CCE Exams Roll Number Management', badge: 'CCE Exams', description: 'CCE exams roll number generation following the same allocation pattern.', papers: ['CCE Exam'], testTypeFilter: (tt) => /cce/i.test(tt) || /joint.competitive/i.test(tt) || /jce/i.test(tt) },
+  'cce-exams': { title: 'CCE Screening Roll Number Management', badge: 'CCE Screening', description: 'CCE screening test roll number generation — the first stage of the CCE exam, following the same allocation pattern as One Paper MCQs.', papers: ['Screening Exam'], testTypeFilter: (tt) => /cce/i.test(tt) || /joint.competitive/i.test(tt) || /combined.competitive/i.test(tt) || /jce/i.test(tt) },
 };
 
 const DEFAULT_ROLL_PREFIXES = {
@@ -89,12 +89,17 @@ const DEFAULT_ROLL_PREFIXES = {
 
 // Accepted exam_category values for each exam-type URL param.
 // The DB exam_category values may not have a trailing 's', and CCE uses
+// 'combined-competitive-exam' (the AJK advertisement/detail prefix) as well as
 // 'joint-competitive-exam' in some installations — all variants are listed here.
 const examCategoryAliases = {
   'one-paper-mcqs': new Set(['one-paper-mcq', 'one-paper-mcqs', 'one_paper_mcq', 'one_paper_mcqs']),
   'two-paper-mcqs': new Set(['two-paper-mcq', 'two-paper-mcqs', 'two_paper_mcq', 'two_paper_mcqs']),
   'written-exams':  new Set(['written-exam', 'written-exams', 'written_exam', 'written_exams']),
-  'cce-exams':      new Set(['cce-exam', 'cce-exams', 'cce_exam', 'cce', 'joint-competitive-exam', 'joint_competitive_exam', 'jce']),
+  'cce-exams':      new Set([
+    'cce-exam', 'cce-exams', 'cce_exam', 'cce',
+    'combined-competitive-exam', 'combined-competitive-exams', 'combined_competitive_exam', 'combined_competitive_exams',
+    'joint-competitive-exam', 'joint_competitive_exam', 'jce',
+  ]),
 };
 
 
@@ -541,12 +546,29 @@ const RollNumberExamFlow = () => {
         console.groupEnd();
       }
 
-      // Fallback: if no ads matched the test-type filter (likely because test_type
-      // was never set on the pivot/job records), show all ads so the admin is not
-      // locked out. Jobs with no test_type will be included with all their details.
-      const adsToUse = matchedAds.length > 0
-        ? matchedAds
-        : allAds.map((ad) => ({ ad, jobs: ad.job_details || [] }));
+      // Fallback: many advertisements' jobs have never been tagged with ANY
+      // test type at all (neither pivot.test_type nor job_details.test_type
+      // set) — dropping the fallback entirely (as a previous fix did, to stop
+      // Two Paper MCQs posts leaking into Written Exams) made every section
+      // show nothing whenever a whole dataset was untagged. This fallback
+      // only ever includes jobs with NO test type reference on either field
+      // — a job explicitly tagged with a *different*, specific exam type is
+      // never included here, so cross-contamination still can't happen.
+      const untaggedAds = matchedAds.length > 0
+        ? []
+        : allAds
+            .map((ad) => {
+              const jobs = (ad.job_details || []).filter((job) => {
+                const pivotHt = String(job.pivot?.test_type || '');
+                const jobHt   = String(job.test_type || '');
+                return !pivotHt && !jobHt;
+              });
+              if (jobs.length === 0) return null;
+              return { ad, jobs };
+            })
+            .filter(Boolean);
+
+      const adsToUse = matchedAds.length > 0 ? matchedAds : untaggedAds;
 
       const filtered = adsToUse.map(({ ad, jobs }) => {
         const adKey = ad.hash_id || String(ad.id);
@@ -639,39 +661,45 @@ const RollNumberExamFlow = () => {
   const capacityShortage = Math.max(0, selectedApplicants - selectedCapacity);
   const capacityPassed = selectedApplicants > 0 && selectedCapacity >= selectedApplicants;
 
-  // Only hide zero-applicant posts when real candidate data is available.
-  // If the candidate portal is unreachable, allCandidateApps is [] and we
-  // fall back to showing all posts so the admin is never locked out.
-  const hasCandidateData = allCandidateApps.length > 0;
-
-  // Show ads/posts that have pending applicants OR already-generated slips.
-  // Hide only when there are truly zero applications of any kind.
-  const postHasActivity = (p) => p.applicants > 0 || p.generatedCount > 0;
+  // Show a post only if it has at least one application in total (pending or
+  // already roll-numbered) — applies the same rule across One Paper MCQs,
+  // Two Paper MCQs, Written Exams, and CCE Screening, since they all share
+  // this component. Hide only when total applications are truly zero.
+  //
+  // This used to only apply when the external candidate-portal fetch
+  // returned at least one application anywhere (hasCandidateData), as a
+  // safety net so a transient portal outage wouldn't hide every post. But
+  // `totalApplicants` already has its own safe fallback independent of that
+  // fetch (candidateAppsAvailable ? totalCount : perPostFallback, sourced
+  // from the admin backend's own advertisement application count — see
+  // `perPostFallback` above) — so gating on hasCandidateData too meant that
+  // whenever the portal fetch came back empty (including the very normal
+  // case of genuinely zero applications system-wide), EVERY post showed
+  // regardless of its real applicant count. Filtering directly on
+  // totalApplicants removes that unconditional escape hatch.
+  const postHasActivity = (p) => (p.totalApplicants ?? 0) > 0;
 
   const availableAdvertisements = useMemo(() =>
-    hasCandidateData
-      ? advertisements.filter((ad) => ad.posts.some(postHasActivity))
-      : advertisements,
-  [advertisements, hasCandidateData]);
+    advertisements.filter((ad) => ad.posts.some(postHasActivity)),
+  [advertisements]);
 
   // Cascade: departments available under the currently selected advertisement
   const availableDepartments = useMemo(() => {
     const pool = filterAdvertisement === 'all'
       ? allPosts
       : allPosts.filter((p) => p.advertisementId === filterAdvertisement);
-    const withApplicants = hasCandidateData ? pool.filter(postHasActivity) : pool;
-    return [...new Set(withApplicants.map((p) => p.department).filter(Boolean))];
-  }, [allPosts, filterAdvertisement, hasCandidateData]);
+    return [...new Set(pool.filter(postHasActivity).map((p) => p.department).filter(Boolean))];
+  }, [allPosts, filterAdvertisement]);
 
   // Cascade: posts available under the currently selected advertisement + department
   const availablePosts = useMemo(() =>
     allPosts.filter((p) => {
-      if (hasCandidateData && !postHasActivity(p)) return false;
+      if (!postHasActivity(p)) return false;
       if (filterAdvertisement !== 'all' && p.advertisementId !== filterAdvertisement) return false;
       if (filterDepartment !== 'all' && p.department !== filterDepartment) return false;
       return true;
     }),
-  [allPosts, filterAdvertisement, filterDepartment, hasCandidateData]);
+  [allPosts, filterAdvertisement, filterDepartment]);
 
   // Reset child filters when parent selection changes
   useEffect(() => { setFilterDepartment('all'); setFilterPost('all'); }, [filterAdvertisement]);
@@ -681,7 +709,7 @@ const RollNumberExamFlow = () => {
     return advertisements.map((ad) => {
       if (filterAdvertisement !== 'all' && ad.id !== filterAdvertisement) return null;
       const posts = ad.posts.filter((post) => {
-        if (hasCandidateData && !postHasActivity(post)) return false;
+        if (!postHasActivity(post)) return false;
         if (filterPost !== 'all' && post.id !== filterPost) return false;
         if (filterDepartment !== 'all' && post.department !== filterDepartment) return false;
         if (search && !`${ad.advertisement} ${post.post} ${post.department}`.toLowerCase().includes(search.toLowerCase())) return false;
@@ -690,7 +718,7 @@ const RollNumberExamFlow = () => {
       if (posts.length === 0) return null;
       return { ...ad, posts };
     }).filter(Boolean);
-  }, [advertisements, filterAdvertisement, filterPost, filterDepartment, search, hasCandidateData]);
+  }, [advertisements, filterAdvertisement, filterPost, filterDepartment, search]);
 
   // Flatten to ad+post rows for pagination, then re-group consecutive rows
   // sharing the same advertisement so the rowSpan grouping still renders
@@ -1391,7 +1419,7 @@ const RollNumberExamFlow = () => {
             </div>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr><th className="w-[260px] px-4 py-3">Advertisement</th><th className="px-4 py-3">Designation / Post</th><th className="px-4 py-3">Department</th><th className="px-4 py-3 text-right"><div>Applicants</div><div className="font-normal text-slate-400 text-[10px] normal-case tracking-normal">Pending / Generated</div></th></tr></thead>
+                <thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr><th className="w-[260px] px-4 py-3">Advertisement</th><th className="px-4 py-3">Designation / Post</th><th className="px-4 py-3">Department</th><th className="px-4 py-3 text-right"><div>Applicants</div></th></tr></thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {flatPostRows.length === 0 && (
                     <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">No posts found for this exam type</td></tr>
@@ -1417,11 +1445,11 @@ const RollNumberExamFlow = () => {
                                 {post.generatedCount > 0 && (
                                   <button
                                     type="button"
-                                    onClick={(e) => { e.stopPropagation(); viewGeneratedForPost(post); }}
+                                    // onClick={(e) => { e.stopPropagation(); viewGeneratedForPost(post); }}
                                     className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-200 transition-colors"
                                   >
                                     <CheckCircle2 size={11} />
-                                    {post.generatedCount} Generated · View
+                                    {post.generatedCount} View
                                   </button>
                                 )}
                               </div>

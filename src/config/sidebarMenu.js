@@ -3,7 +3,7 @@ import {
   Award, Settings, Package, Briefcase, MapPin, Map, Hash,
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
-  Stamp, Boxes, Newspaper, FileQuestion
+  Stamp, Boxes, Newspaper, FileQuestion, Calendar
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -31,7 +31,16 @@ export const MENU_ITEMS = [
       { label: "One Paper MCQs",   path: "/dashboard/roll-numbers/exam/one-paper-mcqs", icon: FileText },
       { label: "Two Paper MCQs",   path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
       { label: "Written Exams",    path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },
-      { label: "CCE Exams",        path: "/dashboard/roll-numbers/exam/cce-exams",      icon: FileQuestion },
+      {
+        label: "Combined Competitive Exams",
+        path: "/dashboard/roll-numbers/exam/cce-exams",
+        icon: FileQuestion,
+        children: [
+          { label: "CCE Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
+          { label: "CCE Master Date Sheet",    path: "/dashboard/cce/date-sheet/master",    icon: Calendar },
+          { label: "CCE Candidate Date Sheet", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
+        ],
+      },
     ],
   },
   {
@@ -122,6 +131,11 @@ export const getPermissionModules = () => {
     if (item.submenu) {
       item.submenu.forEach((sub) => {
         modules.push({ key: sub.path, label: `${item.label} → ${sub.label}` });
+        if (Array.isArray(sub.children)) {
+          sub.children.forEach((child) => {
+            modules.push({ key: child.path, label: `${item.label} → ${sub.label} → ${child.label}` });
+          });
+        }
       });
     } else {
       modules.push({ key: item.id, label: item.label });
