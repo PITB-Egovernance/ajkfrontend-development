@@ -12,20 +12,14 @@ import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
+import settingsCatalogApi from 'api/settingsCatalogApi';
+import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 const PERM = 'settings.qualifications';
 
 const API_BASE = Config.apiUrl;
-
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
 
 const QualificationsManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);
@@ -35,6 +29,7 @@ const QualificationsManagement = () => {
   const navigate = useNavigate();
 
   const [rows,     setRows]     = useState([]);
+  const [allRows,  setAllRows]  = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [totalRows, setTotalRows] = useState(0);
   const [open,     setOpen]     = useState(false);
@@ -52,36 +47,67 @@ const QualificationsManagement = () => {
   const [saving,   setSaving]   = useState(false);
   const [search,   setSearch]   = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+  const hasActiveFilters = search.trim().length > 0;
 
-  const fetchAll = async () => {
+  const fetchPage = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/qualifications?per_page=500`, { headers: getHeaders() });
-      const result = await res.json();
-      if (result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
-        setRows(data.map((item, i) => ({
+      const { items, pagination } = await settingsCatalogApi.getPage('qualifications', page + 1, pageSize);
+      setRows(items.map((item, i) => ({
           id:       item.hash_id || item.id,
-          sr_no:    i + 1,
+          sr_no:    page * pageSize + i + 1,
           hash_id:  item.hash_id,
           name:     item.qualification_name || item.name,
           type:     String(item.type || 'required').toLowerCase(),
           status:   String(item.status || 'active').toLowerCase(),
         })));
-        setTotalRows(Number(result.data?.total) || data.length);
-      } else {
-        toast.error(result.message || 'Failed to load qualifications');
-        setRows([]);
-        setTotalRows(0);
+      setTotalRows(Number(pagination.total) || 0);
+      const backendPage = Math.max(0, Number(pagination.current_page || page + 1) - 1);
+      const backendPageSize = Number(pagination.per_page || pageSize);
+      if (backendPage !== paginationModel.page || backendPageSize !== paginationModel.pageSize) {
+        setPaginationModel({ page: backendPage, pageSize: backendPageSize });
       }
     } catch { toast.error('Server error'); setRows([]); setTotalRows(0); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  const fetchAllForSearch = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPaginatedApiList(`${API_BASE}/settings/qualifications`, {
+        headers: settingsCatalogApi.getHeaders(),
+        perPage: 200,
+      });
+      const mapped = (Array.isArray(data) ? data : []).map((item, i) => ({
+        id:       item.hash_id || item.id,
+        sr_no:    i + 1,
+        hash_id:  item.hash_id,
+        name:     item.qualification_name || item.name,
+        type:     String(item.type || 'required').toLowerCase(),
+        status:   String(item.status || 'active').toLowerCase(),
+      }));
+      setAllRows(mapped);
+      setTotalRows(mapped.length);
+    } catch {
+      toast.error('Server error');
+      setAllRows([]);
+      setTotalRows(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (hasActiveFilters) {
+      fetchAllForSearch();
+      return;
+    }
+    fetchPage(paginationModel.page, paginationModel.pageSize);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasActiveFilters, paginationModel.page, paginationModel.pageSize]);
 
 
-  const filtered = rows.filter((r) =>
+  const filtered = (hasActiveFilters ? allRows : rows).filter((r) =>
     !search.trim() || r.name?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -107,23 +133,22 @@ const QualificationsManagement = () => {
     setSaving(true);
     try {
       const isUpdate = !!editing;
-      const url    = isUpdate
-        ? `${API_BASE}/settings/qualifications/${editing.hash_id}/update`
-        : `${API_BASE}/settings/qualifications/store`;
-      const res    = await fetch(url, {
-        method: isUpdate ? 'PUT' : 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
+      const payload = {
           qualification_name: form.qualification_name.trim(),
           type: form.qualification_type,
           status: form.status,
-        }),
-      });
-      const result = await res.json();
+        };
+      const result = isUpdate
+        ? await settingsCatalogApi.update('qualifications', editing.hash_id, payload)
+        : await settingsCatalogApi.create('qualifications', payload);
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Updated successfully' : 'Qualification added');
         setOpen(false);
-        fetchAll();
+        if (hasActiveFilters) {
+          fetchAllForSearch();
+        } else {
+          fetchPage(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Operation failed');
       }
@@ -134,16 +159,15 @@ const QualificationsManagement = () => {
   const handleDelete = async (row) => {
     if (!await confirmDelete({ title: 'Delete Qualification', identifier: row.name })) return;
     try {
-      const res    = await fetch(`${API_BASE}/settings/qualifications/${row.hash_id}/delete`, {
-        method: 'DELETE', headers: getHeaders(),
-      });
-      const result = await res.json();
+      const result = await settingsCatalogApi.remove('qualifications', row.hash_id);
       if (result.success || result.status === 200) {
         toast.success('Deleted');
-        if (rows.length === 1 && paginationModel.page > 0) {
+        if (!hasActiveFilters && rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
+        } else if (hasActiveFilters) {
+          fetchAllForSearch();
         } else {
-          fetchAll();
+          fetchPage(paginationModel.page, paginationModel.pageSize);
         }
       } else {
         toast.error(result.message || 'Delete failed');
@@ -157,15 +181,18 @@ const QualificationsManagement = () => {
     if (!await confirmStatus({ newStatus })) return;
 
     try {
-      const res    = await fetch(`${API_BASE}/settings/qualifications/${row.hash_id || row.id}/update`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({ qualification_name: row.name, type: row.type, status: newStatus }),
+      const result = await settingsCatalogApi.update('qualifications', row.hash_id || row.id, {
+        qualification_name: row.name,
+        type: row.type,
+        status: newStatus,
       });
-      const result = await res.json();
-      if (res.ok || result.success || result.status === 200) {
+      if (result.success || result.status === 200) {
         toast.success(`Marked as ${newStatus}`);
-        fetchAll();
+        if (hasActiveFilters) {
+          fetchAllForSearch();
+        } else {
+          fetchPage(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Status update failed');
       }
@@ -240,7 +267,7 @@ const QualificationsManagement = () => {
 
         <div className="grid grid-cols-1 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-            <CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{rows.length}</h2></CardContent>
+            <CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{totalRows}</h2></CardContent>
           </Card>
         </div>
 
@@ -251,8 +278,8 @@ const QualificationsManagement = () => {
 
         <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          paginationMode="client"
-          rowCount={filtered.length}
+          paginationMode={hasActiveFilters ? 'client' : 'server'}
+          rowCount={hasActiveFilters ? filtered.length : totalRows}
           pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
           loading={loading} />
 

@@ -11,21 +11,14 @@ import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { hasPermission } from 'utils/permissions';
+import settingsCatalogApi from 'api/settingsCatalogApi';
+import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 
 const PERM = 'settings.departments';
-
 const API_BASE = Config.apiUrl;
-
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
 
 const gridSx = {
   border: 'none',
@@ -53,6 +46,7 @@ const DepartmentsManagement = () => {
 
   const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(true);
+  const [allRows, setAllRows] = useState([]);
   const [total,   setTotal]   = useState(0);
   const [filters, setFilters] = useState({
     department_name: '',
@@ -68,6 +62,7 @@ const DepartmentsManagement = () => {
   const [formData,    setFormData]    = useState(emptyForm);
   const [saving,      setSaving]      = useState(false);
   const [formError,   setFormError]   = useState('');
+  const hasActiveFilters = Object.values(filters).some((value) => String(value ?? '').trim() !== '');
 
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
@@ -136,25 +131,47 @@ const DepartmentsManagement = () => {
     return true;
   };
 
-  const fetchAll = async () => {
+  const fetchPage = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/departments?per_page=500`, { headers: getHeaders() });
-      const result = await res.json();
-      if (res.ok || result.success || result.status === 200) {
-        const payload = result.data ?? {};
-        const data = payload.data ?? result.data ?? [];
-        const dataArray = Array.isArray(data) ? data : [];
-        setRows(formatDepartmentRows(dataArray));
-        setTotal(Number(payload.total ?? dataArray.length ?? 0));
-      } else {
-        toast.error(result.message || 'Failed to load departments');
+      const { items, pagination } = await settingsCatalogApi.getPage('departments', page + 1, pageSize);
+      setRows(formatDepartmentRows(items, page * pageSize));
+      setTotal(Number(pagination.total) || 0);
+      const backendPage = Math.max(0, Number(pagination.current_page || page + 1) - 1);
+      const backendPageSize = Number(pagination.per_page || pageSize);
+      if (backendPage !== paginationModel.page || backendPageSize !== paginationModel.pageSize) {
+        setPaginationModel({ page: backendPage, pageSize: backendPageSize });
       }
     } catch { toast.error('Server error while loading departments'); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  const fetchAllForFilters = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPaginatedApiList(`${API_BASE}/settings/departments`, {
+        headers: settingsCatalogApi.getHeaders(),
+        perPage: 200,
+      });
+      setAllRows(formatDepartmentRows(data));
+      setTotal(Array.isArray(data) ? data.length : 0);
+    } catch {
+      toast.error('Server error while loading departments');
+      setAllRows([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (hasActiveFilters) {
+      fetchAllForFilters();
+      return;
+    }
+    fetchPage(paginationModel.page, paginationModel.pageSize);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasActiveFilters, paginationModel.page, paginationModel.pageSize]);
 
   const openAdd = () => {
     setEditing(null);
@@ -185,25 +202,24 @@ const DepartmentsManagement = () => {
     setFormError('');
     try {
       const isUpdate = !!editing;
-      const url      = isUpdate
-        ? `${API_BASE}/settings/departments/${editing.hash_id}/update`
-        : `${API_BASE}/settings/departments/store`;
-      const res      = await fetch(url, {
-        method: isUpdate ? 'PUT' : 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
+      const payload = {
           department_name: formData.department_name.trim(),
           contact_person:  formData.contact_person.trim(),
           phone_number:    formData.phone_number.trim(),
           mobile_number:   formData.mobile_number.trim(),
           status:          formData.status,
-        }),
-      });
-      const result   = await res.json();
+        };
+      const result = isUpdate
+        ? await settingsCatalogApi.update('departments', editing.hash_id, payload)
+        : await settingsCatalogApi.create('departments', payload);
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Department updated successfully' : 'Department created successfully');
         setOpenModal(false);
-        fetchAll();
+        if (hasActiveFilters) {
+          fetchAllForFilters();
+        } else {
+          fetchPage(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || (isUpdate ? 'Failed to update department' : 'Failed to create department'));
       }
@@ -217,16 +233,15 @@ const DepartmentsManagement = () => {
     handleMenuClose();
     if (!await confirmDelete({ title: 'Delete Department', identifier: row.department_name })) return;
     try {
-      const res    = await fetch(`${API_BASE}/settings/departments/${row.hash_id}/delete`, {
-        method: 'DELETE', headers: getHeaders(),
-      });
-      const result = await res.json();
+      const result = await settingsCatalogApi.remove('departments', row.hash_id);
       if (result.success || result.status === 200) {
         toast.success('Department deleted successfully');
-        if (rows.length === 1 && paginationModel.page > 0) {
+        if (!hasActiveFilters && rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
+        } else if (hasActiveFilters) {
+          fetchAllForFilters();
         } else {
-          fetchAll();
+          fetchPage(paginationModel.page, paginationModel.pageSize);
         }
       } else {
         toast.error(result.message || 'Failed to delete department');
@@ -240,25 +255,21 @@ const DepartmentsManagement = () => {
     if (!await confirmStatus({ newStatus })) return;
 
     try {
-      const res = await fetch(
-        `${API_BASE}/settings/departments/${row.hash_id || row.id}/update`,
-        {
-          method: 'PUT',
-          headers: getHeaders(),
-          body: JSON.stringify({
-            department_name: row.department_name,
-            contact_person: row.contact_person || '',
-            phone_number: row.phone_number || '',
-            mobile_number: row.mobile_number || '',
-            status: newStatus,
-          }),
-        }
-      );
-      const result = await res.json();
+      const result = await settingsCatalogApi.update('departments', row.hash_id || row.id, {
+        department_name: row.department_name,
+        contact_person: row.contact_person || '',
+        phone_number: row.phone_number || '',
+        mobile_number: row.mobile_number || '',
+        status: newStatus,
+      });
 
-      if (res.ok || result.success || result.status === 200) {
+      if (result.success || result.status === 200) {
         toast.success(`Department marked as ${newStatus}`);
-        fetchAll();
+        if (hasActiveFilters) {
+          fetchAllForFilters();
+        } else {
+          fetchPage(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Status update failed');
       }
@@ -304,7 +315,7 @@ const DepartmentsManagement = () => {
     }] : []),
   ];
 
-  const filteredRows = rows.filter(matchesFilters);
+  const filteredRows = (hasActiveFilters ? allRows : rows).filter(matchesFilters);
 
   if (loading && rows.length === 0) return <InlineLoader text="Loading departments..." variant="ring" size="lg" />;
 
@@ -355,8 +366,8 @@ const DepartmentsManagement = () => {
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
-          paginationMode="client"
-          rowCount={filteredRows.length}
+          paginationMode={hasActiveFilters ? 'client' : 'server'}
+          rowCount={hasActiveFilters ? filteredRows.length : total}
           loading={loading}
           initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           autoHeight

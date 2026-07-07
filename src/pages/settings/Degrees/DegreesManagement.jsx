@@ -11,22 +11,16 @@ import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import { hasPermission } from 'utils/permissions';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+import settingsCatalogApi from 'api/settingsCatalogApi';
+import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 
 const PERM = 'settings.degrees';
 
 const API_BASE = Config.apiUrl;
-
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
 
 const emptyForm = { degree_name: '', degree_group: '', status: 'active' };
 
@@ -38,6 +32,7 @@ const DegreesManagement = () => {
   const navigate = useNavigate();
 
   const [rows,   setRows]   = useState([]);
+  const [allRows, setAllRows] = useState([]);
   const [groups, setGroups] = useState([]);   // all known degree groups — used for the filter dropdown
   const [loading, setLoading] = useState(true);
   const [totalRows, setTotalRows] = useState(0);
@@ -53,6 +48,7 @@ const DegreesManagement = () => {
   const [togglingId, setTogglingId] = useState(null);
   const [filters, setFilters] = useState({ degree_name: '', degree_group: '', status: '' });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+  const hasActiveFilters = Object.values(filters).some((value) => String(value ?? '').trim() !== '');
 
   const mapDegreeRow = (item, i) => ({
     id:           item.hash_id || item.id,
@@ -71,27 +67,69 @@ const DegreesManagement = () => {
     return true;
   };
 
-  const fetchAll = async () => {
+  const fetchPage = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const res  = await fetch(`${API_BASE}/settings/degrees?per_page=500`, { headers: getHeaders() });
-      const data = await res.json();
-      if (data.success || data.status === 200) {
-        const list = data.data?.data ?? data.data ?? [];
-        const mapped = (Array.isArray(list) ? list : []).filter(Boolean).map(mapDegreeRow);
-        setRows(mapped);
-        setTotalRows(Number(data.data?.total) || mapped.length);
-        setGroups([...new Set(mapped.map((d) => d.degree_group).filter(Boolean))]);
-      } else {
-        toast.error(data.message || 'Failed to load degrees');
-        setRows([]);
-        setTotalRows(0);
+      const { items, pagination } = await settingsCatalogApi.getPage('degrees', page + 1, pageSize);
+      const mapped = (Array.isArray(items) ? items : []).filter(Boolean).map((item, index) =>
+        mapDegreeRow(item, page * pageSize + index)
+      );
+      setRows(mapped);
+      setTotalRows(Number(pagination.total) || 0);
+      const backendPage = Math.max(0, Number(pagination.current_page || page + 1) - 1);
+      const backendPageSize = Number(pagination.per_page || pageSize);
+      if (backendPage !== paginationModel.page || backendPageSize !== paginationModel.pageSize) {
+        setPaginationModel({ page: backendPage, pageSize: backendPageSize });
       }
     } catch { toast.error('Server error'); setRows([]); setTotalRows(0); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  const fetchAllForFilters = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPaginatedApiList(`${API_BASE}/settings/degrees`, {
+        headers: settingsCatalogApi.getHeaders(),
+        perPage: 200,
+      });
+      const mapped = (Array.isArray(data) ? data : []).filter(Boolean).map(mapDegreeRow);
+      setAllRows(mapped);
+      setTotalRows(mapped.length);
+      setGroups([...new Set(mapped.map((d) => d.degree_group).filter(Boolean))]);
+    } catch {
+      toast.error('Server error');
+      setAllRows([]);
+      setTotalRows(0);
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (hasActiveFilters) {
+      fetchAllForFilters();
+      return;
+    }
+    fetchPage(paginationModel.page, paginationModel.pageSize);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasActiveFilters, paginationModel.page, paginationModel.pageSize]);
+
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const data = await fetchPaginatedApiList(`${API_BASE}/settings/degrees`, {
+          headers: settingsCatalogApi.getHeaders(),
+          perPage: 200,
+        });
+        const mapped = (Array.isArray(data) ? data : []).filter(Boolean).map(mapDegreeRow);
+        setGroups([...new Set(mapped.map((d) => d.degree_group).filter(Boolean))]);
+      } catch {
+        setGroups([]);
+      }
+    };
+    fetchGroups();
+  }, []);
 
   const filterConfig = [
     { name: 'degree_name',  label: 'Degree Name',  type: 'text',   placeholder: 'Filter by degree name' },
@@ -110,7 +148,7 @@ const DegreesManagement = () => {
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const filtered = rows.filter((r) => {
+  const filtered = (hasActiveFilters ? allRows : rows).filter((r) => {
     const matchName  = !filters.degree_name.trim() || r.degree_name?.toLowerCase().includes(filters.degree_name.toLowerCase());
     const matchGroup = !filters.degree_group || r.degree_group === filters.degree_group;
     const matchStatus = !filters.status || r.status === filters.status;
@@ -133,23 +171,22 @@ const DegreesManagement = () => {
     setSaving(true);
     try {
       const isUpdate = !!editing;
-      const url      = isUpdate
-        ? `${API_BASE}/settings/degrees/${editing.hash_id}/update`
-        : `${API_BASE}/settings/degrees/store`;
-      const res      = await fetch(url, {
-        method: isUpdate ? 'PUT' : 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
+      const payload = {
           degree_name: form.degree_name.trim(),
           degree_group: form.degree_group.trim(),
           status: form.status,
-        }),
-      });
-      const result   = await res.json();
+        };
+      const result = isUpdate
+        ? await settingsCatalogApi.update('degrees', editing.hash_id, payload)
+        : await settingsCatalogApi.create('degrees', payload);
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Updated successfully' : 'Degree added');
         setOpen(false);
-        fetchAll();
+        if (hasActiveFilters) {
+          fetchAllForFilters();
+        } else {
+          fetchPage(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Operation failed');
       }
@@ -160,13 +197,16 @@ const DegreesManagement = () => {
   const handleDelete = async (row) => {
     if (!await confirmDelete({ title: 'Delete Degree', identifier: row.degree_name })) return;
     try {
-      const res    = await fetch(`${API_BASE}/settings/degrees/${row.hash_id}/delete`, {
-        method: 'DELETE', headers: getHeaders(),
-      });
-      const result = await res.json();
+      const result = await settingsCatalogApi.remove('degrees', row.hash_id);
       if (result.success || result.status === 200) {
         toast.success('Deleted');
-        fetchAll();
+        if (!hasActiveFilters && rows.length === 1 && paginationModel.page > 0) {
+          setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
+        } else if (hasActiveFilters) {
+          fetchAllForFilters();
+        } else {
+          fetchPage(paginationModel.page, paginationModel.pageSize);
+        }
       } else {
         toast.error(result.message || 'Delete failed');
       }
@@ -182,25 +222,30 @@ const DegreesManagement = () => {
     setTogglingId(rowId);
 
     try {
-      const res = await fetch(`${API_BASE}/settings/degrees/${rowId}/update`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          degree_name: row.degree_name,
-          degree_group: row.degree_group || '',
-          status: newStatus,
-        }),
+      const result = await settingsCatalogApi.update('degrees', rowId, {
+        degree_name: row.degree_name,
+        degree_group: row.degree_group || '',
+        status: newStatus,
       });
-      const result = await res.json();
 
-      if (res.ok || result.success || result.status === 200) {
-        setRows((currentRows) =>
-          currentRows.map((degree) =>
-            (degree.hash_id || degree.id) === rowId
-              ? { ...degree, status: newStatus }
-              : degree
-          )
-        );
+      if (result.success || result.status === 200) {
+        if (hasActiveFilters) {
+          setAllRows((currentRows) =>
+            currentRows.map((degree) =>
+              (degree.hash_id || degree.id) === rowId
+                ? { ...degree, status: newStatus }
+                : degree
+            )
+          );
+        } else {
+          setRows((currentRows) =>
+            currentRows.map((degree) =>
+              (degree.hash_id || degree.id) === rowId
+                ? { ...degree, status: newStatus }
+                : degree
+            )
+          );
+        }
         toast.success(`Marked as ${newStatus}`);
       } else {
         toast.error(result.message || 'Status update failed');
@@ -289,7 +334,9 @@ const DegreesManagement = () => {
 
         <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={GRID_PAGE_SIZE_OPTIONS} paginationMode="client" rowCount={filtered.length}
+          pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
+          paginationMode={hasActiveFilters ? 'client' : 'server'}
+          rowCount={hasActiveFilters ? filtered.length : totalRows}
           loading={loading} autoHeight disableRowSelectionOnClick sx={GRID_SX} />
 
         {/* 3-dot action menu */}
