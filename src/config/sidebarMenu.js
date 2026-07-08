@@ -38,8 +38,8 @@ export const MENU_ITEMS = [
         children: [
           { label: "Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
           { label: "Master Date Sheet",    path: "/dashboard/cce/date-sheet/master",    icon: Calendar },
-          { label: "Candidate Date Sheet", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
-          { label: "CCE Subjects Roll No Slip", path: "/dashboard/cce/date-sheet/roll-slip", icon: Ticket },
+          { label: "Candidate Selected Subjects", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
+          { label: "CCE Date Sheet", path: "/dashboard/cce/date-sheet/roll-slip", icon: Ticket },
         ],
       },
     ],
