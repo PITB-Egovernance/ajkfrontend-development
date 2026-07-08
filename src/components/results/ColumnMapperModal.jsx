@@ -53,10 +53,14 @@ const findBestMatch = (fieldName, csvHeaders) => {
   };
 
   for (const [key, aliases] of Object.entries(aliasesMap)) {
-    if (cleanField === key || key.includes(cleanField)) {
+    const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanField === cleanKey || cleanKey.includes(cleanField) || cleanField.includes(cleanKey)) {
       const matchedAlias = csvHeaders.find(h => {
         const cleanHeader = h.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return aliases.some(alias => cleanHeader === alias || cleanHeader.includes(alias));
+        return aliases.some(alias => {
+          const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanHeader === cleanAlias || cleanHeader.includes(cleanAlias) || cleanAlias.includes(cleanHeader);
+        });
       });
       if (matchedAlias) return matchedAlias;
     }

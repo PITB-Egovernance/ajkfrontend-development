@@ -7,6 +7,7 @@ import {
 import { Card, CardContent } from 'components/ui/Card';
 import CSVUploadZone from 'components/results/CSVUploadZone';
 import ColumnMapperModal from 'components/results/ColumnMapperModal';
+import SearchableMultiSelect from 'components/ui/SearchableMultiSelect';
 import ResultsApi from 'api/resultsApi';
 import RollNumberApi from 'api/rollNumberApi';
 import toast from 'react-hot-toast';
@@ -33,8 +34,8 @@ const TWO_PAPER_COLUMNS = [
 ];
 
 const getTemplateColumns = (examType) => {
-  if (examType === 'two-paper-mcqs') return TWO_PAPER_COLUMNS;
-  if (examType === 'one-paper-mcqs') return ONE_PAPER_COLUMNS;
+  const clean = String(examType || '').toLowerCase().replace(/_/g, '-');
+  if (clean === 'two-paper-mcq' || clean === 'two-paper-mcqs') return TWO_PAPER_COLUMNS;
   return ONE_PAPER_COLUMNS;
 };
 
@@ -272,8 +273,11 @@ const MCQ_MAPPINGS = {
   subjects:          {},
 };
 
-const isMcqExamType = (et) =>
-  et === 'one-paper-mcqs' || et === 'two-paper-mcqs';
+const isMcqExamType = (et) => {
+  const clean = String(et || '').toLowerCase().replace(/_/g, '-');
+  return clean === 'one-paper-mcq' || clean === 'one-paper-mcqs' ||
+         clean === 'two-paper-mcq' || clean === 'two-paper-mcqs';
+};
 
 /* ── Subject breakdown cell ───────────────────────────────────── */
 const SubjectBreakdown = ({ row }) => {
@@ -308,7 +312,7 @@ const SubjectBreakdown = ({ row }) => {
       <div className="flex flex-wrap gap-1.5">
         {subjectsObj.map((s, i) => {
           const name = s.subject_name ?? s.name ?? `Subject ${i + 1}`;
-          const obtained = s.obtained ?? s.marks;
+          const obtained = s.obtained ?? s.marks ?? s.obtained_marks;
           const max = s.max_marks ?? s.max;
           const exceeds = s.exceeds_max ?? (max != null && Number(obtained) > Number(max));
           return (
@@ -570,6 +574,10 @@ const ImportResultsPage = () => {
 
   const isMcq = isMcqExamType(examType);
 
+  // Clubbed jobs selection states
+  const [selectedJobIds, setSelectedJobIds] = useState([jobId]);
+  const [availableJobs, setAvailableJobs] = useState([]);
+
   // Column mapper state (non-MCQ exams only)
   const [mapperOpen, setMapperOpen] = useState(false);
   const [csvHeaders, setCsvHeaders] = useState([]);
@@ -605,10 +613,33 @@ const ImportResultsPage = () => {
         if (!alive) return;
 
         const allAds = adsRes?.data?.data ?? adsRes?.data ?? [];
-        for (const ad of allAds) {
-          const job = (ad.job_details || []).find(j => (j.hash_id || String(j.id)) === jobId);
-          if (job) { setPostName(job.designation || ''); break; }
+        const fetchedJobs = allAds.flatMap(ad =>
+          (ad.job_details || ad.jobDetails || []).map(j => ({
+            ...j,
+            adv_number: ad.adv_number
+          }))
+        );
+
+        // Find primary matching job name
+        const job = fetchedJobs.find(j => (j.hash_id || String(j.id)) === jobId);
+        if (job) {
+          setPostName(job.designation || '');
         }
+
+        // Filter other jobs of same examType for clubbed import options
+        const jobsOfSameType = fetchedJobs.filter(j => {
+          if (examType === 'one-paper-mcqs') return /mcq/i.test(j.test_type) && !/two/i.test(j.test_type);
+          if (examType === 'two-paper-mcqs') return /mcq/i.test(j.test_type) && /two/i.test(j.test_type);
+          if (examType === 'written-exams') return /written/i.test(j.test_type);
+          if (examType === 'cce-exams') return /cce/i.test(j.test_type) || /joint.competitive/i.test(j.test_type) || /jce/i.test(j.test_type);
+          return true;
+        });
+
+        const selectOptions = jobsOfSameType.map(j => ({
+          label: `${j.designation} (Adv: ${j.adv_number || 'N/A'})`,
+          value: j.hash_id || String(j.id),
+        }));
+        setAvailableJobs(selectOptions);
 
         const subs = subjectsRes?.data?.subjects ?? subjectsRes?.data ?? subjectsRes?.subjects ?? [];
         const dynamicCols = (Array.isArray(subs) ? subs : []).map(s => ({
@@ -680,13 +711,15 @@ const ImportResultsPage = () => {
   /* Step 2 — column mapper confirmed → dry_run=true → show DryRunView */
   const handleMappingConfirm = async (payload) => {
     setMapperOpen(false);
-    // For MCQ: always use the fixed MCQ mappings regardless of what mapper returns
-    const mappings = isMcq ? MCQ_MAPPINGS : payload.mappings;
+    // For MCQ: clear the subject mappings but preserve the user's mapped roll number column
+    const mappings = isMcq 
+      ? { ...payload.mappings, subjects: {} } 
+      : payload.mappings;
     const toastId  = toast.loading('Running dry-run validation…', { position: 'top-right', duration: Infinity });
     try {
       const previewRes = await ResultsApi.processDynamicImport({
         temp_file_id:  payload.temp_file_id,
-        job_post_id:   jobId,
+        job_post_ids:  selectedJobIds,
         passing_marks: Number(passingMarks) || 40,
         dry_run:       true,
         mappings,
@@ -709,7 +742,7 @@ const ImportResultsPage = () => {
     try {
       const res  = await ResultsApi.processDynamicImport({
         temp_file_id:  pendingMappingPayload.temp_file_id,
-        job_post_id:   jobId,
+        job_post_ids:  selectedJobIds,
         passing_marks: Number(passingMarks) || 40,
         dry_run:       false,
         mappings:      pendingMappingPayload.mappings,
@@ -805,6 +838,29 @@ const ImportResultsPage = () => {
         {/* Upload form */}
         <Card className="border border-slate-200 bg-white">
           <CardContent className="p-6 space-y-5">
+
+            {/* Clubbed Job Selection */}
+            {availableJobs.length > 1 && (
+              <div className="flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-bold text-slate-700">Clubbed Job Posts Selection</label>
+                  <p className="text-xs text-slate-405">Select all other clubbed job posts to upload results for simultaneously:</p>
+                </div>
+                <SearchableMultiSelect
+                  options={availableJobs}
+                  value={selectedJobIds}
+                  onChange={(val) => {
+                    // Ensure the primary jobId is always selected and cannot be removed
+                    if (!val.includes(jobId)) {
+                      setSelectedJobIds([jobId, ...val]);
+                    } else {
+                      setSelectedJobIds(val);
+                    }
+                  }}
+                  placeholder="Select clubbed posts..."
+                />
+              </div>
+            )}
 
             {/* Template download */}
             <div className="flex items-center justify-between">
