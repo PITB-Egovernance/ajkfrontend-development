@@ -2,8 +2,9 @@
 const apiUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 const productionUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 
-// LOCAL BACKEND — comment out the live apiUrl above and uncomment below for local development.
-// const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
+// LOCAL BACKEND — used ONLY by the result import (upload) endpoints for local testing.
+// Remove/ignore when local testing of the result module is done.
+const localApiUrl = process.env.REACT_APP_LOCAL_API_URL || "http://localhost:8000/api/v1";
 
 const apiKey =
   process.env.REACT_APP_API_KEY ||
@@ -29,6 +30,7 @@ const candidateApiKey = "admin-secret-key-123";
 
 const Config = {
   apiUrl,
+  localApiUrl,
   apiKey,
   productionUrl,
   localUrl,

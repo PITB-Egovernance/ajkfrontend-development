@@ -104,19 +104,9 @@ const ResultsApi = {
    * Scan CSV headers dynamically
    */
   scanCSVHeaders: async (formData) => {
-    const token = AuthService.getToken();
-    const headers = {
-      'Accept': 'application/json',
-      'X-API-KEY': API_KEY,
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
     const response = await fetch(`${API_BASE}/results/import/dynamic/scan`, {
       method: 'POST',
-      headers: headers,
+      headers: getHeaders(false),
       body: formData,
     });
     return handleResponse(response);
@@ -183,11 +173,11 @@ const ResultsApi = {
   /**
    * Download CSV/Excel Template for Result Import
    */
-  downloadTemplate: async (jobPostId = null) => {
-    let url = `${API_BASE}/results/import/template`;
-    if (jobPostId) {
-      url += `?job_post_id=${jobPostId}`;
-    }
+  downloadTemplate: async (jobPostId = null, examType = null) => {
+    const params = [];
+    if (jobPostId) params.push(`job_post_id=${jobPostId}`);
+    if (examType)  params.push(`exam_type=${examType}`);
+    let url = `${API_BASE}/results/import/template${params.length ? `?${params.join('&')}` : ''}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: getHeaders(),
@@ -461,7 +451,7 @@ const ResultsApi = {
    */
   getCandidates: async (jobId, params = {}) => {
     const searchParams = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (Array.isArray(value)) {
         value.forEach(v => searchParams.append(`${key}[]`, v));
@@ -601,6 +591,14 @@ const ResultsApi = {
       headers: getHeaders(),
     });
     return handleResponse(response);
+  },
+
+  downloadRejectedRows: async (jobPostId) => {
+    const response = await fetch(`${API_BASE}/results/import/rejected?job_post_id=${jobPostId}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleBlobResponse(response);
   },
 };
 

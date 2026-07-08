@@ -71,7 +71,8 @@ const ColumnMapperModal = ({
   csvHeaders = [],
   subjects = [],
   tempFileId,
-  onConfirm
+  onConfirm,
+  requireSubjectMapping = true,
 }) => {
   const [mappings, setMappings] = useState({
     identifier_type: 'roll_number', // Default candidate key identifier
@@ -160,19 +161,18 @@ const ColumnMapperModal = ({
   };
 
   const handleConfirm = () => {
-    // Validation
     if (!mappings.identifier_column) {
       setValidationError('Please map the Candidate Identifier column.');
       return;
     }
 
     const mappedSubjectValues = Object.values(mappings.subject_mappings).filter(Boolean);
-    if (mappedSubjectValues.length === 0) {
+
+    if (requireSubjectMapping && mappedSubjectValues.length === 0) {
       setValidationError('Please map at least one subject column to import marks.');
       return;
     }
 
-    // Check for duplicate column mapping
     const allMappedColumns = [mappings.identifier_column, ...mappedSubjectValues];
     const uniqueMappedColumns = new Set(allMappedColumns);
     if (uniqueMappedColumns.size < allMappedColumns.length) {

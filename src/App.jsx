@@ -105,6 +105,7 @@ import CreateDepartmentUser from 'pages/settings/DepartmentUsers/EditDepartmentU
 import TermsAndConditionsManagement from "pages/settings/TermsAndConditions/TermsAndConditionsManagement";
 import VerificationPage from 'pages/results/VerificationPage';
 import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
+import ResultsExamFlow from 'pages/results/ResultsExamFlow';
 
 
 function App() {
@@ -267,6 +268,7 @@ function App() {
 
           {/* Results Module Routes */}
           <Route path="results" element={<ResultsDashboard />} />
+          <Route path="results/exam/:examType" element={<ResultsExamFlow />} />
           <Route path="results/search" element={<ResultSearchPage />} />
           <Route path="results/view/:jobId?" element={<ResultsViewPage />} />
           <Route

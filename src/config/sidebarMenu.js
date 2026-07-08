@@ -81,7 +81,13 @@ export const MENU_ITEMS = [
     id: "results",
     label: "Results",
     icon: Award,
-    path: "/dashboard/results",
+    submenu: [
+      { label: "All Results",    path: "/dashboard/results",                         icon: Award },
+      { label: "One Paper MCQs", path: "/dashboard/results/exam/one-paper-mcqs",    icon: FileText },
+      { label: "Two Paper MCQs", path: "/dashboard/results/exam/two-paper-mcqs",    icon: FileText },
+      { label: "Written Exams",  path: "/dashboard/results/exam/written-exams",     icon: FileCheck },
+      { label: "CCE Exams",      path: "/dashboard/results/exam/cce-exams",         icon: FileQuestion },
+    ],
   },
   // {
   //   id: "workflow-tracking",
