@@ -9,59 +9,7 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import CceScreeningApi from 'api/cceScreeningApi';
 import CceDateSheetApi from 'api/cceDateSheetApi';
 import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
-
-// Same group ordering used across the CCE pages (master date sheet, public syllabus).
-const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G'];
-
-const normalize = (v) => String(v || '').trim().toLowerCase();
-
-const formatPaperDate = (isoDate) => {
-  if (!isoDate) return '—';
-  const d = new Date(`${isoDate}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-};
-
-const formatPaperDay = (isoDate) => {
-  if (!isoDate) return '—';
-  const d = new Date(`${isoDate}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, { weekday: 'long' });
-};
-
-const formatPaperTime = (time24) => {
-  if (!time24) return '—';
-  const [h, m] = time24.split(':');
-  const d = new Date();
-  d.setHours(Number(h), Number(m), 0, 0);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-};
-
-// Groups the master date sheet rows the same way the master page does, then
-// narrows each optional group down to only the papers the candidate picked.
-// Compulsory papers are never candidate-selected — they always come through
-// in full, exactly once, for every candidate.
-const buildCandidateDateSheetGroups = (masterRows, selections) => {
-  const byGroup = {};
-  masterRows.forEach((row) => {
-    const group = row.subject_group || 'Compulsory';
-    (byGroup[group] ||= []).push(row);
-  });
-
-  const known = GROUP_ORDER.filter((g) => byGroup[g]);
-  const unknown = Object.keys(byGroup).filter((g) => !GROUP_ORDER.includes(g));
-
-  return [...known, ...unknown]
-    .map((group) => {
-      if (group === 'Compulsory') return { group, items: byGroup[group] };
-
-      const selectedNames = new Set((selections?.[group] || []).map(normalize));
-      const items = byGroup[group].filter((row) => selectedNames.has(normalize(row.subject_name)));
-      return { group, items };
-    })
-    .filter(({ items }) => items.length > 0);
-};
+import { formatPaperDate, formatPaperDay, formatPaperTime, buildCandidateDateSheetGroups } from 'utils/cceDateSheet';
 
 const DEFAULT_FILTERS = { search: '' };
 const FILTER_CONFIG = [

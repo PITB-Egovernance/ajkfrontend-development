@@ -221,9 +221,16 @@ const RollSlipView = () => {
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.day || '—'}</td>
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.date || '—'}</td>
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{timeRange(group.time, group.endTime)}</td>
-                        {hasLabels && <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle font-bold text-emerald-900">{group.label || '—'}</td>}
+                        {hasLabels && (
+                          <td
+                            className="border border-emerald-900 px-2 py-1 text-left align-middle font-bold text-emerald-900"
+                            style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}
+                          >
+                            {group.label || '—'}
+                          </td>
+                        )}
                         {(!allSameDesc || idx === 0) && (
-                          <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900 align-top"
+                          <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900 align-middle"
                               rowSpan={allSameDesc ? groups.length : undefined}>
                             {group.posts.map((session, pIdx) => (
                               <div key={pIdx} className={pIdx > 0 ? 'border-t border-emerald-100 mt-1 pt-1' : ''}>

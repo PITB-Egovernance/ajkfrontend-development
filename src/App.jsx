@@ -85,6 +85,7 @@ import RollNumberExamFlow from 'pages/roll-numbers/RollNumberExamFlow';
 import CceScreeningResults from 'pages/cce/CceScreeningResults';
 import CceMasterDateSheet from 'pages/cce/CceMasterDateSheet';
 import CceCandidateDateSheet from 'pages/cce/CceCandidateDateSheet';
+import CceRollSlipGeneration from 'pages/cce/CceRollSlipGeneration';
 import AwardList from 'pages/award-list/AwardList';
 import AwardListDetail from 'pages/award-list/AwardListDetail';
 import EmployeesLanding from 'pages/employees/EmployeesLanding';
@@ -252,6 +253,7 @@ function App() {
           <Route path="cce/screening" element={<CceScreeningResults />} />
           <Route path="cce/date-sheet/master" element={<CceMasterDateSheet />} />
           <Route path="cce/date-sheet/candidate" element={<CceCandidateDateSheet />} />
+          <Route path="cce/date-sheet/roll-slip" element={<CceRollSlipGeneration />} />
 
           {/* Award List Routes */}
           <Route path="award-lists" element={<AwardList />} />

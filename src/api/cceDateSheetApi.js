@@ -60,12 +60,18 @@ const CceDateSheetApi = {
   },
 
   // ── Candidate Date Sheet ─────────────────────────────────────────────────
+  // Admin-backend candidate listing — unlike getEligibleCandidatesFromPortal
+  // (which hits the candidate portal directly), this one enriches each row
+  // with the locally-linked application_number, needed anywhere we have to
+  // call another admin-backend endpoint (e.g. roll-slip generation) that
+  // identifies the candidate by application number rather than roll number.
   getEligibleCandidates: async (advertisementId, params = {}) => {
     const search = new URLSearchParams();
-    if (advertisementId) search.set('advertisement_id', advertisementId);
-    if (params.search)   search.set('search',   params.search);
-    if (params.per_page) search.set('per_page', String(params.per_page));
-    if (params.page)     search.set('page',     String(params.page));
+    if (advertisementId)  search.set('advertisement_id', advertisementId);
+    if (params.search)    search.set('search',      params.search);
+    if (params.rollNumber) search.set('roll_number', params.rollNumber);
+    if (params.per_page)  search.set('per_page',     String(params.per_page));
+    if (params.page)      search.set('page',         String(params.page));
 
     const res = await fetch(`${ADMIN_API_BASE}/cce/candidate-date-sheet/candidates?${search}`, {
       headers: getAdminHeaders(false),

@@ -3,7 +3,7 @@ import {
   Award, Settings, Package, Briefcase, MapPin, Map, Hash,
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
-  Stamp, Boxes, Newspaper, FileQuestion, Calendar
+  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -39,6 +39,7 @@ export const MENU_ITEMS = [
           { label: "Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
           { label: "Master Date Sheet",    path: "/dashboard/cce/date-sheet/master",    icon: Calendar },
           { label: "Candidate Date Sheet", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
+          { label: "CCE Subjects Roll No Slip", path: "/dashboard/cce/date-sheet/roll-slip", icon: Ticket },
         ],
       },
     ],
