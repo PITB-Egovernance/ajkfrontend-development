@@ -562,11 +562,11 @@ const RollNumberManagement = () => {
               <p className="text-sm text-slate-500 mt-1">View and manage candidates with generated roll number slips.</p>
             </div>
           </div>
-          <Button variant="outline" size="md" onClick={fetchApplications} disabled={loading}
+          {/* <Button variant="outline" size="md" onClick={fetchApplications} disabled={loading}
             className="h-10 w-10 min-w-[2.5rem] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
             title="Refresh List" aria-label="Refresh List">
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </Button>
+          </Button> */}
         </div>
 
         {/* STATS */}

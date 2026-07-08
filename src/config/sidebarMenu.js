@@ -21,29 +21,7 @@ export const MENU_ITEMS = [
       { label: "Award Lists",            path: "/dashboard/award-lists",   icon: Award },
     ],
   },
-  {
-    id: "roll-number-management",
-    label: "Roll Number Management",
-    icon: Hash,
-    path: "/dashboard/roll-numbers",
-    submenu: [
-      { label: "All Applications", path: "/dashboard/roll-numbers",                    icon: ClipboardList },
-      { label: "One Paper MCQs",   path: "/dashboard/roll-numbers/exam/one-paper-mcqs", icon: FileText },
-      { label: "Two Paper MCQs",   path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
-      { label: "Written Exams",    path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },
-      {
-        label: "CCE Exams",
-        path: "/dashboard/roll-numbers/exam/cce-exams",
-        icon: FileQuestion,
-        children: [
-          { label: "Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
-          { label: "Master Date Sheet",    path: "/dashboard/cce/date-sheet/master",    icon: Calendar },
-          { label: "Candidate Selected Subjects", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
-          { label: "CCE Date Sheet", path: "/dashboard/cce/date-sheet/roll-slip", icon: Ticket },
-        ],
-      },
-    ],
-  },
+  
   {
     id: "employees",
     label: "Employees",
@@ -74,6 +52,30 @@ export const MENU_ITEMS = [
     label: "Approval Flow",
     icon: GitBranch,
     path: "/dashboard/approval-flow",
+  },
+
+  {
+    id: "roll-number-management",
+    label: "Roll Number Management",
+    icon: Hash,
+    path: "/dashboard/roll-numbers",
+    submenu: [
+      { label: "All Applications", path: "/dashboard/roll-numbers",                    icon: ClipboardList },
+      { label: "One Paper MCQs",   path: "/dashboard/roll-numbers/exam/one-paper-mcqs", icon: FileText },
+      { label: "Two Paper MCQs",   path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
+      { label: "Written Exams",    path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },
+      {
+        label: "CCE Exams",
+        path: "/dashboard/roll-numbers/exam/cce-exams",
+        icon: FileQuestion,
+        children: [
+          { label: "Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
+          { label: "Master Date Sheet",    path: "/dashboard/cce/date-sheet/master",    icon: Calendar },
+          { label: "Candidate Selected Subjects", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
+          { label: "CCE Date Sheet", path: "/dashboard/cce/date-sheet/roll-slip", icon: Ticket },
+        ],
+      },
+    ],
   },
   {
     id: "results",
