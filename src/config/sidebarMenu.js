@@ -32,13 +32,13 @@ export const MENU_ITEMS = [
       { label: "Two Paper MCQs",   path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
       { label: "Written Exams",    path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },
       {
-        label: "Combined Competitive Exams",
+        label: "CCE Exams",
         path: "/dashboard/roll-numbers/exam/cce-exams",
         icon: FileQuestion,
         children: [
-          { label: "CCE Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
-          { label: "CCE Master Date Sheet",    path: "/dashboard/cce/date-sheet/master",    icon: Calendar },
-          { label: "CCE Candidate Date Sheet", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
+          { label: "Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
+          { label: "Master Date Sheet",    path: "/dashboard/cce/date-sheet/master",    icon: Calendar },
+          { label: "Candidate Date Sheet", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
         ],
       },
     ],
