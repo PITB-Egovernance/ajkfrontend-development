@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { TextField, MenuItem } from '@mui/material';
 import { BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
@@ -12,6 +12,56 @@ import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 
 // Same group ordering used across the CCE pages (master date sheet, public syllabus).
 const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G'];
+
+const normalize = (v) => String(v || '').trim().toLowerCase();
+
+const formatPaperDate = (isoDate) => {
+  if (!isoDate) return '—';
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+};
+
+const formatPaperDay = (isoDate) => {
+  if (!isoDate) return '—';
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { weekday: 'long' });
+};
+
+const formatPaperTime = (time24) => {
+  if (!time24) return '—';
+  const [h, m] = time24.split(':');
+  const d = new Date();
+  d.setHours(Number(h), Number(m), 0, 0);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+// Groups the master date sheet rows the same way the master page does, then
+// narrows each optional group down to only the papers the candidate picked.
+// Compulsory papers are never candidate-selected — they always come through
+// in full, exactly once, for every candidate.
+const buildCandidateDateSheetGroups = (masterRows, selections) => {
+  const byGroup = {};
+  masterRows.forEach((row) => {
+    const group = row.subject_group || 'Compulsory';
+    (byGroup[group] ||= []).push(row);
+  });
+
+  const known = GROUP_ORDER.filter((g) => byGroup[g]);
+  const unknown = Object.keys(byGroup).filter((g) => !GROUP_ORDER.includes(g));
+
+  return [...known, ...unknown]
+    .map((group) => {
+      if (group === 'Compulsory') return { group, items: byGroup[group] };
+
+      const selectedNames = new Set((selections?.[group] || []).map(normalize));
+      const items = byGroup[group].filter((row) => selectedNames.has(normalize(row.subject_name)));
+      return { group, items };
+    })
+    .filter(({ items }) => items.length > 0);
+};
 
 const DEFAULT_FILTERS = { search: '' };
 const FILTER_CONFIG = [
@@ -35,6 +85,12 @@ const CceCandidateDateSheet = () => {
   const [subjectSelectionLoading, setSubjectSelectionLoading] = useState(false);
   const [subjectSelectionError, setSubjectSelectionError] = useState(null);
 
+  // The master date sheet for the selected advertisement — the single source
+  // of truth for every paper's date/day/time/duration. Never duplicated into
+  // a per-candidate copy; the candidate view is just this, filtered.
+  const [masterRows, setMasterRows] = useState([]);
+  const [masterRowsLoading, setMasterRowsLoading] = useState(false);
+
   useEffect(() => {
     (async () => {
       setAdvertisementsLoading(true);
@@ -42,8 +98,11 @@ const CceCandidateDateSheet = () => {
         const res = await CceScreeningApi.advertisements();
         const list = res?.data ?? [];
         setAdvertisements(Array.isArray(list) ? list : []);
-        // No default selection — the list loads for every CCE advertisement
-        // until the admin narrows it down to one.
+        // Default to the first advertisement (same as the master date sheet
+        // page) so a candidate's date sheet always has a master sheet to
+        // merge against as soon as the page loads. "All Advertisements"
+        // remains selectable for cross-advertisement roll-number lookup.
+        if (list.length > 0) setAdvertisementId(list[0].hash_id || list[0].id);
       } catch (err) {
         toast.error(err?.message || 'Failed to load advertisements');
       } finally {
@@ -51,6 +110,26 @@ const CceCandidateDateSheet = () => {
       }
     })();
   }, []);
+
+  // Load the master date sheet whenever the selected advertisement changes —
+  // it's the same data source the master page reads/writes, so any date the
+  // admin sets there shows up here automatically on next load, no extra sync.
+  useEffect(() => {
+    if (!advertisementId) { setMasterRows([]); return; }
+    (async () => {
+      setMasterRowsLoading(true);
+      try {
+        const res = await CceDateSheetApi.getMasterDateSheet(advertisementId);
+        const list = res?.data ?? [];
+        setMasterRows(Array.isArray(list) ? list : []);
+      } catch (err) {
+        toast.error(err?.message || 'Failed to load master date sheet');
+        setMasterRows([]);
+      } finally {
+        setMasterRowsLoading(false);
+      }
+    })();
+  }, [advertisementId]);
 
   // Candidates are read straight from the candidate portal's own subject-
   // selection API (no application_number/screening/date-sheet data attached —
@@ -133,6 +212,14 @@ const CceCandidateDateSheet = () => {
     }
   }, []);
 
+  // Compulsory papers (once) + only the optional papers this candidate
+  // selected, each carrying whatever date/time/duration is currently set on
+  // the master date sheet (blank if the admin hasn't filled it in yet).
+  const candidateDateSheetGroups = useMemo(
+    () => buildCandidateDateSheetGroups(masterRows, subjectSelection?.selections),
+    [masterRows, subjectSelection]
+  );
+
   const toggleExpand = (row) => {
     const rollNumber = row.roll_number;
     if (expandedRollNumber === rollNumber) {
@@ -195,7 +282,7 @@ const CceCandidateDateSheet = () => {
             <div className="p-2 bg-emerald-100 rounded-lg"><BookOpen size={22} className="text-emerald-700" /></div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">CCE Candidate Date Sheet</h1>
-              <p className="text-sm text-slate-500 mt-1">View each passed candidate's submitted written-exam subject selection.</p>
+              <p className="text-sm text-slate-500 mt-1">View each candidate's date sheet — compulsory papers plus their selected subjects, from the master date sheet.</p>
             </div>
           </div>
           {advertisements.length > 0 && (
@@ -282,46 +369,69 @@ const CceCandidateDateSheet = () => {
               )}
             </div>
 
-            {/* EXPANDED CANDIDATE SUBJECT PANEL */}
+            {/* EXPANDED CANDIDATE DATE SHEET PANEL */}
             {expandedRollNumber && (
-              <Card className="border border-indigo-200">
-                <CardContent className="p-5">
-                  <h2 className="font-semibold text-slate-800 mb-3">
-                    Subject Selection — <span className="font-mono">{expandedRollNumber}</span>
-                  </h2>
+              <Card className="border border-indigo-200 overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="p-5 pb-0">
+                    <h2 className="font-semibold text-slate-800">
+                      Date Sheet — <span className="font-mono">{expandedRollNumber}</span>
+                    </h2>
+                    {subjectSelection?.submitted_at && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        Subject selection submitted {new Date(subjectSelection.submitted_at).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
 
-                  {subjectSelectionLoading ? (
-                    <div className="p-3 mb-4 flex justify-center">
-                      <InlineLoader text="Loading subject selection..." variant="ring" size="sm" />
+                  {subjectSelectionLoading || masterRowsLoading ? (
+                    <div className="p-10 flex justify-center">
+                      <InlineLoader text="Loading date sheet..." variant="ring" size="sm" />
                     </div>
                   ) : subjectSelectionError ? (
-                    <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100">
+                    <div className="m-5 p-3 rounded-lg bg-red-50 border border-red-100">
                       <p className="text-xs text-red-600">Could not load subject selection — {subjectSelectionError}</p>
                     </div>
-                  ) : subjectSelection?.selections && Object.keys(subjectSelection.selections).length > 0 ? (
-                    <div className="mb-1 p-3 rounded-lg bg-indigo-50/60 border border-indigo-100">
-                      <p className="text-xs font-semibold uppercase text-indigo-800 mb-2">
-                        Subject Selection
-                        {subjectSelection.submitted_at && (
-                          <span className="ml-2 font-normal normal-case text-slate-400">
-                            (submitted {new Date(subjectSelection.submitted_at).toLocaleDateString()})
-                          </span>
-                        )}
-                      </p>
-                      <div className="flex flex-wrap gap-x-6 gap-y-2">
-                        {[
-                          ...GROUP_ORDER.filter((g) => subjectSelection.selections[g]),
-                          ...Object.keys(subjectSelection.selections).filter((g) => !GROUP_ORDER.includes(g)),
-                        ].map((group) => (
-                          <div key={group} className="text-sm">
-                            <span className="font-semibold text-slate-700">{group}: </span>
-                            <span className="text-slate-600">{subjectSelection.selections[group].join(', ')}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  ) : !advertisementId ? (
+                    <p className="p-5 text-xs text-slate-400">Select a specific advertisement above to view this candidate's date sheet.</p>
+                  ) : candidateDateSheetGroups.length === 0 ? (
+                    <p className="p-5 text-xs text-slate-400">No subject selection found for this candidate.</p>
                   ) : (
-                    <p className="text-xs text-slate-400">No subject selection found for this candidate.</p>
+                    <div className="overflow-x-auto mt-4">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-xs font-semibold uppercase text-slate-500 bg-slate-50">
+                            <th className="py-2 px-4">Subject / Paper</th>
+                            <th className="py-2 px-4">Marks</th>
+                            <th className="py-2 px-4">Paper Date</th>
+                            <th className="py-2 px-4">Paper Day</th>
+                            <th className="py-2 px-4">Paper Time</th>
+                            <th className="py-2 px-4">Duration (min)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {candidateDateSheetGroups.map(({ group, items }) => (
+                            <React.Fragment key={group}>
+                              <tr className="bg-indigo-50/60">
+                                <td colSpan={6} className="py-1.5 px-4 text-xs font-bold uppercase text-indigo-800">{group}</td>
+                              </tr>
+                              {items.map((row) => (
+                                <tr key={`${row.subject_id}-${row.paper_label || ''}`} className="border-b border-slate-100">
+                                  <td className="py-2 px-4 font-medium text-slate-800">
+                                    {row.subject_name}{row.paper_label ? ` — ${row.paper_label}` : ''}
+                                  </td>
+                                  <td className="py-2 px-4 text-slate-500">{row.total_marks}</td>
+                                  <td className="py-2 px-4 text-slate-600">{formatPaperDate(row.paper_date)}</td>
+                                  <td className="py-2 px-4 text-slate-500">{formatPaperDay(row.paper_date)}</td>
+                                  <td className="py-2 px-4 text-slate-600">{formatPaperTime(row.paper_time)}</td>
+                                  <td className="py-2 px-4 text-slate-600">{row.duration_minutes || '—'}</td>
+                                </tr>
+                              ))}
+                            </React.Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
