@@ -18,10 +18,12 @@ const candidateApiUrl = "/candidate-api/api/candidate";
 // const candidateApiUrl = "https://api-candidate-ajkpsc.punjab.gov.pk/api/candidate";
 
 // Candidate portal — admin-scoped endpoints (e.g. CCE subject selection lookup
-// by roll number). Same backend/proxy as candidateApiUrl above, different prefix.
-const candidateAdminApiUrl = "/candidate-api/api/admin";
-// Production:
-// const candidateAdminApiUrl = "https://api-candidate-ajkpsc.punjab.gov.pk/api/admin";
+// by roll number). Called directly from the browser — the candidate portal's
+// config/cors.php allows this admin frontend's origin.
+const candidateAdminApiUrl = "https://api-candidate-ajkpsc.punjab.gov.pk/api/admin";
+// Local dev (uses the setupProxy.js proxy instead, to avoid needing localhost
+// added to the candidate portal's CORS allow-list):
+// const candidateAdminApiUrl = "/candidate-api/api/admin";
 
 const candidateApiKey = "admin-secret-key-123";
 

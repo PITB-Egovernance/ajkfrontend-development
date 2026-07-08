@@ -83,6 +83,24 @@ const CceDateSheetApi = {
     return handleResponse(res);
   },
 
+  // Candidate portal's own subject-selection endpoint, called directly
+  // (bypasses the admin backend entirely — no application_number, screening
+  // status, or date-sheet progress attached, since the candidate portal
+  // doesn't have that admin-side data). roll_number narrows to one record;
+  // omitting it returns every submitted selection, paginated.
+  getEligibleCandidatesFromPortal: async ({ rollNumber, advertisementId, perPage, page } = {}) => {
+    const search = new URLSearchParams();
+    if (rollNumber)      search.set('roll_number', rollNumber);
+    if (advertisementId) search.set('advertisement_id', advertisementId);
+    if (perPage)          search.set('per_page', String(perPage));
+    if (page)             search.set('page', String(page));
+
+    const res = await fetch(`${CANDIDATE_ADMIN_API_BASE}/cce/subject-selection?${search}`, {
+      headers: getCandidateAdminHeaders(),
+    });
+    return handleResponse(res);
+  },
+
   getCandidateSubjects: async (applicationNumber, advertisementId) => {
     const search = new URLSearchParams();
     if (advertisementId) search.set('advertisement_id', advertisementId);

@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { TextField, MenuItem } from '@mui/material';
-import { BookOpen, Save, Send, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
-import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
-import confirmDelete from 'components/ui/ConfirmDelete';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import CceScreeningApi from 'api/cceScreeningApi';
 import CceDateSheetApi from 'api/cceDateSheetApi';
-import RollNumberApi from 'api/rollNumberApi';
 import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 
 // Same group ordering used across the CCE pages (master date sheet, public syllabus).
@@ -18,17 +15,8 @@ const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', '
 
 const DEFAULT_FILTERS = { search: '' };
 const FILTER_CONFIG = [
-  { name: 'search', label: 'Search (Name / CNIC / Roll No)', type: 'text', placeholder: 'Search by name, CNIC, or roll number' },
+  { name: 'search', label: 'Roll Number', type: 'text', placeholder: 'Enter the exact CCE roll number (e.g. CCE-000001)' },
 ];
-
-const StatusPill = ({ label, tone }) => {
-  const tones = {
-    ok:      'bg-emerald-100 text-emerald-700',
-    warn:    'bg-amber-100 text-amber-700',
-    neutral: 'bg-slate-100 text-slate-500',
-  };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${tones[tone] || tones.neutral}`}>{label}</span>;
-};
 
 const CceCandidateDateSheet = () => {
   const [advertisements, setAdvertisements] = useState([]);
@@ -38,18 +26,14 @@ const CceCandidateDateSheet = () => {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const [expandedApplicationNumber, setExpandedApplicationNumber] = useState(null);
-  const [subjectRows, setSubjectRows] = useState([]);
-  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [expandedRollNumber, setExpandedRollNumber] = useState(null);
   const [subjectSelection, setSubjectSelection] = useState(null);
   const [subjectSelectionLoading, setSubjectSelectionLoading] = useState(false);
   const [subjectSelectionError, setSubjectSelectionError] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [centers, setCenters] = useState([]);
-  const [hallsByCenter, setHallsByCenter] = useState({}); // centerId -> hall[]
 
   useEffect(() => {
     (async () => {
@@ -68,41 +52,48 @@ const CceCandidateDateSheet = () => {
     })();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await RollNumberApi.getExamCenters(500);
-        const list = r.data?.data ?? r.data ?? [];
-        setCenters(Array.isArray(list) ? list : []);
-      } catch { /* silent — center select falls back to empty options */ }
-    })();
-  }, []);
-
-  const loadHallsFor = useCallback(async (centerId) => {
-    if (!centerId || hallsByCenter[centerId]) return;
-    try {
-      const r = await RollNumberApi.getHallsByCenter(centerId);
-      const list = r.data?.data ?? r.data ?? [];
-      setHallsByCenter((prev) => ({ ...prev, [centerId]: Array.isArray(list) ? list : [] }));
-    } catch { /* silent — hall select falls back to empty options for this center */ }
-  }, [hallsByCenter]);
-
+  // Candidates are read straight from the candidate portal's own subject-
+  // selection API (no application_number/screening/date-sheet data attached —
+  // that lives only in the admin backend's own tables). The portal has no
+  // free-text search, so the "search" filter is treated as an exact roll
+  // number lookup (single record); leaving it blank lists everyone who has
+  // submitted a selection, paginated.
   const loadCandidates = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const res = await CceDateSheetApi.getEligibleCandidates(advertisementId, {
-        search:   filters.search || undefined,
-        per_page: paginationModel.pageSize,
-        page:     paginationModel.page + 1,
+      const res = await CceDateSheetApi.getEligibleCandidatesFromPortal({
+        rollNumber:      filters.search || undefined,
+        advertisementId: advertisementId || undefined,
+        perPage:         paginationModel.pageSize,
+        page:            paginationModel.page + 1,
       });
-      const payload = res?.data ?? {};
-      const list = payload.data ?? [];
-      setRows((Array.isArray(list) ? list : []).map((r) => ({ ...r, id: r.application_number })));
-      setTotal(Number(payload.total ?? list.length ?? 0));
+
+      const payload = res?.data;
+      if (Array.isArray(payload)) {
+        setRows(payload);
+        setTotal(Number(res?.meta?.pagination?.total ?? payload.length));
+      } else if (payload) {
+        setRows([payload]);
+        setTotal(1);
+      } else {
+        setRows([]);
+        setTotal(0);
+      }
     } catch (err) {
-      toast.error(err?.message || 'Failed to load eligible candidates');
-      setRows([]);
-      setTotal(0);
+      if (err?.status === 404) {
+        setRows([]);
+        setTotal(0);
+      } else if (err?.status === 401) {
+        setLoadError('Unauthorized — the candidate portal rejected this request\'s API key.');
+        setRows([]);
+        setTotal(0);
+      } else {
+        setLoadError(err?.message || 'Failed to load eligible candidates');
+        toast.error(err?.message || 'Failed to load eligible candidates');
+        setRows([]);
+        setTotal(0);
+      }
     } finally {
       setLoading(false);
     }
@@ -119,21 +110,6 @@ const CceCandidateDateSheet = () => {
     setFilters(DEFAULT_FILTERS);
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
-
-  const loadSubjectsFor = useCallback(async (applicationNumber) => {
-    setSubjectsLoading(true);
-    try {
-      const res = await CceDateSheetApi.getCandidateSubjects(applicationNumber, advertisementId);
-      const list = res?.data ?? [];
-      setSubjectRows(Array.isArray(list) ? list : []);
-      (Array.isArray(list) ? list : []).forEach((r) => { if (r.exam_center_id) loadHallsFor(r.exam_center_id); });
-    } catch (err) {
-      toast.error(err?.message || 'Failed to load candidate subjects');
-      setSubjectRows([]);
-    } finally {
-      setSubjectsLoading(false);
-    }
-  }, [advertisementId, loadHallsFor]);
 
   // Candidate's own group-wise optional-subject selection — data lives in the
   // candidate portal's own database, so this reads it straight from the
@@ -158,102 +134,15 @@ const CceCandidateDateSheet = () => {
   }, []);
 
   const toggleExpand = (row) => {
-    const applicationNumber = row.application_number;
-    if (expandedApplicationNumber === applicationNumber) {
-      setExpandedApplicationNumber(null);
-      setSubjectRows([]);
+    const rollNumber = row.roll_number;
+    if (expandedRollNumber === rollNumber) {
+      setExpandedRollNumber(null);
       setSubjectSelection(null);
       setSubjectSelectionError(null);
       return;
     }
-    setExpandedApplicationNumber(applicationNumber);
-    loadSubjectsFor(applicationNumber);
-    loadSubjectSelectionFor(row.roll_number);
-  };
-
-  const updateSubjectRow = (index, field, value) => {
-    setSubjectRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
-    if (field === 'exam_center_id') loadHallsFor(value);
-  };
-
-  const handleSaveCandidateDateSheet = async () => {
-    const incomplete = subjectRows.filter((r) => !r.exam_center_id);
-    if (incomplete.length > 0) {
-      toast.error('Allocate an exam center for every paper before saving');
-      return;
-    }
-
-    setBusy(true);
-    try {
-      await CceDateSheetApi.saveCandidateDateSheet(
-        expandedApplicationNumber,
-        advertisementId,
-        subjectRows.map((r) => ({
-          subject_id:        r.subject_id,
-          paper_label:       r.paper_label,
-          paper_date:        r.paper_date,
-          paper_time:        r.paper_time,
-          duration_minutes:  r.duration_minutes ? Number(r.duration_minutes) : null,
-          exam_center_id:    r.exam_center_id,
-          exam_hall_id:      r.exam_hall_id || null,
-        }))
-      );
-      toast.success('Candidate date sheet saved successfully');
-      await loadSubjectsFor(expandedApplicationNumber);
-      await loadCandidates();
-    } catch (err) {
-      toast.error(err?.message || 'Failed to save candidate date sheet');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const publishRow = async (row) => {
-    if (!row.hash_id) { toast.error('Save this paper before publishing it'); return; }
-    const confirmed = await confirmDelete({
-      title: 'Publish Candidate Date Sheet',
-      message: `Publish this paper's date sheet? The candidate will be able to view it immediately.`,
-      warning: 'This action cannot be undone.',
-      confirmLabel: 'Publish',
-      confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
-    });
-    if (!confirmed) return;
-
-    setBusy(true);
-    try {
-      await CceDateSheetApi.publish([row.hash_id]);
-      toast.success('Paper published successfully');
-      await loadSubjectsFor(expandedApplicationNumber);
-      await loadCandidates();
-    } catch (err) {
-      toast.error(err?.message || 'Failed to publish');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const unpublishRow = async (row) => {
-    if (!row.hash_id) return;
-    const confirmed = await confirmDelete({
-      title: 'Unpublish Candidate Date Sheet',
-      message: `Unpublish this paper's date sheet? The candidate will no longer be able to view it.`,
-      warning: 'The candidate immediately loses access to this paper.',
-      confirmLabel: 'Unpublish',
-      confirmColor: 'bg-amber-600 hover:bg-amber-700',
-    });
-    if (!confirmed) return;
-
-    setBusy(true);
-    try {
-      await CceDateSheetApi.unpublish([row.hash_id]);
-      toast.success('Paper unpublished successfully');
-      await loadSubjectsFor(expandedApplicationNumber);
-      await loadCandidates();
-    } catch (err) {
-      toast.error(err?.message || 'Failed to unpublish');
-    } finally {
-      setBusy(false);
-    }
+    setExpandedRollNumber(rollNumber);
+    loadSubjectSelectionFor(rollNumber);
   };
 
   const columns = [
@@ -262,16 +151,22 @@ const CceCandidateDateSheet = () => {
       headerName: 'Candidate',
       minWidth: 180,
       flex: 1.1,
+      valueGetter: (p) => p.row.candidate?.name,
       renderCell: (p) => (
         <button type="button" onClick={() => toggleExpand(p.row)}
           className="flex items-center gap-1 font-medium text-indigo-700 hover:underline">
-          {expandedApplicationNumber === p.row.application_number ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          {p.value}
+          {expandedRollNumber === p.row.roll_number ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {p.row.candidate?.name || '—'}
         </button>
       ),
     },
-    { field: 'candidate_cnic', headerName: 'CNIC', minWidth: 140, flex: 0.8 },
-    { field: 'application_number', headerName: 'Application #', minWidth: 150, flex: 0.9 },
+    {
+      field: 'candidate_cnic',
+      headerName: 'CNIC',
+      minWidth: 140,
+      flex: 0.8,
+      valueGetter: (p) => p.row.candidate?.cnic,
+    },
     {
       field: 'roll_number',
       headerName: 'Roll Number',
@@ -279,39 +174,14 @@ const CceCandidateDateSheet = () => {
       flex: 0.8,
       renderCell: (p) => <span className="font-mono font-bold text-indigo-700">{p.value}</span>,
     },
+    { field: 'advertisement_title', headerName: 'Advertisement', minWidth: 150, flex: 0.9 },
+    { field: 'post_name', headerName: 'Post', minWidth: 150, flex: 0.9 },
     {
-      field: 'screening_status',
-      headerName: 'Screening',
-      minWidth: 110,
-      flex: 0.6,
-      renderCell: (p) => <StatusPill label={(p.value || 'pass').toUpperCase()} tone="ok" />,
-    },
-    {
-      field: 'subject_selection_status',
-      headerName: 'Subject Selection',
-      minWidth: 140,
-      flex: 0.7,
-      renderCell: (p) => <StatusPill label={p.value === 'submitted' ? 'Submitted' : 'Pending'} tone={p.value === 'submitted' ? 'ok' : 'neutral'} />,
-    },
-    {
-      field: 'date_sheet_status',
-      headerName: 'Date Sheet Status',
-      minWidth: 140,
-      flex: 0.7,
-      renderCell: (p) => {
-        if (p.value === 'complete') return <StatusPill label="Complete" tone="ok" />;
-        if (p.value === 'draft') return <StatusPill label="Draft" tone="warn" />;
-        return <StatusPill label="Not Started" tone="neutral" />;
-      },
-    },
-    {
-      field: 'published',
-      headerName: 'Publish Status',
-      minWidth: 130,
-      flex: 0.7,
-      renderCell: (p) => p.value
-        ? <StatusPill label="Published" tone="ok" />
-        : <StatusPill label="Not Published" tone="neutral" />,
+      field: 'submitted_at',
+      headerName: 'Submitted At',
+      minWidth: 170,
+      flex: 0.9,
+      renderCell: (p) => p.value ? new Date(p.value).toLocaleString() : '—',
     },
   ];
 
@@ -325,7 +195,7 @@ const CceCandidateDateSheet = () => {
             <div className="p-2 bg-emerald-100 rounded-lg"><BookOpen size={22} className="text-emerald-700" /></div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">CCE Candidate Date Sheet</h1>
-              <p className="text-sm text-slate-500 mt-1">Allocate centers/halls and publish each passed candidate's written date sheet.</p>
+              <p className="text-sm text-slate-500 mt-1">View each passed candidate's submitted written-exam subject selection.</p>
             </div>
           </div>
           {advertisements.length > 0 && (
@@ -334,7 +204,7 @@ const CceCandidateDateSheet = () => {
               size="small"
               label="Advertisement"
               value={advertisementId}
-              onChange={(e) => { setAdvertisementId(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); setExpandedApplicationNumber(null); }}
+              onChange={(e) => { setAdvertisementId(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); setExpandedRollNumber(null); }}
               sx={{ minWidth: 260, backgroundColor: 'white' }}
             >
               <MenuItem value="">All Advertisements</MenuItem>
@@ -366,13 +236,21 @@ const CceCandidateDateSheet = () => {
               onFilterChange={handleFilterChange}
               onClearFilters={handleClearFilters}
               filterConfig={FILTER_CONFIG}
-              title="Filter Eligible Candidates"
+              title="Look Up by Roll Number"
             />
 
             <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-4">
               {loading && rows.length === 0 ? (
                 <div className="p-10 flex justify-center">
                   <InlineLoader text="Loading eligible candidates..." variant="ring" size="lg" />
+                </div>
+              ) : loadError ? (
+                <div className="p-16 flex flex-col items-center justify-center text-center">
+                  <div className="p-4 bg-red-50 rounded-full mb-4">
+                    <BookOpen size={32} className="text-red-400" />
+                  </div>
+                  <p className="text-base font-semibold text-red-700">Could not load candidates</p>
+                  <p className="text-sm text-slate-400 mt-1 max-w-sm">{loadError}</p>
                 </div>
               ) : rows.length === 0 && !loading ? (
                 <div className="p-16 flex flex-col items-center justify-center text-center">
@@ -381,14 +259,16 @@ const CceCandidateDateSheet = () => {
                   </div>
                   <p className="text-base font-semibold text-slate-700">No eligible candidates found</p>
                   <p className="text-sm text-slate-400 mt-1 max-w-sm">
-                    Candidates must have passed CCE screening, have a generated roll number, and have submitted their subject selection.
+                    {filters.search
+                      ? 'No submitted subject selection was found for that roll number.'
+                      : 'Candidates must have passed CCE screening, have a generated roll number, and have submitted their subject selection.'}
                   </p>
                 </div>
               ) : (
                 <TooltipDataGrid
                   rows={rows}
                   columns={columns}
-                  getRowId={(r) => r.application_number}
+                  getRowId={(r) => r.roll_number}
                   paginationMode="server"
                   rowCount={total}
                   paginationModel={paginationModel}
@@ -403,14 +283,13 @@ const CceCandidateDateSheet = () => {
             </div>
 
             {/* EXPANDED CANDIDATE SUBJECT PANEL */}
-            {expandedApplicationNumber && (
+            {expandedRollNumber && (
               <Card className="border border-indigo-200">
                 <CardContent className="p-5">
                   <h2 className="font-semibold text-slate-800 mb-3">
-                    Selected Papers — <span className="font-mono">{expandedApplicationNumber}</span>
+                    Subject Selection — <span className="font-mono">{expandedRollNumber}</span>
                   </h2>
 
-                  {/* Candidate's group-wise optional-subject selection, read live from the candidate portal API. */}
                   {subjectSelectionLoading ? (
                     <div className="p-3 mb-4 flex justify-center">
                       <InlineLoader text="Loading subject selection..." variant="ring" size="sm" />
@@ -420,7 +299,7 @@ const CceCandidateDateSheet = () => {
                       <p className="text-xs text-red-600">Could not load subject selection — {subjectSelectionError}</p>
                     </div>
                   ) : subjectSelection?.selections && Object.keys(subjectSelection.selections).length > 0 ? (
-                    <div className="mb-4 p-3 rounded-lg bg-indigo-50/60 border border-indigo-100">
+                    <div className="mb-1 p-3 rounded-lg bg-indigo-50/60 border border-indigo-100">
                       <p className="text-xs font-semibold uppercase text-indigo-800 mb-2">
                         Subject Selection
                         {subjectSelection.submitted_at && (
@@ -442,92 +321,7 @@ const CceCandidateDateSheet = () => {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-400 mb-4">No subject selection found for this candidate.</p>
-                  )}
-
-                  {subjectsLoading ? (
-                    <div className="p-6 flex justify-center"><InlineLoader text="Loading subjects..." variant="ring" size="md" /></div>
-                  ) : subjectRows.length === 0 ? (
-                    <p className="text-sm text-slate-400 py-4">No selected subjects found for this candidate.</p>
-                  ) : (
-                    <>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                          <thead>
-                            <tr className="border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
-                              <th className="py-2 px-3">Paper</th>
-                              <th className="py-2 px-3">Date</th>
-                              <th className="py-2 px-3">Day</th>
-                              <th className="py-2 px-3">Time</th>
-                              <th className="py-2 px-3">Duration</th>
-                              <th className="py-2 px-3">Exam Center</th>
-                              <th className="py-2 px-3">Exam Hall</th>
-                              <th className="py-2 px-3">Status</th>
-                              <th className="py-2 px-3">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {subjectRows.map((row, index) => (
-                              <tr key={`${row.subject_id}-${row.paper_label || ''}`} className="border-b border-slate-100">
-                                <td className="py-2 px-3 font-medium text-slate-800">
-                                  {row.subject_name}{row.paper_label ? ` — ${row.paper_label}` : ''}
-                                </td>
-                                <td className="py-2 px-3 text-slate-600">{row.paper_date || '—'}</td>
-                                <td className="py-2 px-3 text-slate-500">{row.paper_day || '—'}</td>
-                                <td className="py-2 px-3 text-slate-600">{row.paper_time || '—'}</td>
-                                <td className="py-2 px-3 text-slate-600">{row.duration_minutes ? `${row.duration_minutes} min` : '—'}</td>
-                                <td className="py-2 px-3">
-                                  <TextField select size="small" sx={{ minWidth: 160 }} disabled={!!row.published_at}
-                                    value={row.exam_center_id || ''} onChange={(e) => updateSubjectRow(index, 'exam_center_id', e.target.value)}>
-                                    <MenuItem value="">— Select —</MenuItem>
-                                    {centers.map((c) => {
-                                      const value = c.id != null ? String(c.id) : c.hash_id;
-                                      return <MenuItem key={value} value={value}>{c.name}{c.city ? ` (${c.city})` : ''}</MenuItem>;
-                                    })}
-                                  </TextField>
-                                </td>
-                                <td className="py-2 px-3">
-                                  <TextField select size="small" sx={{ minWidth: 140 }} disabled={!row.exam_center_id || !!row.published_at}
-                                    value={row.exam_hall_id || ''} onChange={(e) => updateSubjectRow(index, 'exam_hall_id', e.target.value)}>
-                                    <MenuItem value="">— None —</MenuItem>
-                                    {(hallsByCenter[row.exam_center_id] || []).map((h) => {
-                                      const value = h.id != null ? String(h.id) : h.hash_id;
-                                      return <MenuItem key={value} value={value}>{h.name}</MenuItem>;
-                                    })}
-                                  </TextField>
-                                </td>
-                                <td className="py-2 px-3">
-                                  {row.published_at
-                                    ? <StatusPill label="Published" tone="ok" />
-                                    : <StatusPill label="Not Published" tone="neutral" />}
-                                </td>
-                                <td className="py-2 px-3">
-                                  {row.published_at ? (
-                                    <Button size="sm" variant="outline" disabled={busy}
-                                      className="border-amber-300 text-amber-700 hover:bg-amber-50"
-                                      onClick={() => unpublishRow(row)}>
-                                      <EyeOff size={13} />
-                                    </Button>
-                                  ) : (
-                                    <Button size="sm" variant="outline" disabled={busy || !row.hash_id}
-                                      title={!row.hash_id ? 'Save first' : undefined}
-                                      onClick={() => publishRow(row)}>
-                                      <Send size={13} />
-                                    </Button>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="flex justify-end mt-4">
-                        <Button onClick={handleSaveCandidateDateSheet} disabled={busy} className="flex items-center gap-2">
-                          <Save size={14} /> {busy ? 'Saving…' : 'Save Candidate Date Sheet'}
-                        </Button>
-                      </div>
-                    </>
+                    <p className="text-xs text-slate-400">No subject selection found for this candidate.</p>
                   )}
                 </CardContent>
               </Card>
