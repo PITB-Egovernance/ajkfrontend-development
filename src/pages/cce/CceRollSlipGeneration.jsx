@@ -41,6 +41,15 @@ const DISTRICT_ZONE_MAP = {
 const ZONE_ORDER  = ['muzaffarabad', 'rawalakot', 'mirpur'];
 const ZONE_LABELS = { muzaffarabad: 'Muzaffarabad', rawalakot: 'Rawalakot', mirpur: 'Mirpur' };
 
+// A CCE candidate keeps the same roll number across every post they applied
+// for (screening → written stage carries it forward, and posts can be
+// "clubbed" onto one sitting), so bare roll_number is NOT a safe lookup key
+// anywhere in this page — two different posts/applications can share one.
+// Every roll_number-keyed lookup here is instead scoped by advertisement too,
+// which is enough to tell apart the concrete case this page has to handle
+// (the same candidate applying to CCE posts under different advertisements).
+const rollKey = (advertisementId, rollNumber) => `${advertisementId}::${String(rollNumber || '').toLowerCase()}`;
+
 const resolveDistrictZone = (meta) => {
   const raw = [meta?.domicile_district].filter(Boolean).map((v) => String(v).toLowerCase().trim());
   for (const v of raw) {
@@ -86,7 +95,7 @@ const CceRollSlipGeneration = () => {
   // into "posts" the same way Roll Number Management groups applications.
   const [candidates, setCandidates] = useState([]);
   const [masterRowsByAd, setMasterRowsByAd] = useState({});
-  const [selectionsByRoll, setSelectionsByRoll] = useState({});
+  const [selectionsByKey, setSelectionsByKey] = useState({});
 
   // Stage 1 — search/filter + post selection
   const [search, setSearch] = useState('');
@@ -138,14 +147,15 @@ const CceRollSlipGeneration = () => {
         setCandidates(flatCandidates);
 
         const selEntries = await Promise.all(flatCandidates.map(async (c) => {
+          const key = rollKey(c.advertisementId, c.roll_number);
           try {
             const res = await CceDateSheetApi.getSubjectSelection(c.roll_number);
-            return [c.roll_number, res?.data ?? null];
+            return [key, res?.data ?? null];
           } catch (err) {
-            return [c.roll_number, null];
+            return [key, null];
           }
         }));
-        setSelectionsByRoll(Object.fromEntries(selEntries));
+        setSelectionsByKey(Object.fromEntries(selEntries));
       } catch (err) {
         toast.error(err?.message || 'Failed to load CCE candidates');
       } finally {
@@ -174,7 +184,7 @@ const CceRollSlipGeneration = () => {
   // scheduled from their own advertisement's master date sheet.
   const candidateRows = useMemo(() => candidates.map((c) => {
     const masterRows = masterRowsByAd[c.advertisementId] || [];
-    const groups = buildCandidateDateSheetGroups(masterRows, selectionsByRoll[c.roll_number]?.selections);
+    const groups = buildCandidateDateSheetGroups(masterRows, selectionsByKey[rollKey(c.advertisementId, c.roll_number)]?.selections);
     const papers = flattenPapers(groups);
     return {
       ...c,
@@ -183,7 +193,7 @@ const CceRollSlipGeneration = () => {
       complete: isDateSheetComplete(papers),
       postKey: `${c.advertisementId}::${c.post_name || '—'}`,
     };
-  }), [candidates, masterRowsByAd, selectionsByRoll]);
+  }), [candidates, masterRowsByAd, selectionsByKey]);
 
   // Posts aggregated across every advertisement — the unit Stage 1 selects,
   // same as Roll Number Management's post table (there scoped to the general
@@ -294,40 +304,57 @@ const CceRollSlipGeneration = () => {
 
     setGenerating(true);
     setGeneratedSlips([]);
-    setProgress(completeCandidateRows.map((r) => ({ roll_number: r.roll_number, candidate_name: r.candidate?.name, status: 'pending', error: null, center: null })));
+    setProgress(completeCandidateRows.map((r) => ({ postKey: r.postKey, roll_number: r.roll_number, candidate_name: r.candidate?.name, status: 'pending', error: null, center: null })));
     const slips = [];
 
     try {
       const distinctAdIds = [...new Set(completeCandidateRows.map((r) => r.advertisementId))];
-      const applications = (await Promise.all(distinctAdIds.map(fetchApplicationsForAdvertisement))).flat();
-      const appNumberByRoll = Object.fromEntries(
-        applications.filter((a) => a.roll_number).map((a) => [String(a.roll_number).toLowerCase(), a.application_number])
-      );
-      const metaByAppNumber = Object.fromEntries(applications.map((a) => [a.application_number, {
-        domicile_district:     a.domicile_district,
-        preferred_exam_cities: a.preferred_exam_cities || [],
-      }]));
-      const resolveAppNumber = (rollNumber) => appNumberByRoll[String(rollNumber).toLowerCase()];
+      // Resolve each post's application_number scoped to the SAME
+      // advertisement it belongs to (via rollKey), not by roll_number alone —
+      // a candidate with two CCE posts under different advertisements shares
+      // one roll number, so a bare roll_number → application_number map would
+      // let the second post's lookup silently overwrite/reuse the first
+      // post's application_number, generating (or re-generating) the wrong
+      // application's slip.
+      const applicationsByAd = await Promise.all(distinctAdIds.map(async (adId) => ({
+        adId,
+        applications: await fetchApplicationsForAdvertisement(adId),
+      })));
 
-      let centerByRoll;
+      const appNumberByRollKey = {};
+      const metaByAppNumber = {};
+      applicationsByAd.forEach(({ adId, applications }) => {
+        applications.forEach((a) => {
+          if (a.roll_number) {
+            appNumberByRollKey[rollKey(adId, a.roll_number)] = a.application_number;
+          }
+          metaByAppNumber[a.application_number] = {
+            domicile_district:     a.domicile_district,
+            preferred_exam_cities: a.preferred_exam_cities || [],
+          };
+        });
+      });
+      const resolveAppNumber = (row) => appNumberByRollKey[rollKey(row.advertisementId, row.roll_number)];
+
+      let centerByPost;
       if (centerSelectionMode === 'auto') {
         const resolver = allocationMethod === 'preference' ? resolvePreferenceZone : resolveDistrictZone;
-        centerByRoll = Object.fromEntries(completeCandidateRows.map((row) => {
-          const zone = resolver(metaByAppNumber[resolveAppNumber(row.roll_number)]);
-          return [row.roll_number, { zone, center: zoneCenterLookup[zone] }];
+        centerByPost = Object.fromEntries(completeCandidateRows.map((row) => {
+          const zone = resolver(metaByAppNumber[resolveAppNumber(row)]);
+          return [row.postKey, { zone, center: zoneCenterLookup[zone] }];
         }));
       } else {
         // Only the first checked center is actually used for generation —
         // the rest just count toward the capacity check, same as Roll
         // Number Management's custom mode.
         const center = normalizedCenters.find((c) => c.id === selectedCenterIds[0]);
-        centerByRoll = Object.fromEntries(completeCandidateRows.map((row) => [row.roll_number, { zone: null, center }]));
+        centerByPost = Object.fromEntries(completeCandidateRows.map((row) => [row.postKey, { zone: null, center }]));
       }
 
       for (const row of completeCandidateRows) {
-        const allocation = centerByRoll[row.roll_number];
+        const allocation = centerByPost[row.postKey];
         if (!allocation?.center?.id) {
-          setProgress((prev) => prev.map((p) => (p.roll_number === row.roll_number ? {
+          setProgress((prev) => prev.map((p) => (p.postKey === row.postKey ? {
             ...p,
             status: 'error',
             error: allocation?.zone
@@ -337,9 +364,9 @@ const CceRollSlipGeneration = () => {
           continue;
         }
 
-        setProgress((prev) => prev.map((p) => (p.roll_number === row.roll_number ? { ...p, status: 'generating', center: allocation.center.center } : p)));
+        setProgress((prev) => prev.map((p) => (p.postKey === row.postKey ? { ...p, status: 'generating', center: allocation.center.center } : p)));
         try {
-          const applicationNumber = resolveAppNumber(row.roll_number);
+          const applicationNumber = resolveAppNumber(row);
           if (!applicationNumber) throw new Error('Not yet linked to an admin application record');
 
           const papers = row.papers.map((paper) => ({
@@ -373,15 +400,16 @@ const CceRollSlipGeneration = () => {
             throw new Error(finalStatus?.message || 'Timed out waiting for generation to finish');
           }
           slips.push({
-            roll_number:        row.roll_number,
-            candidate_name:     row.candidate?.name,
-            candidate_cnic:     row.candidate?.cnic,
-            application_number: applicationNumber,
-            center:             allocation.center.center,
+            postKey:             row.postKey,
+            roll_number:         row.roll_number,
+            candidate_name:      row.candidate?.name,
+            candidate_cnic:      row.candidate?.cnic,
+            application_number:  applicationNumber,
+            center:              allocation.center.center,
           });
-          setProgress((prev) => prev.map((p) => (p.roll_number === row.roll_number ? { ...p, status: 'done' } : p)));
+          setProgress((prev) => prev.map((p) => (p.postKey === row.postKey ? { ...p, status: 'done' } : p)));
         } catch (err) {
-          setProgress((prev) => prev.map((p) => (p.roll_number === row.roll_number ? { ...p, status: 'error', error: err?.message } : p)));
+          setProgress((prev) => prev.map((p) => (p.postKey === row.postKey ? { ...p, status: 'error', error: err?.message } : p)));
         }
       }
 
@@ -683,7 +711,7 @@ const CceRollSlipGeneration = () => {
                       <p className="font-semibold">{failedProgress.length} candidate{failedProgress.length === 1 ? '' : 's'} could not be generated:</p>
                       <ul className="mt-1 list-disc pl-5">
                         {failedProgress.map((p) => (
-                          <li key={p.roll_number}><span className="font-mono">{p.roll_number}</span> — {p.error}</li>
+                          <li key={p.postKey}><span className="font-mono">{p.roll_number}</span> — {p.error}</li>
                         ))}
                       </ul>
                     </div>
@@ -702,14 +730,14 @@ const CceRollSlipGeneration = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {generatedSlips.map((s) => (
-                          <tr key={s.roll_number} className="hover:bg-slate-50">
+                          <tr key={s.postKey} className="hover:bg-slate-50">
                             <td className="px-4 py-3 font-mono font-bold text-emerald-800">{s.roll_number}</td>
                             <td className="px-4 py-3 font-medium text-slate-800">{s.candidate_name}</td>
                             <td className="px-4 py-3 text-slate-500">{s.candidate_cnic}</td>
                             <td className="px-4 py-3 text-slate-500">{s.center}</td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex justify-end gap-2">
-                                <Button variant="outline" size="sm" className="gap-1 bg-white" onClick={() => navigate(`/dashboard/roll-numbers/slip/${s.roll_number}`)}>
+                                <Button variant="outline" size="sm" className="gap-1 bg-white" onClick={() => navigate(`/dashboard/roll-numbers/slip/${s.roll_number}?application_number=${encodeURIComponent(s.application_number)}`)}>
                                   <Eye size={13} /> View
                                 </Button>
                                 <Button variant="outline" size="sm" className="gap-1 bg-white" onClick={() => handleDownloadSlip(s.application_number, s.roll_number)}>
@@ -741,7 +769,7 @@ const CceRollSlipGeneration = () => {
                   <p className="text-sm font-semibold text-slate-800 mb-3">Generation Progress</p>
                   <div className="space-y-2">
                     {progress.map((p) => (
-                      <div key={p.roll_number} className="flex items-center justify-between text-sm border-b border-slate-100 pb-2 last:border-0">
+                      <div key={p.postKey} className="flex items-center justify-between text-sm border-b border-slate-100 pb-2 last:border-0">
                         <span className="font-mono text-slate-700">{p.roll_number}</span>
                         <span className="text-slate-500 flex-1 px-4 truncate">{p.candidate_name}</span>
                         <span className="text-xs text-slate-400 px-2 truncate max-w-[140px]">{p.center || ''}</span>

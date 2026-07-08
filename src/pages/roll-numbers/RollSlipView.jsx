@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Download, Hash } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
@@ -17,6 +17,13 @@ const InfoRow = ({ label, value, bold }) => (
 const RollSlipView = () => {
   const navigate = useNavigate();
   const { rollNumber } = useParams();
+  const [searchParams] = useSearchParams();
+  // A roll number can be shared by more than one of the candidate's
+  // applications (e.g. multiple CCE posts under different advertisements) —
+  // when the link that brought us here knows which one, it's passed as
+  // ?application_number= so the correct application's slip loads instead of
+  // an arbitrary match.
+  const applicationNumber = searchParams.get('application_number');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -26,7 +33,7 @@ const RollSlipView = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const result = await RollNumberApi.getSlipViewData(rollNumber);
+        const result = await RollNumberApi.getSlipViewData(rollNumber, applicationNumber);
         if (!cancelled) setData(result.data);
       } catch (err) {
         if (!cancelled) {
@@ -39,7 +46,7 @@ const RollSlipView = () => {
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [rollNumber, navigate]);
+  }, [rollNumber, applicationNumber, navigate]);
 
   const handleDownload = async () => {
     setDownloading(true);

@@ -28,7 +28,8 @@ const CceCandidateDateSheet = () => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const [expandedRollNumber, setExpandedRollNumber] = useState(null);
+  const [expandedRowKey, setExpandedRowKey] = useState(null);
+  const [expandedRow, setExpandedRow] = useState(null);
   const [subjectSelection, setSubjectSelection] = useState(null);
   const [subjectSelectionLoading, setSubjectSelectionLoading] = useState(false);
   const [subjectSelectionError, setSubjectSelectionError] = useState(null);
@@ -168,16 +169,31 @@ const CceCandidateDateSheet = () => {
     [masterRows, subjectSelection]
   );
 
+  // A roll number can be shared by more than one of the candidate's CCE
+  // applications (e.g. multiple posts under different advertisements), so
+  // roll_number alone isn't a safe row identity here — two such rows would
+  // collide in the grid (MUI requires unique row ids) and "expanding" one
+  // could silently act on the other. Compose with advertisement/post so each
+  // row — and the expanded-panel tracking — stays distinct even when the
+  // roll number matches.
+  const rowKey = (row) => `${row.roll_number}::${row.advertisement_title || ''}::${row.post_name || ''}`;
+
   const toggleExpand = (row) => {
-    const rollNumber = row.roll_number;
-    if (expandedRollNumber === rollNumber) {
-      setExpandedRollNumber(null);
+    const key = rowKey(row);
+    if (expandedRowKey === key) {
+      setExpandedRowKey(null);
+      setExpandedRow(null);
       setSubjectSelection(null);
       setSubjectSelectionError(null);
       return;
     }
-    setExpandedRollNumber(rollNumber);
-    loadSubjectSelectionFor(rollNumber);
+    setExpandedRowKey(key);
+    setExpandedRow(row);
+    // The candidate portal's single-record lookup only accepts a bare roll
+    // number, so if this roll number is genuinely shared by another post the
+    // payload returned here can't be disambiguated further than the portal
+    // itself allows — a known limitation of that upstream API.
+    loadSubjectSelectionFor(row.roll_number);
   };
 
   const columns = [
@@ -190,7 +206,7 @@ const CceCandidateDateSheet = () => {
       renderCell: (p) => (
         <button type="button" onClick={() => toggleExpand(p.row)}
           className="flex items-center gap-1 font-medium text-indigo-700 hover:underline">
-          {expandedRollNumber === p.row.roll_number ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {expandedRowKey === rowKey(p.row) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           {p.row.candidate?.name || '—'}
         </button>
       ),
@@ -239,7 +255,7 @@ const CceCandidateDateSheet = () => {
               size="small"
               label="Advertisement"
               value={advertisementId}
-              onChange={(e) => { setAdvertisementId(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); setExpandedRollNumber(null); }}
+              onChange={(e) => { setAdvertisementId(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); setExpandedRowKey(null); setExpandedRow(null); }}
               sx={{ minWidth: 260, backgroundColor: 'white' }}
             >
               <MenuItem value="">All Advertisements</MenuItem>
@@ -303,7 +319,7 @@ const CceCandidateDateSheet = () => {
                 <TooltipDataGrid
                   rows={rows}
                   columns={columns}
-                  getRowId={(r) => r.roll_number}
+                  getRowId={(r) => rowKey(r)}
                   paginationMode="server"
                   rowCount={total}
                   paginationModel={paginationModel}
@@ -318,12 +334,13 @@ const CceCandidateDateSheet = () => {
             </div>
 
             {/* EXPANDED CANDIDATE DATE SHEET PANEL */}
-            {expandedRollNumber && (
+            {expandedRowKey && (
               <Card className="border border-indigo-200 overflow-hidden">
                 <CardContent className="p-0">
                   <div className="p-5 pb-0">
                     <h2 className="font-semibold text-slate-800">
-                      Date Sheet — <span className="font-mono">{expandedRollNumber}</span>
+                      Date Sheet — <span className="font-mono">{expandedRow?.roll_number}</span>
+                      {expandedRow?.post_name ? <span className="ml-2 text-sm font-normal text-slate-500">({expandedRow.post_name})</span> : null}
                     </h2>
                     {subjectSelection?.submitted_at && (
                       <p className="text-xs text-slate-400 mt-1">

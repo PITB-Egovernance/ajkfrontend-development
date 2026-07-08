@@ -81,9 +81,14 @@ const RollNumberApi = {
     });
   },
 
-  // JSON slip data for the in-app viewer looked up by roll number (fast — skips PDF rendering)
-  getSlipViewData: async (rollNumber) => {
-    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/roll-slip/${encodeURIComponent(rollNumber)}/view-data`, {
+  // JSON slip data for the in-app viewer looked up by roll number (fast —
+  // skips PDF rendering). A roll number can be shared by more than one of
+  // the candidate's applications (e.g. multiple CCE posts), so pass
+  // applicationNumber whenever the caller has it — it disambiguates which
+  // specific application's slip to load instead of an arbitrary match.
+  getSlipViewData: async (rollNumber, applicationNumber) => {
+    const search = applicationNumber ? `?application_number=${encodeURIComponent(applicationNumber)}` : '';
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/roll-slip/${encodeURIComponent(rollNumber)}/view-data${search}`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);
