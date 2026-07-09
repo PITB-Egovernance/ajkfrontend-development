@@ -27,16 +27,25 @@ const TWO_PAPER_COLUMNS = [
   { name: 'Sr#',                      type: 'Number', required: false },
   { name: 'Roll No',                  type: 'Text',   required: true  },
   { name: 'District Code',            type: 'Text',   required: true  },
+  { name: 'Gender',                   type: 'Text',   required: true  },
   { name: 'Obtained Marks (paper 1)', type: 'Number', required: true  },
   { name: 'Obtained Marks (paper 2)', type: 'Number', required: true  },
   { name: 'Total Obtain Marks',       type: 'Number', required: true  },
   { name: 'Result',                   type: 'Text',   required: true  },
 ];
 
+const WRITTEN_TEMPLATE_COLUMNS = [
+  { name: 'Roll Number',     type: 'Text',   required: true  },
+  { name: 'Candidate Name',   type: 'Text',   required: true  },
+  { name: 'District Code',   type: 'Text',   required: true  },
+  { name: 'Gender',          type: 'Text',   required: true  },
+];
+
 const getTemplateColumns = (examType) => {
   const clean = String(examType || '').toLowerCase().replace(/_/g, '-');
   if (clean === 'two-paper-mcq' || clean === 'two-paper-mcqs') return TWO_PAPER_COLUMNS;
-  return ONE_PAPER_COLUMNS;
+  if (clean === 'one-paper-mcq' || clean === 'one-paper-mcqs') return ONE_PAPER_COLUMNS;
+  return WRITTEN_TEMPLATE_COLUMNS;
 };
 
 
@@ -281,6 +290,15 @@ const isMcqExamType = (et) => {
 
 /* ── Subject breakdown cell ───────────────────────────────────── */
 const SubjectBreakdown = ({ row }) => {
+  const status = String(row.status ?? '').toUpperCase();
+  if (status === 'ABSENT') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-500 border border-slate-200">
+        Absent from all papers
+      </span>
+    );
+  }
+
   const subjectsObj = row.subjects ?? row.marks_breakdown ?? row.subject_marks ?? null;
 
   if (subjectsObj && typeof subjectsObj === 'object' && !Array.isArray(subjectsObj)) {
@@ -648,7 +666,13 @@ const ImportResultsPage = () => {
           required: true,
           isSubject: true,
         }));
-        setColumns([...getTemplateColumns(examType), ...dynamicCols]);
+        
+        let finalCols = [...getTemplateColumns(examType), ...dynamicCols];
+        if (!isMcq) {
+          finalCols.push({ name: 'Total Marks', type: 'Number', required: true });
+          finalCols.push({ name: 'Attendance Status', type: 'Text', required: true });
+        }
+        setColumns(finalCols);
       } catch { /* silent */ }
     })();
 
