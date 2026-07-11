@@ -155,7 +155,11 @@ const ResultsViewPage = () => {
       accessorKey: 'marks_status',
       header: 'Status',
       cell: info => {
-        const status = info.getValue() || 'Pending';
+        const examStatus = String(info.row.original.status || '').toUpperCase();
+        let status = info.getValue() || 'Pending';
+        if (['ABSENT', 'UFM', 'RL'].includes(examStatus)) {
+          status = examStatus;
+        }
         const styles = {
           'Pending': 'bg-slate-100 text-slate-500 border-slate-200',
           'Uploaded': 'bg-blue-50 text-blue-600 border-blue-100',
@@ -165,6 +169,8 @@ const ResultsViewPage = () => {
           'Published': 'bg-indigo-50 text-indigo-600 border-indigo-100',
           'REJECTED': 'bg-red-50 text-red-600 border-red-100',
           'ABSENT': 'bg-rose-50 text-rose-600 border-rose-100',
+          'UFM': 'bg-rose-50 text-rose-600 border-rose-100',
+          'RL': 'bg-amber-50 text-amber-600 border-amber-100',
           'SHORTLISTED': 'bg-purple-50 text-purple-600 border-purple-100',
           'INTERVIEW PENDING': 'bg-amber-50 text-amber-600 border-amber-100',
           'SELECTED': 'bg-green-50 text-green-600 border-green-100',
@@ -175,6 +181,8 @@ const ResultsViewPage = () => {
           'NOT SELECTED': 'bg-slate-400',
           'REJECTED': 'bg-red-600',
           'ABSENT': 'bg-rose-600',
+          'UFM': 'bg-rose-600',
+          'RL': 'bg-amber-600',
           'APPROVED': 'bg-emerald-600',
           'SHORTLISTED': 'bg-purple-600',
           'INTERVIEW PENDING': 'bg-amber-600',
@@ -193,6 +201,16 @@ const ResultsViewPage = () => {
       accessorKey: 'marks_summary',
       header: 'Marks Preview',
       cell: info => {
+        const examStatus = String(info.row.original.status || '').toUpperCase();
+        if (examStatus === 'ABSENT') {
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-500 border border-slate-200">Absent</span>;
+        }
+        if (examStatus === 'UFM') {
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-50 text-rose-600 border border-rose-100">Unfair Means</span>;
+        }
+        if (examStatus === 'RL') {
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-100">Result Late</span>;
+        }
         const marks = info.getValue() || {};
         return (
           <div className="flex flex-wrap gap-1.5">
@@ -299,13 +317,13 @@ const ResultsViewPage = () => {
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap">
-          {['all', 'Pending', 'Uploaded', 'Under Verification', 'APPROVED', 'SHORTLISTED', 'REJECTED', 'ABSENT', 'SELECTED', 'NOT SELECTED'].map(status => (
+          {['all', 'Pending', 'Uploaded', 'Under Verification', 'APPROVED', 'SHORTLISTED', 'REJECTED', 'ABSENT', 'UFM', 'RL', 'SELECTED', 'NOT SELECTED'].map(status => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${statusFilter === status
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200'
+                ? 'bg-slate-800 text-white'
+                : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200'
                 }`}
             >
               {status}

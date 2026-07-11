@@ -97,6 +97,15 @@ const ResultsDashboard = () => {
 
   const [pendingCount, setPendingCount] = useState(0);
 
+  const getExamTypeParam = (job) => {
+    const category = job.resolved_test_type_exam_category || job.pivot?.test_type_exam_category || '';
+    if (category === 'one_paper_mcq') return 'one-paper-mcqs';
+    if (category === 'two_paper_mcq') return 'two-paper-mcqs';
+    if (category === 'written_exam') return 'written-exams';
+    if (category === 'combined_competitive_exam') return 'cce-exams';
+    return '';
+  };
+
   const [stats, setStats] = useState([
     { label: 'Total Results Entered', value: '0', icon: Database, bg: 'bg-blue-50', iconBg: 'bg-blue-600' },
     { label: 'Pending Publication', value: '0', icon: ClipboardCheck, bg: 'bg-amber-50', iconBg: 'bg-amber-600' },
@@ -440,7 +449,7 @@ const ResultsDashboard = () => {
                                         const isImportable = !['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
                                         return isImportable ? (
                                           <Link 
-                                            to={`/dashboard/results/import/${getJobRouteId(job)}`} 
+                                            to={`/dashboard/results/import/${getJobRouteId(job)}?examType=${getExamTypeParam(job)}`} 
                                             onClick={() => setActiveDropdownJobId(null)}
                                             className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors"
                                           >

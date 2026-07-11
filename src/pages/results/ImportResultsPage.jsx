@@ -298,6 +298,20 @@ const SubjectBreakdown = ({ row }) => {
       </span>
     );
   }
+  if (status === 'UFM') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-50 text-rose-600 border border-rose-100">
+        Unfair Means (Disqualified)
+      </span>
+    );
+  }
+  if (status === 'RL') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-100">
+        Result Late / Withheld
+      </span>
+    );
+  }
 
   const subjectsObj = row.subjects ?? row.marks_breakdown ?? row.subject_marks ?? null;
 
@@ -373,6 +387,8 @@ const ExamStatusBadge = ({ status }) => {
     'FAIL':   'bg-sky-50 text-sky-600',
     'ERROR':  'bg-red-100 text-red-700',
     'ABSENT': 'bg-slate-100 text-slate-500',
+    'UFM':    'bg-rose-105 text-rose-700 border border-rose-200',
+    'RL':     'bg-amber-105 text-amber-700 border border-amber-200',
   }[s] || 'bg-slate-100 text-slate-500';
   return (
     <span className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest ${cfg}`}>
