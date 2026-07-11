@@ -95,7 +95,6 @@ import EmployeeList from 'pages/employees/EmployeeList';
 // Results Module Imports
 import AwardListPage from 'pages/results/AwardListPage';
 import ImportResultsPage from 'pages/results/ImportResultsPage';
-import MarkEntryPage from 'pages/results/MarkEntryPage';
 import MeritManagementPage from 'pages/results/MeritManagementPage';
 import PublicationPage from 'pages/results/PublicationPage';
 import ResultsDashboard from 'pages/results/ResultsDashboard';
@@ -279,14 +278,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="results/entry"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MarkEntryPage />
-              </ProtectedRoute>
-            }
-          />
+
           <Route
             path="results/import/:jobId?"
             element={

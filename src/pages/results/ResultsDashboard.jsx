@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   ShieldAlert,
   Search,
-  Plus,
   FileText,
   Award
 } from 'lucide-react';
@@ -31,7 +30,6 @@ import {
   DropdownMenuSeparator,
 } from 'components/ui/DropdownMenu';
 import OfficialPublicationModal from 'components/results/OfficialPublicationModal';
-import MarkApprovalConsole from 'components/results/MarkApprovalConsole';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 
@@ -200,14 +198,6 @@ const ResultsDashboard = () => {
 
   const quickActions = [
     {
-      title: 'Manual Mark Entry',
-      desc: 'Individual candidate result entry',
-      link: '/dashboard/results/entry',
-      icon: Plus,
-      iconBg: 'bg-emerald-500',
-      show: isAdmin
-    },
-    {
       title: 'Verification Queue',
       desc: 'Review & approve candidate results',
       link: '/dashboard/results/verification',
@@ -305,11 +295,7 @@ const ResultsDashboard = () => {
           </div>
         </div>
 
-        {getUserRole() === 'admin' && (
-          <div className="mb-6">
-            <MarkApprovalConsole />
-          </div>
-        )}
+
 
         {/* Active Job Results Management - TABLE VIEW */}
         <div className="space-y-4">
