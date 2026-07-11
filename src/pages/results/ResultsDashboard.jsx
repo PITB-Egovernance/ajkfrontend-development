@@ -316,8 +316,8 @@ const ResultsDashboard = () => {
             </div>
           </div>
 
-          <Card className="border border-slate-200 bg-white overflow-hidden">
-            <div className="overflow-x-auto">
+          <Card className="border border-slate-200 bg-white overflow-visible">
+            <div className="overflow-x-auto md:overflow-visible">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
@@ -356,7 +356,7 @@ const ResultsDashboard = () => {
                       const adv = job.adv;
                       const isLastRow = idx === allJobRows.length - 1;
                       const isSecondLastRow = idx === allJobRows.length - 2;
-                      const openUpwards = isLastRow || isSecondLastRow;
+                      const openUpwards = allJobRows.length > 3 && (isLastRow || isSecondLastRow);
 
                       return (
                         <tr key={job.hash_id || job.id} className="hover:bg-slate-50/50 transition-colors group">
