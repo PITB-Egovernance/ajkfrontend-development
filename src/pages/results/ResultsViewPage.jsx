@@ -213,7 +213,7 @@ const ResultsViewPage = () => {
         }
         const marks = info.getValue() || {};
         return (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1">
             {Object.entries(marks).map(([key, val]) => (
               <div key={key} className="bg-slate-50 border border-slate-200 rounded-md px-2 py-0.5 flex flex-col items-center min-w-[44px]">
                 <span className="text-[8px] font-semibold text-slate-500 uppercase leading-none mb-0.5">{key}</span>

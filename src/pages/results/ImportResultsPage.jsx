@@ -319,7 +319,7 @@ const SubjectBreakdown = ({ row }) => {
 
   if (subjectsObj && typeof subjectsObj === 'object' && !Array.isArray(subjectsObj)) {
     return (
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1">
         {Object.entries(subjectsObj).map(([name, info]) => {
           const obtained = info?.obtained ?? info?.marks ?? info;
           const max = info?.max_marks ?? info?.max ?? null;
@@ -343,7 +343,7 @@ const SubjectBreakdown = ({ row }) => {
 
   if (Array.isArray(subjectsObj) && subjectsObj.length > 0) {
     return (
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1">
         {subjectsObj.map((s, i) => {
           const name = s.subject_name ?? s.name ?? `Subject ${i + 1}`;
           const obtained = s.obtained ?? s.marks ?? s.obtained_marks;
@@ -687,7 +687,7 @@ const ImportResultsPage = () => {
         const isMcqActive = isMcqExamType(activeExamType);
         
         let finalCols = [];
-        if (activeExamType === 'written-exams') {
+        if (activeExamType === 'written-exams' || activeExamType === 'cce-exams') {
           const dynamicCols = Array.isArray(subs) ? subs.map(s => ({
             name: (s.subject_name || s.name || '') + ' ' + (s.max_marks || 100),
             type: 'Number',

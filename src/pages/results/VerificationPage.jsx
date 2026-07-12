@@ -434,7 +434,7 @@ const VerificationPage = () => {
                               {cand.status === 'absent' ? (
                                 <span className="text-[10px] font-medium text-slate-400 italic">Candidate Absent</span>
                               ) : subjects.length > 0 ? (
-                                <div className="flex flex-wrap gap-1.5">
+                                <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1 max-w-[380px]">
                                   {subjects.map(([name, scoreInfo]) => (
                                     <span
                                       key={name}
