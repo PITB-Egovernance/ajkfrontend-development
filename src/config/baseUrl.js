@@ -1,5 +1,5 @@
 // LIVE BACKEND — active. Use the live API for deployment.
-const apiUrl = "http://localhost:8000/api/v1";
+const apiUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 const productionUrl = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
 
 // LOCAL BACKEND — used ONLY by the result import (upload) endpoints for local testing.

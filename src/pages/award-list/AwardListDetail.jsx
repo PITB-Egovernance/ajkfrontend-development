@@ -9,12 +9,14 @@ import SearchableSelect from 'components/ui/SearchableSelect';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   ArrowLeft, RefreshCw, Upload, Calculator, Download,
-  Edit, CheckCircle, History, Send,
+  Edit, CheckCircle, History, Send, X
 } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import { formatDate } from 'utils/dateUtils';
+import { toast } from 'react-hot-toast';
+import CSVUploadZone from 'components/results/CSVUploadZone';
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
@@ -76,6 +78,47 @@ export default function AwardListDetail() {
   const [importing, setImporting]         = useState(false);
   const [actionMsg, setActionMsg]         = useState('');
   const [actionSeverity, setActionSeverity] = useState('info');
+
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [selectedUploadFile, setSelectedUploadFile] = useState(null);
+  const [csvLoading, setCsvLoading] = useState(false);
+
+  const handleImportSubmit = async (fileToUpload) => {
+    const file = fileToUpload || selectedUploadFile;
+    if (!file) {
+      toast.error('Please select a file to upload first.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setCsvLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${id}/import`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${AuthService.getToken()}`,
+          'X-API-KEY': Config.apiKey,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data?.message || 'CSV imported successfully!');
+        setImportModalOpen(false);
+        setSelectedUploadFile(null);
+        fetchDetail();
+      } else {
+        toast.error(data?.message || 'Import failed');
+      }
+    } catch (err) {
+      toast.error('Failed to import CSV file');
+    } finally {
+      setCsvLoading(false);
+    }
+  };
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -299,10 +342,12 @@ export default function AwardListDetail() {
       sortable: false,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <Tooltip title="Edit Marks">
-            <IconButton size="small" onClick={() => openMarks(row)}>
-              <Edit size={15} />
-            </IconButton>
+          <Tooltip title="Manual entry disabled. Use CSV import.">
+            <span>
+              <IconButton size="small" disabled={true}>
+                <Edit size={15} />
+              </IconButton>
+            </span>
           </Tooltip>
           <Tooltip title="Change Status">
             <IconButton size="small" color="primary" onClick={() => openStatus(row)}>
@@ -431,6 +476,17 @@ export default function AwardListDetail() {
         >
           Export CSV
         </Button>
+        {!isPublished && (
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<Upload size={14} />}
+            onClick={() => setImportModalOpen(true)}
+          >
+            Import CSV
+          </Button>
+        )}
         {!isPublished && (
           <Button
             variant="contained"
@@ -640,6 +696,28 @@ export default function AwardListDetail() {
           >
             Update Status
           </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Import CSV Modal Dialog */}
+      <Dialog open={importModalOpen} onClose={() => setImportModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" fontWeight={700}>Bulk Import Interview Awards</Typography>
+          <IconButton size="small" onClick={() => setImportModalOpen(false)}>
+            <X size={18} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Alert severity="info">
+            Download the pre-filled template, fill in Matric, Inter, Bachelors, and Interview (viva voce) marks, then drag and drop the CSV file below to import.
+          </Alert>
+          <CSVUploadZone
+            onFileSelect={setSelectedUploadFile}
+            onPreview={handleImportSubmit}
+            loading={csvLoading}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setImportModalOpen(false)} disabled={csvLoading}>Cancel</Button>
         </DialogActions>
       </Dialog>
     </Box>
