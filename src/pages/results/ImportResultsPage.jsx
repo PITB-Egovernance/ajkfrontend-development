@@ -38,10 +38,9 @@ const TWO_PAPER_COLUMNS = [
 ];
 
 const WRITTEN_TEMPLATE_COLUMNS = [
-  { name: 'Roll Number',     type: 'Text',   required: true  },
-  { name: 'Candidate Name',   type: 'Text',   required: true  },
-  { name: 'District Code',   type: 'Text',   required: true  },
-  { name: 'Gender',          type: 'Text',   required: true  },
+  { name: 'Roll no',               type: 'Text',   required: true  },
+  { name: 'Name with father name', type: 'Text',   required: true  },
+  { name: 'Dist',                  type: 'Text',   required: true  },
 ];
 
 const getTemplateColumns = (examType) => {
@@ -686,17 +685,31 @@ const ImportResultsPage = () => {
 
         const subs = subjectsRes?.data?.subjects ?? subjectsRes?.data ?? subjectsRes?.subjects ?? [];
         const isMcqActive = isMcqExamType(activeExamType);
-        const dynamicCols = (!isMcqActive && Array.isArray(subs) ? subs : []).map(s => ({
-          name: (s.subject_name || s.name || '') + ' Marks',
-          type: 'Number',
-          required: true,
-          isSubject: true,
-        }));
         
-        let finalCols = [...getTemplateColumns(activeExamType), ...dynamicCols];
-        if (!isMcqActive) {
-          finalCols.push({ name: 'Total Marks', type: 'Number', required: true });
-          finalCols.push({ name: 'Attendance Status', type: 'Text', required: true });
+        let finalCols = [];
+        if (activeExamType === 'written-exams') {
+          const dynamicCols = Array.isArray(subs) ? subs.map(s => ({
+            name: (s.subject_name || s.name || '') + ' ' + (s.max_marks || 100),
+            type: 'Number',
+            required: true,
+            isSubject: true,
+          })) : [];
+          finalCols = [...getTemplateColumns(activeExamType), ...dynamicCols];
+          finalCols.push({ name: 'Total Obtained Marks', type: 'Number', required: true });
+          finalCols.push({ name: 'Obtained Marks %age', type: 'Number', required: true });
+          finalCols.push({ name: 'Status', type: 'Text', required: true });
+        } else {
+          const dynamicCols = (!isMcqActive && Array.isArray(subs) ? subs : []).map(s => ({
+            name: (s.subject_name || s.name || '') + ' Marks',
+            type: 'Number',
+            required: true,
+            isSubject: true,
+          }));
+          finalCols = [...getTemplateColumns(activeExamType), ...dynamicCols];
+          if (!isMcqActive) {
+            finalCols.push({ name: 'Total Marks', type: 'Number', required: true });
+            finalCols.push({ name: 'Attendance Status', type: 'Text', required: true });
+          }
         }
         setColumns(finalCols);
       } catch { /* silent */ }
