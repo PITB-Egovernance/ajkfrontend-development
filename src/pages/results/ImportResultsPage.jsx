@@ -24,14 +24,17 @@ const ONE_PAPER_COLUMNS = [
 ];
 
 const TWO_PAPER_COLUMNS = [
-  { name: 'Sr#',                      type: 'Number', required: false },
+  { name: 'Sr No',                    type: 'Number', required: false },
   { name: 'Roll No',                  type: 'Text',   required: true  },
-  { name: 'District Code',            type: 'Text',   required: true  },
-  { name: 'Gender',                   type: 'Text',   required: true  },
+  { name: 'Name',                     type: 'Text',   required: false },
+  { name: 'District',                 type: 'Text',   required: false },
+  { name: 'Subject 1',                type: 'Text',   required: false },
+  { name: 'Subject 2',                type: 'Text',   required: false },
   { name: 'Obtained Marks (paper 1)', type: 'Number', required: true  },
   { name: 'Obtained Marks (paper 2)', type: 'Number', required: true  },
-  { name: 'Total Obtain Marks',       type: 'Number', required: true  },
+  { name: 'Total Obtained Marks',     type: 'Number', required: true  },
   { name: 'Result',                   type: 'Text',   required: true  },
+  { name: 'Merit No',                 type: 'Number', required: false },
 ];
 
 const WRITTEN_TEMPLATE_COLUMNS = [
@@ -656,16 +659,22 @@ const ImportResultsPage = () => {
 
         // Find primary matching job name
         const job = fetchedJobs.find(j => (j.hash_id || String(j.id)) === jobId);
+        let activeExamType = examType;
         if (job) {
           setPostName(job.designation || '');
+          const category = job.resolved_test_type_exam_category || job.pivot?.test_type_exam_category || '';
+          if (category === 'one_paper_mcq') activeExamType = 'one-paper-mcqs';
+          if (category === 'two_paper_mcq') activeExamType = 'two-paper-mcqs';
+          if (category === 'written_exam') activeExamType = 'written-exams';
+          if (category === 'combined_competitive_exam') activeExamType = 'cce-exams';
         }
 
         // Filter other jobs of same examType for clubbed import options
         const jobsOfSameType = fetchedJobs.filter(j => {
-          if (examType === 'one-paper-mcqs') return /mcq/i.test(j.test_type) && !/two/i.test(j.test_type);
-          if (examType === 'two-paper-mcqs') return /mcq/i.test(j.test_type) && /two/i.test(j.test_type);
-          if (examType === 'written-exams') return /written/i.test(j.test_type);
-          if (examType === 'cce-exams') return /cce/i.test(j.test_type) || /joint.competitive/i.test(j.test_type) || /jce/i.test(j.test_type);
+          if (activeExamType === 'one-paper-mcqs') return /mcq/i.test(j.test_type) && !/two/i.test(j.test_type);
+          if (activeExamType === 'two-paper-mcqs') return /mcq/i.test(j.test_type) && /two/i.test(j.test_type);
+          if (activeExamType === 'written-exams') return /written/i.test(j.test_type);
+          if (activeExamType === 'cce-exams') return /cce/i.test(j.test_type) || /joint.competitive/i.test(j.test_type) || /jce/i.test(j.test_type);
           return true;
         });
 
@@ -676,15 +685,16 @@ const ImportResultsPage = () => {
         setAvailableJobs(selectOptions);
 
         const subs = subjectsRes?.data?.subjects ?? subjectsRes?.data ?? subjectsRes?.subjects ?? [];
-        const dynamicCols = (Array.isArray(subs) ? subs : []).map(s => ({
+        const isMcqActive = isMcqExamType(activeExamType);
+        const dynamicCols = (!isMcqActive && Array.isArray(subs) ? subs : []).map(s => ({
           name: (s.subject_name || s.name || '') + ' Marks',
           type: 'Number',
           required: true,
           isSubject: true,
         }));
         
-        let finalCols = [...getTemplateColumns(examType), ...dynamicCols];
-        if (!isMcq) {
+        let finalCols = [...getTemplateColumns(activeExamType), ...dynamicCols];
+        if (!isMcqActive) {
           finalCols.push({ name: 'Total Marks', type: 'Number', required: true });
           finalCols.push({ name: 'Attendance Status', type: 'Text', required: true });
         }
