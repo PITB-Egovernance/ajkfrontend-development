@@ -230,6 +230,14 @@ const ResultsDashboard = () => {
       icon: History,
       iconBg: 'bg-slate-700',
       show: isAdmin
+    },
+    {
+      title: 'Scrutiny & Rechecking',
+      desc: 'Verify, review & resolve candidate paper recounting appeals',
+      link: '/dashboard/results/scrutiny',
+      icon: ClipboardCheck,
+      iconBg: 'bg-amber-600',
+      show: isAdmin
     }
   ];
 
@@ -299,8 +307,8 @@ const ResultsDashboard = () => {
         <div className="space-y-4">
           <h2 className="text-base font-semibold text-slate-900">Featured Workflows</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {quickActions.filter(a => a.show).slice(0, 3).map((action, idx) => (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {quickActions.filter(a => a.show).map((action, idx) => (
               <Link key={idx} to={action.link}>
                 <Card className="border border-slate-200 hover:border-slate-300 transition-all h-full">
                   <CardContent className="p-4">

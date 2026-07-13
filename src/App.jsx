@@ -107,6 +107,7 @@ import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
 import ResultsExamFlow from 'pages/results/ResultsExamFlow';
 import StatisticalSummary from 'pages/results/StatisticalSummary';
 import AuditTrailReport from 'pages/results/AuditTrailReport';
+import ScrutinyRequests from 'pages/results/ScrutinyRequests';
 
 
 function App() {
@@ -285,6 +286,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'secretary', 'chairman', 'director']}>
                 <AuditTrailReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/scrutiny"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'secretary', 'chairman', 'director']}>
+                <ScrutinyRequests />
               </ProtectedRoute>
             }
           />
