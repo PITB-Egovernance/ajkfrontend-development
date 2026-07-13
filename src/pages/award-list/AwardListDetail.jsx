@@ -83,6 +83,30 @@ export default function AwardListDetail() {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null);
   const [csvLoading, setCsvLoading] = useState(false);
 
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const handleBulkStatus = async (status) => {
+    if (selectedIds.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${id}/bulk-status`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ ids: selectedIds, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message ?? 'Bulk update failed');
+      toast.success(data?.message ?? `Updated ${selectedIds.length} candidates status successfully.`);
+      setSelectedIds([]); // clear selection
+      fetchDetail();
+    } catch (err) {
+      toast.error(err.message ?? 'Failed to perform bulk status update');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const handleImportSubmit = async (fileToUpload) => {
     const file = fileToUpload || selectedUploadFile;
     if (!file) {
@@ -117,6 +141,29 @@ export default function AwardListDetail() {
       toast.error('Failed to import CSV file');
     } finally {
       setCsvLoading(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      toast.loading('Exporting template...', { id: 'csv-export' });
+      const res = await fetch(`${API_BASE}/award-lists/${id}/export`, {
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to export template');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `award_list_${id}_export.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Template exported successfully!', { id: 'csv-export' });
+    } catch (err) {
+      toast.error('Failed to export template', { id: 'csv-export' });
     }
   };
 
@@ -268,45 +315,84 @@ export default function AwardListDetail() {
     setPublishing(false);
   };
 
-  const isMcq = list?.advertisement?.test_type === 1 || list?.advertisement?.test_type === '1';
-  const writtenLabel = isMcq ? 'Test (B/45)' : 'Written (B/45)';
-  const combinedLabel = isMcq ? 'Acad+Test (70)' : 'Acad+Written (70)';
+  const getAcademicDetail = (row, field) => {
+    try {
+      const notesDecoded = JSON.parse(row.notes || '{}');
+      return notesDecoded[field] ?? '—';
+    } catch (e) {
+      return '—';
+    }
+  };
 
   const entryColumns = [
     { field: 'merit_position', headerName: 'Rank', width: 60, align: 'center', headerAlign: 'center' },
     { field: 'roll_number', headerName: 'Roll No', width: 90 },
-    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1, minWidth: 140 },
+    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1.2, minWidth: 150 },
     {
-      field: 'part_a_total',
-      headerName: 'Acad (A/25)',
+      field: 'matric_obt_tot',
+      headerName: 'Matric',
+      width: 100,
+      valueGetter: (params) => {
+        const obt = getAcademicDetail(params.row, 'matric_obt');
+        const tot = getAcademicDetail(params.row, 'matric_tot');
+        return obt !== '—' ? `${obt} / ${tot}` : '—';
+      }
+    },
+    {
+      field: 'inter_obt_tot',
+      headerName: 'F.A/F.SC',
+      width: 100,
+      valueGetter: (params) => {
+        const obt = getAcademicDetail(params.row, 'inter_obt');
+        const tot = getAcademicDetail(params.row, 'inter_tot');
+        return obt !== '—' ? `${obt} / ${tot}` : '—';
+      }
+    },
+    {
+      field: 'grad_obt_tot',
+      headerName: "Bachelor's",
+      width: 110,
+      valueGetter: (params) => {
+        const obt = getAcademicDetail(params.row, 'grad_obt');
+        const tot = getAcademicDetail(params.row, 'grad_tot');
+        return obt !== '—' ? `${obt} / ${tot}` : '—';
+      }
+    },
+    {
+      field: 'marks_matric',
+      headerName: 'Matric %',
+      width: 90,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ row }) => row.marks_matric > 0 ? Number(row.marks_matric).toFixed(2) + '%' : '—'
+    },
+    {
+      field: 'marks_inter',
+      headerName: 'F.A/F.SC %',
       width: 100,
       align: 'right',
       headerAlign: 'right',
-      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+      renderCell: ({ row }) => row.marks_inter > 0 ? Number(row.marks_inter).toFixed(2) + '%' : '—'
+    },
+    {
+      field: 'marks_grad',
+      headerName: "Bachelor's %",
+      width: 110,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ row }) => row.marks_grad > 0 ? Number(row.marks_grad).toFixed(2) + '%' : '—'
     },
     {
       field: 'marks_written',
-      headerName: writtenLabel,
+      headerName: 'Written (A)',
       width: 110,
       align: 'right',
       headerAlign: 'right',
       renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
     },
     {
-      field: 'academic_written_combined',
-      headerName: combinedLabel,
-      width: 120,
-      align: 'right',
-      headerAlign: 'right',
-      valueGetter: (params) => {
-        const partA = Number(params.row.part_a_total ?? 0);
-        const written = Number(params.row.marks_written ?? 0);
-        return (partA + written).toFixed(2);
-      }
-    },
-    {
-      field: 'part_b_total',
-      headerName: 'Interview (C/30)',
+      field: 'marks_pak_studies',
+      headerName: 'Viva Voce (B)',
       width: 120,
       align: 'right',
       headerAlign: 'right',
@@ -314,7 +400,7 @@ export default function AwardListDetail() {
     },
     {
       field: 'grand_total',
-      headerName: 'Grand Total (100)',
+      headerName: 'Grand Total (A+B)',
       width: 140,
       align: 'right',
       headerAlign: 'right',
@@ -323,6 +409,16 @@ export default function AwardListDetail() {
           {value != null ? Number(value).toFixed(2) : '0.00'}
         </Typography>
       ),
+    },
+    {
+      field: 'remarks',
+      headerName: 'Remarks',
+      flex: 1,
+      minWidth: 120,
+      valueGetter: (params) => {
+        const rem = getAcademicDetail(params.row, 'remarks');
+        return rem !== '—' ? rem : params.row.notes;
+      }
     },
     {
       field: 'status',
@@ -334,28 +430,6 @@ export default function AwardListDetail() {
           <Chip label={displayLabel} color={statusColor(value)} size="small" />
         );
       },
-    },
-    {
-      field: 'actions',
-      headerName: '',
-      width: 90,
-      sortable: false,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <Tooltip title="Manual entry disabled. Use CSV import.">
-            <span>
-              <IconButton size="small" disabled={true}>
-                <Edit size={15} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title="Change Status">
-            <IconButton size="small" color="primary" onClick={() => openStatus(row)}>
-              <CheckCircle size={15} />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      ),
     },
   ];
 
@@ -472,7 +546,7 @@ export default function AwardListDetail() {
           variant="outlined"
           size="small"
           startIcon={<Download size={14} />}
-          onClick={() => window.open(`${API_BASE}/award-lists/${id}/export`, '_blank')}
+          onClick={handleExportCSV}
         >
           Export CSV
         </Button>
@@ -503,6 +577,84 @@ export default function AwardListDetail() {
 
       <Divider sx={{ mb: 2 }} />
 
+      {/* Bulk action toolbar */}
+      {selectedIds.length > 0 && (
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 1.5, 
+            mb: 2, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            bgcolor: 'primary.light', 
+            color: 'primary.contrastText',
+            borderRadius: 2
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle2" fontWeight={600} color="inherit">
+              {selectedIds.length} candidate(s) selected
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              onClick={() => handleBulkStatus('selected')}
+              disabled={bulkSaving}
+            >
+              Mark Selected
+            </Button>
+            <Button
+              variant="contained"
+              color="warning"
+              size="small"
+              onClick={() => handleBulkStatus('provisional')}
+              disabled={bulkSaving}
+            >
+              Mark Provisional
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              size="small"
+              onClick={() => handleBulkStatus('absent')}
+              disabled={bulkSaving}
+            >
+              Mark Absent
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              size="small"
+              onClick={() => handleBulkStatus('declined')}
+              disabled={bulkSaving}
+            >
+              Mark Declined
+            </Button>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: 'grey.700', '&:hover': { bgcolor: 'grey.800' } }}
+              size="small"
+              onClick={() => handleBulkStatus('disqualified')}
+              disabled={bulkSaving}
+            >
+              Mark Disqualified
+            </Button>
+            <Button
+              variant="text"
+              sx={{ color: 'primary.contrastText' }}
+              size="small"
+              onClick={() => setSelectedIds([])}
+            >
+              Cancel
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label={`Entries (${entries.length})`} />
@@ -520,8 +672,10 @@ export default function AwardListDetail() {
             columns={entryColumns}
             pageSizeOptions={[15, 25, 50, 100]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-            disableRowSelectionOnClick
             density="compact"
+            checkboxSelection={!isPublished}
+            rowSelectionModel={selectedIds}
+            onRowSelectionModelChange={(ids) => setSelectedIds(ids)}
             sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
           />
         </Box>
