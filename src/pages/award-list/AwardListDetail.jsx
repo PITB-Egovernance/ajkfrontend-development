@@ -4,6 +4,7 @@ import {
   Box, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Grid, IconButton,
   Paper, Tab, Tabs, TextField, Tooltip, Typography, Alert,
+  FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
@@ -107,6 +108,86 @@ export default function AwardListDetail() {
     }
   };
 
+  const [openMeritEntries, setOpenMeritEntries] = useState([]);
+  const [openMeritLoading, setOpenMeritLoading] = useState(false);
+
+  const [categoryMeritEntries, setCategoryMeritEntries] = useState([]);
+  const [categoryMeritLoading, setCategoryMeritLoading] = useState(false);
+  const [categoryType, setCategoryType] = useState('district');
+  const [categoryValue, setCategoryValue] = useState('all');
+
+  const fetchOpenMerit = async () => {
+    setOpenMeritLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${id}/open-merit`, { headers: getHeaders() });
+      const data = await res.json();
+      setOpenMeritEntries(data?.data ?? []);
+    } catch (err) {
+      toast.error('Failed to fetch open merit list');
+    } finally {
+      setOpenMeritLoading(false);
+    }
+  };
+
+  const fetchCategoryMerit = async (type = categoryType, val = categoryValue) => {
+    setCategoryMeritLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${id}/category-merit?category=${type}&value=${val}`, { headers: getHeaders() });
+      const data = await res.json();
+      setCategoryMeritEntries(data?.data ?? []);
+    } catch (err) {
+      toast.error('Failed to fetch category merit list');
+    } finally {
+      setCategoryMeritLoading(false);
+    }
+  };
+
+  const handleDownloadOpenMeritPDF = async () => {
+    try {
+      toast.loading('Generating Open Merit PDF...', { id: 'pdf-export' });
+      const res = await fetch(`${API_BASE}/award-lists/${id}/open-merit?export=pdf`, {
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to generate PDF');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `open_merit_list_${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Open Merit PDF downloaded successfully!', { id: 'pdf-export' });
+    } catch (err) {
+      toast.error('Failed to download Open Merit PDF', { id: 'pdf-export' });
+    }
+  };
+
+  const handleDownloadCategoryMeritPDF = async () => {
+    try {
+      toast.loading('Generating Category Merit PDF...', { id: 'pdf-export' });
+      const res = await fetch(`${API_BASE}/award-lists/${id}/category-merit?category=${categoryType}&value=${categoryValue}&export=pdf`, {
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to generate PDF');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `category_merit_${categoryType}_${categoryValue}_list_${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Category Merit PDF downloaded successfully!', { id: 'pdf-export' });
+    } catch (err) {
+      toast.error('Failed to download Category Merit PDF', { id: 'pdf-export' });
+    }
+  };
+
   const handleImportSubmit = async (fileToUpload) => {
     const file = fileToUpload || selectedUploadFile;
     if (!file) {
@@ -183,6 +264,14 @@ export default function AwardListDetail() {
   }, [id]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
+
+  useEffect(() => {
+    if (tab === 1) {
+      fetchOpenMerit();
+    } else if (tab === 2) {
+      fetchCategoryMerit(categoryType, categoryValue);
+    }
+  }, [tab, id, categoryType, categoryValue]);
 
   const openMarks = (entry) => {
     setMarksEntry(entry);
@@ -433,6 +522,98 @@ export default function AwardListDetail() {
     },
   ];
 
+  const openMeritColumns = [
+    { field: 'merit_position', headerName: 'Rank', width: 70, align: 'center', headerAlign: 'center' },
+    { field: 'roll_number', headerName: 'Roll No', width: 110 },
+    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1.5, minWidth: 200 },
+    {
+      field: 'marks_written',
+      headerName: 'Written (A)',
+      width: 120,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'marks_pak_studies',
+      headerName: 'Viva Voce (B)',
+      width: 120,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'grand_total',
+      headerName: 'Grand Total (A+B)',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => (
+        <Typography variant="body2" fontWeight={700}>
+          {value != null ? Number(value).toFixed(2) : '0.00'}
+        </Typography>
+      ),
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: ({ value }) => {
+        const displayLabel = STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value ?? 'Pending';
+        return (
+          <Chip label={displayLabel} color={statusColor(value)} size="small" />
+        );
+      },
+    },
+  ];
+
+  const categoryMeritColumns = [
+    { field: 'category_rank', headerName: 'Quota Rank', width: 100, align: 'center', headerAlign: 'center' },
+    { field: 'merit_position', headerName: 'Open Rank', width: 100, align: 'center', headerAlign: 'center' },
+    { field: 'category_value', headerName: 'Quota', width: 120, align: 'center', headerAlign: 'center' },
+    { field: 'roll_number', headerName: 'Roll No', width: 110 },
+    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1.5, minWidth: 200 },
+    {
+      field: 'marks_written',
+      headerName: 'Written (A)',
+      width: 120,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'marks_pak_studies',
+      headerName: 'Viva Voce (B)',
+      width: 120,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'grand_total',
+      headerName: 'Grand Total (A+B)',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => (
+        <Typography variant="body2" fontWeight={700}>
+          {value != null ? Number(value).toFixed(2) : '0.00'}
+        </Typography>
+      ),
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: ({ value }) => {
+        const displayLabel = STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value ?? 'Pending';
+        return (
+          <Chip label={displayLabel} color={statusColor(value)} size="small" />
+        );
+      },
+    },
+  ];
+
   const auditColumns = [
     {
       field: 'changed_at',
@@ -658,6 +839,8 @@ export default function AwardListDetail() {
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label={`Entries (${entries.length})`} />
+        <Tab label="Open Merit List" disabled={entries.length === 0} />
+        <Tab label="Category Merit List" disabled={entries.length === 0} />
         <Tab
           label={`Audit Log (${auditLogs.length})`}
           icon={<History size={14} />}
@@ -682,6 +865,108 @@ export default function AwardListDetail() {
       )}
 
       {tab === 1 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="subtitle1" fontWeight={600}>Open Merit List (Final Standing)</Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<Download size={14} />}
+              onClick={handleDownloadOpenMeritPDF}
+              disabled={openMeritLoading || openMeritEntries.length === 0}
+            >
+              Download Open Merit PDF
+            </Button>
+          </Box>
+          <Box sx={{ height: 500 }}>
+            <TooltipDataGrid
+              rows={openMeritEntries}
+              columns={openMeritColumns}
+              loading={openMeritLoading}
+              pageSizeOptions={[15, 25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+              density="compact"
+              sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
+            />
+          </Box>
+        </Box>
+      )}
+
+      {tab === 2 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="subtitle1" fontWeight={600}>Category/Quota-wise Merit</Typography>
+              
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Category Type</InputLabel>
+                <Select
+                  value={categoryType}
+                  label="Category Type"
+                  onChange={(e) => {
+                    setCategoryType(e.target.value);
+                    setCategoryValue('all');
+                  }}
+                >
+                  <MenuItem value="district">District Quota</MenuItem>
+                  <MenuItem value="gender">Gender Quota</MenuItem>
+                  <MenuItem value="disability">Disability Quota</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Quota Value</InputLabel>
+                <Select
+                  value={categoryValue}
+                  label="Quota Value"
+                  onChange={(e) => setCategoryValue(e.target.value)}
+                >
+                  <MenuItem value="all">All Quotas</MenuItem>
+                  {Array.from(new Set(entries.map(ent => {
+                    const app = ent.application;
+                    if (!app) return null;
+                    if (categoryType === 'district') {
+                      return app.personal_details?.district_code ?? app.personal_details?.district;
+                    } else if (categoryType === 'gender') {
+                      return app.personal_details?.gender;
+                    } else if (categoryType === 'disability') {
+                      return app.personal_details?.is_disabled ? 'Yes' : 'No';
+                    }
+                    return null;
+                  }).filter(Boolean))).map(val => (
+                    <MenuItem key={val} value={val}>{val.toUpperCase()}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Button
+              variant="contained"
+              color="info"
+              size="small"
+              startIcon={<Download size={14} />}
+              onClick={handleDownloadCategoryMeritPDF}
+              disabled={categoryMeritLoading || categoryMeritEntries.length === 0}
+            >
+              Download Quota PDF
+            </Button>
+          </Box>
+          <Box sx={{ height: 500 }}>
+            <TooltipDataGrid
+              rows={categoryMeritEntries}
+              columns={categoryMeritColumns}
+              loading={categoryMeritLoading}
+              pageSizeOptions={[15, 25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+              density="compact"
+              sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
+            />
+          </Box>
+        </Box>
+      )}
+
+      {tab === 3 && (
         <Box sx={{ height: 400 }}>
           <TooltipDataGrid
             rows={auditLogs}
