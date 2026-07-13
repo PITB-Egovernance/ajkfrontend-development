@@ -451,29 +451,39 @@ const VerificationPage = () => {
                               )}
                             </td>
 
-                            {/* Score / Percentage formatted to 2 decimals */}
-                            <td className="py-4 px-6 text-center font-bold text-slate-800 text-sm tabular-nums">
-                              {cand.status === 'absent' ? '—' : cand.percentage !== null ? `${Number(cand.percentage).toFixed(2)}%` : '—'}
-                            </td>
+                             {/* Score / Percentage formatted to 2 decimals */}
+                             <td className="py-4 px-6 text-center font-bold text-slate-800 text-sm tabular-nums">
+                               {['absent', 'rl', 'ufm'].includes(cand.status) ? '—' : cand.percentage !== null ? `${Number(cand.percentage).toFixed(2)}%` : '—'}
+                             </td>
 
-                            {/* Exam Status (Passed / Failed / Absent) */}
-                            <td className="py-4 px-6 text-center">
-                              {cand.status === 'pass' && (
-                                <span className="inline-flex items-center px-2 py-0.5 bg-emerald-50 border border-emerald-250 text-emerald-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                  PASSED
-                                </span>
-                              )}
-                              {cand.status === 'fail' && (
-                                <span className="inline-flex items-center px-2 py-0.5 bg-rose-50 border border-rose-250 text-rose-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                  FAILED
-                                </span>
-                              )}
-                              {cand.status === 'absent' && (
-                                <span className="inline-flex items-center px-2 py-0.5 bg-slate-150 border border-slate-300 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                  ABSENT
-                                </span>
-                              )}
-                            </td>
+                             {/* Exam Status (Passed / Failed / Absent / RL / UFM) */}
+                             <td className="py-4 px-6 text-center">
+                               {cand.status === 'pass' && (
+                                 <span className="inline-flex items-center px-2 py-0.5 bg-emerald-50 border border-emerald-250 text-emerald-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                                   PASSED
+                                 </span>
+                               )}
+                               {cand.status === 'fail' && (
+                                 <span className="inline-flex items-center px-2 py-0.5 bg-rose-50 border border-rose-250 text-rose-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                                   FAILED
+                                 </span>
+                               )}
+                               {cand.status === 'absent' && (
+                                 <span className="inline-flex items-center px-2 py-0.5 bg-slate-150 border border-slate-300 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                                   ABSENT
+                                 </span>
+                               )}
+                               {cand.status === 'rl' && (
+                                 <span className="inline-flex items-center px-2 py-0.5 bg-amber-50 border border-amber-250 text-amber-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                                   RL
+                                 </span>
+                               )}
+                               {cand.status === 'ufm' && (
+                                 <span className="inline-flex items-center px-2 py-0.5 bg-red-100 border border-red-300 text-red-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                                   UFM
+                                 </span>
+                               )}
+                             </td>
 
                             {/* Verification Status */}
                             <td className="py-4 px-6 text-center">
