@@ -584,7 +584,9 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
         <div className="col-md-6 form-group">
           <SearchableSelect
             label="Age Relaxation"
+            placeholder="Age Relaxation"
             name="age_relaxation"
+
             value={formData.age_relaxation}
             onChange={handleChange}
             required
@@ -702,6 +704,7 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
         <div className="col-md-6 form-group">
           <SearchableSelect
             label="Gender"
+            placeholder="Gender"
             name="gender_basis"
             value={formData.gender_basis}
             onChange={handleChange}
@@ -717,6 +720,7 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
           <TextField
             fullWidth
             label="Any Other Conditions"
+            placeholder="Any Other Conditions"
             name="other_conditions"
             value={formData.other_conditions}
             onChange={handleChange}
