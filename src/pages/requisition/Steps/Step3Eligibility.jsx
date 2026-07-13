@@ -602,6 +602,7 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
             <div className="col-md-6 form-group">
               <SearchableSelect
                 label="Reason for Age Relaxation"
+                placeholder="Reason for Age Relaxation"
                 name="relaxation_reason"
                 value={isOtherRelaxation ? '__other__' : formData.relaxation_reason}
                 onChange={(e) => {
