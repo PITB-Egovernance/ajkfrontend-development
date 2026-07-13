@@ -222,6 +222,14 @@ const ResultsDashboard = () => {
       icon: BarChart2,
       iconBg: 'bg-emerald-600',
       show: isAdmin
+    },
+    {
+      title: 'Audit Trail Report',
+      desc: 'Chronological vigilance log of mark uploads, changes & approvals',
+      link: '/dashboard/results/audit-trail',
+      icon: History,
+      iconBg: 'bg-slate-700',
+      show: isAdmin
     }
   ];
 

@@ -300,6 +300,7 @@ const StatisticalSummary = () => {
               startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <RefreshCw size={14} />}
               onClick={fetchSummary}
               disabled={loading || !canLoad}
+              sx={{ height: "40px" }}
             >
               Load Summary
             </Button>
@@ -309,6 +310,7 @@ const StatisticalSummary = () => {
                 startIcon={exporting ? <CircularProgress size={14} /> : <Download size={14} />}
                 onClick={handleExport}
                 disabled={exporting}
+                sx={{ height: "40px" }}
               >
                 Export Excel
               </Button>
