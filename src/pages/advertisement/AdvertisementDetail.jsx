@@ -2,10 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Download,
-  AlertCircle,
-  History,
-  ChevronDown,
-  ChevronUp
+  AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdvertisementApi from '../../api/advertisementApi';
@@ -50,7 +47,6 @@ const AdvertisementDetail = () => {
   const [testTypeOptions, setTestTypeOptions] = useState([]);
   const [subjectOptions, setSubjectOptions] = useState([]);
   const [secretarySignature, setSecretarySignature] = useState(null);
-  const [showChangeLog, setShowChangeLog] = useState(false);
 
   const API_ROOT = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
   const API_BASE = Config.apiUrl;
@@ -503,6 +499,43 @@ const AdvertisementDetail = () => {
 
   const changeLogs = useMemo(() => parseChangeLogs(advertisement), [advertisement]);
 
+  // Group change_logs entries by job_id so a job's rendered "Total Posts"
+  // count can be looked up and shown as before -> after.
+  const changeLogsByJob = useMemo(() => {
+    const map = {};
+    changeLogs.forEach((log) => {
+      const jobId = log?.job_id;
+      if (jobId === null || jobId === undefined || jobId === '') return;
+      const key = String(jobId);
+      if (!map[key]) map[key] = [];
+      map[key].push(log);
+    });
+    return map;
+  }, [changeLogs]);
+
+  const getPostsChangeLog = (job) => {
+    const possibleKeys = [
+      job.hash_id,
+      job.id,
+      job.job_id,
+      job.pivot?.job_id,
+      job.pivot?.id,
+    ]
+      .filter((v) => v !== null && v !== undefined && v !== '')
+      .map((v) => String(v));
+
+    for (const key of possibleKeys) {
+      const entries = changeLogsByJob[key];
+      if (!entries) continue;
+      const match = entries.find(
+        (log) => log.field === 'num_posts' || log.type === 'count_changed'
+      );
+      if (match && match.before !== undefined && match.after !== undefined) return match;
+    }
+
+    return null;
+  };
+
   /* ── RENDER HELPERS ── */
   if (loading) {
     return (
@@ -954,6 +987,28 @@ const AdvertisementDetail = () => {
           font-weight: 700;
           color: #14532d;
         }
+        .adv-post-vacancies .vac-num-changed {
+          display: flex;
+          align-items: baseline;
+          justify-content: center;
+          gap: 3px;
+          white-space: nowrap;
+        }
+        .adv-post-vacancies .vac-before {
+          font-size: 12px;
+          font-weight: 700;
+          color: #b91c1c;
+          text-decoration: line-through;
+        }
+        .adv-post-vacancies .vac-arrow {
+          font-size: 11px;
+          color: #888;
+        }
+        .adv-post-vacancies .vac-after {
+          font-size: 18px;
+          font-weight: 700;
+          color: #14532d;
+        }
         .adv-post-vacancies .vac-lbl {
           font-size: 9px;
           letter-spacing: .12em;
@@ -1236,71 +1291,6 @@ const AdvertisementDetail = () => {
       `}</style>
 
       <div className="mx-auto" style={{ maxWidth: '210mm' }}>
-        {changeLogs.length > 0 && (
-          <div className="no-print mb-4 rounded-lg border border-amber-200 bg-amber-50 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowChangeLog((prev) => !prev)}
-              className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left"
-            >
-              <span className="flex items-center gap-2 text-sm font-bold text-amber-900">
-                <History size={16} />
-                Edit History ({changeLogs.length})
-              </span>
-              {showChangeLog ? <ChevronUp size={16} className="text-amber-700" /> : <ChevronDown size={16} className="text-amber-700" />}
-            </button>
-
-            {showChangeLog && (
-              <div className="px-4 pb-4 space-y-2">
-                {changeLogs.map((log, index) => {
-                  const isDeleted = log.type === 'deleted' || log.field === 'job_deleted';
-                  const isAdded = log.type === 'added' || log.type === 'created';
-                  const hasBeforeAfter = log.before !== undefined || log.after !== undefined;
-
-                  return (
-                    <div
-                      key={`${log.field || log.job_id || 'entry'}-${index}`}
-                      className="rounded-md border border-amber-100 bg-white p-2.5 text-xs"
-                    >
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <span className={`rounded px-1.5 py-0.5 font-semibold ${
-                          isDeleted
-                            ? 'bg-red-50 text-red-700'
-                            : isAdded
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-emerald-50 text-emerald-700'
-                        }`}>
-                          {isDeleted ? 'Deleted' : isAdded ? 'Added' : 'Changed'}
-                        </span>
-                        <span className="font-semibold text-slate-800">
-                          {log.designation ? `${log.designation} — ` : ''}
-                          {log.label || toTitleCase(log.field) || 'Update'}
-                        </span>
-                      </div>
-
-                      {hasBeforeAfter && (
-                        <div className="flex flex-wrap items-center gap-2 text-slate-600">
-                          <span className="rounded bg-red-50 px-1.5 py-0.5 text-red-700 line-through">
-                            {String(log.before ?? 'N/A')}
-                          </span>
-                          <span className="text-slate-400">&rarr;</span>
-                          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
-                            {String(log.after ?? 'N/A')}
-                          </span>
-                        </div>
-                      )}
-
-                      {log.message && (
-                        <div className="mt-1 text-slate-500">{log.message}</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── MAIN A4 SHEET VIEW ──
             A real <table> so the browser repeats <thead>/<tfoot> on every
             printed page, producing consistent top/bottom margins without any
@@ -1409,6 +1399,7 @@ const AdvertisementDetail = () => {
                           .join(', ')
                       : districtOptions.map((d) => d.name).join(', ') || 'All AJK Districts';
                   const serviceRuleText = getServiceRuleText(job);
+                  const postsChangeLog = getPostsChangeLog(job);
 
                   return (
                     <article key={jobIdx} className="adv-post">
@@ -1429,9 +1420,21 @@ const AdvertisementDetail = () => {
                         </div>
 
                         <div className="adv-post-vacancies">
-                          <span className="vac-num">
-                            {String(job.num_posts || 0).padStart(2, '0')}
-                          </span>
+                          {postsChangeLog ? (
+                            <span className="vac-num vac-num-changed">
+                              <span className="vac-before">
+                                Before {String(postsChangeLog.before).padStart(2, '0')}
+                              </span>
+                              <span className="vac-arrow">&rarr;</span>
+                              <span className="vac-after">
+                                After {String(postsChangeLog.after).padStart(2, '0')}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="vac-num">
+                              {String(job.num_posts || 0).padStart(2, '0')}
+                            </span>
+                          )}
                           <span className="vac-lbl">
                             {Number(job.num_posts) === 1 ? 'Post' : 'Posts'}
                           </span>
