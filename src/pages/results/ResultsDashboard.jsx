@@ -13,7 +13,8 @@ import {
   ShieldAlert,
   Search,
   FileText,
-  Award
+  Award,
+  BarChart2
 } from 'lucide-react';
 import { useAuth } from 'context/AuthContext';
 import { getUserRole } from 'utils/roleUtils';
@@ -212,6 +213,14 @@ const ResultsDashboard = () => {
       link: '/dashboard/results/verification',
       icon: ShieldAlert,
       iconBg: 'bg-indigo-600',
+      show: isAdmin
+    },
+    {
+      title: 'Statistical Summary',
+      desc: 'Pass %, score distribution, toppers & category breakdown',
+      link: '/dashboard/results/statistical-summary',
+      icon: BarChart2,
+      iconBg: 'bg-emerald-600',
       show: isAdmin
     }
   ];

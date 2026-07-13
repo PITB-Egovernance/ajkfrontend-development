@@ -105,6 +105,7 @@ import TermsAndConditionsManagement from "pages/settings/TermsAndConditions/Term
 import VerificationPage from 'pages/results/VerificationPage';
 import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
 import ResultsExamFlow from 'pages/results/ResultsExamFlow';
+import StatisticalSummary from 'pages/results/StatisticalSummary';
 
 
 function App() {
@@ -270,6 +271,14 @@ function App() {
           <Route path="results/exam/:examType" element={<ResultsExamFlow />} />
           <Route path="results/search" element={<ResultSearchPage />} />
           <Route path="results/view/:jobId?" element={<ResultsViewPage />} />
+          <Route
+            path="results/statistical-summary"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'secretary', 'chairman', 'director']}>
+                <StatisticalSummary />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="results/verification/:jobId?"
             element={
