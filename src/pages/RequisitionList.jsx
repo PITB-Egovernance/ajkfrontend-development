@@ -43,6 +43,25 @@ const hasDraftIdentity = (row) => {
   return Boolean(row?.temp_id) || Boolean(row?.current_step);
 };
 
+const isPendingStatusValue = (status) => {
+  return (status || "").toLowerCase().includes("pending");
+};
+
+const isApprovedStatusValue = (status) => {
+  return (status || "").toLowerCase().includes("approved");
+};
+
+const canUploadRequisitionForm = (row) => {
+  if (!row) return false;
+  if (
+    (isPendingStatusValue(row.status) || isApprovedStatusValue(row.status)) &&
+    Boolean(row.requisition_form)
+  ) {
+    return false;
+  }
+  return true;
+};
+
 const getRequisitionSource = (status) => {
   const normalized = String(status || "").trim().toLowerCase();
 
@@ -265,6 +284,7 @@ const RequisitionList = () => {
           num_posts: item.num_posts,
           status: item.status || (item.temp_id ? "Draft" : "Pending"),
           requisition_status: item.requisition_status,
+          requisition_form: item.requisition_form,
         }));
         setRows(requisitions);
         setTotal(total);
@@ -1015,10 +1035,12 @@ const RequisitionList = () => {
           <Eye size={18} style={{ marginRight: "8px" }} />
           View
         </MenuItem>
-        <MenuItem onClick={handleUpload}>
-          <Upload size={18} style={{ marginRight: "8px" }} />
-          Upload
-        </MenuItem>
+        {canUploadRequisitionForm(selectedRow) && (
+          <MenuItem onClick={handleUpload}>
+            <Upload size={18} style={{ marginRight: "8px" }} />
+            Upload
+          </MenuItem>
+        )}
         {selectedRow &&
           getRequisitionSource(selectedRow.requisition_status) === "admin" &&
           (isDraftStatusValue(selectedRow.status) ||

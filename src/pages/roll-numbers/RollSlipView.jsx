@@ -24,6 +24,12 @@ const RollSlipView = () => {
   // ?application_number= so the correct application's slip loads instead of
   // an arbitrary match.
   const applicationNumber = searchParams.get('application_number');
+  // 'written' selects the CCE Written-stage slip (built from
+  // CceCandidateDateSheet) instead of the default Screening/generic slip —
+  // the two stages are rendered from entirely separate backend data so they
+  // never show each other's schedule.
+  const stage = searchParams.get('stage');
+  const isWrittenStage = stage === 'written';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -33,7 +39,9 @@ const RollSlipView = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const result = await RollNumberApi.getSlipViewData(rollNumber, applicationNumber);
+        const result = isWrittenStage
+          ? await RollNumberApi.getCceWrittenSlipViewData(rollNumber, applicationNumber)
+          : await RollNumberApi.getSlipViewData(rollNumber, applicationNumber);
         if (!cancelled) setData(result.data);
       } catch (err) {
         if (!cancelled) {
@@ -46,14 +54,16 @@ const RollSlipView = () => {
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [rollNumber, applicationNumber, navigate]);
+  }, [rollNumber, applicationNumber, isWrittenStage, navigate]);
 
   const handleDownload = async () => {
     setDownloading(true);
     const tid = toast.loading('Preparing slip PDF…');
     try {
       const appNo = data?.applicationNo;
-      const res = await RollNumberApi.downloadSlip(appNo);
+      const res = isWrittenStage
+        ? await RollNumberApi.downloadCceWrittenSlip(rollNumber, appNo)
+        : await RollNumberApi.downloadSlip(appNo);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         toast.dismiss(tid);
@@ -120,7 +130,7 @@ const RollSlipView = () => {
                 <div style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.01em', marginTop: '2px' }}>Public Service Commission</div>
                 <div style={{ display: 'block', fontSize: '14px', fontWeight: 700, lineHeight: 1.2, marginTop: '4px', textTransform: 'none' }}>Jalalabad, Muzaffarabad.</div>
                 <div className="mt-3">
-                  <span className="text-base font-black underline text-emerald-900 tracking-widest">Admission Letter For Test/Examination</span>
+                  <span className="text-base font-black underline text-emerald-900 tracking-widest">Roll Number Slip For Test/Examination</span>
                   {data.examType === 'cce-exams' && (
                     <div className="text-sm font-bold text-emerald-900 mt-0.5">(CCE Screening Test)</div>
                   )}
@@ -218,7 +228,7 @@ const RollSlipView = () => {
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DAY</th>
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DATE</th>
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">TIME</th>
-                      {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>}
+                      {/* {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>} */}
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DESCRIPTION</th>
                     </tr>
                   </thead>
@@ -228,14 +238,14 @@ const RollSlipView = () => {
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.day || '—'}</td>
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.date || '—'}</td>
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{timeRange(group.time, group.endTime)}</td>
-                        {hasLabels && (
+                        {/* {hasLabels && (
                           <td
                             className="border border-emerald-900 px-2 py-1 text-left align-middle font-bold text-emerald-900"
                             style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}
                           >
                             {group.label || '—'}
                           </td>
-                        )}
+                        )} */}
                         {(!allSameDesc || idx === 0) && (
                           <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900 align-middle"
                               rowSpan={allSameDesc ? groups.length : undefined}>
@@ -277,7 +287,7 @@ const RollSlipView = () => {
               )}
             </div>
             <div className="text-xs text-slate-500">
-              Generated: {data.generatedAt}
+              {/* Generated: {data.generatedAt} */}
             </div>
             <div>
               <div className="border-t border-slate-600 w-28 mx-auto mb-1" />
@@ -293,8 +303,8 @@ const RollSlipView = () => {
             <p className="text-xs font-bold text-emerald-900">Azad Jammu &amp; Kashmir Public Service Commission</p>
             <p className="text-[11px] text-slate-600">Muzaffarabad &nbsp;|&nbsp; www.ajkpsc.gop.pk &nbsp;|&nbsp; info@ajkpsc.gop.pk</p>
             <p className="text-[10px] text-slate-500 border-t border-slate-200 mt-1 pt-1">
-              <strong className="text-emerald-900">This is a system-generated document.</strong>
-              &nbsp;&middot;&nbsp; Generated on {data.generatedAt}
+              <strong className="text-emerald-900">This is a system-generated document. No need for signature and stamp</strong>
+              {/* &nbsp;&middot;&nbsp; Generated on {data.generatedAt} */}
             </p>
           </div>
         </div>

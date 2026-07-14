@@ -181,6 +181,9 @@ const parseRollNumber = (roll) => {
 
 const newWrittenSchedule = () => ({ id: Date.now() + Math.random(), date: '', startTime: '10:00', duration: 90, subjectId: '' });
 
+// Returns 24-hour "HH:MM" — same format as the <input type="time"> start time —
+// so it stays parseable downstream (slip views' to12Hour() and the backend's
+// Carbon::createFromFormat('H:i', ...) both expect 24-hour input, not "1:00 PM").
 const computeEndTime = (startTime, durationMinutes) => {
   if (!startTime || !durationMinutes) return '';
   const [h, m] = startTime.split(':').map(Number);
@@ -188,9 +191,17 @@ const computeEndTime = (startTime, durationMinutes) => {
   const totalMinutes = h * 60 + m + Number(durationMinutes);
   const endH = Math.floor((totalMinutes / 60) % 24);
   const endM = totalMinutes % 60;
-  const period = endH >= 12 ? 'PM' : 'AM';
-  const hour12 = endH % 12 === 0 ? 12 : endH % 12;
-  return `${hour12}:${String(endM).padStart(2, '0')} ${period}`;
+  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+};
+
+// 12-hour display formatting for the read-only "End Time" fields in this form.
+const to12Hour = (time24) => {
+  if (!time24) return '';
+  const [h, m] = time24.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return time24;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 };
 
 // Roll number slip generation now runs as a backend queue job. This polls
@@ -1031,7 +1042,7 @@ const RollNumberExamFlow = () => {
               exam_type: examType,
               exam_date: firstExamDate || null,
               attendance_time: firstExamTime || null,
-              papers: papers.length > 1 ? papers : undefined,
+              papers: papers.length > 0 ? papers : undefined,
               allocation_method: allocationMethod,
               auto_allocate: true,
               prefix: rollPrefix.trim(),
@@ -1128,7 +1139,7 @@ const RollNumberExamFlow = () => {
         exam_type: examType,
         exam_date: scheduleDates[0] || null,
         attendance_time: scheduleTimes[0] || null,
-        papers: papers.length > 1 ? papers : undefined,
+        papers: papers.length > 0 ? papers : undefined,
         allocation_method: allocationMethod,
         auto_allocate: false,
         prefix: rollPrefix.trim(),
@@ -1167,8 +1178,9 @@ const RollNumberExamFlow = () => {
   // Navigates to a dedicated full-page slip viewer route (in-app, not a
   // modal or a new browser tab) — consistent with how Advertisement detail
   // pages are viewed elsewhere in the app.
-  const viewSlip = useCallback((rollNumber) => {
-    navigate(`/dashboard/roll-numbers/slip/${encodeURIComponent(rollNumber)}`);
+  const viewSlip = useCallback((rollNumber, applicationNumber) => {
+    const query = applicationNumber ? `?application_number=${encodeURIComponent(applicationNumber)}` : '';
+    navigate(`/dashboard/roll-numbers/slip/${encodeURIComponent(rollNumber)}${query}`);
   }, [navigate]);
 
   const downloadSlip = useCallback(async (applicationNumber) => {
@@ -1277,7 +1289,7 @@ const RollNumberExamFlow = () => {
 
     const newRolls = s3SelectedList.map((_, i) => {
       const seq = startSeq + i;
-      return fmt ? `${fmt.prefix}${String(seq).padStart(fmt.padLen, '0')}` : String(seq).padStart(6, '0');
+      return fmt ? `${fmt.prefix}${String(seq).padStart(fmt.padLen, '0')}` : String(seq).padStart(5, '0');
     });
 
     // Use deduped candidate list for conflict check to avoid false positives
@@ -1543,7 +1555,7 @@ const RollNumberExamFlow = () => {
                 </div>
                 <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                   <span className="font-mono text-sm font-bold text-slate-700">
-                    {rollPrefix ? `${rollPrefix}-000001` : '000001'}
+                    {rollPrefix ? `${rollPrefix}-00001` : '00001'}
                   </span>
                   <span className="text-xs text-slate-400">preview</span>
                 </div>
@@ -1627,18 +1639,18 @@ const RollNumberExamFlow = () => {
                                 />
                               </td>
                               <td className="px-4 py-3">
-                                <div style={{ width: 140 }}>
-                                  <SearchableSelect
-                                    disabled={!isSelected}
-                                    value={String(sch.duration)}
-                                    onChange={e => updateSubjectSchedule(subj.id, 'duration', Number(e.target.value))}
-                                    options={[60, 90, 120, 150, 180].map(m => ({ value: String(m), label: `${m} min` }))}
-                                    placeholder="Duration"
-                                  />
-                                </div>
+                                <TextField
+                                  size="small" type="number"
+                                  disabled={!isSelected}
+                                  value={sch.duration}
+                                  onChange={e => updateSubjectSchedule(subj.id, 'duration', Number(e.target.value))}
+                                  InputLabelProps={{ shrink: true }}
+                                  inputProps={{ min: 1 }}
+                                  sx={{ width: 140 }}
+                                />
                               </td>
                               <td className="px-4 py-3 text-slate-500 text-sm">
-                                {isSelected ? (computeEndTime(sch.startTime, sch.duration) || '—') : '—'}
+                                {isSelected ? (to12Hour(computeEndTime(sch.startTime, sch.duration)) || '—') : '—'}
                               </td>
                             </tr>
                           );
@@ -1656,15 +1668,18 @@ const RollNumberExamFlow = () => {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                       <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
                       <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleTimes((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
-                      <SearchableSelect
-                        required
-                        label="Duration *"
-                        value={String(scheduleDurations[index] ?? 90)}
+                      <TextField
+                        size="small" type="number"
+                        label="Duration (Minutes) *"
+                        value={scheduleDurations[index] ?? 90}
                         onChange={(e) => { const v = Number(e.target.value); setScheduleDurations((cur) => { const a = [...cur]; while (a.length <= index) a.push(90); a[index] = v; return a; }); }}
-                        options={[60, 90, 120, 150, 180].map((m) => ({ value: String(m), label: `${m} Minutes` }))}
-                        placeholder="Select Duration"
+                        required
+                        error={!scheduleDurations[index]}
+                        helperText={!scheduleDurations[index] ? 'Required' : ''}
+                        InputLabelProps={{ shrink: true }}
+                        inputProps={{ min: 1 }}
                       />
-                      <TextField size="small" label="End Time" value={computeEndTime(scheduleTimes[index], scheduleDurations[index]) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
+                      <TextField size="small" label="End Time" value={to12Hour(computeEndTime(scheduleTimes[index], scheduleDurations[index])) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
                     </div>
                   </div>
                 ))}
@@ -1988,7 +2003,7 @@ const RollNumberExamFlow = () => {
                           <td className="px-4 py-3 text-slate-600">{c.start_date || scheduleDates[0] || '—'}</td>
                           <td className="px-4 py-3 text-right">
                             <div className="inline-flex gap-2">
-                              <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-white px-3" onClick={() => viewSlip(c.roll)}>
+                              <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-white px-3" onClick={() => viewSlip(c.roll, c.id)}>
                                 <Eye size={13} /> View Slip
                               </Button>
                               <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-white px-3" onClick={() => downloadSlip(c.id)}>
