@@ -94,6 +94,24 @@ const RollNumberApi = {
     return handleResponse(res);
   },
 
+  // CCE Written-stage equivalents of getSlipViewData/downloadSlip — sourced
+  // server-side from CceCandidateDateSheet instead of the Screening stage's
+  // exam_sessions, so the two stages' slips never mix.
+  getCceWrittenSlipViewData: async (rollNumber, applicationNumber) => {
+    const search = applicationNumber ? `?application_number=${encodeURIComponent(applicationNumber)}` : '';
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/roll-slip/${encodeURIComponent(rollNumber)}/written-view-data${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  downloadCceWrittenSlip: async (rollNumber, applicationNumber) => {
+    const search = applicationNumber ? `?application_number=${encodeURIComponent(applicationNumber)}` : '';
+    return fetch(`${ADMIN_API_BASE}/roll-numbers/cce-written-slip/${encodeURIComponent(rollNumber)}${search}`, {
+      headers: getAdminHeaders(false),
+    });
+  },
+
   // JSON slip data looked up by application number — includes raw editable
   // fields (exam_center_id, exam_date, attendance_time) used to pre-fill the
   // "Edit Slip" form, unlike the roll-number-keyed view above which is
