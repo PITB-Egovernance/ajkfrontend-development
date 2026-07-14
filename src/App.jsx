@@ -99,7 +99,6 @@ import MeritManagementPage from 'pages/results/MeritManagementPage';
 import PublicationPage from 'pages/results/PublicationPage';
 import ResultsDashboard from 'pages/results/ResultsDashboard';
 import ResultsViewPage from 'pages/results/ResultsViewPage';
-import ResultSearchPage from 'pages/results/ResultSearchPage';
 import CreateDepartmentUser from 'pages/settings/DepartmentUsers/EditDepartmentUser';
 import TermsAndConditionsManagement from "pages/settings/TermsAndConditions/TermsAndConditionsManagement";
 import VerificationPage from 'pages/results/VerificationPage';
@@ -271,7 +270,6 @@ function App() {
           {/* Results Module Routes */}
           <Route path="results" element={<ResultsDashboard />} />
           <Route path="results/exam/:examType" element={<ResultsExamFlow />} />
-          <Route path="results/search" element={<ResultSearchPage />} />
           <Route path="results/view/:jobId?" element={<ResultsViewPage />} />
           <Route
             path="results/statistical-summary"

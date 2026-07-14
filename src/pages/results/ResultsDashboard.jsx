@@ -285,22 +285,6 @@ const ResultsDashboard = () => {
               </CardContent>
             </Card>
           )}
-
-          <Link to="/dashboard/results/search">
-            <Card className="border border-slate-200 cursor-pointer hover:border-slate-300 transition-colors">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-500 mb-1">Search & Print</p>
-                    <p className="text-sm font-semibold text-slate-700">Verification Center</p>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-slate-800 text-white">
-                    <Search className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
         </div>
 
         {/* Quick Actions */}
