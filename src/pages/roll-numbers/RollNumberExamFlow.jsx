@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Download, Eye, Filter, Hash, MapPin, Plus, Search, Send, Users, X } from 'lucide-react';
 import SearchableSelect from 'components/ui/SearchableSelect';
@@ -100,6 +100,229 @@ const examCategoryAliases = {
     'combined-competitive-exam', 'combined-competitive-exams', 'combined_competitive_exam', 'combined_competitive_exams',
     'joint-competitive-exam', 'joint_competitive_exam', 'jce',
   ]),
+};
+
+
+// Normalize IDs before comparing values returned from different APIs.
+// Candidate API can return a numeric id, hash_id, ext_adv_id, or pivot id
+// for the same post, while the advertisement API may expose another variant.
+const normalizeId = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+};
+
+const uniqueIds = (values) => [...new Set(values.map(normalizeId).filter(Boolean))];
+
+const normalizeLookupText = (value) => String(value ?? '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
+const lookupKey = (prefix, value) => {
+  const normalized = normalizeLookupText(value);
+  return normalized ? `${prefix}:${normalized}` : '';
+};
+
+// Candidate and admin APIs do not always return the same post identifier.
+// Include IDs plus stable business keys so applicant counts still match when
+// one API returns hash_id and another returns ext_adv_id/numeric id.
+const getCandidatePostIdentifiers = (app) => uniqueIds([
+  // Candidate portal application shape
+  app?.job_post?.ext_adv_id,
+  app?.job_post?.hash_id,
+  app?.job_post?.id,
+  app?.job_post?.job_id,
+  app?.job_post?.job_detail_id,
+  app?.job_post?.ext_job_id,
+
+  // Admin/received-application shape
+  app?.job?.hash_id,
+  app?.job?.id,
+  app?.job?.job_detail_id,
+  app?.job_detail?.hash_id,
+  app?.job_detail?.id,
+  app?.post?.hash_id,
+  app?.post?.id,
+  app?.post_id,
+  app?.job_post_id,
+  app?.job_id,
+  app?.ext_adv_id,
+  app?.job_detail_id,
+  app?.advertisement_job_id,
+
+  // Stable business keys — useful when the two APIs expose different IDs
+  lookupKey(
+    'case',
+    app?.job_post?.case_number ??
+      app?.job?.case_number ??
+      app?.job_detail?.case_number ??
+      app?.post?.case_number ??
+      app?.case_number
+  ),
+  lookupKey(
+    'post',
+    app?.job_post?.designation ??
+      app?.job_post?.post_title ??
+      app?.job?.designation ??
+      app?.job?.post_title ??
+      app?.job_detail?.designation ??
+      app?.job_detail?.post_title ??
+      app?.post?.designation ??
+      app?.post?.post_title ??
+      app?.designation ??
+      app?.post_title
+  ),
+]);
+
+// Normalizes the applications response returned by the admin API endpoint
+// used by getApplicationsByAdvertisement().
+const extractAdminApplications = (response) => extractArray(
+  response?.data?.applications?.data,
+  response?.data?.applications,
+  response?.data?.data?.applications?.data,
+  response?.data?.data?.applications,
+  response?.data?.data?.data,
+  response?.data?.data,
+  response?.applications?.data,
+  response?.applications,
+  response?.data,
+  response,
+);
+
+// Convert an admin/received-application record into the same loose shape used
+// by candidate-portal applications. Existing fields are preserved.
+const normalizeApplicationForGeneration = (app) => {
+  const personal = app?.snapshot_data ?? app?.personal_details ?? {};
+  const candidate = app?.candidate ?? {};
+
+  return {
+    ...app,
+    application_number:
+      app?.application_number ??
+      app?.application_no ??
+      app?.applicationNumber ??
+      '',
+    snapshot_data: {
+      ...personal,
+      name:
+        personal?.name ??
+        personal?.candidate_name ??
+        app?.candidate_name ??
+        candidate?.name ??
+        '',
+      cnic:
+        personal?.cnic ??
+        personal?.candidate_cnic ??
+        app?.candidate_cnic ??
+        candidate?.cnic ??
+        '',
+      email:
+        personal?.email ??
+        personal?.candidate_email ??
+        app?.candidate_email ??
+        candidate?.email ??
+        '',
+      mobile_number:
+        personal?.mobile_number ??
+        personal?.mobile ??
+        personal?.candidate_mobile ??
+        app?.candidate_mobile ??
+        candidate?.mobile_number ??
+        candidate?.mobile ??
+        '',
+    },
+    preferred_exam_cities: Array.isArray(app?.preferred_exam_cities)
+      ? app.preferred_exam_cities
+      : [],
+    candidate: {
+      ...candidate,
+      documents: Array.isArray(candidate?.documents)
+        ? candidate.documents
+        : Array.isArray(app?.documents)
+          ? app.documents
+          : [],
+    },
+  };
+};
+
+const getJobIdentifiers = (job) => uniqueIds([
+  job?.hash_id,
+  job?.id,
+  job?.ext_adv_id,
+  job?.external_id,
+  job?.job_detail_id,
+  job?.pivot?.job_id,
+  job?.pivot?.job_detail_id,
+  job?.pivot?.ext_adv_id,
+  lookupKey('case', job?.case_number),
+  lookupKey('post', job?.designation ?? job?.post_title),
+]);
+
+const extractArray = (...values) => {
+  for (const value of values) {
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+};
+
+const getAdvertisementJobs = (ad) => extractArray(
+  ad?.job_details,
+  ad?.jobDetails,
+  ad?.jobs,
+  ad?.posts,
+  ad?.advertisement_jobs,
+  ad?.advertisementJobs,
+);
+
+const extractApplicationsPage = (response) => {
+  const payload = response?.data ?? response ?? {};
+
+  const paginator =
+    payload?.applications ??
+    payload?.data?.applications ??
+    payload?.data ??
+    payload;
+
+  const rows = extractArray(
+    paginator?.data,
+    paginator?.applications,
+    paginator?.rows,
+    payload?.applications?.data,
+    payload?.data?.applications?.data,
+  );
+
+  return {
+    rows,
+    currentPage: Number(
+      paginator?.current_page ??
+      payload?.current_page ??
+      1
+    ) || 1,
+    lastPage: Number(
+      paginator?.last_page ??
+      payload?.last_page ??
+      1
+    ) || 1,
+  };
+};
+
+const addApplicationToIdentifierMap = (map, identifiers, applicationNumber) => {
+  identifiers.forEach((identifier) => {
+    if (!map[identifier]) map[identifier] = new Set();
+    map[identifier].add(applicationNumber || `anonymous-${map[identifier].size}`);
+  });
+};
+
+// Merge application sets for every identifier belonging to the same post.
+// This remains correct even when some applications use numeric IDs and
+// others use hash IDs or external advertisement-post IDs.
+const countUniqueApplicationsForIdentifiers = (map, identifiers) => {
+  const applications = new Set();
+  identifiers.forEach((identifier) => {
+    const values = map[identifier];
+    if (values instanceof Set) values.forEach((value) => applications.add(value));
+  });
+  return applications.size;
 };
 
 
@@ -315,34 +538,121 @@ const RollNumberExamFlow = () => {
       .finally(() => clearTimeout(timer));
   }, []);
 
+  // The candidate portal API is slow and rate-limit-sensitive, and this call
+  // runs alongside ~9 other requests in fetchData's Promise.all. Firing every
+  // page at once (as before) plus no HTTP-status check meant a transient
+  // timeout/429/5xx on any single page silently collapsed the whole result to
+  // `[]` — the table would then look empty even though applications exist.
+  // Each page now gets its own retry + status check, and pages are fetched in
+  // small batches instead of all at once so a burst of parallel requests
+  // doesn't get throttled or dropped by the portal.
   const fetchAllCandidateApps = useCallback(async () => {
-    try {
-      const headers = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
-      const firstRes = await fetchWithTimeout(`${Config.candidateApiUrl}/applications?per_page=100`, { headers });
-      const firstJson = await firstRes.json();
-      const firstPage = firstJson?.data?.data ?? firstJson?.data ?? [];
-      const lastPage = firstJson?.data?.last_page ?? 1;
+    const headers = {
+      Accept: 'application/json',
+      'X-API-KEY': Config.candidateApiKey,
+    };
 
-      let allApps = [...firstPage];
-      if (lastPage > 1) {
-        const remaining = await Promise.all(
-          Array.from({ length: Math.min(lastPage - 1, 9) }, (_, i) =>
-            fetchWithTimeout(`${Config.candidateApiUrl}/applications?per_page=100&page=${i + 2}`, { headers })
-              .then(r => r.json())
-              .then(j => j?.data?.data ?? [])
-              .catch(() => [])
-          )
-        );
-        remaining.forEach(page => { allApps = allApps.concat(page); });
+    const fetchPage = async (page = 1) => {
+      const url = `${Config.candidateApiUrl}/applications?per_page=100&page=${page}`;
+
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const res = await fetchWithTimeout(
+            url,
+            { headers, cache: 'no-store' },
+            30000
+          );
+
+          if (!res.ok) {
+            throw new Error(`Candidate applications API returned HTTP ${res.status}`);
+          }
+
+          const json = await res.json();
+          const normalized = extractApplicationsPage(json);
+
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`[RollNumberExamFlow] Candidate applications page ${page}`, {
+              rows: normalized.rows.length,
+              currentPage: normalized.currentPage,
+              lastPage: normalized.lastPage,
+              rawResponse: json,
+            });
+          }
+
+          return normalized;
+        } catch (err) {
+          if (attempt === 2) {
+            console.warn(`Candidate API fetch failed (page ${page}):`, err?.message);
+            return { rows: [], currentPage: page, lastPage: page };
+          }
+        }
       }
-      return allApps;
-    } catch (err) {
-      console.warn('Candidate API fetch failed:', err?.message);
-      return [];
+
+      return { rows: [], currentPage: page, lastPage: page };
+    };
+
+    const firstPage = await fetchPage(1);
+    let allApps = [...firstPage.rows];
+
+    if (firstPage.lastPage > 1) {
+      const pageNumbers = Array.from(
+        { length: firstPage.lastPage - 1 },
+        (_, index) => index + 2
+      );
+      const concurrency = 3;
+
+      for (let index = 0; index < pageNumbers.length; index += concurrency) {
+        const batch = pageNumbers.slice(index, index + concurrency);
+        const results = await Promise.all(batch.map(fetchPage));
+        results.forEach((result) => {
+          allApps = allApps.concat(result.rows);
+        });
+      }
     }
+
+    const uniqueApps = [];
+    const seenApps = new Set();
+
+    allApps.forEach((app, index) => {
+      const key =
+        normalizeId(app?.application_number) ||
+        normalizeId(app?.hash_id) ||
+        normalizeId(app?.id) ||
+        `application-${index}`;
+
+      if (seenApps.has(key)) return;
+      seenApps.add(key);
+      uniqueApps.push(app);
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[RollNumberExamFlow] Total unique candidate applications:', uniqueApps.length);
+      console.table(
+        uniqueApps.slice(0, 20).map((app) => ({
+          application_number: app?.application_number || '',
+          post_name:
+            app?.job_post?.designation ||
+            app?.job_post?.post_title ||
+            app?.designation ||
+            app?.post_title ||
+            '',
+          post_identifiers: getCandidatePostIdentifiers(app).join(', '),
+        }))
+      );
+    }
+
+    return uniqueApps;
   }, [fetchWithTimeout]);
 
+  // Guards against a slow, stale fetchData call (e.g. from a previous
+  // examType before the admin switched tabs) resolving after a newer one and
+  // clobbering fresher state with outdated data — only the fetch whose id
+  // still matches the ref when it reaches a setState point is allowed to commit.
+  const fetchIdRef = useRef(0);
+
   const fetchData = useCallback(async () => {
+    const requestId = ++fetchIdRef.current;
+    const isStale = () => requestId !== fetchIdRef.current;
     setLoading(true);
     try {
       const adminHeaders = {
@@ -352,13 +662,12 @@ const RollNumberExamFlow = () => {
       };
       const candidateHeaders = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
 
-      const [adsResult, centersResult, testTypesRes, gradesRes, candidateApps, rollNumbersResult, utilizationResult, citiesRes, writtenSubjectsRes, designationsRes] = await Promise.all([
+      const [adsResult, centersResult, testTypesRes, gradesRes, candidateApps, utilizationResult, citiesRes, writtenSubjectsRes, designationsRes] = await Promise.all([
         RollNumberApi.getAdvertisementsWithJobs(200).catch((e) => { console.error('[RollNumberExamFlow] getAdvertisementsWithJobs failed:', e?.message); return {}; }),
         RollNumberApi.getExamCenters(500),
         fetch(`${Config.apiUrl}/settings/test-types?per_page=200`, { headers: adminHeaders }).then(r => r.json()).catch(() => ({})),
         fetch(`${Config.apiUrl}/settings/grades?per_page=200`, { headers: adminHeaders }).then(r => r.json()).catch(() => ({})),
         fetchAllCandidateApps(),
-        RollNumberApi.getAdvertisements({ per_page: 200 }).catch(() => ({})),
         RollNumberApi.getCenterUtilization().catch(() => ({ data: {} })),
         fetch(`${Config.apiUrl}/settings/cities?per_page=1000`, { headers: adminHeaders }).then(r => r.json()).catch(() => ({})),
         examType === 'written-exams'
@@ -436,6 +745,7 @@ const RollNumberExamFlow = () => {
           if (numId && numId !== hid) subjectsMap[numId] = subjects;
         });
 
+        if (isStale()) return;
         setTestTypeSubjectsMap(subjectsMap);
 
         // Flat subjects list — includes designation_ids for filtering by selected post's designation
@@ -483,37 +793,45 @@ const RollNumberExamFlow = () => {
         }
       } catch { /* silent */ }
 
-      // Count candidate applications per post, split into pending vs generated
-      const jobPostCountMap = {};    // total apps per post (by ext_adv_id)
-      const generatedCountPerPost = {}; // apps with a roll number slip per post
+      // Count candidate applications against every post identifier returned by
+      // the candidate API. Sets prevent duplicate counting when one application
+      // contains multiple aliases for the same post.
+      const jobPostApplicationsMap = {};       // identifier → Set(application_number)
+      const generatedApplicationsMap = {};     // identifier → Set(application_number)
       const candidateAppsAvailable = Array.isArray(candidateApps) && candidateApps.length > 0;
+
       if (candidateAppsAvailable) {
-        candidateApps.forEach(app => {
-          const extAdvId = app.job_post?.ext_adv_id || null;
-          if (extAdvId) {
-            jobPostCountMap[extAdvId] = (jobPostCountMap[extAdvId] || 0) + 1;
-            if (generatedAppsSet.has(app.application_number)) {
-              generatedCountPerPost[extAdvId] = (generatedCountPerPost[extAdvId] || 0) + 1;
-            }
+        candidateApps.forEach((app, appIndex) => {
+          const identifiers = getCandidatePostIdentifiers(app);
+          if (identifiers.length === 0) return;
+
+          const applicationKey = normalizeId(app.application_number) || `candidate-${appIndex}`;
+          addApplicationToIdentifierMap(jobPostApplicationsMap, identifiers, applicationKey);
+
+          if (generatedAppsSet.has(app.application_number)) {
+            addApplicationToIdentifierMap(generatedApplicationsMap, identifiers, applicationKey);
           }
         });
       }
+      if (isStale()) return;
       setAllCandidateApps(candidateAppsAvailable ? candidateApps : []);
 
-      const adAppCountMap = {};
-      const rnAds = rollNumbersResult?.data?.data ?? rollNumbersResult?.data ?? [];
-      (Array.isArray(rnAds) ? rnAds : []).forEach((ad) => {
-        const key = ad.hash_id || String(ad.id);
-        adAppCountMap[key] = ad.total_applications ?? 0;
-      });
-
-      const allAds = adsResult?.data?.data ?? adsResult?.data ?? [];
+      const allAds = extractArray(
+        adsResult?.data?.data?.data,
+        adsResult?.data?.data,
+        adsResult?.data?.advertisements?.data,
+        adsResult?.data?.advertisements,
+        adsResult?.advertisements?.data,
+        adsResult?.advertisements,
+        adsResult?.data,
+        adsResult,
+      );
 
       const validCategories = examCategoryAliases[examType] ?? new Set([examType]);
 
       const matchedAds = allAds
         .map((ad) => {
-          const jobs = (ad.job_details || []).filter((job) => {
+          const jobs = getAdvertisementJobs(ad).filter((job) => {
             const pivotHt  = String(job.pivot?.test_type || '');
             const jobHt    = String(job.test_type || '');
 
@@ -542,7 +860,7 @@ const RollNumberExamFlow = () => {
 
       // Debug: log as JSON string so values are immediately readable
       if (process.env.NODE_ENV !== 'production') {
-        const dbg = allAds[0]?.job_details?.slice(0, 2).map(j => ({
+        const dbg = getAdvertisementJobs(allAds[0]).slice(0, 2).map(j => ({
           designation: j.designation,
           designation_id: j.designation_id,
           designation_hash_id: j.designation_hash_id,
@@ -551,10 +869,10 @@ const RollNumberExamFlow = () => {
           test_type: j.test_type,
           pivot_test_type: j.pivot?.test_type,
         }));
-        console.group(`[RollNumberExamFlow] examType=${examType} matched ${matchedAds.length}/${allAds.length}`);
-        console.log('testTypeMap:', JSON.stringify(testTypeMap));
-        console.log('first ad jobs:', JSON.stringify(dbg, null, 2));
-        console.groupEnd();
+        // console.group(`[RollNumberExamFlow] examType=${examType} matched ${matchedAds.length}/${allAds.length}`);
+        // console.log('testTypeMap:', JSON.stringify(testTypeMap));
+        // console.log('first ad jobs:', JSON.stringify(dbg, null, 2));
+        // console.groupEnd();
       }
 
       // Fallback: many advertisements' jobs have never been tagged with ANY
@@ -569,7 +887,7 @@ const RollNumberExamFlow = () => {
         ? []
         : allAds
             .map((ad) => {
-              const jobs = (ad.job_details || []).filter((job) => {
+              const jobs = getAdvertisementJobs(ad).filter((job) => {
                 const pivotHt = String(job.pivot?.test_type || '');
                 const jobHt   = String(job.test_type || '');
                 return !pivotHt && !jobHt;
@@ -583,8 +901,6 @@ const RollNumberExamFlow = () => {
 
       const filtered = adsToUse.map(({ ad, jobs }) => {
         const adKey = ad.hash_id || String(ad.id);
-        const adTotal = ad.total_applications ?? adAppCountMap[adKey] ?? 0;
-        const perPostFallback = jobs.length > 0 ? Math.ceil(adTotal / jobs.length) : 0;
 
         return {
           id: adKey,
@@ -593,15 +909,52 @@ const RollNumberExamFlow = () => {
             : `Advertisement #${ad.id}`,
           meta: meta.badge,
           posts: jobs.map((job) => {
-            const jobId = job.hash_id || String(job.id);
+            // A candidate application's `ext_adv_id` (from the portal's job_post)
+            // can be the parent Advertisement's hash_id rather than this specific
+            // JobDetail's hash_id (see backend RollNumberSlipService::
+            // resolveLocalAdvertisementFromPortal). That's only safe to treat as
+            // "this post" when the advertisement has exactly one post — otherwise
+            // it would wrongly match applications meant for a sibling post.
+            const jobIdentifiers = jobs.length === 1
+              ? uniqueIds([...getJobIdentifiers(job), adKey, String(ad.id)])
+              : getJobIdentifiers(job);
+            const jobId = jobIdentifiers[0] || normalizeId(job.hash_id || job.id);
             const deptName = job.department_label || 'N/A';
             const rawScale = gradeMap[job.scale] || job.scale || '';
             const scaleDisplay = rawScale ? (rawScale.toUpperCase().startsWith('BPS') ? rawScale : `BPS-${rawScale}`) : '';
-            const totalCount    = jobPostCountMap[jobId] ?? 0;
-            const generatedCount = candidateAppsAvailable ? (generatedCountPerPost[jobId] ?? 0) : 0;
-            const pendingCount   = candidateAppsAvailable ? totalCount - generatedCount : perPostFallback;
+
+            const candidateApiTotal = countUniqueApplicationsForIdentifiers(
+              jobPostApplicationsMap,
+              jobIdentifiers
+            );
+            const candidateApiGenerated = countUniqueApplicationsForIdentifiers(
+              generatedApplicationsMap,
+              jobIdentifiers
+            );
+
+            // Prefer an exact post-level count from the admin API when the
+            // candidate API is unavailable. Never divide advertisement totals
+            // equally across posts because each post can have a different count.
+            const backendPostTotal = Number(
+              job.total_applications ??
+              job.applications_count ??
+              job.total_applicants ??
+              job.applicants_count ??
+              job.received_applications_count ??
+              job.pivot?.total_applications ??
+              job.pivot?.applications_count ??
+              0
+            );
+
+            const totalCount = candidateApiTotal > 0
+              ? candidateApiTotal
+              : backendPostTotal;
+            const generatedCount = candidateApiGenerated;
+            const pendingCount = Math.max(0, totalCount - generatedCount);
+
             return {
               id: jobId,
+              matchingIds: jobIdentifiers,
               post: job.designation || job.post_title || 'Untitled Post',
               caseNo: job.case_number ? `Case ${job.case_number} | ${scaleDisplay}` : scaleDisplay,
               scale: scaleDisplay,
@@ -609,7 +962,7 @@ const RollNumberExamFlow = () => {
               department: deptName,
               applicants: pendingCount,      // candidates without a roll number (used for capacity check)
               generatedCount,                // candidates with a roll number already
-              totalApplicants: candidateAppsAvailable ? totalCount : perPostFallback,
+              totalApplicants: totalCount,
               advertisementId: adKey,
               testTypeId: String(job.pivot?.test_type || job.test_type || ''),
               designationHashId: String(
@@ -622,6 +975,25 @@ const RollNumberExamFlow = () => {
           }),
         };
       });
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.table(
+          filtered.flatMap((advertisement) =>
+            advertisement.posts.map((post) => ({
+              examType,
+              advertisement: advertisement.advertisement,
+              advertisementId: advertisement.id,
+              post: post.post,
+              postId: post.id,
+              matchingIds: post.matchingIds?.join(', '),
+              testTypeId: post.testTypeId,
+              totalApplicants: post.totalApplicants,
+              pendingApplicants: post.applicants,
+              generatedCount: post.generatedCount,
+            }))
+          )
+        );
+      }
 
       setAdvertisements(filtered);
 
@@ -654,9 +1026,9 @@ const RollNumberExamFlow = () => {
           .sort()
       );
     } catch (err) {
-      toast.error(err?.message || 'Failed to load data');
+      if (!isStale()) toast.error(err?.message || 'Failed to load data');
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }, [examType, meta.badge]);
 
@@ -688,7 +1060,7 @@ const RollNumberExamFlow = () => {
   // case of genuinely zero applications system-wide), EVERY post showed
   // regardless of its real applicant count. Filtering directly on
   // totalApplicants removes that unconditional escape hatch.
-  const postHasActivity = (p) => (p.totalApplicants ?? 0) > 0;
+  const postHasActivity = (post) => Number(post?.totalApplicants ?? post?.applicants ?? 0) > 0;
 
   const availableAdvertisements = useMemo(() =>
     advertisements.filter((ad) => ad.posts.some(postHasActivity)),
@@ -880,23 +1252,134 @@ const RollNumberExamFlow = () => {
     setBusy(true, 'Roll number slip generation is in progress. Please wait until it finishes.');
     setGenerationQueue([]);
     try {
-      // Collect matching candidate applications (client-side filter by selected posts)
-      const selectedPostIdSet = new Set(selectedPosts.map(p => p.id));
-      const matchedApps = allCandidateApps.filter(app => {
-        const extAdvId = app.job_post?.ext_adv_id || null;
-        return extAdvId && selectedPostIdSet.has(extAdvId);
-      });
+      // Collect applications for selected posts. Start with the candidate portal
+      // cache, then fall back to the admin advertisement-applications endpoint.
+      // The fallback is required because the listing table can use an admin-side
+      // applications_count while the candidate portal records may expose a
+      // different post identifier (or may not have loaded at all).
+      const selectedPostIdentifierSet = new Set(
+        selectedPosts.flatMap((post) =>
+          uniqueIds([
+            post.id,
+            ...(post.matchingIds || []),
+            lookupKey('case', post.caseNo),
+            lookupKey('post', post.post),
+          ])
+        )
+      );
+
+      const isApplicationForSelectedPost = (app) =>
+        getCandidatePostIdentifiers(app)
+          .some((identifier) => selectedPostIdentifierSet.has(identifier));
+
+      let matchedApps = allCandidateApps
+        .filter(isApplicationForSelectedPost)
+        .map(normalizeApplicationForGeneration);
+
+      // Admin API fallback: retrieve applications advertisement by advertisement.
+      // When records contain a post identifier, filter strictly. If the endpoint
+      // is already scoped to an advertisement with exactly one selected/available
+      // post and records contain no post identifier, it is safe to include them.
+      if (matchedApps.length === 0) {
+        const selectedByAdvertisement = selectedPosts.reduce((groups, post) => {
+          const advertisementId = normalizeId(post.advertisementId);
+          if (!advertisementId) return groups;
+          if (!groups[advertisementId]) groups[advertisementId] = [];
+          groups[advertisementId].push(post);
+          return groups;
+        }, {});
+
+        const adminFallbackApps = [];
+
+        for (const [advertisementId, postsForAdvertisement] of Object.entries(selectedByAdvertisement)) {
+          try {
+            const response = await RollNumberApi.getApplicationsByAdvertisement(
+              advertisementId,
+              { per_page: 1000 }
+            );
+            const rows = extractAdminApplications(response);
+
+            const allPostsForAdvertisement = allPosts.filter(
+              (post) => normalizeId(post.advertisementId) === advertisementId
+            );
+            const mayUseAdvertisementScopedRows =
+              postsForAdvertisement.length === 1 &&
+              allPostsForAdvertisement.length === 1;
+
+            rows.forEach((rawApp) => {
+              const app = normalizeApplicationForGeneration(rawApp);
+              const identifiers = getCandidatePostIdentifiers(app);
+              const hasUsablePostIdentifier = identifiers.length > 0;
+              const exactMatch = identifiers.some((identifier) =>
+                selectedPostIdentifierSet.has(identifier)
+              );
+
+              if (exactMatch || (!hasUsablePostIdentifier && mayUseAdvertisementScopedRows)) {
+                adminFallbackApps.push(app);
+              }
+            });
+          } catch (error) {
+            console.warn(
+              `[RollNumberExamFlow] Could not load applications for advertisement ${advertisementId}:`,
+              error?.message || error
+            );
+          }
+        }
+
+        matchedApps = adminFallbackApps;
+      }
+
+      // Final fallback for records where the admin endpoint returns the correct
+      // advertisement data but omits post identifiers. This is only allowed when
+      // exactly one post is selected under that advertisement, preventing sibling
+      // posts from being mixed into clubbed/multi-post generation.
+      if (matchedApps.length === 0 && selectedPosts.length === 1) {
+        const onlyPost = selectedPosts[0];
+        try {
+          const response = await RollNumberApi.getApplicationsByAdvertisement(
+            onlyPost.advertisementId,
+            { per_page: 1000 }
+          );
+          const rows = extractAdminApplications(response)
+            .map(normalizeApplicationForGeneration);
+
+          const allPostsForAdvertisement = allPosts.filter(
+            (post) => normalizeId(post.advertisementId) === normalizeId(onlyPost.advertisementId)
+          );
+
+          if (allPostsForAdvertisement.length === 1) {
+            matchedApps = rows;
+          }
+        } catch (error) {
+          console.warn('[RollNumberExamFlow] Final application fallback failed:', error);
+        }
+      }
 
       const seen = new Set();
-      const uniqueApps = matchedApps.filter(a => {
-        const num = a.application_number;
-        if (!num || seen.has(num)) return false;
-        seen.add(num);
+      const uniqueApps = matchedApps.filter((app, index) => {
+        const applicationNumber = normalizeId(app.application_number);
+        const key = applicationNumber || normalizeId(app.id) || `application-${index}`;
+        if (!applicationNumber || seen.has(key)) return false;
+        seen.add(key);
         return true;
       });
 
       if (uniqueApps.length === 0) {
-        toast.error('No applications found for the selected posts');
+        console.group('[RollNumberExamFlow] No applications matched — diagnostic dump');
+        console.log('selectedPosts:', selectedPosts.map((post) => ({
+          post: post.post,
+          id: post.id,
+          advertisementId: post.advertisementId,
+          matchingIds: post.matchingIds,
+        })));
+        console.log('selectedPostIdentifierSet:', [...selectedPostIdentifierSet]);
+        console.log('allCandidateApps.length:', allCandidateApps.length);
+        console.log('sample candidate identifiers:', allCandidateApps.slice(0, 10).map((app) => ({
+          application_number: app.application_number,
+          computedIdentifiers: getCandidatePostIdentifiers(app),
+        })));
+        console.groupEnd();
+        toast.error('No applications found for the selected posts. The application records are not linked with the selected post identifier.');
         return;
       }
 
@@ -926,21 +1409,67 @@ const RollNumberExamFlow = () => {
         : (scheduleTimes[0] || null);
 
       // Reusable candidate object builder
-      const buildCandidate = (app) => ({
-        application_number: app.application_number,
-        candidate_name: app.snapshot_data?.name || app.candidate?.name || '',
-        candidate_cnic: app.snapshot_data?.cnic || app.candidate?.cnic || '',
-        candidate_email: app.snapshot_data?.email || app.candidate?.email || '',
-        candidate_mobile: app.snapshot_data?.mobile_number || app.candidate?.mobile_number || '',
-        ext_adv_id: app.job_post?.ext_adv_id || '',
-        ext_advertisement_id: app.job_post?.ext_advertisement_id || '',
-        preferred_exam_cities: (app.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-        personal_details: app.snapshot_data || {},
-        documents: (app.candidate?.documents || []).map(d => ({
-          doc_type: d.doc_type || d.type || '',
-          file_url: d.file_url || d.url || '',
-        })).filter(d => d.doc_type && d.file_url),
-      });
+      const buildCandidate = (app) => {
+        const personal = app.snapshot_data || app.personal_details || {};
+        const documents = app.candidate?.documents || app.documents || [];
+
+        return {
+          application_number: app.application_number,
+          candidate_name:
+            personal.name ||
+            personal.candidate_name ||
+            app.candidate_name ||
+            app.candidate?.name ||
+            '',
+          candidate_cnic:
+            personal.cnic ||
+            personal.candidate_cnic ||
+            app.candidate_cnic ||
+            app.candidate?.cnic ||
+            '',
+          candidate_email:
+            personal.email ||
+            personal.candidate_email ||
+            app.candidate_email ||
+            app.candidate?.email ||
+            '',
+          candidate_mobile:
+            personal.mobile_number ||
+            personal.mobile ||
+            personal.candidate_mobile ||
+            app.candidate_mobile ||
+            app.candidate?.mobile_number ||
+            app.candidate?.mobile ||
+            '',
+          // Laravel validation requires both external identifiers to be strings.
+          // Admin API fallback applications can contain numeric IDs, so normalize
+          // the final resolved value instead of passing a number in the payload.
+          ext_adv_id: normalizeId(
+            app.job_post?.ext_adv_id ??
+            app.ext_adv_id ??
+            app.job_detail_id ??
+            selectedPosts[0]?.id ??
+            ''
+          ),
+          ext_advertisement_id: normalizeId(
+            app.job_post?.ext_advertisement_id ??
+            app.ext_advertisement_id ??
+            app.advertisement_id ??
+            selectedPosts[0]?.advertisementId ??
+            ''
+          ),
+          preferred_exam_cities: (app.preferred_exam_cities || [])
+            .map((city) => typeof city === 'string' ? city : (city?.city || city?.name || ''))
+            .filter(Boolean),
+          personal_details: personal,
+          documents: (Array.isArray(documents) ? documents : [])
+            .map((document) => ({
+              doc_type: document.doc_type || document.type || '',
+              file_url: document.file_url || document.url || document.path || '',
+            }))
+            .filter((document) => document.doc_type && document.file_url),
+        };
+      };
 
       // ── AUTO MODE — district / preference queue ────────────────────────────
       if (centerSelectionMode === 'auto') {
@@ -1448,11 +1977,11 @@ const RollNumberExamFlow = () => {
                           <td className={`px-4 py-3 text-slate-600 ${isLastInGroup ? groupBorder : ''}`}>{post.department}</td>
                           <td className={`px-4 py-3 text-right ${isLastInGroup ? groupBorder : ''}`}>
                               <div className="flex flex-col items-end gap-1">
-                                {post.applicants > 0 && (
-                                  <span className="font-bold text-slate-900 text-sm">{post.applicants}</span>
-                                )}
-                                {post.applicants === 0 && post.generatedCount === 0 && (
-                                  <span className="text-slate-400 text-sm">—</span>
+                                <span className="font-bold text-slate-900 text-sm">{post.totalApplicants ?? 0}</span>
+                                {(post.generatedCount > 0 || post.applicants !== post.totalApplicants) && (
+                                  <span className="text-[11px] text-slate-500">
+                                    Pending: {post.applicants ?? 0}
+                                  </span>
                                 )}
                                 {post.generatedCount > 0 && (
                                   <button
