@@ -723,7 +723,7 @@ const ImportResultsPage = () => {
   const handleDownloadTemplate = async () => {
     setDownloading(true);
     try {
-      const { blob, filename } = await ResultsApi.downloadTemplate(jobId, examType);
+      const { blob, filename } = await ResultsApi.downloadTemplate(jobId, examType, selectedJobIds);
       const url  = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href  = url;
