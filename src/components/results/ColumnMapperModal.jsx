@@ -54,7 +54,9 @@ const findBestMatch = (fieldName, csvHeaders) => {
     'current affairs': ['current affairs', 'ca'],
     'urdu essay precis comprehension grammar composition and translation': ['urdu', 'urdu marks', 'urdu paper'],
     'english precis comprehension grammar composition and translation': ['english precis', 'english', 'english marks'],
-    'english essay': ['english essay', 'essay', 'eng essay']
+    'english essay': ['english essay', 'essay', 'eng essay'],
+    'total obtained marks': ['obtained marks (out of 100)', 'total obtained marks', 'total marks', 'obtained marks', 'total marks obtained', 'marks obtained'],
+    'obtained marks %age': ['obtained marks (out of 100%)', 'obtained marks (out of 70%)', 'obtained marks %age', 'percentage', '%age', 'obtained marks percentage', 'obtained marks (out of 100)']
   };
 
   // Pre-process fieldName to find keys by partial matches
@@ -360,10 +362,11 @@ const ColumnMapperModal = ({
                         label="Maps to Column"
                         value={mappedVal}
                         onChange={(e) => handleSubjectMappingChange(sName, e.target.value)}
-                        options={mappedVal ? [
-                          { value: mappedVal, label: mappedVal }
-                        ] : [
-                          { value: '', label: '-- None Found --' }
+                        options={[
+                          { value: '', label: '-- Skip / Map Later --' },
+                          ...csvHeaders
+                             .filter((h) => !h.toLowerCase().includes('attendance'))
+                             .map((header) => ({ value: header, label: header })),
                         ]}
                       />
                     </div>

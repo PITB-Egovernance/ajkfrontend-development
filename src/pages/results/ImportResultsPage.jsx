@@ -670,11 +670,12 @@ const ImportResultsPage = () => {
 
         // Filter other jobs of same examType for clubbed import options
         const jobsOfSameType = fetchedJobs.filter(j => {
-          if (activeExamType === 'one-paper-mcqs') return /mcq/i.test(j.test_type) && !/two/i.test(j.test_type);
-          if (activeExamType === 'two-paper-mcqs') return /mcq/i.test(j.test_type) && /two/i.test(j.test_type);
-          if (activeExamType === 'written-exams') return /written/i.test(j.test_type);
-          if (activeExamType === 'cce-exams') return /cce/i.test(j.test_type) || /joint.competitive/i.test(j.test_type) || /jce/i.test(j.test_type);
-          return true;
+          const category = j.resolved_test_type_exam_category || j.pivot?.test_type_exam_category || j.test_type_exam_category || '';
+          if (activeExamType === 'one-paper-mcqs') return category === 'one_paper_mcq';
+          if (activeExamType === 'two-paper-mcqs') return category === 'two_paper_mcq';
+          if (activeExamType === 'written-exams') return category === 'written_exam';
+          if (activeExamType === 'cce-exams') return category === 'combined_competitive_exam';
+          return false;
         });
 
         const selectOptions = jobsOfSameType.map(j => ({

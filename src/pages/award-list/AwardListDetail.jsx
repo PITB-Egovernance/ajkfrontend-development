@@ -211,7 +211,24 @@ export default function AwardListDetail() {
 
       const data = await res.json();
       if (res.ok) {
-        toast.success(data?.message || 'CSV imported successfully!');
+        const importData = data?.data || {};
+        const errorsList = importData.errors || [];
+        const updatedCount = importData.updated || 0;
+
+        if (errorsList.length > 0) {
+          toast.error(
+            <div>
+              <strong>Import completed with {errorsList.length} errors:</strong>
+              <ul style={{ margin: '5px 0 0 15px', padding: 0 }}>
+                {errorsList.slice(0, 5).map((err, idx) => <li key={idx}>{err}</li>)}
+                {errorsList.length > 5 && <li>...and {errorsList.length - 5} more</li>}
+              </ul>
+            </div>,
+            { duration: 6000 }
+          );
+        } else {
+          toast.success(data?.message || 'CSV imported successfully!');
+        }
         setImportModalOpen(false);
         setSelectedUploadFile(null);
         fetchDetail();
@@ -453,7 +470,11 @@ export default function AwardListDetail() {
       width: 90,
       align: 'right',
       headerAlign: 'right',
-      renderCell: ({ row }) => row.marks_matric > 0 ? Number(row.marks_matric).toFixed(2) + '%' : '—'
+      renderCell: ({ row }) => {
+        const obt = Number(getAcademicDetail(row, 'matric_obt'));
+        const tot = Number(getAcademicDetail(row, 'matric_tot'));
+        return tot > 0 ? ((obt / tot) * 100).toFixed(2) + '%' : '—';
+      }
     },
     {
       field: 'marks_inter',
@@ -461,7 +482,11 @@ export default function AwardListDetail() {
       width: 100,
       align: 'right',
       headerAlign: 'right',
-      renderCell: ({ row }) => row.marks_inter > 0 ? Number(row.marks_inter).toFixed(2) + '%' : '—'
+      renderCell: ({ row }) => {
+        const obt = Number(getAcademicDetail(row, 'inter_obt'));
+        const tot = Number(getAcademicDetail(row, 'inter_tot'));
+        return tot > 0 ? ((obt / tot) * 100).toFixed(2) + '%' : '—';
+      }
     },
     {
       field: 'marks_grad',
@@ -469,20 +494,33 @@ export default function AwardListDetail() {
       width: 110,
       align: 'right',
       headerAlign: 'right',
-      renderCell: ({ row }) => row.marks_grad > 0 ? Number(row.marks_grad).toFixed(2) + '%' : '—'
+      renderCell: ({ row }) => {
+        const obt = Number(getAcademicDetail(row, 'grad_obt'));
+        const tot = Number(getAcademicDetail(row, 'grad_tot'));
+        return tot > 0 ? ((obt / tot) * 100).toFixed(2) + '%' : '—';
+      }
     },
     {
       field: 'marks_written',
-      headerName: 'Written (A)',
-      width: 110,
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'MCQ Test (A) [70 Marks]' : 'Written Marks (A)',
+      width: 170,
       align: 'right',
       headerAlign: 'right',
+      valueGetter: (params) => {
+        const val = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        if (isMcq && val > 70.0) {
+          const maxRaw = Number(list?.test_total_marks ?? 100);
+          return (val / maxRaw) * 70.0;
+        }
+        return val;
+      },
       renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
     },
     {
       field: 'marks_pak_studies',
-      headerName: 'Viva Voce (B)',
-      width: 120,
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'Viva Voce (B) [30 Marks]' : 'Viva Voce (B)',
+      width: 170,
       align: 'right',
       headerAlign: 'right',
       renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
@@ -493,6 +531,14 @@ export default function AwardListDetail() {
       width: 140,
       align: 'right',
       headerAlign: 'right',
+      valueGetter: (params) => {
+        const rawWritten = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        const maxRaw = Number(list?.test_total_marks ?? 100);
+        const written = (isMcq && rawWritten > 70.0) ? ((rawWritten / maxRaw) * 70.0) : rawWritten;
+        const viva = Number(params.row.marks_pak_studies ?? 0);
+        return written + viva;
+      },
       renderCell: ({ value }) => (
         <Typography variant="body2" fontWeight={700}>
           {value != null ? Number(value).toFixed(2) : '0.00'}
@@ -505,8 +551,17 @@ export default function AwardListDetail() {
       flex: 1,
       minWidth: 120,
       valueGetter: (params) => {
-        const rem = getAcademicDetail(params.row, 'remarks');
-        return rem !== '—' ? rem : params.row.notes;
+        const notesStr = params.row.notes;
+        if (!notesStr) return '—';
+        try {
+          const decoded = JSON.parse(notesStr);
+          if (decoded && typeof decoded === 'object') {
+            return decoded.remarks || '';
+          }
+          return notesStr;
+        } catch (e) {
+          return notesStr;
+        }
       }
     },
     {
@@ -528,16 +583,25 @@ export default function AwardListDetail() {
     { field: 'candidate_name', headerName: 'Candidate Name', flex: 1.5, minWidth: 200 },
     {
       field: 'marks_written',
-      headerName: 'Written (A)',
-      width: 120,
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'MCQ Test (A) [70 Marks]' : 'Written Marks (A)',
+      width: 170,
       align: 'right',
       headerAlign: 'right',
+      valueGetter: (params) => {
+        const val = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        if (isMcq && val > 70.0) {
+          const maxRaw = Number(list?.test_total_marks ?? 100);
+          return (val / maxRaw) * 70.0;
+        }
+        return val;
+      },
       renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
     },
     {
       field: 'marks_pak_studies',
-      headerName: 'Viva Voce (B)',
-      width: 120,
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'Viva Voce (B) [30 Marks]' : 'Viva Voce (B)',
+      width: 170,
       align: 'right',
       headerAlign: 'right',
       renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
@@ -548,6 +612,14 @@ export default function AwardListDetail() {
       width: 150,
       align: 'right',
       headerAlign: 'right',
+      valueGetter: (params) => {
+        const rawWritten = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        const maxRaw = Number(list?.test_total_marks ?? 100);
+        const written = (isMcq && rawWritten > 70.0) ? ((rawWritten / maxRaw) * 70.0) : rawWritten;
+        const viva = Number(params.row.marks_pak_studies ?? 0);
+        return written + viva;
+      },
       renderCell: ({ value }) => (
         <Typography variant="body2" fontWeight={700}>
           {value != null ? Number(value).toFixed(2) : '0.00'}
@@ -575,16 +647,25 @@ export default function AwardListDetail() {
     { field: 'candidate_name', headerName: 'Candidate Name', flex: 1.5, minWidth: 200 },
     {
       field: 'marks_written',
-      headerName: 'Written (A)',
-      width: 120,
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'MCQ Test (A) [70 Marks]' : 'Written Marks (A)',
+      width: 170,
       align: 'right',
       headerAlign: 'right',
+      valueGetter: (params) => {
+        const val = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        if (isMcq && val > 70.0) {
+          const maxRaw = Number(list?.test_total_marks ?? 100);
+          return (val / maxRaw) * 70.0;
+        }
+        return val;
+      },
       renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
     },
     {
       field: 'marks_pak_studies',
-      headerName: 'Viva Voce (B)',
-      width: 120,
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'Viva Voce (B) [30 Marks]' : 'Viva Voce (B)',
+      width: 170,
       align: 'right',
       headerAlign: 'right',
       renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
@@ -595,6 +676,14 @@ export default function AwardListDetail() {
       width: 150,
       align: 'right',
       headerAlign: 'right',
+      valueGetter: (params) => {
+        const rawWritten = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        const maxRaw = Number(list?.test_total_marks ?? 100);
+        const written = (isMcq && rawWritten > 70.0) ? ((rawWritten / maxRaw) * 70.0) : rawWritten;
+        const viva = Number(params.row.marks_pak_studies ?? 0);
+        return written + viva;
+      },
       renderCell: ({ value }) => (
         <Typography variant="body2" fontWeight={700}>
           {value != null ? Number(value).toFixed(2) : '0.00'}
