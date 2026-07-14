@@ -95,17 +95,18 @@ import EmployeeList from 'pages/employees/EmployeeList';
 // Results Module Imports
 import AwardListPage from 'pages/results/AwardListPage';
 import ImportResultsPage from 'pages/results/ImportResultsPage';
-import MarkEntryPage from 'pages/results/MarkEntryPage';
 import MeritManagementPage from 'pages/results/MeritManagementPage';
 import PublicationPage from 'pages/results/PublicationPage';
 import ResultsDashboard from 'pages/results/ResultsDashboard';
 import ResultsViewPage from 'pages/results/ResultsViewPage';
-import ResultSearchPage from 'pages/results/ResultSearchPage';
 import CreateDepartmentUser from 'pages/settings/DepartmentUsers/EditDepartmentUser';
 import TermsAndConditionsManagement from "pages/settings/TermsAndConditions/TermsAndConditionsManagement";
 import VerificationPage from 'pages/results/VerificationPage';
 import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
 import ResultsExamFlow from 'pages/results/ResultsExamFlow';
+import StatisticalSummary from 'pages/results/StatisticalSummary';
+import AuditTrailReport from 'pages/results/AuditTrailReport';
+import ScrutinyRequests from 'pages/results/ScrutinyRequests';
 
 
 function App() {
@@ -269,8 +270,31 @@ function App() {
           {/* Results Module Routes */}
           <Route path="results" element={<ResultsDashboard />} />
           <Route path="results/exam/:examType" element={<ResultsExamFlow />} />
-          <Route path="results/search" element={<ResultSearchPage />} />
           <Route path="results/view/:jobId?" element={<ResultsViewPage />} />
+          <Route
+            path="results/statistical-summary"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'secretary', 'chairman', 'director']}>
+                <StatisticalSummary />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/audit-trail"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'secretary', 'chairman', 'director']}>
+                <AuditTrailReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/scrutiny"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'secretary', 'chairman', 'director']}>
+                <ScrutinyRequests />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="results/verification/:jobId?"
             element={
@@ -279,14 +303,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="results/entry"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MarkEntryPage />
-              </ProtectedRoute>
-            }
-          />
+
           <Route
             path="results/import/:jobId?"
             element={

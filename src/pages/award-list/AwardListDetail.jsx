@@ -4,17 +4,20 @@ import {
   Box, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Grid, IconButton,
   Paper, Tab, Tabs, TextField, Tooltip, Typography, Alert,
+  FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   ArrowLeft, RefreshCw, Upload, Calculator, Download,
-  Edit, CheckCircle, History, Send,
+  Edit, CheckCircle, History, Send, X
 } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import { formatDate } from 'utils/dateUtils';
+import { toast } from 'react-hot-toast';
+import CSVUploadZone from 'components/results/CSVUploadZone';
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
@@ -77,6 +80,191 @@ export default function AwardListDetail() {
   const [actionMsg, setActionMsg]         = useState('');
   const [actionSeverity, setActionSeverity] = useState('info');
 
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [selectedUploadFile, setSelectedUploadFile] = useState(null);
+  const [csvLoading, setCsvLoading] = useState(false);
+
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const handleBulkStatus = async (status) => {
+    if (selectedIds.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${id}/bulk-status`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ ids: selectedIds, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message ?? 'Bulk update failed');
+      toast.success(data?.message ?? `Updated ${selectedIds.length} candidates status successfully.`);
+      setSelectedIds([]); // clear selection
+      fetchDetail();
+    } catch (err) {
+      toast.error(err.message ?? 'Failed to perform bulk status update');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const [openMeritEntries, setOpenMeritEntries] = useState([]);
+  const [openMeritLoading, setOpenMeritLoading] = useState(false);
+
+  const [categoryMeritEntries, setCategoryMeritEntries] = useState([]);
+  const [categoryMeritLoading, setCategoryMeritLoading] = useState(false);
+  const [categoryType, setCategoryType] = useState('district');
+  const [categoryValue, setCategoryValue] = useState('all');
+
+  const fetchOpenMerit = async () => {
+    setOpenMeritLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${id}/open-merit`, { headers: getHeaders() });
+      const data = await res.json();
+      setOpenMeritEntries(data?.data ?? []);
+    } catch (err) {
+      toast.error('Failed to fetch open merit list');
+    } finally {
+      setOpenMeritLoading(false);
+    }
+  };
+
+  const fetchCategoryMerit = async (type = categoryType, val = categoryValue) => {
+    setCategoryMeritLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${id}/category-merit?category=${type}&value=${val}`, { headers: getHeaders() });
+      const data = await res.json();
+      setCategoryMeritEntries(data?.data ?? []);
+    } catch (err) {
+      toast.error('Failed to fetch category merit list');
+    } finally {
+      setCategoryMeritLoading(false);
+    }
+  };
+
+  const handleDownloadOpenMeritPDF = async () => {
+    try {
+      toast.loading('Generating Open Merit PDF...', { id: 'pdf-export' });
+      const res = await fetch(`${API_BASE}/award-lists/${id}/open-merit?export=pdf`, {
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to generate PDF');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `open_merit_list_${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Open Merit PDF downloaded successfully!', { id: 'pdf-export' });
+    } catch (err) {
+      toast.error('Failed to download Open Merit PDF', { id: 'pdf-export' });
+    }
+  };
+
+  const handleDownloadCategoryMeritPDF = async () => {
+    try {
+      toast.loading('Generating Category Merit PDF...', { id: 'pdf-export' });
+      const res = await fetch(`${API_BASE}/award-lists/${id}/category-merit?category=${categoryType}&value=${categoryValue}&export=pdf`, {
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to generate PDF');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `category_merit_${categoryType}_${categoryValue}_list_${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Category Merit PDF downloaded successfully!', { id: 'pdf-export' });
+    } catch (err) {
+      toast.error('Failed to download Category Merit PDF', { id: 'pdf-export' });
+    }
+  };
+
+  const handleImportSubmit = async (fileToUpload) => {
+    const file = fileToUpload || selectedUploadFile;
+    if (!file) {
+      toast.error('Please select a file to upload first.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setCsvLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/award-lists/${id}/import`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${AuthService.getToken()}`,
+          'X-API-KEY': Config.apiKey,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const importData = data?.data || {};
+        const errorsList = importData.errors || [];
+        const updatedCount = importData.updated || 0;
+
+        if (errorsList.length > 0) {
+          toast.error(
+            <div>
+              <strong>Import completed with {errorsList.length} errors:</strong>
+              <ul style={{ margin: '5px 0 0 15px', padding: 0 }}>
+                {errorsList.slice(0, 5).map((err, idx) => <li key={idx}>{err}</li>)}
+                {errorsList.length > 5 && <li>...and {errorsList.length - 5} more</li>}
+              </ul>
+            </div>,
+            { duration: 6000 }
+          );
+        } else {
+          toast.success(data?.message || 'CSV imported successfully!');
+        }
+        setImportModalOpen(false);
+        setSelectedUploadFile(null);
+        fetchDetail();
+      } else {
+        toast.error(data?.message || 'Import failed');
+      }
+    } catch (err) {
+      toast.error('Failed to import CSV file');
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      toast.loading('Exporting template...', { id: 'csv-export' });
+      const res = await fetch(`${API_BASE}/award-lists/${id}/export`, {
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to export template');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `award_list_${id}_export.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Template exported successfully!', { id: 'csv-export' });
+    } catch (err) {
+      toast.error('Failed to export template', { id: 'csv-export' });
+    }
+  };
+
   const fetchDetail = useCallback(async () => {
     setLoading(true);
     try {
@@ -93,6 +281,14 @@ export default function AwardListDetail() {
   }, [id]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
+
+  useEffect(() => {
+    if (tab === 1) {
+      fetchOpenMerit();
+    } else if (tab === 2) {
+      fetchCategoryMerit(categoryType, categoryValue);
+    }
+  }, [tab, id, categoryType, categoryValue]);
 
   const openMarks = (entry) => {
     setMarksEntry(entry);
@@ -225,61 +421,148 @@ export default function AwardListDetail() {
     setPublishing(false);
   };
 
-  const isMcq = list?.advertisement?.test_type === 1 || list?.advertisement?.test_type === '1';
-  const writtenLabel = isMcq ? 'Test (B/45)' : 'Written (B/45)';
-  const combinedLabel = isMcq ? 'Acad+Test (70)' : 'Acad+Written (70)';
+  const getAcademicDetail = (row, field) => {
+    try {
+      const notesDecoded = JSON.parse(row.notes || '{}');
+      return notesDecoded[field] ?? '—';
+    } catch (e) {
+      return '—';
+    }
+  };
 
   const entryColumns = [
     { field: 'merit_position', headerName: 'Rank', width: 60, align: 'center', headerAlign: 'center' },
     { field: 'roll_number', headerName: 'Roll No', width: 90 },
-    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1, minWidth: 140 },
+    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1.2, minWidth: 150 },
     {
-      field: 'part_a_total',
-      headerName: 'Acad (A/25)',
+      field: 'matric_obt_tot',
+      headerName: 'Matric',
       width: 100,
-      align: 'right',
-      headerAlign: 'right',
-      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
-    },
-    {
-      field: 'marks_written',
-      headerName: writtenLabel,
-      width: 110,
-      align: 'right',
-      headerAlign: 'right',
-      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
-    },
-    {
-      field: 'academic_written_combined',
-      headerName: combinedLabel,
-      width: 120,
-      align: 'right',
-      headerAlign: 'right',
       valueGetter: (params) => {
-        const partA = Number(params.row.part_a_total ?? 0);
-        const written = Number(params.row.marks_written ?? 0);
-        return (partA + written).toFixed(2);
+        const obt = getAcademicDetail(params.row, 'matric_obt');
+        const tot = getAcademicDetail(params.row, 'matric_tot');
+        return obt !== '—' ? `${obt} / ${tot}` : '—';
       }
     },
     {
-      field: 'part_b_total',
-      headerName: 'Interview (C/30)',
-      width: 120,
+      field: 'inter_obt_tot',
+      headerName: 'F.A/F.SC',
+      width: 100,
+      valueGetter: (params) => {
+        const obt = getAcademicDetail(params.row, 'inter_obt');
+        const tot = getAcademicDetail(params.row, 'inter_tot');
+        return obt !== '—' ? `${obt} / ${tot}` : '—';
+      }
+    },
+    {
+      field: 'grad_obt_tot',
+      headerName: "Bachelor's",
+      width: 110,
+      valueGetter: (params) => {
+        const obt = getAcademicDetail(params.row, 'grad_obt');
+        const tot = getAcademicDetail(params.row, 'grad_tot');
+        return obt !== '—' ? `${obt} / ${tot}` : '—';
+      }
+    },
+    {
+      field: 'marks_matric',
+      headerName: 'Matric %',
+      width: 90,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ row }) => {
+        const obt = Number(getAcademicDetail(row, 'matric_obt'));
+        const tot = Number(getAcademicDetail(row, 'matric_tot'));
+        return tot > 0 ? ((obt / tot) * 100).toFixed(2) + '%' : '—';
+      }
+    },
+    {
+      field: 'marks_inter',
+      headerName: 'F.A/F.SC %',
+      width: 100,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ row }) => {
+        const obt = Number(getAcademicDetail(row, 'inter_obt'));
+        const tot = Number(getAcademicDetail(row, 'inter_tot'));
+        return tot > 0 ? ((obt / tot) * 100).toFixed(2) + '%' : '—';
+      }
+    },
+    {
+      field: 'marks_grad',
+      headerName: "Bachelor's %",
+      width: 110,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ row }) => {
+        const obt = Number(getAcademicDetail(row, 'grad_obt'));
+        const tot = Number(getAcademicDetail(row, 'grad_tot'));
+        return tot > 0 ? ((obt / tot) * 100).toFixed(2) + '%' : '—';
+      }
+    },
+    {
+      field: 'marks_written',
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'MCQ Test (A) [70 Marks]' : 'Written Marks (A)',
+      width: 170,
+      align: 'right',
+      headerAlign: 'right',
+      valueGetter: (params) => {
+        const val = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        if (isMcq && val > 70.0) {
+          const maxRaw = Number(list?.test_total_marks ?? 100);
+          return (val / maxRaw) * 70.0;
+        }
+        return val;
+      },
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'marks_pak_studies',
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'Viva Voce (B) [30 Marks]' : 'Viva Voce (B)',
+      width: 170,
       align: 'right',
       headerAlign: 'right',
       renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
     },
     {
       field: 'grand_total',
-      headerName: 'Grand Total (100)',
+      headerName: 'Grand Total (A+B)',
       width: 140,
       align: 'right',
       headerAlign: 'right',
+      valueGetter: (params) => {
+        const rawWritten = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        const maxRaw = Number(list?.test_total_marks ?? 100);
+        const written = (isMcq && rawWritten > 70.0) ? ((rawWritten / maxRaw) * 70.0) : rawWritten;
+        const viva = Number(params.row.marks_pak_studies ?? 0);
+        return written + viva;
+      },
       renderCell: ({ value }) => (
         <Typography variant="body2" fontWeight={700}>
           {value != null ? Number(value).toFixed(2) : '0.00'}
         </Typography>
       ),
+    },
+    {
+      field: 'remarks',
+      headerName: 'Remarks',
+      flex: 1,
+      minWidth: 120,
+      valueGetter: (params) => {
+        const notesStr = params.row.notes;
+        if (!notesStr) return '—';
+        try {
+          const decoded = JSON.parse(notesStr);
+          if (decoded && typeof decoded === 'object') {
+            return decoded.remarks || '';
+          }
+          return notesStr;
+        } catch (e) {
+          return notesStr;
+        }
+      }
     },
     {
       field: 'status',
@@ -292,25 +575,131 @@ export default function AwardListDetail() {
         );
       },
     },
+  ];
+
+  const openMeritColumns = [
+    { field: 'merit_position', headerName: 'Rank', width: 70, align: 'center', headerAlign: 'center' },
+    { field: 'roll_number', headerName: 'Roll No', width: 110 },
+    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1.5, minWidth: 200 },
     {
-      field: 'actions',
-      headerName: '',
-      width: 90,
-      sortable: false,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <Tooltip title="Edit Marks">
-            <IconButton size="small" onClick={() => openMarks(row)}>
-              <Edit size={15} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Change Status">
-            <IconButton size="small" color="primary" onClick={() => openStatus(row)}>
-              <CheckCircle size={15} />
-            </IconButton>
-          </Tooltip>
-        </Box>
+      field: 'marks_written',
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'MCQ Test (A) [70 Marks]' : 'Written Marks (A)',
+      width: 170,
+      align: 'right',
+      headerAlign: 'right',
+      valueGetter: (params) => {
+        const val = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        if (isMcq && val > 70.0) {
+          const maxRaw = Number(list?.test_total_marks ?? 100);
+          return (val / maxRaw) * 70.0;
+        }
+        return val;
+      },
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'marks_pak_studies',
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'Viva Voce (B) [30 Marks]' : 'Viva Voce (B)',
+      width: 170,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'grand_total',
+      headerName: 'Grand Total (A+B)',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      valueGetter: (params) => {
+        const rawWritten = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        const maxRaw = Number(list?.test_total_marks ?? 100);
+        const written = (isMcq && rawWritten > 70.0) ? ((rawWritten / maxRaw) * 70.0) : rawWritten;
+        const viva = Number(params.row.marks_pak_studies ?? 0);
+        return written + viva;
+      },
+      renderCell: ({ value }) => (
+        <Typography variant="body2" fontWeight={700}>
+          {value != null ? Number(value).toFixed(2) : '0.00'}
+        </Typography>
       ),
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: ({ value }) => {
+        const displayLabel = STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value ?? 'Pending';
+        return (
+          <Chip label={displayLabel} color={statusColor(value)} size="small" />
+        );
+      },
+    },
+  ];
+
+  const categoryMeritColumns = [
+    { field: 'category_rank', headerName: 'Quota Rank', width: 100, align: 'center', headerAlign: 'center' },
+    { field: 'merit_position', headerName: 'Open Rank', width: 100, align: 'center', headerAlign: 'center' },
+    { field: 'category_value', headerName: 'Quota', width: 120, align: 'center', headerAlign: 'center' },
+    { field: 'roll_number', headerName: 'Roll No', width: 110 },
+    { field: 'candidate_name', headerName: 'Candidate Name', flex: 1.5, minWidth: 200 },
+    {
+      field: 'marks_written',
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'MCQ Test (A) [70 Marks]' : 'Written Marks (A)',
+      width: 170,
+      align: 'right',
+      headerAlign: 'right',
+      valueGetter: (params) => {
+        const val = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        if (isMcq && val > 70.0) {
+          const maxRaw = Number(list?.test_total_marks ?? 100);
+          return (val / maxRaw) * 70.0;
+        }
+        return val;
+      },
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'marks_pak_studies',
+      headerName: (list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq') ? 'Viva Voce (B) [30 Marks]' : 'Viva Voce (B)',
+      width: 170,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: ({ value }) => value != null ? Number(value).toFixed(2) : '0.00',
+    },
+    {
+      field: 'grand_total',
+      headerName: 'Grand Total (A+B)',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      valueGetter: (params) => {
+        const rawWritten = Number(params.row.marks_written ?? 0);
+        const isMcq = list?.test_type_slug === 'one-paper-mcq' || list?.test_type_slug === 'two-paper-mcq';
+        const maxRaw = Number(list?.test_total_marks ?? 100);
+        const written = (isMcq && rawWritten > 70.0) ? ((rawWritten / maxRaw) * 70.0) : rawWritten;
+        const viva = Number(params.row.marks_pak_studies ?? 0);
+        return written + viva;
+      },
+      renderCell: ({ value }) => (
+        <Typography variant="body2" fontWeight={700}>
+          {value != null ? Number(value).toFixed(2) : '0.00'}
+        </Typography>
+      ),
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: ({ value }) => {
+        const displayLabel = STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value ?? 'Pending';
+        return (
+          <Chip label={displayLabel} color={statusColor(value)} size="small" />
+        );
+      },
     },
   ];
 
@@ -427,10 +816,21 @@ export default function AwardListDetail() {
           variant="outlined"
           size="small"
           startIcon={<Download size={14} />}
-          onClick={() => window.open(`${API_BASE}/award-lists/${id}/export`, '_blank')}
+          onClick={handleExportCSV}
         >
           Export CSV
         </Button>
+        {!isPublished && (
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<Upload size={14} />}
+            onClick={() => setImportModalOpen(true)}
+          >
+            Import CSV
+          </Button>
+        )}
         {!isPublished && (
           <Button
             variant="contained"
@@ -447,9 +847,89 @@ export default function AwardListDetail() {
 
       <Divider sx={{ mb: 2 }} />
 
+      {/* Bulk action toolbar */}
+      {selectedIds.length > 0 && (
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 1.5, 
+            mb: 2, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            bgcolor: 'primary.light', 
+            color: 'primary.contrastText',
+            borderRadius: 2
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle2" fontWeight={600} color="inherit">
+              {selectedIds.length} candidate(s) selected
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              onClick={() => handleBulkStatus('selected')}
+              disabled={bulkSaving}
+            >
+              Mark Selected
+            </Button>
+            <Button
+              variant="contained"
+              color="warning"
+              size="small"
+              onClick={() => handleBulkStatus('provisional')}
+              disabled={bulkSaving}
+            >
+              Mark Provisional
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              size="small"
+              onClick={() => handleBulkStatus('absent')}
+              disabled={bulkSaving}
+            >
+              Mark Absent
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              size="small"
+              onClick={() => handleBulkStatus('declined')}
+              disabled={bulkSaving}
+            >
+              Mark Declined
+            </Button>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: 'grey.700', '&:hover': { bgcolor: 'grey.800' } }}
+              size="small"
+              onClick={() => handleBulkStatus('disqualified')}
+              disabled={bulkSaving}
+            >
+              Mark Disqualified
+            </Button>
+            <Button
+              variant="text"
+              sx={{ color: 'primary.contrastText' }}
+              size="small"
+              onClick={() => setSelectedIds([])}
+            >
+              Cancel
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label={`Entries (${entries.length})`} />
+        <Tab label="Open Merit List" disabled={entries.length === 0} />
+        <Tab label="Category Merit List" disabled={entries.length === 0} />
         <Tab
           label={`Audit Log (${auditLogs.length})`}
           icon={<History size={14} />}
@@ -464,14 +944,118 @@ export default function AwardListDetail() {
             columns={entryColumns}
             pageSizeOptions={[15, 25, 50, 100]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-            disableRowSelectionOnClick
             density="compact"
+            checkboxSelection={!isPublished}
+            rowSelectionModel={selectedIds}
+            onRowSelectionModelChange={(ids) => setSelectedIds(ids)}
             sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
           />
         </Box>
       )}
 
       {tab === 1 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="subtitle1" fontWeight={600}>Open Merit List (Final Standing)</Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<Download size={14} />}
+              onClick={handleDownloadOpenMeritPDF}
+              disabled={openMeritLoading || openMeritEntries.length === 0}
+            >
+              Download Open Merit PDF
+            </Button>
+          </Box>
+          <Box sx={{ height: 500 }}>
+            <TooltipDataGrid
+              rows={openMeritEntries}
+              columns={openMeritColumns}
+              loading={openMeritLoading}
+              pageSizeOptions={[15, 25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+              density="compact"
+              sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
+            />
+          </Box>
+        </Box>
+      )}
+
+      {tab === 2 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="subtitle1" fontWeight={600}>Category/Quota-wise Merit</Typography>
+              
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Category Type</InputLabel>
+                <Select
+                  value={categoryType}
+                  label="Category Type"
+                  onChange={(e) => {
+                    setCategoryType(e.target.value);
+                    setCategoryValue('all');
+                  }}
+                >
+                  <MenuItem value="district">District Quota</MenuItem>
+                  <MenuItem value="gender">Gender Quota</MenuItem>
+                  <MenuItem value="disability">Disability Quota</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Quota Value</InputLabel>
+                <Select
+                  value={categoryValue}
+                  label="Quota Value"
+                  onChange={(e) => setCategoryValue(e.target.value)}
+                >
+                  <MenuItem value="all">All Quotas</MenuItem>
+                  {Array.from(new Set(entries.map(ent => {
+                    const app = ent.application;
+                    if (!app) return null;
+                    if (categoryType === 'district') {
+                      return app.personal_details?.district_code ?? app.personal_details?.district;
+                    } else if (categoryType === 'gender') {
+                      return app.personal_details?.gender;
+                    } else if (categoryType === 'disability') {
+                      return app.personal_details?.is_disabled ? 'Yes' : 'No';
+                    }
+                    return null;
+                  }).filter(Boolean))).map(val => (
+                    <MenuItem key={val} value={val}>{val.toUpperCase()}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Button
+              variant="contained"
+              color="info"
+              size="small"
+              startIcon={<Download size={14} />}
+              onClick={handleDownloadCategoryMeritPDF}
+              disabled={categoryMeritLoading || categoryMeritEntries.length === 0}
+            >
+              Download Quota PDF
+            </Button>
+          </Box>
+          <Box sx={{ height: 500 }}>
+            <TooltipDataGrid
+              rows={categoryMeritEntries}
+              columns={categoryMeritColumns}
+              loading={categoryMeritLoading}
+              pageSizeOptions={[15, 25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+              density="compact"
+              sx={{ bgcolor: 'background.paper', borderRadius: 2, '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' } }}
+            />
+          </Box>
+        </Box>
+      )}
+
+      {tab === 3 && (
         <Box sx={{ height: 400 }}>
           <TooltipDataGrid
             rows={auditLogs}
@@ -640,6 +1224,28 @@ export default function AwardListDetail() {
           >
             Update Status
           </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Import CSV Modal Dialog */}
+      <Dialog open={importModalOpen} onClose={() => setImportModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" fontWeight={700}>Bulk Import Interview Awards</Typography>
+          <IconButton size="small" onClick={() => setImportModalOpen(false)}>
+            <X size={18} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Alert severity="info">
+            Download the pre-filled template, fill in Matric, Inter, Bachelors, and Interview (viva voce) marks, then drag and drop the CSV file below to import.
+          </Alert>
+          <CSVUploadZone
+            onFileSelect={setSelectedUploadFile}
+            onPreview={handleImportSubmit}
+            loading={csvLoading}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setImportModalOpen(false)} disabled={csvLoading}>Cancel</Button>
         </DialogActions>
       </Dialog>
     </Box>

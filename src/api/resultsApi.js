@@ -173,10 +173,13 @@ const ResultsApi = {
   /**
    * Download CSV/Excel Template for Result Import
    */
-  downloadTemplate: async (jobPostId = null, examType = null) => {
+  downloadTemplate: async (jobPostId = null, examType = null, jobPostIds = []) => {
     const params = [];
     if (jobPostId) params.push(`job_post_id=${jobPostId}`);
     if (examType)  params.push(`exam_type=${examType}`);
+    if (jobPostIds && jobPostIds.length > 0) {
+      params.push(`job_post_ids=${jobPostIds.join(',')}`);
+    }
     let url = `${API_BASE}/results/import/template${params.length ? `?${params.join('&')}` : ''}`;
     const response = await fetch(url, {
       method: 'GET',

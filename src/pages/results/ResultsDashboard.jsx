@@ -12,9 +12,9 @@ import {
   LayoutDashboard,
   ShieldAlert,
   Search,
-  Plus,
   FileText,
-  Award
+  Award,
+  BarChart2
 } from 'lucide-react';
 import { useAuth } from 'context/AuthContext';
 import { getUserRole } from 'utils/roleUtils';
@@ -31,7 +31,6 @@ import {
   DropdownMenuSeparator,
 } from 'components/ui/DropdownMenu';
 import OfficialPublicationModal from 'components/results/OfficialPublicationModal';
-import MarkApprovalConsole from 'components/results/MarkApprovalConsole';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 
@@ -98,6 +97,15 @@ const ResultsDashboard = () => {
   const canPublish = hasPermission(`${PERM}.verify_result`);
 
   const [pendingCount, setPendingCount] = useState(0);
+
+  const getExamTypeParam = (job) => {
+    const category = job.resolved_test_type_exam_category || job.pivot?.test_type_exam_category || '';
+    if (category === 'one_paper_mcq') return 'one-paper-mcqs';
+    if (category === 'two_paper_mcq') return 'two-paper-mcqs';
+    if (category === 'written_exam') return 'written-exams';
+    if (category === 'combined_competitive_exam') return 'cce-exams';
+    return '';
+  };
 
   const [stats, setStats] = useState([
     { label: 'Total Results Entered', value: '0', icon: Database, bg: 'bg-blue-50', iconBg: 'bg-blue-600' },
@@ -200,19 +208,43 @@ const ResultsDashboard = () => {
 
   const quickActions = [
     {
-      title: 'Manual Mark Entry',
-      desc: 'Individual candidate result entry',
-      link: '/dashboard/results/entry',
-      icon: Plus,
-      iconBg: 'bg-emerald-500',
-      show: isAdmin
-    },
-    {
       title: 'Verification Queue',
       desc: 'Review & approve candidate results',
       link: '/dashboard/results/verification',
       icon: ShieldAlert,
       iconBg: 'bg-indigo-600',
+      show: isAdmin
+    },
+    {
+      title: 'Statistical Summary',
+      desc: 'Pass %, score distribution, toppers & category breakdown',
+      link: '/dashboard/results/statistical-summary',
+      icon: BarChart2,
+      iconBg: 'bg-emerald-600',
+      show: isAdmin
+    },
+    {
+      title: 'Audit Trail Report',
+      desc: 'Chronological vigilance log of mark uploads, changes & approvals',
+      link: '/dashboard/results/audit-trail',
+      icon: History,
+      iconBg: 'bg-slate-700',
+      show: isAdmin
+    },
+    {
+      title: 'Scrutiny & Rechecking',
+      desc: 'Verify, review & resolve candidate paper recounting appeals',
+      link: '/dashboard/results/scrutiny',
+      icon: ClipboardCheck,
+      iconBg: 'bg-amber-600',
+      show: isAdmin
+    },
+    {
+      title: 'Award Lists',
+      desc: 'View, track & manage final candidate recommendation and merit award lists',
+      link: '/dashboard/award-lists',
+      icon: Award,
+      iconBg: 'bg-blue-600',
       show: isAdmin
     }
   ];
@@ -261,30 +293,14 @@ const ResultsDashboard = () => {
               </CardContent>
             </Card>
           )}
-
-          <Link to="/dashboard/results/search">
-            <Card className="border border-slate-200 cursor-pointer hover:border-slate-300 transition-colors">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-500 mb-1">Search & Print</p>
-                    <p className="text-sm font-semibold text-slate-700">Verification Center</p>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-slate-800 text-white">
-                    <Search className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
         </div>
 
         {/* Quick Actions */}
         <div className="space-y-4">
           <h2 className="text-base font-semibold text-slate-900">Featured Workflows</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {quickActions.filter(a => a.show).slice(0, 3).map((action, idx) => (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {quickActions.filter(a => a.show).map((action, idx) => (
               <Link key={idx} to={action.link}>
                 <Card className="border border-slate-200 hover:border-slate-300 transition-all h-full">
                   <CardContent className="p-4">
@@ -305,11 +321,7 @@ const ResultsDashboard = () => {
           </div>
         </div>
 
-        {getUserRole() === 'admin' && (
-          <div className="mb-6">
-            <MarkApprovalConsole />
-          </div>
-        )}
+
 
         {/* Active Job Results Management - TABLE VIEW */}
         <div className="space-y-4">
@@ -330,8 +342,8 @@ const ResultsDashboard = () => {
             </div>
           </div>
 
-          <Card className="border border-slate-200 bg-white overflow-hidden">
-            <div className="overflow-x-auto">
+          <Card className="border border-slate-200 bg-white overflow-visible">
+            <div className="overflow-x-auto md:overflow-visible">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
@@ -370,7 +382,7 @@ const ResultsDashboard = () => {
                       const adv = job.adv;
                       const isLastRow = idx === allJobRows.length - 1;
                       const isSecondLastRow = idx === allJobRows.length - 2;
-                      const openUpwards = isLastRow || isSecondLastRow;
+                      const openUpwards = allJobRows.length > 3 && (isLastRow || isSecondLastRow);
 
                       return (
                         <tr key={job.hash_id || job.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -454,7 +466,7 @@ const ResultsDashboard = () => {
                                         const isImportable = !['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
                                         return isImportable ? (
                                           <Link 
-                                            to={`/dashboard/results/import/${getJobRouteId(job)}`} 
+                                            to={`/dashboard/results/import/${getJobRouteId(job)}?examType=${getExamTypeParam(job)}`} 
                                             onClick={() => setActiveDropdownJobId(null)}
                                             className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors"
                                           >

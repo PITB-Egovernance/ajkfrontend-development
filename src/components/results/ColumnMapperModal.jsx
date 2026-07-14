@@ -43,23 +43,38 @@ const findBestMatch = (fieldName, csvHeaders) => {
 
   // 4. Common aliases & abbreviations
   const aliasesMap = {
-    'roll_number': ['roll no', 'roll_no', 'rollnumber', 'roll', 'rl_no', 'rl no'],
+    'roll_number': ['roll no', 'roll_no', 'rollnumber', 'roll', 'rl_no', 'rl no', 'roll_number'],
     'application_id': ['app id', 'app_id', 'applicationid', 'application', 'app_no', 'app no'],
     'english': ['eng', 'engl', 'english marks'],
-    'mathematics': ['math', 'maths', 'mth'],
-    'pakistan affairs': ['pak affairs', 'pak', 'pak_affairs', 'pa', 'pak studies'],
-    'islamic studies': ['islamiat', 'isl', 'islamic_studies', 'is', 'islamic'],
-    'general knowledge': ['gk', 'general_knowledge', 'gen knowledge', 'general knowledge']
+    'mathematics': ['math', 'maths', 'mth', 'math'],
+    'pakistan affairs': ['pak affairs', 'pak', 'pak_affairs', 'pa', 'pak studies', 'pakistan affairs & kashmir affairs', 'pakistan affairs'],
+    'islamic studies': ['islamiat', 'isl', 'islamic_studies', 'is', 'islamic', 'islamic studies'],
+    'general knowledge': ['gk', 'general_knowledge', 'gen knowledge', 'general knowledge'],
+    'every day science': ['every day science', 'eds', 'general science', 'everyday science'],
+    'current affairs': ['current affairs', 'ca'],
+    'urdu essay precis comprehension grammar composition and translation': ['urdu', 'urdu marks', 'urdu paper'],
+    'english precis comprehension grammar composition and translation': ['english precis', 'english', 'english marks'],
+    'english essay': ['english essay', 'essay', 'eng essay'],
+    'total obtained marks': ['obtained marks (out of 100)', 'total obtained marks', 'total marks', 'obtained marks', 'total marks obtained', 'marks obtained'],
+    'obtained marks %age': ['obtained marks (out of 100%)', 'obtained marks (out of 70%)', 'obtained marks %age', 'percentage', '%age', 'obtained marks percentage', 'obtained marks (out of 100)']
   };
 
-  for (const [key, aliases] of Object.entries(aliasesMap)) {
-    if (cleanField === key || key.includes(cleanField)) {
-      const matchedAlias = csvHeaders.find(h => {
-        const cleanHeader = h.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return aliases.some(alias => cleanHeader === alias || cleanHeader.includes(alias));
+  // Pre-process fieldName to find keys by partial matches
+  const matchedKey = Object.keys(aliasesMap).find(k => {
+    const cleanK = k.replace(/[^a-z0-9]/g, '');
+    return cleanField.includes(cleanK) || cleanK.includes(cleanField);
+  });
+
+  if (matchedKey) {
+    const aliases = aliasesMap[matchedKey];
+    const matchedAlias = csvHeaders.find(h => {
+      const cleanHeader = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return aliases.some(alias => {
+        const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return cleanHeader === cleanAlias || cleanHeader.includes(cleanAlias) || cleanAlias.includes(cleanHeader);
       });
-      if (matchedAlias) return matchedAlias;
-    }
+    });
+    if (matchedAlias) return matchedAlias;
   }
 
   return '';
@@ -94,18 +109,25 @@ const ColumnMapperModal = ({
       // Auto-suggest subjects
       const initialSubjectMappings = {};
       if (subjects.length === 0) {
-        // MCQ case: Find the total marks column
+        // MCQ case: Find columns containing marks/score indicators
         const marksCols = csvHeaders.filter(h => {
           const lh = h.toLowerCase();
-          return !lh.includes('attendance') && !lh.includes('roll') && !lh.includes('name') && !lh.includes('cnic') && !lh.includes('application') && !lh.includes('id');
+          const isMarksCol = lh.includes('marks') || lh.includes('obt') || lh.includes('score') || lh.includes('paper') || lh.includes('obtained') || lh.includes('result');
+          const isMetadata = lh.includes('attendance') || lh.includes('roll') || lh.includes('name') || lh.includes('cnic') || lh.includes('application') || lh.includes('id');
+          return isMarksCol && !isMetadata;
         });
         marksCols.forEach(col => {
           initialSubjectMappings[col] = col;
         });
       } else {
-        // Written case: Auto-suggest subjects
+        // Written case: Auto-suggest subjects using fuzzy finder match
         subjects.forEach(subject => {
-          initialSubjectMappings[subject.subject_name] = findBestMatch(subject.subject_name, csvHeaders);
+          const sName = typeof subject === 'string' ? subject : (subject.subject_name ?? '');
+          if (!sName) return;
+          const matchedHeader = findBestMatch(sName, csvHeaders);
+          if (matchedHeader) {
+            initialSubjectMappings[sName] = matchedHeader;
+          }
         });
       }
 
@@ -321,27 +343,30 @@ const ColumnMapperModal = ({
               </div>
             ) : (
               subjects.map((subject) => {
-                const mappedVal = mappings.subject_mappings[subject.subject_name] || '';
+                const sName = typeof subject === 'string' ? subject : (subject.subject_name ?? '');
+                const maxMarks = typeof subject === 'string' ? 100 : (subject.max_marks ?? 100);
+                const sId = typeof subject === 'string' ? subject : (subject.id ?? sName);
+                const mappedVal = mappings.subject_mappings[sName] || '';
                 return (
                   <div
-                    key={subject.id}
+                    key={sId}
                     className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-3.5 hover:bg-slate-50/50 rounded-lg border border-slate-200 transition-colors"
                   >
                     <div>
-                      <span className="font-semibold text-slate-800 text-sm">{subject.subject_name}</span>
-                      <span className="ml-2 text-xs font-medium text-slate-500">(Max Marks: {subject.max_marks})</span>
+                      <span className="font-semibold text-slate-800 text-sm">{sName}</span>
+                      <span className="ml-2 text-xs font-medium text-slate-500">(Max Marks: {maxMarks})</span>
                     </div>
 
                     <div className="w-full md:w-80">
                       <SearchableSelect
                         label="Maps to Column"
                         value={mappedVal}
-                        onChange={(e) => handleSubjectMappingChange(subject.subject_name, e.target.value)}
+                        onChange={(e) => handleSubjectMappingChange(sName, e.target.value)}
                         options={[
                           { value: '', label: '-- Skip / Map Later --' },
                           ...csvHeaders
-                            .filter((h) => !h.toLowerCase().includes('attendance'))
-                            .map((header) => ({ value: header, label: header })),
+                             .filter((h) => !h.toLowerCase().includes('attendance'))
+                             .map((header) => ({ value: header, label: header })),
                         ]}
                       />
                     </div>
@@ -349,6 +374,15 @@ const ColumnMapperModal = ({
                 );
               })
             )}
+
+            {/* Helper Guideline Text */}
+            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-2">
+              <Info size={14} className="text-emerald-600 shrink-0" />
+              <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                Please verify and select the corresponding column(s) containing the marks to be imported. Unselected columns will be skipped.
+              </p>
+            </div>
+
           </div>
         </div>
       </DialogContent>

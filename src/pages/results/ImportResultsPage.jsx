@@ -7,6 +7,7 @@ import {
 import { Card, CardContent } from 'components/ui/Card';
 import CSVUploadZone from 'components/results/CSVUploadZone';
 import ColumnMapperModal from 'components/results/ColumnMapperModal';
+import SearchableMultiSelect from 'components/ui/SearchableMultiSelect';
 import ResultsApi from 'api/resultsApi';
 import RollNumberApi from 'api/rollNumberApi';
 import toast from 'react-hot-toast';
@@ -23,19 +24,30 @@ const ONE_PAPER_COLUMNS = [
 ];
 
 const TWO_PAPER_COLUMNS = [
-  { name: 'Sr#',                      type: 'Number', required: false },
+  { name: 'Sr No',                    type: 'Number', required: false },
   { name: 'Roll No',                  type: 'Text',   required: true  },
-  { name: 'District Code',            type: 'Text',   required: true  },
+  { name: 'Name',                     type: 'Text',   required: false },
+  { name: 'District',                 type: 'Text',   required: false },
+  { name: 'Subject 1',                type: 'Text',   required: false },
+  { name: 'Subject 2',                type: 'Text',   required: false },
   { name: 'Obtained Marks (paper 1)', type: 'Number', required: true  },
   { name: 'Obtained Marks (paper 2)', type: 'Number', required: true  },
-  { name: 'Total Obtain Marks',       type: 'Number', required: true  },
+  { name: 'Total Obtained Marks',     type: 'Number', required: true  },
   { name: 'Result',                   type: 'Text',   required: true  },
+  { name: 'Merit No',                 type: 'Number', required: false },
+];
+
+const WRITTEN_TEMPLATE_COLUMNS = [
+  { name: 'Roll no',               type: 'Text',   required: true  },
+  { name: 'Name with father name', type: 'Text',   required: true  },
+  { name: 'Dist',                  type: 'Text',   required: true  },
 ];
 
 const getTemplateColumns = (examType) => {
-  if (examType === 'two-paper-mcqs') return TWO_PAPER_COLUMNS;
-  if (examType === 'one-paper-mcqs') return ONE_PAPER_COLUMNS;
-  return ONE_PAPER_COLUMNS;
+  const clean = String(examType || '').toLowerCase().replace(/_/g, '-');
+  if (clean === 'two-paper-mcq' || clean === 'two-paper-mcqs') return TWO_PAPER_COLUMNS;
+  if (clean === 'one-paper-mcq' || clean === 'one-paper-mcqs') return ONE_PAPER_COLUMNS;
+  return WRITTEN_TEMPLATE_COLUMNS;
 };
 
 
@@ -272,16 +284,42 @@ const MCQ_MAPPINGS = {
   subjects:          {},
 };
 
-const isMcqExamType = (et) =>
-  et === 'one-paper-mcqs' || et === 'two-paper-mcqs';
+const isMcqExamType = (et) => {
+  const clean = String(et || '').toLowerCase().replace(/_/g, '-');
+  return clean === 'one-paper-mcq' || clean === 'one-paper-mcqs' ||
+         clean === 'two-paper-mcq' || clean === 'two-paper-mcqs';
+};
 
 /* ── Subject breakdown cell ───────────────────────────────────── */
 const SubjectBreakdown = ({ row }) => {
+  const status = String(row.status ?? '').toUpperCase();
+  if (status === 'ABSENT') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-500 border border-slate-200">
+        Absent from all papers
+      </span>
+    );
+  }
+  if (status === 'UFM') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-50 text-rose-600 border border-rose-100">
+        Unfair Means (Disqualified)
+      </span>
+    );
+  }
+  if (status === 'RL') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-100">
+        Result Late / Withheld
+      </span>
+    );
+  }
+
   const subjectsObj = row.subjects ?? row.marks_breakdown ?? row.subject_marks ?? null;
 
   if (subjectsObj && typeof subjectsObj === 'object' && !Array.isArray(subjectsObj)) {
     return (
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1">
         {Object.entries(subjectsObj).map(([name, info]) => {
           const obtained = info?.obtained ?? info?.marks ?? info;
           const max = info?.max_marks ?? info?.max ?? null;
@@ -305,10 +343,10 @@ const SubjectBreakdown = ({ row }) => {
 
   if (Array.isArray(subjectsObj) && subjectsObj.length > 0) {
     return (
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1">
         {subjectsObj.map((s, i) => {
           const name = s.subject_name ?? s.name ?? `Subject ${i + 1}`;
-          const obtained = s.obtained ?? s.marks;
+          const obtained = s.obtained ?? s.marks ?? s.obtained_marks;
           const max = s.max_marks ?? s.max;
           const exceeds = s.exceeds_max ?? (max != null && Number(obtained) > Number(max));
           return (
@@ -351,6 +389,8 @@ const ExamStatusBadge = ({ status }) => {
     'FAIL':   'bg-sky-50 text-sky-600',
     'ERROR':  'bg-red-100 text-red-700',
     'ABSENT': 'bg-slate-100 text-slate-500',
+    'UFM':    'bg-rose-105 text-rose-700 border border-rose-200',
+    'RL':     'bg-amber-105 text-amber-700 border border-amber-200',
   }[s] || 'bg-slate-100 text-slate-500';
   return (
     <span className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest ${cfg}`}>
@@ -570,6 +610,10 @@ const ImportResultsPage = () => {
 
   const isMcq = isMcqExamType(examType);
 
+  // Clubbed jobs selection states
+  const [selectedJobIds, setSelectedJobIds] = useState([jobId]);
+  const [availableJobs, setAvailableJobs] = useState([]);
+
   // Column mapper state (non-MCQ exams only)
   const [mapperOpen, setMapperOpen] = useState(false);
   const [csvHeaders, setCsvHeaders] = useState([]);
@@ -605,19 +649,70 @@ const ImportResultsPage = () => {
         if (!alive) return;
 
         const allAds = adsRes?.data?.data ?? adsRes?.data ?? [];
-        for (const ad of allAds) {
-          const job = (ad.job_details || []).find(j => (j.hash_id || String(j.id)) === jobId);
-          if (job) { setPostName(job.designation || ''); break; }
+        const fetchedJobs = allAds.flatMap(ad =>
+          (ad.job_details || ad.jobDetails || []).map(j => ({
+            ...j,
+            adv_number: ad.adv_number
+          }))
+        );
+
+        // Find primary matching job name
+        const job = fetchedJobs.find(j => (j.hash_id || String(j.id)) === jobId);
+        let activeExamType = examType;
+        if (job) {
+          setPostName(job.designation || '');
+          const category = job.resolved_test_type_exam_category || job.pivot?.test_type_exam_category || '';
+          if (category === 'one_paper_mcq') activeExamType = 'one-paper-mcqs';
+          if (category === 'two_paper_mcq') activeExamType = 'two-paper-mcqs';
+          if (category === 'written_exam') activeExamType = 'written-exams';
+          if (category === 'combined_competitive_exam') activeExamType = 'cce-exams';
         }
 
-        const subs = subjectsRes?.data?.subjects ?? subjectsRes?.data ?? subjectsRes?.subjects ?? [];
-        const dynamicCols = (Array.isArray(subs) ? subs : []).map(s => ({
-          name: (s.subject_name || s.name || '') + ' Marks',
-          type: 'Number',
-          required: true,
-          isSubject: true,
+        // Filter other jobs of same examType for clubbed import options
+        const jobsOfSameType = fetchedJobs.filter(j => {
+          const category = j.resolved_test_type_exam_category || j.pivot?.test_type_exam_category || j.test_type_exam_category || '';
+          if (activeExamType === 'one-paper-mcqs') return category === 'one_paper_mcq';
+          if (activeExamType === 'two-paper-mcqs') return category === 'two_paper_mcq';
+          if (activeExamType === 'written-exams') return category === 'written_exam';
+          if (activeExamType === 'cce-exams') return category === 'combined_competitive_exam';
+          return false;
+        });
+
+        const selectOptions = jobsOfSameType.map(j => ({
+          label: `${j.designation} (Adv: ${j.adv_number || 'N/A'})`,
+          value: j.hash_id || String(j.id),
         }));
-        setColumns([...getTemplateColumns(examType), ...dynamicCols]);
+        setAvailableJobs(selectOptions);
+
+        const subs = subjectsRes?.data?.subjects ?? subjectsRes?.data ?? subjectsRes?.subjects ?? [];
+        const isMcqActive = isMcqExamType(activeExamType);
+        
+        let finalCols = [];
+        if (activeExamType === 'written-exams' || activeExamType === 'cce-exams') {
+          const dynamicCols = Array.isArray(subs) ? subs.map(s => ({
+            name: (s.subject_name || s.name || '') + ' ' + (s.max_marks || 100),
+            type: 'Number',
+            required: true,
+            isSubject: true,
+          })) : [];
+          finalCols = [...getTemplateColumns(activeExamType), ...dynamicCols];
+          finalCols.push({ name: 'Total Obtained Marks', type: 'Number', required: true });
+          finalCols.push({ name: 'Obtained Marks %age', type: 'Number', required: true });
+          finalCols.push({ name: 'Status', type: 'Text', required: true });
+        } else {
+          const dynamicCols = (!isMcqActive && Array.isArray(subs) ? subs : []).map(s => ({
+            name: (s.subject_name || s.name || '') + ' Marks',
+            type: 'Number',
+            required: true,
+            isSubject: true,
+          }));
+          finalCols = [...getTemplateColumns(activeExamType), ...dynamicCols];
+          if (!isMcqActive) {
+            finalCols.push({ name: 'Total Marks', type: 'Number', required: true });
+            finalCols.push({ name: 'Attendance Status', type: 'Text', required: true });
+          }
+        }
+        setColumns(finalCols);
       } catch { /* silent */ }
     })();
 
@@ -628,7 +723,7 @@ const ImportResultsPage = () => {
   const handleDownloadTemplate = async () => {
     setDownloading(true);
     try {
-      const { blob, filename } = await ResultsApi.downloadTemplate(jobId, examType);
+      const { blob, filename } = await ResultsApi.downloadTemplate(jobId, examType, selectedJobIds);
       const url  = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href  = url;
@@ -665,8 +760,8 @@ const ImportResultsPage = () => {
 
       const apiSubjects = data.subjects ?? [];
       setCsvHeaders(data.headers ?? []);
-      // For MCQ: no subject mapping needed; for non-MCQ: use API subjects
-      setSubjects(!isMcq && apiSubjects.length > 1 ? apiSubjects : []);
+      // For MCQ: no subject mapping needed; for non-MCQ: map only the two aggregate concern columns
+      setSubjects(!isMcq ? ['Total Obtained Marks', 'Obtained Marks %age'] : []);
       setTempFileId(fileId);
       setMapperOpen(true);
     } catch (err) {
@@ -680,13 +775,15 @@ const ImportResultsPage = () => {
   /* Step 2 — column mapper confirmed → dry_run=true → show DryRunView */
   const handleMappingConfirm = async (payload) => {
     setMapperOpen(false);
-    // For MCQ: always use the fixed MCQ mappings regardless of what mapper returns
-    const mappings = isMcq ? MCQ_MAPPINGS : payload.mappings;
+    // For MCQ: clear the subject mappings but preserve the user's mapped roll number column
+    const mappings = isMcq 
+      ? { ...payload.mappings, subjects: {} } 
+      : payload.mappings;
     const toastId  = toast.loading('Running dry-run validation…', { position: 'top-right', duration: Infinity });
     try {
       const previewRes = await ResultsApi.processDynamicImport({
         temp_file_id:  payload.temp_file_id,
-        job_post_id:   jobId,
+        job_post_ids:  selectedJobIds,
         passing_marks: Number(passingMarks) || 40,
         dry_run:       true,
         mappings,
@@ -709,7 +806,7 @@ const ImportResultsPage = () => {
     try {
       const res  = await ResultsApi.processDynamicImport({
         temp_file_id:  pendingMappingPayload.temp_file_id,
-        job_post_id:   jobId,
+        job_post_ids:  selectedJobIds,
         passing_marks: Number(passingMarks) || 40,
         dry_run:       false,
         mappings:      pendingMappingPayload.mappings,
@@ -805,6 +902,29 @@ const ImportResultsPage = () => {
         {/* Upload form */}
         <Card className="border border-slate-200 bg-white">
           <CardContent className="p-6 space-y-5">
+
+            {/* Clubbed Job Selection */}
+            {availableJobs.length > 1 && (
+              <div className="flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-bold text-slate-700">Clubbed Job Posts Selection</label>
+                  <p className="text-xs text-slate-405">Select all other clubbed job posts to upload results for simultaneously:</p>
+                </div>
+                <SearchableMultiSelect
+                  options={availableJobs}
+                  value={selectedJobIds}
+                  onChange={(val) => {
+                    // Ensure the primary jobId is always selected and cannot be removed
+                    if (!val.includes(jobId)) {
+                      setSelectedJobIds([jobId, ...val]);
+                    } else {
+                      setSelectedJobIds(val);
+                    }
+                  }}
+                  placeholder="Select clubbed posts..."
+                />
+              </div>
+            )}
 
             {/* Template download */}
             <div className="flex items-center justify-between">
