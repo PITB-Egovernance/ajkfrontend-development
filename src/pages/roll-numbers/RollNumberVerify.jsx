@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader2, FileText } from 'lucide-react';
 import Config from 'config/baseUrl';
 
@@ -22,12 +22,18 @@ const to12Hour = (t) => {
 const RollNumberVerify = () => {
   const { rollNumber } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Embedded in the QR code itself — disambiguates which specific
+  // application this slip belongs to, since a roll number alone can be
+  // shared by more than one application without them being clubbed.
+  const applicationNumber = searchParams.get('application_number');
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
 
   useEffect(() => {
-    fetch(`${Config.apiUrl}/roll-numbers/verify/${encodeURIComponent(rollNumber)}`)
+    const query = applicationNumber ? `?application_number=${encodeURIComponent(applicationNumber)}` : '';
+    fetch(`${Config.apiUrl}/roll-numbers/verify/${encodeURIComponent(rollNumber)}${query}`)
       .then(r => r.json())
       .then(res => {
         if (res.success) setData(res.data);
@@ -35,7 +41,7 @@ const RollNumberVerify = () => {
       })
       .catch(() => setError('Failed to connect. Please try again.'))
       .finally(() => setLoading(false));
-  }, [rollNumber]);
+  }, [rollNumber, applicationNumber]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex flex-col items-center justify-center p-4">
@@ -136,7 +142,7 @@ const RollNumberVerify = () => {
             {/* View Full Slip */}
             <div className="px-6 py-4 border-t border-slate-100">
               <button
-                onClick={() => navigate(`/verify/roll/${encodeURIComponent(rollNumber)}/slip`)}
+                onClick={() => navigate(`/verify/roll/${encodeURIComponent(rollNumber)}/slip${applicationNumber ? `?application_number=${encodeURIComponent(applicationNumber)}` : ''}`)}
                 className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm py-3 rounded-xl transition-colors"
               >
                 <FileText size={16} /> View Full Examination Slip

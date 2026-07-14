@@ -380,6 +380,7 @@ const CceRollSlipGeneration = () => {
             application_numbers: [applicationNumber],
             exam_center_id:      Number(allocation.center.id),
             exam_type:            'cce-exams',
+            stage:               'written',
             papers,
             allocation_method:   centerSelectionMode === 'auto' ? allocationMethod : undefined,
             auto_allocate:       centerSelectionMode === 'auto',
@@ -424,7 +425,7 @@ const CceRollSlipGeneration = () => {
 
   const handleDownloadSlip = async (applicationNumber, rollNumber) => {
     try {
-      const res = await RollNumberApi.downloadSlip(applicationNumber);
+      const res = await RollNumberApi.downloadCceWrittenSlip(rollNumber, applicationNumber);
       if (!res.ok) throw new Error('Failed to download slip');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -737,7 +738,7 @@ const CceRollSlipGeneration = () => {
                             <td className="px-4 py-3 text-slate-500">{s.center}</td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex justify-end gap-2">
-                                <Button variant="outline" size="sm" className="gap-1 bg-white" onClick={() => navigate(`/dashboard/roll-numbers/slip/${s.roll_number}?application_number=${encodeURIComponent(s.application_number)}`)}>
+                                <Button variant="outline" size="sm" className="gap-1 bg-white" onClick={() => navigate(`/dashboard/roll-numbers/slip/${s.roll_number}?application_number=${encodeURIComponent(s.application_number)}&stage=written`)}>
                                   <Eye size={13} /> View
                                 </Button>
                                 <Button variant="outline" size="sm" className="gap-1 bg-white" onClick={() => handleDownloadSlip(s.application_number, s.roll_number)}>

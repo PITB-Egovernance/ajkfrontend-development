@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, XCircle } from 'lucide-react';
 import Config from 'config/baseUrl';
 
@@ -23,20 +23,30 @@ const timeRange = (start, end) => end ? `${to12Hour(start)} to ${to12Hour(end)}`
 const RollNumberPublicSlip = () => {
   const { rollNumber } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Embedded in the QR code / forwarded from the verify page — disambiguates
+  // which specific application this slip belongs to, since a roll number
+  // alone can be shared by more than one application without them being clubbed.
+  const applicationNumber = searchParams.get('application_number');
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
 
   useEffect(() => {
-    fetch(`${Config.apiUrl}/roll-numbers/verify/${encodeURIComponent(rollNumber)}`)
+    const query = applicationNumber ? `?application_number=${encodeURIComponent(applicationNumber)}` : '';
+    fetch(`${Config.apiUrl}/roll-numbers/verify/${encodeURIComponent(rollNumber)}${query}`)
       .then(r => r.json())
       .then(res => {
-        if (res.success) setData(res.data);
-        else setError(res.message || 'Roll number not found');
+        if (res.success) {
+          // console.log(res.data);
+          setData(res.data);
+        } else {
+          setError(res.message || 'Roll number not found');
+        }
       })
       .catch(() => setError('Failed to connect. Please try again.'))
       .finally(() => setLoading(false));
-  }, [rollNumber]);
+  }, [rollNumber, applicationNumber]);
 
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -150,7 +160,7 @@ const RollNumberPublicSlip = () => {
                     <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DAY</th>
                     <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DATE</th>
                     <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">TIME</th>
-                    {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>}
+                    {/* {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>} */}
                     <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DESCRIPTION</th>
                   </tr>
                 </thead>
@@ -160,7 +170,7 @@ const RollNumberPublicSlip = () => {
                       <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{group.day || '—'}</td>
                       <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{group.date || '—'}</td>
                       <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{timeRange(group.time, group.endTime)}</td>
-                      {hasLabels && <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap font-bold text-emerald-900">{group.label || '—'}</td>}
+                      {/* {hasLabels && <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap font-bold text-emerald-900">{group.label || '—'}</td>} */}
                       {(!allSameDesc || idx === 0) && (
                         <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900 align-top"
                             rowSpan={allSameDesc ? data.sessionGroups.length : undefined}>
