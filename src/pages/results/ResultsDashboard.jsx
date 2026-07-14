@@ -238,6 +238,14 @@ const ResultsDashboard = () => {
       icon: ClipboardCheck,
       iconBg: 'bg-amber-600',
       show: isAdmin
+    },
+    {
+      title: 'Award Lists',
+      desc: 'View, track & manage final candidate recommendation and merit award lists',
+      link: '/dashboard/award-lists',
+      icon: Award,
+      iconBg: 'bg-blue-600',
+      show: isAdmin
     }
   ];
 
