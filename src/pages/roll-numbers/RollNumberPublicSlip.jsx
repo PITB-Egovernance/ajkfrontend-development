@@ -160,7 +160,7 @@ const RollNumberPublicSlip = () => {
                     <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DAY</th>
                     <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DATE</th>
                     <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">TIME</th>
-                    {/* {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>} */}
+                    {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>}
                     <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DESCRIPTION</th>
                   </tr>
                 </thead>
@@ -170,7 +170,7 @@ const RollNumberPublicSlip = () => {
                       <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{group.day || '—'}</td>
                       <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{group.date || '—'}</td>
                       <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap">{timeRange(group.time, group.endTime)}</td>
-                      {/* {hasLabels && <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap font-bold text-emerald-900">{group.label || '—'}</td>} */}
+                      {hasLabels && <td className="border border-emerald-900 px-2 py-1 align-middle whitespace-nowrap font-bold text-emerald-900">{group.label || '—'}</td>}
                       {(!allSameDesc || idx === 0) && (
                         <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900 align-top"
                             rowSpan={allSameDesc ? data.sessionGroups.length : undefined}>

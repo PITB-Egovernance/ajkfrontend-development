@@ -228,7 +228,7 @@ const RollSlipView = () => {
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DAY</th>
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">DATE</th>
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">TIME</th>
-                      {/* {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>} */}
+                      {hasLabels && <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs whitespace-nowrap">SUBJECT/PAPER</th>}
                       <th className="border border-emerald-900 px-2 py-1 text-emerald-900 text-xs">DESCRIPTION</th>
                     </tr>
                   </thead>
@@ -238,14 +238,14 @@ const RollSlipView = () => {
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.day || '—'}</td>
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{group.date || '—'}</td>
                         <td className="border border-emerald-900 px-2 py-1 whitespace-nowrap align-middle">{timeRange(group.time, group.endTime)}</td>
-                        {/* {hasLabels && (
+                        {hasLabels && (
                           <td
                             className="border border-emerald-900 px-2 py-1 text-left align-middle font-bold text-emerald-900"
                             style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}
                           >
                             {group.label || '—'}
                           </td>
-                        )} */}
+                        )}
                         {(!allSameDesc || idx === 0) && (
                           <td className="border border-emerald-900 px-2 py-1 text-left font-bold text-emerald-900 align-middle"
                               rowSpan={allSameDesc ? groups.length : undefined}>
