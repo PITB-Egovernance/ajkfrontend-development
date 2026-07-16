@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import RollNumberApi from 'api/rollNumberApi';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
@@ -317,6 +318,68 @@ const ResultsExamFlow = () => {
     });
   }, [allJobRows, searchTerm, filterAdv, filterDept, filterPost]);
 
+  const columns = useMemo(() => [
+    {
+      field: 'advertisement',
+      headerName: 'Advertisement',
+      flex: 1,
+      minWidth: 150,
+      renderCell: (params) => (
+        <div className="py-2">
+          <p className="text-xs font-semibold text-slate-500 mb-0.5">#{params.row.adv?.adv_number}</p>
+          <p className="text-xs text-slate-400">{params.row.adv?.title || 'General Recruitment'}</p>
+        </div>
+      )
+    },
+    {
+      field: 'designation',
+      headerName: 'Job Designation',
+      flex: 2,
+      minWidth: 250,
+      renderCell: (params) => (
+        <div className="py-2">
+          <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-650 transition-colors">
+            {params.row.designation}
+          </p>
+          <p className="text-xs text-slate-400">Scale: BPS-{params.row.scale}</p>
+        </div>
+      )
+    },
+    {
+      field: 'result_status',
+      headerName: 'Current Stage',
+      flex: 1,
+      minWidth: 150,
+      renderCell: (params) => <StatusBadge status={params.value} />
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => {
+        const job = params.row;
+        const rId = getJobRouteId(job);
+        const isPublishedState   = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
+        const isImportable       = !isPublishedState;
+        const isShortlistable    = ['Approved', 'APPROVED', 'WITHDRAWN'].includes(job.result_status);
+        const isInterviewAllowed = isPublishedState && (isAdmin || isDirector || ['data_entry', 'dataentry', 'senior_admin'].includes(userRole));
+        const isWithdrawable     = isPublishedState && (isAdmin || isDirector);
+
+        return (
+          <div className="flex items-center h-full">
+            <ActionCell job={job} rId={rId} examType={examType}
+              isPublishedState={isPublishedState} isImportable={isImportable}
+              isShortlistable={isShortlistable} isInterviewAllowed={isInterviewAllowed}
+              isWithdrawable={isWithdrawable}
+              onGazette={handleDownloadGazette} onWithdraw={handleWithdraw}
+              activeId={activeDropdownJobId} setActiveId={setActiveDropdownJobId} />
+          </div>
+        );
+      }
+    }
+  ], [examType, activeDropdownJobId, isAdmin, isDirector, userRole]);
+
   if (!meta) {
     return (
       <div className="p-8 text-center text-slate-500">
@@ -386,58 +449,24 @@ const ResultsExamFlow = () => {
             </Button>
           </div>
 
-          <Card className="border border-slate-200 bg-white overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Advertisement</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Job Designation</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Current Stage</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredRows.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="px-6 py-12 text-center text-slate-400 font-semibold text-sm">
-                        No jobs found for this exam type
-                      </td>
-                    </tr>
-                  ) : filteredRows.map((job) => {
-                    const adv  = job.adv;
-                    const rId  = getJobRouteId(job);
-                    const isPublishedState   = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
-                    const isImportable       = !isPublishedState;
-                    const isShortlistable    = ['Approved', 'APPROVED', 'WITHDRAWN'].includes(job.result_status);
-                    const isInterviewAllowed = isPublishedState && (isAdmin || isDirector || ['data_entry', 'dataentry', 'senior_admin'].includes(userRole));
-                    const isWithdrawable     = isPublishedState && (isAdmin || isDirector);
-                    return (
-                      <tr key={rId} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-6 py-4">
-                          <p className="text-xs font-semibold text-slate-500 mb-0.5">#{adv?.adv_number}</p>
-                          <p className="text-xs text-slate-400">{adv?.title || 'General Recruitment'}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">{job.designation}</p>
-                          <p className="text-xs text-slate-400">Scale: BPS-{job.scale}</p>
-                        </td>
-                        <td className="px-6 py-4"><StatusBadge status={job.result_status} /></td>
-                        <td className="px-6 py-4 text-right">
-                          <ActionCell job={job} rId={rId} examType={examType}
-                            isPublishedState={isPublishedState} isImportable={isImportable}
-                            isShortlistable={isShortlistable} isInterviewAllowed={isInterviewAllowed}
-                            isWithdrawable={isWithdrawable}
-                            onGazette={handleDownloadGazette} onWithdraw={handleWithdraw}
-                            activeId={activeDropdownJobId} setActiveId={setActiveDropdownJobId} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <TooltipDataGrid
+              rows={filteredRows.map((job, idx) => ({
+                ...job,
+                id: job.hash_id || job.id || `${job.adv?.adv_number}-${idx}`
+              }))}
+              columns={columns}
+              autoHeight
+              pageSizeOptions={[10, 25, 50]}
+              initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
+              loading={loading}
+              disableRowSelectionOnClick
+              sx={{
+                '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+                '& .MuiDataGrid-row': { minHeight: '52px !important' }
+              }}
+            />
+          </div>
         </div>
 
       </div>

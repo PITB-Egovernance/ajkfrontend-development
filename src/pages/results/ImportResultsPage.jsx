@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   ArrowLeft, Download, FileSpreadsheet,
   CheckCircle2, XCircle, X, AlertCircle, Users, Send, RefreshCw,
@@ -112,12 +113,12 @@ const TemplateModal = ({ open, onClose, columns, onDownload, downloading, postNa
 
     {/* Table */}
     <div className="max-h-[58vh] overflow-y-auto">
-      <table className="w-full">
-        <thead className="bg-white border-b border-slate-200 sticky top-0 shadow-sm">
+      <table className="w-full text-left border-collapse">
+        <thead className="bg-white border-b border-slate-200 sticky top-0 shadow-sm z-10 text-slate-900">
           <tr>
-            <th className="px-8 py-4 text-xs font-semibold text-slate-400 text-left w-16">#</th>
-            <th className="px-8 py-4 text-xs font-semibold text-slate-400 text-left">Column Name</th>
-            <th className="px-8 py-4 text-xs font-semibold text-slate-400 text-right">Data Type</th>
+            <th className="px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-850 w-16">#</th>
+            <th className="px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-850">Column Name</th>
+            <th className="px-8 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-850 text-right">Data Type</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -125,16 +126,16 @@ const TemplateModal = ({ open, onClose, columns, onDownload, downloading, postNa
             const isSubject = col.isSubject;
             return (
               <tr key={idx} className={`transition-colors ${isSubject ? 'bg-emerald-50/70 hover:bg-emerald-50' : 'bg-white hover:bg-slate-50/60'}`}>
-                <td className="px-8 py-4">
+                <td className="px-8 py-3.5">
                   <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${isSubject ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
                     {idx + 1}
                   </span>
                 </td>
-                <td className={`px-8 py-4 font-semibold text-sm ${isSubject ? 'text-emerald-800' : 'text-slate-700'}`}>
+                <td className={`px-8 py-3.5 font-semibold text-sm ${isSubject ? 'text-emerald-800' : 'text-slate-700'}`}>
                   {col.name}
                   {col.required && <span className="ml-1.5 text-rose-500 text-xs font-bold">*</span>}
                 </td>
-                <td className="px-8 py-4 text-right">
+                <td className="px-8 py-3.5 text-right">
                   <span className={`px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide ${isSubject ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                     {col.type}
                   </span>
@@ -435,6 +436,86 @@ const DryRunView = ({ data, onClose, onConfirm, confirming, onAdjustMappings }) 
   const failed  = Number(summary.failed      ?? summary.failed_rows ?? 0);
   const hasErrors = failed > 0;
 
+  const columns = useMemo(() => [
+    {
+      field: 'roll_no',
+      headerName: 'Candidate Details',
+      flex: 2,
+      minWidth: 200,
+      renderCell: (params) => {
+        const row = params.row;
+        return (
+          <div className="space-y-0.5 py-2 text-left w-full">
+            <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-blue-750 border border-blue-100 rounded text-[9px] font-bold">
+              Roll No: {row.roll_no ?? '—'}
+            </span>
+            <p className="text-xs font-semibold text-slate-900 truncate">{row.full_name ?? row.name ?? ''}</p>
+          </div>
+        );
+      }
+    },
+    {
+      field: 'subjects',
+      headerName: 'Subject Breakdown',
+      flex: 3,
+      minWidth: 250,
+      renderCell: (params) => {
+        const row = params.row;
+        return (
+          <div className="py-2 text-left w-full">
+            <SubjectBreakdown row={row} />
+          </div>
+        );
+      }
+    },
+    {
+      field: 'percentage',
+      headerName: 'Percentage',
+      flex: 1,
+      minWidth: 100,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        const row = params.row;
+        return (
+          <span className="font-bold text-slate-800 text-sm tabular-nums">
+            {row.percentage != null ? `${Number(row.percentage).toFixed(2)}%` : '—'}
+          </span>
+        );
+      }
+    },
+    {
+      field: 'status',
+      headerName: 'Exam Status',
+      flex: 1,
+      minWidth: 120,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        const status = String(params.value ?? '').toUpperCase();
+        return (
+          <div className="flex items-center justify-center">
+            <ExamStatusBadge status={status} />
+          </div>
+        );
+      }
+    },
+    {
+      field: 'errors',
+      headerName: 'Row Validation',
+      flex: 2.5,
+      minWidth: 220,
+      renderCell: (params) => {
+        const errors = params.value ?? [];
+        return (
+          <div className="py-2 text-left w-full">
+            <RowValidation errors={errors} />
+          </div>
+        );
+      }
+    }
+  ], []);
+
   return (
     <div className="space-y-5">
       {/* Header row */}
@@ -461,59 +542,19 @@ const DryRunView = ({ data, onClose, onConfirm, confirming, onAdjustMappings }) 
       <div className="flex gap-5 items-start">
 
         {/* Left — table card */}
-        <div className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden min-w-0">
-          {/* Table sub-header */}
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold text-slate-800">Transactional Dry-Run Sandbox</p>
-              <p className="text-xs text-slate-400">Spreadsheet Candidate Marks Audit</p>
-            </div>
-          </div>
-
-          {/* Scrollable table */}
-          <div className="overflow-x-auto max-h-[calc(100vh-260px)] overflow-y-auto">
-            <table className="w-full text-xs border-collapse">
-              <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 w-44">Candidate Details</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Subject Breakdown</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 w-24">Percentage</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 w-28">Exam Status</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 w-56">Row Validation</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.map((row, i) => {
-                  const errors  = row.errors ?? [];
-                  const isClean = errors.length === 0;
-                  const status  = String(row.status ?? '').toUpperCase();
-                  return (
-                    <tr key={i} className={`transition-colors ${!isClean ? 'bg-rose-50/20' : 'bg-white'} hover:bg-slate-50/50`}>
-                      <td className="px-4 py-3.5 align-top">
-                        <div className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold mb-1">
-                          Roll No: {row.roll_no ?? '—'}
-                        </div>
-                        <p className="text-xs font-semibold text-slate-700 leading-tight">{row.full_name ?? row.name ?? ''}</p>
-                      </td>
-                      <td className="px-4 py-3.5 align-top"><SubjectBreakdown row={row} /></td>
-                      <td className="px-4 py-3.5 align-top text-sm font-semibold text-slate-700">
-                        {row.percentage != null ? `${Number(row.percentage).toFixed(2)}%` : '—'}
-                      </td>
-                      <td className="px-4 py-3.5 align-top"><ExamStatusBadge status={status} /></td>
-                      <td className="px-4 py-3.5 align-top"><RowValidation errors={errors} /></td>
-                    </tr>
-                  );
-                })}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-16 text-center text-slate-400 text-xs">
-                      No rows returned from dry-run.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden min-w-0 p-4">
+          <TooltipDataGrid
+            rows={rows.map((row, idx) => ({ ...row, id: row.roll_no || idx }))}
+            columns={columns}
+            autoHeight
+            pageSizeOptions={[10, 25, 50]}
+            initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
+            disableRowSelectionOnClick
+            sx={{
+              '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+              '& .MuiDataGrid-row': { minHeight: '52px !important' }
+            }}
+          />
         </div>
 
         {/* Right — stats sidebar */}

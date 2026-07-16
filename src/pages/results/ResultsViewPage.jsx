@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   ArrowLeft,
   Search,
@@ -136,27 +131,56 @@ const ResultsViewPage = () => {
   // Table Columns
   const columns = useMemo(() => [
     {
-      accessorKey: 'full_name',
-      header: 'Candidate Identity',
-      cell: info => (
-        <div className="flex flex-col">
-          <span className="font-semibold text-slate-900 text-sm leading-tight">{info.getValue()}</span>
-          <span className="text-xs text-slate-500 mt-1">
-            Ref: <span className="text-blue-600 font-semibold">{info.row.original.application_number}</span> | Roll: <span className="text-indigo-600 font-semibold">{info.row.original.roll_no || 'N/A'}</span>
-          </span>
-          <span className="text-xs text-slate-400 mt-0.5">
-            CNIC: {info.row.original.cnic}
-          </span>
-        </div>
-      ),
-      size: 350,
+      field: 'full_name',
+      headerName: 'Candidate Name',
+      flex: 1.5,
+      minWidth: 160,
+      renderCell: (params) => (
+        <span className="font-semibold text-slate-900 text-sm leading-tight py-2 inline-block">{params.value}</span>
+      )
     },
     {
-      accessorKey: 'marks_status',
-      header: 'Status',
-      cell: info => {
-        const examStatus = String(info.row.original.status || '').toUpperCase();
-        let status = info.getValue() || 'Pending';
+      field: 'application_number',
+      headerName: 'Ref No',
+      flex: 1,
+      minWidth: 130,
+      renderCell: (params) => (
+        <span className="text-xs font-medium text-slate-800 py-2 inline-block">
+          {params.value}
+        </span>
+      )
+    },
+    {
+      field: 'roll_no',
+      headerName: 'Roll No',
+      flex: 1,
+      minWidth: 110,
+      renderCell: (params) => (
+        <span className="text-xs font-medium text-slate-800 py-2 inline-block">
+          {params.value || '—'}
+        </span>
+      )
+    },
+    {
+      field: 'cnic',
+      headerName: 'CNIC',
+      flex: 1.2,
+      minWidth: 140,
+      renderCell: (params) => (
+        <span className="text-xs text-slate-700 py-2 inline-block">{params.value}</span>
+      )
+    },
+    {
+      field: 'marks_status',
+      headerName: 'Status',
+      flex: 1,
+      minWidth: 130,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        const cand = params.row;
+        const examStatus = String(cand.status || '').toUpperCase();
+        let status = params.value || 'Pending';
         if (['ABSENT', 'UFM', 'RL'].includes(examStatus)) {
           status = examStatus;
         }
@@ -189,19 +213,23 @@ const ResultsViewPage = () => {
           'SELECTED': 'bg-green-600',
         };
         return (
-          <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${styles[status] || styles['Pending']}`}>
-            <div className={`w-1.5 h-1.5 rounded-full ${dotStyles[status] || 'bg-current'}`}></div>
-            {status}
+          <div className="flex items-center justify-center">
+            <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider inline-flex items-center gap-1.5 ${styles[status] || styles['Pending']}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${dotStyles[status] || 'bg-current'}`}></div>
+              {status}
+            </span>
           </div>
         );
-      },
-      size: 180,
+      }
     },
     {
-      accessorKey: 'marks_summary',
-      header: 'Marks Preview',
-      cell: info => {
-        const examStatus = String(info.row.original.status || '').toUpperCase();
+      field: 'marks_summary',
+      headerName: 'Marks Preview',
+      flex: 3,
+      minWidth: 320,
+      renderCell: (params) => {
+        const cand = params.row;
+        const examStatus = String(cand.status || '').toUpperCase();
         if (examStatus === 'ABSENT') {
           return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-500 border border-slate-200">Absent</span>;
         }
@@ -211,9 +239,9 @@ const ResultsViewPage = () => {
         if (examStatus === 'RL') {
           return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-100">Result Late</span>;
         }
-        const marks = info.getValue() || {};
+        const marks = params.value || {};
         return (
-          <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1">
+          <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1 py-2 text-left w-full">
             {Object.entries(marks).map(([key, val]) => (
               <div key={key} className="bg-slate-50 border border-slate-200 rounded-md px-2 py-0.5 flex flex-col items-center min-w-[44px]">
                 <span className="text-[8px] font-semibold text-slate-500 uppercase leading-none mb-0.5">{key}</span>
@@ -223,28 +251,9 @@ const ResultsViewPage = () => {
             {Object.keys(marks).length === 0 && <span className="text-slate-300 italic text-xs mt-1">No data</span>}
           </div>
         );
-      },
-      size: 500,
+      }
     }
   ], []);
-
-  // Table Instance
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
-
-  // Virtualization
-  const tableContainerRef = useRef(null);
-  const { rows } = table.getRowModel();
-
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 84,
-    overscan: 15,
-  });
 
   const handleDownloadTemplate = async () => {
     try {
@@ -267,7 +276,7 @@ const ResultsViewPage = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+    <div className="flex flex-col bg-slate-50 space-y-6">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between z-10">
         <div className="flex items-center gap-4">
@@ -316,100 +325,53 @@ const ResultsViewPage = () => {
           />
         </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {['all', 'Pending', 'Uploaded', 'Under Verification', 'APPROVED', 'SHORTLISTED', 'REJECTED', 'ABSENT', 'UFM', 'RL', 'SELECTED', 'NOT SELECTED'].map(status => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${statusFilter === status
-                ? 'bg-slate-800 text-white'
-                : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200'
-                }`}
-            >
-              {status}
-            </button>
-          ))}
+        <div className="relative min-w-[200px]">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 rounded-lg text-sm transition-all outline-none h-10 cursor-pointer"
+          >
+            <option value="all">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Uploaded">Uploaded</option>
+            <option value="Under Verification">Under Verification</option>
+            <option value="APPROVED">Approved</option>
+            <option value="SHORTLISTED">Shortlisted</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="ABSENT">Absent</option>
+            <option value="UFM">Unfair Means (UFM)</option>
+            <option value="RL">Result Late (RL)</option>
+            <option value="SELECTED">Selected</option>
+            <option value="NOT SELECTED">Not Selected</option>
+          </select>
         </div>
       </div>
 
-      {/* Virtual Table Content */}
-      <div className="flex-grow overflow-hidden relative">
-        <div
-          ref={tableContainerRef}
-          className="h-full overflow-auto scrollbar-thin scrollbar-thumb-slate-200"
-          onScroll={(e) => {
-            const { scrollHeight, scrollTop, clientHeight } = e.currentTarget;
-            if (scrollHeight - scrollTop <= clientHeight * 1.5 && hasMore && !loading) {
-              fetchData(nextCursor, true);
-            }
-          }}
-        >
-          <div style={{ height: `${rowVirtualizer.getTotalSize() + 48}px`, width: '100%', position: 'relative' }}>
-            {/* Div-based Header */}
-            <div className="sticky top-0 bg-slate-50 z-30 border-b border-slate-200 flex w-full h-[48px]">
-              {table.getHeaderGroups()[0].headers.map(header => (
-                <div
-                  key={header.id}
-                  className="px-6 flex items-center text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-50"
-                  style={{ width: header.getSize() }}
-                >
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                </div>
-              ))}
-            </div>
+      {/* Table Content */}
+      <div className="flex-grow p-4 lg:p-6 bg-slate-50 overflow-hidden flex flex-col">
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-grow relative p-4">
+          <TooltipDataGrid
+            rows={data.map((cand, idx) => ({ ...cand, id: cand.app_id || cand.id || idx }))}
+            columns={columns}
+            autoHeight
+            loading={loading}
+            disableRowSelectionOnClick
+            hideFooter
+            sx={{
+              '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+              '& .MuiDataGrid-row': { minHeight: '52px !important' }
+            }}
+          />
 
-            {/* Div-based Rows with Offset */}
-            {rowVirtualizer.getVirtualItems().map(virtualRow => {
-              const row = rows[virtualRow.index];
-              if (!row) return null;
-              return (
-                <div
-                  key={row.id}
-                  className="hover:bg-slate-50/50 transition-all flex items-center border-b border-slate-100 group bg-white"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualRow.size}px`,
-                    // 48px is the header height
-                    transform: `translateY(${virtualRow.start + 48}px)`,
-                  }}
-                >
-                  {row.getVisibleCells().map(cell => (
-                    <div
-                      key={cell.id}
-                      className="px-6 flex items-center h-full"
-                      style={{ width: cell.column.getSize() }}
-                    >
-                      <div className="w-full">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-
-          {loading && (
-            <div className="flex items-center justify-center py-10 bg-white/50 backdrop-blur-sm sticky bottom-0">
-              <div className="flex flex-col items-center gap-2">
-                <InlineLoader />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fetching candidates...</p>
-              </div>
-            </div>
-          )}
-
-          {!loading && data.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-32 gap-4">
-              <div className="p-6 bg-slate-100 rounded-[2.5rem] text-slate-400">
-                <Search size={48} strokeWidth={1} />
-              </div>
-              <div className="text-center">
-                <h3 className="text-base font-black text-slate-900">No candidates found</h3>
-                <p className="text-xs font-medium text-slate-400 mt-1">Try adjusting your filters or search term</p>
-              </div>
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={() => fetchData(nextCursor, true)}
+                disabled={loading}
+                className="h-9 px-4 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-semibold text-xs rounded-lg shadow-none flex items-center justify-center gap-2"
+              >
+                {loading ? 'Loading...' : 'Load More Candidates'}
+              </Button>
             </div>
           )}
         </div>

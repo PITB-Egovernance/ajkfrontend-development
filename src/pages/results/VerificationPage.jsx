@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   CheckCircle2,
   XCircle,
@@ -230,6 +231,169 @@ const VerificationPage = () => {
     }
   };
 
+  const columns = useMemo(() => [
+    {
+      field: 'full_name',
+      headerName: 'Candidate & Roll No',
+      flex: 2,
+      minWidth: 200,
+      renderCell: (params) => {
+        const cand = params.row;
+        return (
+          <div className="space-y-1 py-2 text-left w-full">
+            <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 border border-indigo-100/50 text-indigo-700 rounded text-[9px] font-semibold font-mono">
+              Roll No: {cand.roll_no || 'Pending'}
+            </span>
+            <h5 className="font-semibold text-slate-800 text-sm tracking-tight">{cand.full_name}</h5>
+            <p className="text-[10px] text-slate-500 font-mono">{cand.cnic}</p>
+          </div>
+        );
+      }
+    },
+    {
+      field: 'job_designation',
+      headerName: 'Post & Adv',
+      flex: 2,
+      minWidth: 200,
+      renderCell: (params) => {
+        const cand = params.row;
+        return (
+          <div className="space-y-0.5 max-w-[200px] py-2 text-left w-full">
+            <p className="font-semibold text-slate-800 text-xs truncate" title={cand.job_designation}>
+              {cand.job_designation || 'N/A'}
+            </p>
+            <p className="text-[10px] text-slate-500 font-mono">
+              Adv: {cand.adv_number || 'N/A'}
+            </p>
+          </div>
+        );
+      }
+    },
+    {
+      field: 'marks_summary',
+      headerName: 'Subject Breakdown',
+      flex: 3,
+      minWidth: 300,
+      renderCell: (params) => {
+        const cand = params.row;
+        const subjects = cand.marks_summary ? Object.entries(cand.marks_summary) : [];
+        return (
+          <div className="py-2 text-left w-full">
+            {cand.status === 'absent' ? (
+              <span className="text-[10px] font-medium text-slate-400 italic">Candidate Absent</span>
+            ) : subjects.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1 max-w-[380px]">
+                {subjects.map(([name, scoreInfo]) => (
+                  <span
+                    key={name}
+                    className="px-2 py-0.5 bg-white border border-slate-200 rounded-md font-semibold text-[10px] text-slate-700 shadow-sm"
+                  >
+                    {name}: <strong className="text-slate-900">{scoreInfo.obtained} / {scoreInfo.total}</strong>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                Marks Pending Ingestion
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      field: 'percentage',
+      headerName: 'Percentage',
+      flex: 1,
+      minWidth: 100,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        const cand = params.row;
+        return (
+          <span className="font-bold text-slate-800 text-sm tabular-nums">
+            {['absent', 'rl', 'ufm'].includes(cand.status) ? '—' : cand.percentage !== null ? `${Number(cand.percentage).toFixed(2)}%` : '—'}
+          </span>
+        );
+      }
+    },
+    {
+      field: 'status',
+      headerName: 'Exam Status',
+      flex: 1,
+      minWidth: 120,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        const status = params.value;
+        return (
+          <div className="flex items-center justify-center">
+            {status === 'pass' && (
+              <span className="inline-flex items-center px-2 py-0.5 bg-emerald-50 border border-emerald-250 text-emerald-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                PASSED
+              </span>
+            )}
+            {status === 'fail' && (
+              <span className="inline-flex items-center px-2 py-0.5 bg-rose-50 border border-rose-250 text-rose-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                FAILED
+              </span>
+            )}
+            {status === 'absent' && (
+              <span className="inline-flex items-center px-2 py-0.5 bg-slate-150 border border-slate-300 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                ABSENT
+              </span>
+            )}
+            {status === 'rl' && (
+              <span className="inline-flex items-center px-2 py-0.5 bg-amber-55 border border-amber-250 text-amber-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                RL
+              </span>
+            )}
+            {status === 'ufm' && (
+              <span className="inline-flex items-center px-2 py-0.5 bg-red-100 border border-red-300 text-red-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                UFM
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      field: 'marks_status',
+      headerName: 'Verification Status',
+      flex: 1.5,
+      minWidth: 150,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        const status = params.value;
+        return (
+          <div className="flex items-center justify-center">
+            {status === 'Approved' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                <CheckCircle2 size={10} className="text-emerald-500" /> Approved
+              </span>
+            )}
+            {status === 'Rejected' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                <XCircle size={10} className="text-rose-500" /> Rejected
+              </span>
+            )}
+            {status === 'Under Verification' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-55 border border-amber-200 text-amber-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                <AlertCircle size={10} className="text-amber-500" /> Under Verification
+              </span>
+            )}
+            {status === 'Uploaded' && (
+              <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                Uploaded
+              </span>
+            )}
+          </div>
+        );
+      }
+    }
+  ], []);
+
   if (jobsLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
@@ -365,171 +529,21 @@ const VerificationPage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] font-semibold uppercase tracking-wider">
-                        <th className="py-3 px-6 w-12 text-center">
-                          <button
-                            type="button"
-                            onClick={handleSelectAll}
-                            className="text-slate-400 hover:text-indigo-600 transition-colors"
-                          >
-                            {selectedApps.length === candidates.length ? (
-                              <CheckSquare size={16} className="text-indigo-600" />
-                            ) : (
-                              <Square size={16} />
-                            )}
-                          </button>
-                        </th>
-                        <th className="py-3 px-6">Candidate & Roll No</th>
-                        <th className="py-3 px-6">Post & Adv</th>
-                        <th className="py-3 px-6">Subject Breakdown</th>
-                        <th className="py-3 px-6 text-center">Percentage</th>
-                        <th className="py-3 px-6 text-center">Exam Status</th>
-                        <th className="py-3 px-6 text-center">Verification Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs bg-white">
-                      {candidates.map((cand) => {
-                        const isSelected = selectedApps.includes(cand.app_id);
-
-                        // Parse subject summaries
-                        const subjects = cand.marks_summary ? Object.entries(cand.marks_summary) : [];
-
-                        return (
-                          <tr
-                            key={cand.app_id}
-                            className={`hover:bg-slate-50/50 transition-colors ${isSelected ? 'bg-indigo-50/20' : ''
-                              }`}
-                          >
-                            {/* Selection Checkbox */}
-                            <td className="py-4 px-6 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleSelectRow(cand.app_id)}
-                                className="text-slate-405 hover:text-indigo-650 transition-colors"
-                              >
-                                {isSelected ? (
-                                  <CheckSquare size={16} className="text-indigo-600" />
-                                ) : (
-                                  <Square size={16} />
-                                )}
-                              </button>
-                            </td>
-
-                            {/* Candidate Info */}
-                            <td className="py-4 px-6">
-                              <div className="space-y-1">
-                                <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 border border-indigo-100/50 text-indigo-700 rounded text-[9px] font-semibold font-mono">
-                                  Roll No: {cand.roll_no || 'Pending'}
-                                </span>
-                                <h5 className="font-semibold text-slate-800 text-sm tracking-tight">{cand.full_name}</h5>
-                                <p className="text-[10px] text-slate-500 font-mono">{cand.cnic}</p>
-                              </div>
-                            </td>
-
-                            {/* Job Post & Advertisement Info */}
-                            <td className="py-4 px-6">
-                              <div className="space-y-0.5 max-w-[200px]">
-                                <p className="font-semibold text-slate-800 text-xs truncate" title={cand.job_designation}>
-                                  {cand.job_designation || 'N/A'}
-                                </p>
-                                <p className="text-[10px] text-slate-500 font-mono">
-                                  Adv: {cand.adv_number || 'N/A'}
-                                </p>
-                              </div>
-                            </td>
-
-                            {/* Subjects breakdown */}
-                            <td className="py-4 px-6">
-                              {cand.status === 'absent' ? (
-                                <span className="text-[10px] font-medium text-slate-400 italic">Candidate Absent</span>
-                              ) : subjects.length > 0 ? (
-                                <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto pr-1 max-w-[380px]">
-                                  {subjects.map(([name, scoreInfo]) => (
-                                    <span
-                                      key={name}
-                                      className="px-2 py-0.5 bg-white border border-slate-200 rounded-md font-semibold text-[10px] text-slate-700 shadow-sm"
-                                    >
-                                      {name}: <strong className="text-slate-900">{scoreInfo.obtained} / {scoreInfo.total}</strong>
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                                  Marks Pending Ingestion
-                                </span>
-                              )}
-                            </td>
-
-                             {/* Score / Percentage formatted to 2 decimals */}
-                             <td className="py-4 px-6 text-center font-bold text-slate-800 text-sm tabular-nums">
-                               {['absent', 'rl', 'ufm'].includes(cand.status) ? '—' : cand.percentage !== null ? `${Number(cand.percentage).toFixed(2)}%` : '—'}
-                             </td>
-
-                             {/* Exam Status (Passed / Failed / Absent / RL / UFM) */}
-                             <td className="py-4 px-6 text-center">
-                               {cand.status === 'pass' && (
-                                 <span className="inline-flex items-center px-2 py-0.5 bg-emerald-50 border border-emerald-250 text-emerald-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                   PASSED
-                                 </span>
-                               )}
-                               {cand.status === 'fail' && (
-                                 <span className="inline-flex items-center px-2 py-0.5 bg-rose-50 border border-rose-250 text-rose-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                   FAILED
-                                 </span>
-                               )}
-                               {cand.status === 'absent' && (
-                                 <span className="inline-flex items-center px-2 py-0.5 bg-slate-150 border border-slate-300 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                   ABSENT
-                                 </span>
-                               )}
-                               {cand.status === 'rl' && (
-                                 <span className="inline-flex items-center px-2 py-0.5 bg-amber-50 border border-amber-250 text-amber-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                   RL
-                                 </span>
-                               )}
-                               {cand.status === 'ufm' && (
-                                 <span className="inline-flex items-center px-2 py-0.5 bg-red-100 border border-red-300 text-red-800 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                   UFM
-                                 </span>
-                               )}
-                             </td>
-
-                            {/* Verification Status */}
-                            <td className="py-4 px-6 text-center">
-                              {cand.marks_status === 'Approved' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                  <CheckCircle2 size={10} className="text-emerald-500" /> Approved
-                                </span>
-                              )}
-                              {cand.marks_status === 'Rejected' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                  <XCircle size={10} className="text-rose-500" /> Rejected
-                                </span>
-                              )}
-                              {cand.marks_status === 'Under Verification' && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-55 border border-amber-200 text-amber-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                  <AlertCircle size={10} className="text-amber-500" /> Under Verification
-                                </span>
-                              )}
-                              {cand.marks_status === 'Uploaded' && (
-                                <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                  Uploaded
-                                </span>
-                              )}
-                              {cand.marks_status === 'Pending' && (
-                                <span className="inline-flex items-center px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-500 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                                  Pending
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="p-4 bg-white rounded-lg shadow-sm">
+                  <TooltipDataGrid
+                    rows={candidates.map(cand => ({ ...cand, id: cand.app_id }))}
+                    columns={columns}
+                    checkboxSelection
+                    rowSelectionModel={selectedApps}
+                    onRowSelectionModelChange={(newSelection) => setSelectedApps(newSelection)}
+                    autoHeight
+                    disableRowSelectionOnClick
+                    hideFooter
+                    sx={{
+                      '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+                      '& .MuiDataGrid-row': { minHeight: '52px !important' }
+                    }}
+                  />
                 </div>
               )}
             </CardContent>
