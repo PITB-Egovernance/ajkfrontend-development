@@ -13,6 +13,7 @@ import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import RollNumberApi from 'api/rollNumberApi';
 import ResultsApi from 'api/resultsApi';
+import AdvertisementApi from 'api/advertisementApi';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { getJobRouteId } from 'utils/jobMapper';
@@ -207,7 +208,7 @@ const ResultsExamFlow = () => {
       };
 
       const [adsResult, testTypesRes] = await Promise.all([
-        RollNumberApi.getAdvertisementsWithJobs(200).catch(() => ({})),
+        AdvertisementApi.getAll(1, { per_page: 200, results_only: true }).catch(() => ({})),
         fetch(`${Config.apiUrl}/settings/test-types?per_page=200`, { headers: adminHeaders }).then(r => r.json()).catch(() => ({})),
       ]);
 
