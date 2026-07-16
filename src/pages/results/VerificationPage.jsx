@@ -64,14 +64,13 @@ const VerificationPage = () => {
     const fetchJobs = async () => {
       try {
         setJobsLoading(true);
-        const res = await AdvertisementApi.getAll(1);
-
+        const adsRes = await AdvertisementApi.getAll(1, { per_page: 100, results_only: true }); // active ads with eligible candidates
         let advertisements = [];
-        if (res && res.data) {
-          if (Array.isArray(res.data.data)) {
-            advertisements = res.data.data;
-          } else if (Array.isArray(res.data)) {
-            advertisements = res.data;
+        if (adsRes && adsRes.data) {
+          if (Array.isArray(adsRes.data.data)) {
+            advertisements = adsRes.data.data;
+          } else if (Array.isArray(adsRes.data)) {
+            advertisements = adsRes.data;
           }
         }
 
