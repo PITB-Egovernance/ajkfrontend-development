@@ -9,7 +9,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import CceScreeningApi from 'api/cceScreeningApi';
 import CceDateSheetApi from 'api/cceDateSheetApi';
 import RollNumberApi from 'api/rollNumberApi';
-import { buildCandidateDateSheetGroups, flattenPapers, isDateSheetComplete, formatPaperTime } from 'utils/cceDateSheet';
+import { buildCandidateDateSheetGroups, flattenPapers, isDateSheetComplete } from 'utils/cceDateSheet';
 
 const STATUS_STYLES = {
   pending:    'text-slate-400',
@@ -369,10 +369,18 @@ const CceRollSlipGeneration = () => {
           const applicationNumber = resolveAppNumber(row);
           if (!applicationNumber) throw new Error('Not yet linked to an admin application record');
 
+          // subject_id/paper_label/duration_minutes (and the raw, unformatted
+          // time) are what let the backend actually write + publish this
+          // candidate's cce_candidate_date_sheets rows during generation —
+          // without them the roll number gets minted but the written-stage
+          // slip has nothing to show on View/Download.
           const papers = row.papers.map((paper) => ({
-            label: paper.subject_name + (paper.paper_label ? ` — ${paper.paper_label}` : ''),
-            date:  paper.paper_date,
-            time:  formatPaperTime(paper.paper_time),
+            subject_id:        paper.subject_id,
+            paper_label:       paper.paper_label || null,
+            label:             paper.subject_name + (paper.paper_label ? ` — ${paper.paper_label}` : ''),
+            date:              paper.paper_date,
+            time:              paper.paper_time,
+            duration_minutes:  paper.duration_minutes,
           }));
 
           // eslint-disable-next-line no-await-in-loop

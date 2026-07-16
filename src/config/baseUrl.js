@@ -11,7 +11,7 @@ const apiKey =
   process.env.REACT_APP_API_KEY ||
   "9kX7pL2mQ8rT5vY3nZ6bJ1hF4gD0eA9cU8iO2sV7tE5rW";
 
-const localUrl = "http://localhost:3000";
+// const localUrl = "http://localhost:3000";
 
 // Candidate portal
 // Development: use proxy configured in setupProxy.js to avoid CORS issues
@@ -34,7 +34,7 @@ const Config = {
   localApiUrl,
   apiKey,
   productionUrl,
-  localUrl,
+  // localUrl,
   candidateApiUrl,
   candidateAdminApiUrl,
   candidateApiKey,

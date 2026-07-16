@@ -69,9 +69,9 @@ export const MENU_ITEMS = [
         path: "/dashboard/roll-numbers/exam/cce-exams",
         icon: FileQuestion,
         children: [
-          { label: "Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
+         
           { label: "Master Date Sheet",    path: "/dashboard/cce/date-sheet/master",    icon: Calendar },
-          { label: "Candidate Selected Subjects", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
+          // { label: "Candidate Selected Subjects", path: "/dashboard/cce/date-sheet/candidate", icon: BookOpen },
           { label: "CCE Date Sheet", path: "/dashboard/cce/date-sheet/roll-slip", icon: Ticket },
         ],
       },
@@ -86,7 +86,13 @@ export const MENU_ITEMS = [
       { label: "One Paper MCQs", path: "/dashboard/results/exam/one-paper-mcqs",    icon: FileText },
       { label: "Two Paper MCQs", path: "/dashboard/results/exam/two-paper-mcqs",    icon: FileText },
       { label: "Written Exams",  path: "/dashboard/results/exam/written-exams",     icon: FileCheck },
-      { label: "CCE Exams",      path: "/dashboard/results/exam/cce-exams",         icon: FileQuestion },
+      { label: "CCE Exams",      
+        path: "/dashboard/results/exam/cce-exams",        
+        icon: FileQuestion ,
+        children:[
+           { label: "CCE Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
+        ],
+      },
     ],
   },
   // {
