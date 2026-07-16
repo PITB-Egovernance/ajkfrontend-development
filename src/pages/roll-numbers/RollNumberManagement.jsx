@@ -202,6 +202,12 @@ const RollNumberManagement = () => {
             preferred_exam_cities: (item.preferred_exam_cities || [])
               .map((c) => (typeof c === 'string' ? c : (c?.city || c?.name || ''))).filter(Boolean),
             roll_number:           rollStr,
+            exam_type:             item.exam_type || null,
+            // 'written' once a CCE Written Exam roll number slip has been
+            // generated for this application (backend-derived — see
+            // RollNumberController::index's applicationNumbersWithWrittenStage
+            // check) — only ever set for the cce-exams flow.
+            stage:                 item.stage || 'screening',
             exam_center:           item.exam_center || null,
             exam_center_id:        item.exam_center_id || null,
             exam_city:             item.exam_city || null,
@@ -699,7 +705,15 @@ const RollNumberManagement = () => {
             // candidate's applications (e.g. multiple CCE posts) — pass
             // application_number too so the viewer loads THIS row's
             // application, not an arbitrary sibling that shares the roll number.
-            const query = row.application_number ? `?application_number=${encodeURIComponent(row.application_number)}` : '';
+            const params = new URLSearchParams();
+            if (row.application_number) params.set('application_number', row.application_number);
+            // CCE Written Exam only: once a written roll number slip has been
+            // generated (row.stage === 'written'), show that instead of the
+            // screening slip. Every other exam type keeps showing the
+            // screening slip it's always shown, since 'stage' only ever
+            // flips to 'written' for the cce-exams flow.
+            if (row.exam_type === 'cce-exams' && row.stage === 'written') params.set('stage', 'written');
+            const query = params.toString() ? `?${params.toString()}` : '';
             navigate(`/dashboard/roll-numbers/slip/${encodeURIComponent(row.roll_number)}${query}`);
           }}
           disabled={!selectedRow?.roll_number}>

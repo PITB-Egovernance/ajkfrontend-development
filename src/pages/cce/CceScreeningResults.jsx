@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
-import { IconButton, Menu, MenuItem, TextField } from '@mui/material';
+import { IconButton, Menu, MenuItem, TextField, Checkbox, ListItemText, Chip, Box } from '@mui/material';
 import {
   ShieldCheck,
   MoreVertical,
@@ -48,7 +48,9 @@ const StatusPill = ({ status }) => {
 const CceScreeningResults = () => {
   const [advertisements, setAdvertisements] = useState([]);
   const [advertisementsLoading, setAdvertisementsLoading] = useState(true);
-  const [advertisementId, setAdvertisementId] = useState('');
+  // Multi-select — a candidate's clubbed posts can span several advertisements
+  // sharing one roll number, so more than one can be selected at once.
+  const [advertisementIds, setAdvertisementIds] = useState([]);
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -79,14 +81,23 @@ const CceScreeningResults = () => {
 
   // ── Advertisements eligible for CCE screening (roll numbers already
   // generated) — feeds the advertisement selector next to the header. ──────
+  // Default selection: the first advertisement plus any others it shares a
+  // clubbed roll number with (clubbed_advertisement_ids, from the backend).
+  // A non-clubbed advertisement just gets itself selected.
   useEffect(() => {
     (async () => {
       setAdvertisementsLoading(true);
       try {
         const res = await CceScreeningApi.advertisements();
         const list = res?.data ?? [];
-        setAdvertisements(Array.isArray(list) ? list : []);
-        if (list.length > 0) setAdvertisementId(list[0].hash_id || list[0].id);
+        const safeList = Array.isArray(list) ? list : [];
+        setAdvertisements(safeList);
+        if (safeList.length > 0) {
+          const first = safeList[0];
+          const firstId = first.hash_id || first.id;
+          const clubbedIds = Array.isArray(first.clubbed_advertisement_ids) ? first.clubbed_advertisement_ids : [];
+          setAdvertisementIds([firstId, ...clubbedIds]);
+        }
       } catch (err) {
         toast.error(err?.message || 'Failed to load advertisements');
       } finally {
@@ -95,12 +106,12 @@ const CceScreeningResults = () => {
     })();
   }, []);
 
-  // ── Screening candidates for the selected advertisement ─────────────────
+  // ── Screening candidates for the selected advertisement(s) ──────────────
   const loadResults = useCallback(async () => {
-    if (!advertisementId) return;
+    if (advertisementIds.length === 0) return;
     setLoading(true);
     try {
-      const res = await CceScreeningApi.list(advertisementId, {
+      const res = await CceScreeningApi.list(advertisementIds, {
         status:   filters.status || undefined,
         search:   filters.search || undefined,
         per_page: paginationModel.pageSize,
@@ -118,7 +129,7 @@ const CceScreeningResults = () => {
     } finally {
       setLoading(false);
     }
-  }, [advertisementId, filters, paginationModel]);
+  }, [advertisementIds, filters, paginationModel]);
 
   useEffect(() => { loadResults(); }, [loadResults]);
 
@@ -351,15 +362,38 @@ const CceScreeningResults = () => {
               select
               size="small"
               label="Advertisement"
-              value={advertisementId}
-              onChange={(e) => { setAdvertisementId(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); }}
-              sx={{ minWidth: 260, backgroundColor: 'white' }}
+              value={advertisementIds}
+              onChange={(e) => {
+                const { value } = e.target;
+                setAdvertisementIds(typeof value === 'string' ? value.split(',') : value);
+                setPaginationModel((prev) => ({ ...prev, page: 0 }));
+              }}
+              SelectProps={{
+                multiple: true,
+                renderValue: (selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((val) => {
+                      const ad = advertisements.find((a) => (a.hash_id || a.id) === val);
+                      return <Chip key={val} size="small" label={ad?.adv_number || ad?.title || val} />;
+                    })}
+                  </Box>
+                ),
+              }}
+              sx={{ minWidth: 280, backgroundColor: 'white' }}
             >
-              {advertisements.map((ad) => (
-                <MenuItem key={ad.hash_id || ad.id} value={ad.hash_id || ad.id}>
-                  {ad.adv_number || ad.title || `Advertisement #${ad.id}`}
-                </MenuItem>
-              ))}
+              {advertisements.map((ad) => {
+                const value = ad.hash_id || ad.id;
+                const isClubbed = Array.isArray(ad.clubbed_advertisement_ids) && ad.clubbed_advertisement_ids.length > 0;
+                return (
+                  <MenuItem key={value} value={value}>
+                    <Checkbox size="small" checked={advertisementIds.includes(value)} />
+                    <ListItemText
+                      primary={ad.adv_number || ad.title || `Advertisement #${ad.id}`}
+                      secondary={isClubbed ? 'Clubbed with other advertisements' : null}
+                    />
+                  </MenuItem>
+                );
+              })}
             </TextField>
           )}
         </div>

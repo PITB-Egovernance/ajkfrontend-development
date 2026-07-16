@@ -41,11 +41,13 @@ const CceScreeningApi = {
     return handleResponse(res);
   },
 
-  // List CCE screening results for an advertisement — auto-synced server-side
-  // from already-roll-numbered candidates on every load.
-  list: async (advertisementId, params = {}) => {
+  // List CCE screening results for one or more advertisements — auto-synced
+  // server-side from already-roll-numbered candidates on every load. Pass an
+  // array to view a clubbed group of advertisements together.
+  list: async (advertisementIds, params = {}) => {
+    const ids = Array.isArray(advertisementIds) ? advertisementIds : [advertisementIds];
     const search = new URLSearchParams();
-    search.set('advertisement_id', advertisementId);
+    search.set('advertisement_id', ids.join(','));
     if (params.status)   search.set('status',   params.status);
     if (params.search)   search.set('search',   params.search);
     if (params.per_page) search.set('per_page', String(params.per_page));
