@@ -762,8 +762,14 @@ const ImportResultsPage = () => {
 
       const apiSubjects = data.subjects ?? [];
       setCsvHeaders(data.headers ?? []);
-      // For MCQ: no subject mapping needed; for non-MCQ: map only the two aggregate concern columns
-      setSubjects(!isMcq ? ['Total Obtained Marks', 'Obtained Marks %age'] : []);
+      
+      // If it's a standard Written Exam, we must map the actual configured subjects.
+      // CCE has programmatically-mapped subjects on the backend.
+      if (resolvedExamType === 'written-exams') {
+        setSubjects(apiSubjects);
+      } else {
+        setSubjects(!isMcq ? ['Total Obtained Marks', 'Obtained Marks %age'] : []);
+      }
       setTempFileId(fileId);
       setMapperOpen(true);
     } catch (err) {
