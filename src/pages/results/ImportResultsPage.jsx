@@ -603,12 +603,13 @@ const ImportResultsPage = () => {
   const navigate         = useNavigate();
 
   const [postName,     setPostName]     = useState('');
+  const [resolvedExamType, setResolvedExamType] = useState(examType);
   const [columns,      setColumns]      = useState(getTemplateColumns(examType));
   const [downloading,  setDownloading]  = useState(false);
   const [scanLoading,  setScanLoading]  = useState(false);
   const [passingMarks, setPassingMarks] = useState(40);
 
-  const isMcq = isMcqExamType(examType);
+  const isMcq = isMcqExamType(resolvedExamType);
 
   // Clubbed jobs selection states
   const [selectedJobIds, setSelectedJobIds] = useState([jobId]);
@@ -713,6 +714,7 @@ const ImportResultsPage = () => {
           }
         }
         setColumns(finalCols);
+        setResolvedExamType(activeExamType);
       } catch { /* silent */ }
     })();
 
@@ -723,7 +725,7 @@ const ImportResultsPage = () => {
   const handleDownloadTemplate = async () => {
     setDownloading(true);
     try {
-      const { blob, filename } = await ResultsApi.downloadTemplate(jobId, examType, selectedJobIds);
+      const { blob, filename } = await ResultsApi.downloadTemplate(jobId, resolvedExamType, selectedJobIds);
       const url  = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href  = url;
@@ -904,7 +906,7 @@ const ImportResultsPage = () => {
           <CardContent className="p-6 space-y-5">
 
             {/* Clubbed Job Selection */}
-            {availableJobs.length > 1 && (
+            {resolvedExamType !== 'cce-exams' && availableJobs.length > 1 && (
               <div className="flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-bold text-slate-700">Clubbed Job Posts Selection</label>
@@ -923,6 +925,38 @@ const ImportResultsPage = () => {
                   }}
                   placeholder="Select clubbed posts..."
                 />
+
+                {/* Removable chips/badges showing the actual selected job names */}
+                {selectedJobIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {selectedJobIds.map(id => {
+                      const jobOpt = availableJobs.find(j => j.value === id);
+                      if (!jobOpt) return null;
+                      const isPrimary = id === jobId;
+                      return (
+                        <div
+                          key={id}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                            isPrimary
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-slate-100 text-slate-750 border-slate-300'
+                          }`}
+                        >
+                          <span>{jobOpt.label}</span>
+                          {!isPrimary && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedJobIds(prev => prev.filter(pId => pId !== id))}
+                              className="hover:bg-slate-250 text-slate-400 hover:text-slate-700 rounded p-0.5 transition-colors"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -972,7 +1006,7 @@ const ImportResultsPage = () => {
       <TemplateModal
         open={showTemplate}
         onClose={() => setShowTemplate(false)}
-        columns={columns.length ? columns : getTemplateColumns(examType)}
+        columns={columns.length ? columns : getTemplateColumns(resolvedExamType)}
         onDownload={handleDownloadTemplate}
         downloading={downloading}
         postName={postName}

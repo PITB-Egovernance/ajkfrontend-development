@@ -384,6 +384,7 @@ const VerificationPage = () => {
                           </button>
                         </th>
                         <th className="py-3 px-6">Candidate & Roll No</th>
+                        <th className="py-3 px-6">Post & Adv</th>
                         <th className="py-3 px-6">Subject Breakdown</th>
                         <th className="py-3 px-6 text-center">Percentage</th>
                         <th className="py-3 px-6 text-center">Exam Status</th>
@@ -408,7 +409,7 @@ const VerificationPage = () => {
                               <button
                                 type="button"
                                 onClick={() => handleSelectRow(cand.app_id)}
-                                className="text-slate-400 hover:text-indigo-600 transition-colors"
+                                className="text-slate-405 hover:text-indigo-650 transition-colors"
                               >
                                 {isSelected ? (
                                   <CheckSquare size={16} className="text-indigo-600" />
@@ -426,6 +427,18 @@ const VerificationPage = () => {
                                 </span>
                                 <h5 className="font-semibold text-slate-800 text-sm tracking-tight">{cand.full_name}</h5>
                                 <p className="text-[10px] text-slate-500 font-mono">{cand.cnic}</p>
+                              </div>
+                            </td>
+
+                            {/* Job Post & Advertisement Info */}
+                            <td className="py-4 px-6">
+                              <div className="space-y-0.5 max-w-[200px]">
+                                <p className="font-semibold text-slate-800 text-xs truncate" title={cand.job_designation}>
+                                  {cand.job_designation || 'N/A'}
+                                </p>
+                                <p className="text-[10px] text-slate-500 font-mono">
+                                  Adv: {cand.adv_number || 'N/A'}
+                                </p>
                               </div>
                             </td>
 
