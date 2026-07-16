@@ -125,7 +125,7 @@ const ResultsDashboard = () => {
   const fetchActiveJobs = async () => {
     setFetchingJobs(true);
     try {
-      const res = await AdvertisementApi.getAll(1);
+      const res = await AdvertisementApi.getAll(1, { results_only: true });
       setJobs(res.data?.data || res.data || []);
     } catch (err) {
       toast.error('Failed to load active jobs for result management');

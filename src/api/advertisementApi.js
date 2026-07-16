@@ -48,8 +48,9 @@ const AdvertisementApi = {
   /**
    * Get all advertisements with pagination
    */
-  getAll: async (page = 1) => {
-    const response = await fetch(`${API_BASE}/advertisements?page=${page}`, {
+  getAll: async (page = 1, params = {}) => {
+    const queryParams = new URLSearchParams({ page, ...params }).toString();
+    const response = await fetch(`${API_BASE}/advertisements?${queryParams}`, {
       method: 'GET',
       headers: getHeaders(),
     });
