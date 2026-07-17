@@ -33,7 +33,7 @@ const examCategoryAliases = {
   'one-paper-mcqs': new Set(['one-paper-mcq', 'one-paper-mcqs', 'one_paper_mcq', 'one_paper_mcqs']),
   'two-paper-mcqs': new Set(['two-paper-mcq', 'two-paper-mcqs', 'two_paper_mcq', 'two_paper_mcqs']),
   'written-exams':  new Set(['written-exam', 'written-exams', 'written_exam', 'written_exams']),
-  'cce-exams':      new Set(['cce-exam', 'cce-exams', 'cce_exam', 'cce', 'joint-competitive-exam', 'joint_competitive_exam', 'jce']),
+  'cce-exams':      new Set(['cce-exam', 'cce-exams', 'cce_exam', 'cce', 'joint-competitive-exam', 'joint_competitive_exam', 'jce', 'combined-competitive-exam', 'combined_competitive_exam']),
 };
 
 const confirmWithdraw = () =>
@@ -242,9 +242,7 @@ const ResultsExamFlow = () => {
         })
         .filter(Boolean);
 
-      const adsToUse = matchedAds.length > 0
-        ? matchedAds
-        : allAds.map((ad) => ({ ad, jobs: ad.job_details || [] }));
+      const adsToUse = matchedAds;
 
       setAllJobRows(
         adsToUse.flatMap(({ ad, jobs }) =>
