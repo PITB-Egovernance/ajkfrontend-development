@@ -575,10 +575,14 @@ const ResultsApi = {
   },
 
   /**
-   * Get preview of the shortlist based on 2n + 1 formula
+   * Get preview of the shortlist based on 2n + 1 formula or manual selection
    */
-  getShortlistPreview: async (jobId) => {
-    const response = await fetch(`${API_BASE}/results/${jobId}/shortlist/preview`, {
+  getShortlistPreview: async (jobId, candidateIds = []) => {
+    const url = new URL(`${API_BASE}/results/${jobId}/shortlist/preview`);
+    if (candidateIds && candidateIds.length > 0) {
+      url.searchParams.append('candidate_ids', candidateIds.join(','));
+    }
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: getHeaders(),
     });
@@ -588,10 +592,11 @@ const ResultsApi = {
   /**
    * Publish Provisional Merit List and auto-populate Award List
    */
-  publishShortlist: async (jobId) => {
+  publishShortlist: async (jobId, candidateIds = []) => {
     const response = await fetch(`${API_BASE}/results/${jobId}/shortlist/publish`, {
       method: 'POST',
       headers: getHeaders(),
+      body: JSON.stringify({ candidate_ids: candidateIds }),
     });
     return handleResponse(response);
   },
