@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
+import TooltipDataGrid from 'components/ui/TooltipDataGrid';
+import { Menu, MenuItem } from '@mui/material';
 import {
   FileSpreadsheet,
   Database,
@@ -84,6 +86,151 @@ const confirmWithdraw = () => {
       position: 'top-center',
     });
   });
+};
+
+const ActionCell = ({ job, isAdmin, isDirector, userRole, handleOpenPublish, handleDownloadGazette, fetchActiveJobs, getExamTypeParam }) => {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+  const navigate = useNavigate();
+
+  const handleClick = (event) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = (event) => {
+    if (event) event.stopPropagation();
+    setAnchorEl(null);
+  };
+
+  const rId = getJobRouteId(job);
+  const isImportable = !['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
+  const isShortlistable = ['Approved', 'APPROVED', 'WITHDRAWN'].includes(job.result_status);
+  const isGazetteReady = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
+  const isPublishedState = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
+  const hasInterviewPermission = isAdmin || isDirector || ['data_entry', 'dataentry', 'senior_admin'].includes(userRole);
+  const isInterviewAllowed = isPublishedState && hasInterviewPermission;
+  const isWithdrawable = isPublishedState && (isAdmin || isDirector);
+
+  return (
+    <div className="flex items-center h-full">
+      <Button 
+        variant="outline" 
+        onClick={handleClick}
+        className="h-9 px-3 rounded-lg border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 shadow-none"
+      >
+        Actions <ChevronDown size={14} className="text-slate-450" />
+      </Button>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        onClick={(e) => e.stopPropagation()}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.08))',
+            mt: 1,
+            minWidth: 180,
+            '& .MuiMenuItem-root': {
+              fontSize: '12px',
+              color: '#334155',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 14px',
+              fontWeight: '500'
+            },
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        {isImportable ? (
+          <MenuItem onClick={() => { handleClose(); navigate(`/dashboard/results/import/${rId}?examType=${getExamTypeParam(job)}`); }}>
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600 mr-2" />
+            Import Marks (CSV)
+          </MenuItem>
+        ) : (
+          <MenuItem disabled className="opacity-50">
+            <FileSpreadsheet className="h-4 w-4 text-slate-400 mr-2" />
+            Import Marks (CSV)
+          </MenuItem>
+        )}
+
+        <MenuItem onClick={() => { handleClose(); navigate(`/dashboard/results/view/${rId}`); }}>
+          <ArrowRight className="h-4 w-4 text-slate-400 mr-2" />
+          Manage Results
+        </MenuItem>
+
+        {isShortlistable ? (
+          <MenuItem onClick={() => { handleClose(); navigate(`/dashboard/results/shortlist/${rId}`); }}>
+            <Send className="h-4 w-4 text-slate-400 mr-2" />
+            Prepare Shortlist
+          </MenuItem>
+        ) : (
+          <MenuItem disabled className="opacity-50">
+            <Send className="h-4 w-4 text-slate-400 mr-2" />
+            Prepare Shortlist
+          </MenuItem>
+        )}
+
+        <div className="my-1 border-t border-slate-105" />
+
+        {isGazetteReady ? (
+          <MenuItem onClick={() => { handleClose(); handleDownloadGazette(job); }}>
+            <FileText className="h-4 w-4 text-slate-400 mr-2" />
+            Official Gazette
+          </MenuItem>
+        ) : (
+          <MenuItem disabled className="opacity-50">
+            <FileText className="h-4 w-4 text-slate-400 mr-2" />
+            Official Gazette
+          </MenuItem>
+        )}
+
+        {isInterviewAllowed ? (
+          <MenuItem onClick={() => { handleClose(); navigate("/dashboard/award-lists"); }}>
+            <LayoutDashboard className="h-4 w-4 text-slate-400 mr-2" />
+            Interview Marks
+          </MenuItem>
+        ) : (
+          <MenuItem disabled className="opacity-50">
+            <LayoutDashboard className="h-4 w-4 text-slate-400 mr-2" />
+            Interview Marks
+          </MenuItem>
+        )}
+
+        {isWithdrawable ? (
+          <MenuItem 
+            onClick={async () => {
+              handleClose();
+              const reason = await confirmWithdraw();
+              if (!reason) return;
+              try {
+                toast.loading('Withdrawing publication...', { id: 'withdraw' });
+                await ResultsApi.withdraw(rId, reason);
+                toast.success('Publication withdrawn', { id: 'withdraw' });
+                fetchActiveJobs();
+              } catch (err) {
+                toast.error('Withdrawal failed', { id: 'withdraw' });
+              }
+            }}
+            className="text-rose-600 hover:text-rose-700"
+          >
+            <ShieldAlert className="h-4 w-4 text-rose-500 mr-2" />
+            Withdraw Gazette
+          </MenuItem>
+        ) : (
+          <MenuItem disabled className="opacity-50">
+            <ShieldAlert className="h-4 w-4 text-slate-400 mr-2" />
+            Withdraw Gazette
+          </MenuItem>
+        )}
+      </Menu>
+    </div>
+  );
 };
 
 const ResultsDashboard = () => {
@@ -249,6 +396,97 @@ const ResultsDashboard = () => {
     }
   ];
 
+  const columns = useMemo(() => [
+    {
+      field: 'advertisement',
+      headerName: 'Advertisement',
+      flex: 1,
+      minWidth: 150,
+      renderCell: (params) => (
+        <div className="py-2">
+          <p className="text-xs font-semibold text-slate-500 mb-0.5">#{params.row.adv?.adv_number}</p>
+          <p className="text-xs text-slate-450">{params.row.adv?.title || 'General Recruitment'}</p>
+        </div>
+      )
+    },
+    {
+      field: 'designation',
+      headerName: 'Job Designation',
+      flex: 2,
+      minWidth: 250,
+      renderCell: (params) => (
+        <div className="py-2">
+          <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-650 transition-colors">
+            {params.row.designation}
+          </p>
+          <p className="text-xs text-slate-400">Scale: BPS-{params.row.scale}</p>
+        </div>
+      )
+    },
+    {
+      field: 'result_status',
+      headerName: 'Current Stage',
+      flex: 1,
+      minWidth: 150,
+      renderCell: (params) => {
+        const status = params.value || 'Pending';
+        let badgeClass = 'bg-slate-100 text-slate-500 border border-slate-200';
+        let dotClass = 'bg-slate-400';
+
+        if (status === 'Published' || status === 'PROVISIONAL PUBLISHED') {
+          badgeClass = 'bg-purple-50 text-purple-600 border border-purple-100';
+          dotClass = 'bg-purple-600';
+        } else if (status === 'FINAL PUBLISHED') {
+          badgeClass = 'bg-indigo-50 text-indigo-600 border border-indigo-100';
+          dotClass = 'bg-indigo-600';
+        } else if (status === 'GAZETTE PUBLISHED') {
+          badgeClass = 'bg-pink-50 text-pink-600 border border-pink-100';
+          dotClass = 'bg-pink-600';
+        } else if (status === 'Approved' || status === 'APPROVED') {
+          badgeClass = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+          dotClass = 'bg-emerald-600';
+        } else if (status === 'Under Verification' || status === 'PENDING IMPORT') {
+          badgeClass = 'bg-amber-50 text-amber-600 border border-amber-100';
+          dotClass = 'bg-amber-600';
+        } else if (status === 'Uploaded') {
+          badgeClass = 'bg-blue-50 text-blue-600 border border-blue-100';
+          dotClass = 'bg-blue-600';
+        } else if (status === 'WITHDRAWN') {
+          badgeClass = 'bg-rose-50 text-rose-600 border border-rose-100';
+          dotClass = 'bg-rose-600';
+        }
+
+        return (
+          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider inline-flex items-center gap-1.5 ${badgeClass}`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`}></div>
+            {status}
+          </span>
+        );
+      }
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => {
+        const job = params.row;
+        return (
+          <ActionCell 
+            job={job}
+            isAdmin={isAdmin}
+            isDirector={isDirector}
+            userRole={userRole}
+            handleOpenPublish={handleOpenPublish}
+            handleDownloadGazette={handleDownloadGazette}
+            fetchActiveJobs={fetchActiveJobs}
+            getExamTypeParam={getExamTypeParam}
+          />
+        );
+      }
+    }
+  ], [isAdmin, isDirector, userRole]);
+
   return (
     <div className="min-h-screen p-2">
       <div className="max-w-8xl mx-auto space-y-6">
@@ -342,273 +580,32 @@ const ResultsDashboard = () => {
             </div>
           </div>
 
-          <Card className="border border-slate-200 bg-white overflow-visible">
-            <div className="overflow-x-auto md:overflow-visible">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Advertisement</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Job Designation</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Current Stage</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {fetchingJobs ? (
-                    [1, 2, 3].map(i => (
-                      <tr key={i} className="animate-pulse">
-                        <td colSpan="4" className="px-6 py-4"><div className="h-4 bg-slate-100 rounded w-full"></div></td>
-                      </tr>
-                    ))
-                  ) : (() => {
-                    const allJobRows = jobs.flatMap(adv => 
-                      (adv.job_details || adv.jobDetails || []).filter(job =>
-                        job.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        adv.adv_number.toLowerCase().includes(searchTerm.toLowerCase())
-                      ).map(job => ({ ...job, adv }))
-                    );
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            {(() => {
+              const allJobRows = jobs.flatMap(adv => 
+                (adv.job_details || adv.jobDetails || []).filter(job =>
+                  job.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  adv.adv_number.toLowerCase().includes(searchTerm.toLowerCase())
+                ).map((job, idx) => ({ ...job, adv, id: job.hash_id || job.id || `${adv.adv_number}-${idx}` }))
+              );
 
-                    if (allJobRows.length === 0) {
-                      return (
-                        <tr>
-                          <td colSpan="4" className="px-6 py-12 text-center text-slate-400 font-semibold text-sm">
-                            No active jobs found for result management
-                          </td>
-                        </tr>
-                      );
-                    }
-
-                    return allJobRows.map((job, idx) => {
-                      const adv = job.adv;
-                      const isLastRow = idx === allJobRows.length - 1;
-                      const isSecondLastRow = idx === allJobRows.length - 2;
-                      const openUpwards = allJobRows.length > 3 && (isLastRow || isSecondLastRow);
-
-                      return (
-                        <tr key={job.hash_id || job.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <p className="text-xs font-semibold text-slate-500 mb-0.5">#{adv.adv_number}</p>
-                            <p className="text-xs text-slate-400">{adv.title || 'General Recruitment'}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                              {job.designation}
-                            </p>
-                            <p className="text-xs text-slate-400">Scale: BPS-{job.scale}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            {(() => {
-                              const status = job.result_status || 'Pending';
-                              let badgeClass = 'bg-slate-100 text-slate-500 border border-slate-200';
-                              let dotClass = 'bg-slate-400';
-
-                              if (status === 'Published' || status === 'PROVISIONAL PUBLISHED') {
-                                badgeClass = 'bg-purple-50 text-purple-600 border border-purple-100';
-                                dotClass = 'bg-purple-600';
-                              } else if (status === 'FINAL PUBLISHED') {
-                                badgeClass = 'bg-indigo-50 text-indigo-600 border border-indigo-100';
-                                dotClass = 'bg-indigo-600';
-                              } else if (status === 'GAZETTE PUBLISHED') {
-                                badgeClass = 'bg-pink-50 text-pink-600 border border-pink-100';
-                                dotClass = 'bg-pink-600';
-                              } else if (status === 'Approved' || status === 'APPROVED') {
-                                badgeClass = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
-                                dotClass = 'bg-emerald-600';
-                              } else if (status === 'Under Verification' || status === 'PENDING IMPORT') {
-                                badgeClass = 'bg-amber-50 text-amber-600 border border-amber-100';
-                                dotClass = 'bg-amber-600';
-                              } else if (status === 'Uploaded') {
-                                badgeClass = 'bg-blue-50 text-blue-600 border border-blue-100';
-                                dotClass = 'bg-blue-600';
-                              } else if (status === 'WITHDRAWN') {
-                                badgeClass = 'bg-rose-50 text-rose-600 border border-rose-100';
-                                dotClass = 'bg-rose-600';
-                              }
-
-                              return (
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider inline-flex items-center gap-1.5 ${badgeClass}`}>
-                                  <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`}></div>
-                                  {status}
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end">
-                              <div className="relative inline-block text-left">
-                                <Button 
-                                  variant="outline" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const rId = getJobRouteId(job);
-                                    setActiveDropdownJobId(activeDropdownJobId === rId ? null : rId);
-                                  }}
-                                  className="h-9 px-3 rounded-lg border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 shadow-none"
-                                >
-                                  Actions <ChevronDown size={14} className="text-slate-405" />
-                                </Button>
-                                
-                                {activeDropdownJobId === getJobRouteId(job) && (
-                                  <>
-                                    <div 
-                                      className="fixed inset-0 z-30" 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveDropdownJobId(null);
-                                      }}
-                                    />
-                                    <div className={`absolute right-0 w-56 bg-white border border-slate-200 rounded-lg shadow-lg p-1 z-40 text-left animate-in fade-in zoom-in-95 duration-100 ${
-                                      openUpwards ? 'bottom-full mb-1' : 'mt-1'
-                                    }`}>
-                                      
-                                      {/* Import Marks */}
-                                      {(() => {
-                                        const isImportable = !['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
-                                        return isImportable ? (
-                                          <Link 
-                                            to={`/dashboard/results/import/${getJobRouteId(job)}?examType=${getExamTypeParam(job)}`} 
-                                            onClick={() => setActiveDropdownJobId(null)}
-                                            className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors"
-                                          >
-                                            <FileSpreadsheet size={14} className="text-slate-400" />
-                                            Import Marks (CSV)
-                                          </Link>
-                                        ) : (
-                                          <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50">
-                                            <FileSpreadsheet size={14} />
-                                            Import Marks (CSV)
-                                          </div>
-                                        );
-                                      })()}
-
-                                      {/* Manage Results */}
-                                      <Link 
-                                        to={`/dashboard/results/view/${getJobRouteId(job)}`} 
-                                        onClick={() => setActiveDropdownJobId(null)}
-                                        className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors"
-                                      >
-                                        <ArrowRight size={14} className="text-slate-400" />
-                                        Manage Results
-                                      </Link>
-
-                                      {/* Prepare Shortlist */}
-                                      {(() => {
-                                        const isShortlistable = ['Approved', 'APPROVED', 'WITHDRAWN'].includes(job.result_status);
-                                        return isShortlistable ? (
-                                          <Link 
-                                            to={`/dashboard/results/shortlist/${getJobRouteId(job)}`} 
-                                            onClick={() => setActiveDropdownJobId(null)}
-                                            className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors"
-                                          >
-                                            <Send size={14} className="text-slate-400" />
-                                            Prepare Shortlist
-                                          </Link>
-                                        ) : (
-                                          <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50">
-                                            <Send size={14} />
-                                            Prepare Shortlist
-                                          </div>
-                                        );
-                                      })()}
-
-                                      <div className="my-1 border-t border-slate-100" />
-
-                                      {/* Official Gazette */}
-                                      {(() => {
-                                        const isGazetteReady = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
-                                        return isGazetteReady ? (
-                                          <button
-                                            onClick={() => {
-                                              setActiveDropdownJobId(null);
-                                              handleDownloadGazette(job);
-                                            }}
-                                            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors text-left"
-                                          >
-                                            <FileText size={14} className="text-slate-400" />
-                                            Official Gazette
-                                          </button>
-                                        ) : (
-                                          <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-450 cursor-not-allowed opacity-50">
-                                            <FileText size={14} />
-                                            Official Gazette
-                                          </div>
-                                        );
-                                      })()}
-
-                                      {/* Manage Interview Marks */}
-                                      {(() => {
-                                        const isPublishedState = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
-                                        const hasPermission = isAdmin || isDirector || ['data_entry', 'dataentry', 'senior_admin'].includes(userRole);
-                                        const isInterviewAllowed = isPublishedState && hasPermission;
-                                        return isInterviewAllowed ? (
-                                          <Link 
-                                            to="/dashboard/award-lists" 
-                                            onClick={() => setActiveDropdownJobId(null)}
-                                            className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors"
-                                          >
-                                            <LayoutDashboard size={14} className="text-slate-400" />
-                                            Interview Marks
-                                          </Link>
-                                        ) : (
-                                          <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50">
-                                            <LayoutDashboard size={14} />
-                                            Interview Marks
-                                          </div>
-                                        );
-                                      })()}
-
-                                      {/* Withdraw Results */}
-                                      {(() => {
-                                        const isPublishedState = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
-                                        const isAuthorized = isAdmin || isDirector;
-                                        const isWithdrawable = isPublishedState && isAuthorized;
-                                        return isWithdrawable ? (
-                                          <button
-                                            onClick={async () => {
-                                              setActiveDropdownJobId(null);
-                                              const reason = await confirmWithdraw();
-                                              if (!reason) return;
-                                              try {
-                                                toast.loading('Withdrawing publication...', { id: 'withdraw' });
-                                                await ResultsApi.withdraw(getJobRouteId(job), reason);
-                                                toast.success('Publication withdrawn', { id: 'withdraw' });
-                                                fetchActiveJobs();
-                                              } catch (err) {
-                                                toast.error('Withdrawal failed', { id: 'withdraw' });
-                                              }
-                                            }}
-                                            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded transition-colors text-left"
-                                          >
-                                            <ShieldAlert size={14} className="text-rose-500" />
-                                            Withdraw Results
-                                          </button>
-                                        ) : (
-                                          <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-slate-400 cursor-not-allowed opacity-50">
-                                            <ShieldAlert size={14} />
-                                            Withdraw Results
-                                          </div>
-                                        );
-                                      })()}
-
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })()}
-                </tbody>
-              </table>
-            </div>
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <p className="text-xs text-slate-500">
-                Showing {jobs.length} Advertisements
-              </p>
-            </div>
-          </Card>
+              return (
+                <TooltipDataGrid
+                  rows={allJobRows}
+                  columns={columns}
+                  autoHeight
+                  pageSizeOptions={[10, 25, 50]}
+                  initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
+                  loading={fetchingJobs}
+                  disableRowSelectionOnClick
+                  sx={{
+                    '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+                    '& .MuiDataGrid-row': { minHeight: '52px !important' }
+                  }}
+                />
+              );
+            })()}
+          </div>
         </div>
 
         {/* Recent Activity Section */}
