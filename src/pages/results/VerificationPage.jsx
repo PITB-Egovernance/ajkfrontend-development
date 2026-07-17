@@ -35,7 +35,7 @@ const getGroupedJobs = (flatJobs) => {
 
   flatJobs.forEach(job => {
     const adv = job.advertisements?.[0] || {};
-    const adId = adv.id || job.advertisement_id || job.advertisementId;
+    const adId = adv.id || adv.hash_id || adv.hashId || job.advertisement_id || job.advertisementId || job.pivot?.advertisement_id || job.pivot?.advertisementId;
     const testType = job.pivot?.test_type || job.pivot?.testType || job.test_type || job.testType;
 
     if (adId && testType) {
