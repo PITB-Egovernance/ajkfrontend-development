@@ -13,6 +13,7 @@ export default function InterviewShortlistPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   useEffect(() => {
     if (jobId) {
@@ -35,6 +36,25 @@ export default function InterviewShortlistPage() {
   const handlePublishSuccess = () => {
     setPublishOpen(false);
     navigate('/dashboard/results');
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allIds = data.candidates.map(c => c.id);
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectRow = (id) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(item => item !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
   };
 
   if (loading) {
@@ -88,7 +108,8 @@ export default function InterviewShortlistPage() {
             {job.result_status === 'Approved' || job.result_status === 'APPROVED' ? (
               <Button
                 onClick={() => setPublishOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm px-4 h-9 rounded-lg flex items-center gap-1.5 transition-all"
+                disabled={selectedIds.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm px-4 h-9 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send size={14} />
                 Publish Provisional Shortlist
@@ -130,8 +151,10 @@ export default function InterviewShortlistPage() {
           <Card className="border border-slate-200 shadow-sm rounded-xl bg-white">
             <CardContent className="p-6 flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Interview Candidates Needed</p>
-                <p className="text-2xl font-bold text-slate-900">{(2 * job.num_posts) + 1}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Candidates Selected</p>
+                <p className="text-2xl font-bold text-slate-900">
+                  {selectedIds.length} <span className="text-sm font-semibold text-slate-400">/ {candidates.length}</span>
+                </p>
               </div>
               <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
                 <ClipboardCheck size={20} />
@@ -154,6 +177,14 @@ export default function InterviewShortlistPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
+                    <th className="px-4 py-3.5 text-center text-slate-500 w-12">
+                      <input
+                        type="checkbox"
+                        checked={candidates.length > 0 && selectedIds.length === candidates.length}
+                        onChange={handleSelectAll}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                    </th>
                     <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-center text-slate-500">Merit Rank</th>
                     <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">Roll Number</th>
                     <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">Candidate Name</th>
@@ -167,39 +198,50 @@ export default function InterviewShortlistPage() {
                 <tbody className="divide-y divide-slate-100">
                   {candidates.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-6 py-10 text-center text-slate-400 font-semibold text-xs">
+                      <td colSpan="9" className="px-6 py-10 text-center text-slate-400 font-semibold text-xs">
                         No candidates are currently eligible for shortlisting
                       </td>
                     </tr>
                   ) : (
-                    candidates.map((candidate, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold ${idx < (2 * job.num_posts + 1)
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                              : 'bg-slate-150 text-slate-400'
-                            }`}>
-                            {idx + 1}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-xs font-bold text-slate-700">{candidate.roll_no}</td>
-                        <td className="px-6 py-4 text-xs font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                          {candidate.candidate_name}
-                        </td>
-                        <td className="px-6 py-4 text-xs text-slate-400">{candidate.cnic}</td>
-                        <td className="px-6 py-4 text-xs font-semibold text-slate-800 text-right">{candidate.obtained_marks}</td>
-                        <td className="px-6 py-4 text-xs text-slate-405 text-right">{candidate.total_max_marks}</td>
-                        <td className="px-6 py-4 text-xs font-bold text-indigo-600 text-right">{candidate.percentage}%</td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border whitespace-nowrap ${idx < (2 * job.num_posts + 1)
-                              ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                              : 'bg-slate-50 text-slate-400 border-slate-200'
-                            }`}>
-                            {idx < (2 * job.num_posts + 1) ? 'In Shortlist' : 'Below Cutoff'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                    candidates.map((candidate, idx) => {
+                      const isSelected = selectedIds.includes(candidate.id);
+                      return (
+                        <tr key={idx} className={`hover:bg-slate-50/50 transition-colors group ${isSelected ? 'bg-indigo-50/20' : ''}`}>
+                          <td className="px-4 py-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleSelectRow(candidate.id)}
+                              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold ${isSelected
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                : 'bg-slate-150 text-slate-400'
+                              }`}>
+                              {idx + 1}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-xs font-bold text-slate-700">{candidate.roll_no}</td>
+                          <td className="px-6 py-4 text-xs font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                            {candidate.candidate_name}
+                          </td>
+                          <td className="px-6 py-4 text-xs text-slate-400">{candidate.cnic}</td>
+                          <td className="px-6 py-4 text-xs font-semibold text-slate-800 text-right">{candidate.obtained_marks}</td>
+                          <td className="px-6 py-4 text-xs text-slate-405 text-right">{candidate.total_max_marks}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-indigo-600 text-right">{candidate.percentage}%</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border whitespace-nowrap ${isSelected
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                : 'bg-slate-50 text-slate-400 border-slate-200'
+                              }`}>
+                              {isSelected ? 'Selected' : 'Deselected'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -213,6 +255,7 @@ export default function InterviewShortlistPage() {
         isOpen={publishOpen}
         onClose={() => setPublishOpen(false)}
         jobId={jobId}
+        selectedIds={selectedIds}
         onConfirm={handlePublishSuccess}
       />
     </div>
