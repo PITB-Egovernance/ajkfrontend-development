@@ -31,6 +31,34 @@ const handleResponse = async (response) => {
   return result;
 };
 
+// Both `/roll-numbers` and `/advertisements` are real Laravel paginators —
+// requesting one page with a large per_page silently drops everything past
+// it once the record count grows beyond that page size (Postman against the
+// same endpoint shows further pages; the single-page fetch below did not).
+// This walks every page and merges `data` into one flat array so callers
+// always get the complete list regardless of how many records exist.
+const fetchAllPages = async (buildUrl, perPage) => {
+  const firstRes = await fetch(buildUrl(1, perPage), { headers: getAdminHeaders(false) });
+  const first    = await handleResponse(firstRes);
+  const page1    = first?.data ?? {};
+  let items      = Array.isArray(page1.data) ? page1.data : [];
+  const lastPage = page1.last_page ?? 1;
+
+  if (lastPage > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: lastPage - 1 }, (_, i) => i + 2).map((page) =>
+        fetch(buildUrl(page, perPage), { headers: getAdminHeaders(false) }).then(handleResponse)
+      )
+    );
+    rest.forEach((r) => {
+      const d = r?.data?.data;
+      if (Array.isArray(d)) items = items.concat(d);
+    });
+  }
+
+  return { ...first, data: { ...page1, data: items } };
+};
+
 const RollNumberApi = {
   // List shortlisted applications eligible for slip generation. Filtering,
   // sorting and pagination all happen server-side (see RollNumberController::shortlisted) —
@@ -170,14 +198,23 @@ const RollNumberApi = {
     return handleResponse(res);
   },
 
+  // With an explicit `page`, fetch exactly that page (unchanged behavior).
+  // Without one, walk every page so the caller gets every advertisement,
+  // not just whatever fits in the first `per_page`.
   getAdvertisements: async (params = {}) => {
-    const search = new URLSearchParams();
-    if (params.per_page) search.set('per_page', String(params.per_page));
-    if (params.page) search.set('page', String(params.page));
-    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers?${search}`, {
-      headers: getAdminHeaders(false),
-    });
-    return handleResponse(res);
+    if (params.page) {
+      const search = new URLSearchParams();
+      if (params.per_page) search.set('per_page', String(params.per_page));
+      search.set('page', String(params.page));
+      const res = await fetch(`${ADMIN_API_BASE}/roll-numbers?${search}`, {
+        headers: getAdminHeaders(false),
+      });
+      return handleResponse(res);
+    }
+    return fetchAllPages(
+      (page, perPage) => `${ADMIN_API_BASE}/roll-numbers?per_page=${perPage}&page=${page}`,
+      params.per_page || 200
+    );
   },
 
   getApplicationsByAdvertisement: async (advertisementId, params = {}) => {
@@ -209,10 +246,10 @@ const RollNumberApi = {
   },
 
   getAdvertisementsWithJobs: async (perPage = 100) => {
-    const res = await fetch(`${ADMIN_API_BASE}/advertisements?per_page=${perPage}`, {
-      headers: getAdminHeaders(false),
-    });
-    return handleResponse(res);
+    return fetchAllPages(
+      (page, pp) => `${ADMIN_API_BASE}/advertisements?per_page=${pp}&page=${page}`,
+      perPage
+    );
   },
 
   // Publish/unpublish roll number slips so they become visible/hidden to

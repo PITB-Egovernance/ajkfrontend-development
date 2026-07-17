@@ -43,6 +43,31 @@ const DEFAULT_FILTERS = {
   working_state: '',
 };
 
+// Separate, independent filter group: Advertisement -> Department -> Post.
+// Kept entirely apart from DEFAULT_FILTERS/filters above so the existing
+// filter bar's "Clear All" / active-filter-chips behavior is untouched.
+const DEFAULT_HIERARCHY_FILTERS = {
+  adv_number: '',
+  department_hash_id: '',
+  job_detail_hash_id: '',
+};
+
+// adv_number sometimes already reads "Advertisement 1-26" and sometimes just
+// "1-26" depending on how it was entered — only prefix it when it's missing,
+// so the dropdown never shows "Advertisement Advertisement 1-26".
+const formatAdvertisementLabel = (value) => {
+  const str = String(value ?? '');
+  return /^advertisement\b/i.test(str) ? str : `Advertisement ${str}`;
+};
+
+// A job_detail's `department` relation object is null whenever the record
+// still uses the legacy raw-text department column (department_id unset) —
+// the backend resolves that case into `department_label` instead (see
+// JobDetail::getDepartmentLabelAttribute), so fall back to it here too, or
+// the Department dropdown silently drops every legacy-tagged post.
+const getDeptKey   = (jd) => jd?.department?.hash_id || jd?.department_label || null;
+const getDeptLabel = (jd) => jd?.department?.department_name || jd?.department?.name || jd?.department_label || 'Unassigned Department';
+
 const WORKING_STATE_OPTIONS = [
   { value: 'generated', label: 'Roll No Generated (Not Published)' },
   { value: 'published', label: 'Published' },
@@ -94,6 +119,10 @@ const RollNumberManagement = () => {
   const [centers,          setCenters]           = useState([]);
   const [advertisements,   setAdvertisements]    = useState([]);
 
+  // Advertisement -> Department -> Post hierarchy filter (separate block, own state)
+  const [hierarchyFilters,          setHierarchyFilters]          = useState(DEFAULT_HIERARCHY_FILTERS);
+  const [debouncedHierarchyFilters, setDebouncedHierarchyFilters] = useState(DEFAULT_HIERARCHY_FILTERS);
+
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
@@ -106,10 +135,15 @@ const RollNumberManagement = () => {
     return () => clearTimeout(t);
   }, [filters]);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedHierarchyFilters(hierarchyFilters), FILTER_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [hierarchyFilters]);
+
   // Reset to page 1 whenever the applied filters change.
   useEffect(() => {
     setPaginationModel((prev) => (prev.page === 0 ? prev : { ...prev, page: 0 }));
-  }, [debouncedFilters]);
+  }, [debouncedFilters, debouncedHierarchyFilters]);
 
   // ── Exam centers (for the Exam Center filter dropdown) ─────────────────
   useEffect(() => {
@@ -137,9 +171,10 @@ const RollNumberManagement = () => {
   // page) so Exam Center / Advertisement No only ever offer values that
   // actually exist, and dropdown values are the raw ids the backend expects.
   const filterConfig = useMemo(() => {
+    // adv_number already reads e.g. "Advertisement 1-26" — don't re-prefix it.
     const advertisementOptions = Array.from(new Set(advertisements.map((a) => a.adv_number).filter(Boolean)))
       .sort()
-      .map((value) => ({ value, label: `Advertisement ${value}` }));
+      .map((value) => ({ value, label: formatAdvertisementLabel(value) }));
 
     const centerOptions = centers
       .filter((c) => c.id != null)
@@ -166,16 +201,117 @@ const RollNumberManagement = () => {
 
   const hasActiveFilters = useMemo(() => Object.values(filters).some(Boolean), [filters]);
 
+  // ── Advertisement -> Department -> Post cascade ─────────────────────────
+  // Built entirely client-side from `advertisements` (already fetched above
+  // via getAdvertisementsWithJobs, which nests job_details[].department per
+  // advertisement) — no extra API calls needed. Each dropdown's options are
+  // narrowed by whatever parent(s) are currently selected; an unset filter
+  // is treated as "all", per the requested hierarchy.
+  const advertisementsScopedByAd = useMemo(
+    () => (hierarchyFilters.adv_number
+      ? advertisements.filter((a) => a.adv_number === hierarchyFilters.adv_number)
+      : advertisements),
+    [advertisements, hierarchyFilters.adv_number]
+  );
+
+  const cascadeAdvertisementOptions = useMemo(() => (
+    advertisements
+      .filter((a) => a.adv_number)
+      .map((a) => ({ value: a.adv_number, label: formatAdvertisementLabel(a.adv_number) }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  ), [advertisements]);
+
+  const cascadeDepartmentOptions = useMemo(() => {
+    const map = new Map();
+    advertisementsScopedByAd.forEach((a) => {
+      (a.job_details || []).forEach((jd) => {
+        const key = getDeptKey(jd);
+        if (key) map.set(key, getDeptLabel(jd));
+      });
+    });
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [advertisementsScopedByAd]);
+
+  const cascadePostOptions = useMemo(() => {
+    const map = new Map();
+    advertisementsScopedByAd.forEach((a) => {
+      (a.job_details || []).forEach((jd) => {
+        if (hierarchyFilters.department_hash_id && getDeptKey(jd) !== hierarchyFilters.department_hash_id) return;
+        if (jd.hash_id && jd.designation) map.set(jd.hash_id, jd.designation);
+      });
+    });
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [advertisementsScopedByAd, hierarchyFilters.department_hash_id]);
+
+  const hierarchyFilterConfig = useMemo(() => ([
+    { name: 'adv_number', label: 'Advertisement', type: 'select', options: cascadeAdvertisementOptions },
+    { name: 'department_hash_id', label: 'Department', type: 'select', options: cascadeDepartmentOptions },
+    { name: 'job_detail_hash_id', label: 'Post', type: 'select', options: cascadePostOptions },
+  ]), [cascadeAdvertisementOptions, cascadeDepartmentOptions, cascadePostOptions]);
+
+  // Changing a parent clears its dependent children so a stale, no-longer-valid
+  // selection can't linger (e.g. picking a new Advertisement clears any
+  // previously chosen Department/Post from the old one).
+  const handleHierarchyChange = (e) => {
+    const { name, value } = e.target;
+    setHierarchyFilters((prev) => {
+      if (name === 'adv_number') return { adv_number: value, department_hash_id: '', job_detail_hash_id: '' };
+      if (name === 'department_hash_id') return { ...prev, department_hash_id: value, job_detail_hash_id: '' };
+      return { ...prev, [name]: value };
+    });
+  };
+
+  const handleClearHierarchyFilters = () => {
+    setHierarchyFilters(DEFAULT_HIERARCHY_FILTERS);
+    setDebouncedHierarchyFilters(DEFAULT_HIERARCHY_FILTERS);
+  };
+
+  // The live `shortlisted` endpoint only accepts `advertisement_no` — it has
+  // no department/post filter param. Department/Post are therefore applied
+  // client-side by matching each row's `job_title` (its post/designation)
+  // against the designation(s) that belong to the selected Department/Post
+  // within the selected (or, if none, every) Advertisement.
+  const activeDesignations = useMemo(() => {
+    if (!debouncedHierarchyFilters.job_detail_hash_id && !debouncedHierarchyFilters.department_hash_id) return null;
+    const scoped = debouncedHierarchyFilters.adv_number
+      ? advertisements.filter((a) => a.adv_number === debouncedHierarchyFilters.adv_number)
+      : advertisements;
+    const set = new Set();
+    scoped.forEach((a) => {
+      (a.job_details || []).forEach((jd) => {
+        if (!jd.designation) return;
+        if (debouncedHierarchyFilters.job_detail_hash_id) {
+          if (jd.hash_id === debouncedHierarchyFilters.job_detail_hash_id) set.add(jd.designation);
+        } else if (getDeptKey(jd) === debouncedHierarchyFilters.department_hash_id) {
+          set.add(jd.designation);
+        }
+      });
+    });
+    return set;
+  }, [advertisements, debouncedHierarchyFilters]);
+
   // ── Data: search/filter/sort/paginate all happen server-side — this page
   // just requests the current page for the active filters and renders it. ──
   const fetchApplications = useCallback(async () => {
     setLoading(true);
     try {
+      // Department/Post have no server-side filter param on this endpoint —
+      // when either is active, pull a larger batch and narrow+paginate
+      // client-side (below) instead of relying on server pagination.
+      const needsClientNarrowing = activeDesignations !== null;
+      // Old "Advertisement No" filter wins if both it and the new hierarchy
+      // filter happen to be set — the hierarchy filter fills the gap otherwise.
+      const effectiveAdvNo = debouncedFilters.advertisement_no || debouncedHierarchyFilters.adv_number;
+
       const result = await RollNumberApi.getShortlisted({
-        per_page:            paginationModel.pageSize,
-        page:                paginationModel.page + 1,
+        per_page:            needsClientNarrowing ? 2000 : paginationModel.pageSize,
+        page:                needsClientNarrowing ? 1 : paginationModel.page + 1,
         search:              debouncedFilters.search,
-        advertisement_no:    debouncedFilters.advertisement_no,
+        advertisement_no:    effectiveAdvNo,
         payment_status:      debouncedFilters.payment_status,
         exam_center_id:      debouncedFilters.exam_center_id,
         preferred_exam_city: debouncedFilters.preferred_exam_city,
@@ -186,7 +322,7 @@ const RollNumberManagement = () => {
       const payload = result?.data ?? {};
       const items   = Array.isArray(payload.data) ? payload.data : [];
 
-      const mapped = items
+      let mapped = items
         .map((item) => {
           const rollStr = typeof item.roll_number === 'string' ? item.roll_number
                         : (item.roll_number?.roll_number || null);
@@ -221,8 +357,16 @@ const RollNumberManagement = () => {
         // backend being hit hasn't picked up that filter yet.
         .filter((row) => !!row.roll_number);
 
-      setAllRows(mapped);
-      setTotalCount(payload.total ?? mapped.length);
+      if (needsClientNarrowing) {
+        mapped = mapped.filter((row) => activeDesignations.has(row.job_title));
+      }
+
+      const pageRows = needsClientNarrowing
+        ? mapped.slice(paginationModel.page * paginationModel.pageSize, (paginationModel.page + 1) * paginationModel.pageSize)
+        : mapped;
+
+      setAllRows(pageRows);
+      setTotalCount(needsClientNarrowing ? mapped.length : (payload.total ?? mapped.length));
       if (payload.stats) {
         setStats({
           total:     payload.stats.total ?? 0,
@@ -244,7 +388,7 @@ const RollNumberManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel, debouncedFilters]);
+  }, [paginationModel, debouncedFilters, debouncedHierarchyFilters, activeDesignations]);
 
   useEffect(() => {
     fetchApplications();
@@ -616,6 +760,15 @@ const RollNumberManagement = () => {
           onClearFilters={handleClearFilters}
           filterConfig={filterConfig}
           title="Filter Roll Number Slips"
+        />
+
+        {/* HIERARCHY FILTERS — Advertisement -> Department -> Post (independent of the filter bar above) */}
+        <AdvancedFilter
+          filters={hierarchyFilters}
+          onFilterChange={handleHierarchyChange}
+          onClearFilters={handleClearHierarchyFilters}
+          filterConfig={hierarchyFilterConfig}
+          title="Filter by Advertisement → Department → Post"
         />
 
         {/* BULK BAR */}
