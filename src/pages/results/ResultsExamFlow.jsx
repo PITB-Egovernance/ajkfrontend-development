@@ -141,7 +141,7 @@ const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShor
           className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors">
           <ArrowRight size={14} className="text-slate-400" /> Manage Results
         </Link>
-        {isShortlistable ? (
+        {/* {isShortlistable ? (
           <Link to={`/dashboard/results/shortlist/${rId}`} onClick={() => setActiveId(null)}
             className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors">
             <Send size={14} className="text-slate-400" /> Prepare Shortlist
@@ -150,7 +150,7 @@ const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShor
           <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50">
             <Send size={14} /> Prepare Shortlist
           </div>
-        )}
+        )} */}
         {isShortlistable ? (
           <Link to={`/dashboard/results/post-result/${rId}`} onClick={() => setActiveId(null)}
             className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors">
@@ -161,7 +161,7 @@ const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShor
             <ClipboardCheck size={14} /> Post-Result Processing
           </div>
         )}
-        <div className="my-1 border-t border-slate-100" />
+        {/* <div className="my-1 border-t border-slate-100" />
         {isPublishedState ? (
           <button onClick={() => { setActiveId(null); onGazette(job); }}
             className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors text-left">
@@ -181,8 +181,8 @@ const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShor
           <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50">
             <LayoutDashboard size={14} /> Interview Marks
           </div>
-        )}
-        {isWithdrawable ? (
+        )} */}
+        {/* {isWithdrawable ? (
           <button onClick={() => { setActiveId(null); onWithdraw(job, rId); }}
             className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded transition-colors text-left">
             <ShieldAlert size={14} className="text-rose-500" /> Withdraw Results
@@ -191,7 +191,7 @@ const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShor
           <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-slate-400 cursor-not-allowed opacity-50">
             <ShieldAlert size={14} /> Withdraw Results
           </div>
-        )}
+        )} */}
       </PortalDropdown>
     </div>
   );

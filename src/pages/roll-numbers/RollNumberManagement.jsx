@@ -40,7 +40,6 @@ const DEFAULT_FILTERS = {
   preferred_exam_city: '',
   exam_center_id: '',
   payment_status: '',
-  working_state: '',
 };
 
 // Separate, independent filter group: Advertisement -> Department -> Post.
@@ -68,9 +67,11 @@ const formatAdvertisementLabel = (value) => {
 const getDeptKey   = (jd) => jd?.department?.hash_id || jd?.department_label || null;
 const getDeptLabel = (jd) => jd?.department?.department_name || jd?.department?.name || jd?.department_label || 'Unassigned Department';
 
-const WORKING_STATE_OPTIONS = [
-  { value: 'generated', label: 'Roll No Generated (Not Published)' },
-  { value: 'published', label: 'Published' },
+// Slip Status is now driven by the Published/Unpublished tabs (not a filter
+// dropdown) — see `activeTab` below.
+const TABS = [
+  { id: 'unpublished', label: 'Unpublished Slips', slipStatus: 'generated' },
+  { id: 'published', label: 'Published Slips', slipStatus: 'published' },
 ];
 
 const gridSx = {
@@ -101,6 +102,7 @@ const RollNumberManagement = () => {
   const [loading,         setLoading]          = useState(true);
   const [paginationModel, setPaginationModel]  = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]   = useState([]);
+  const [activeTab,       setActiveTab]        = useState('unpublished');
   const selectedIds = useMemo(() => {
     if (!selectionModel) return [];
     if (Array.isArray(selectionModel)) return selectionModel;
@@ -140,10 +142,15 @@ const RollNumberManagement = () => {
     return () => clearTimeout(t);
   }, [hierarchyFilters]);
 
-  // Reset to page 1 whenever the applied filters change.
+  // Reset to page 1 whenever the applied filters or the active tab change.
   useEffect(() => {
     setPaginationModel((prev) => (prev.page === 0 ? prev : { ...prev, page: 0 }));
-  }, [debouncedFilters, debouncedHierarchyFilters]);
+  }, [debouncedFilters, debouncedHierarchyFilters, activeTab]);
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setSelectionModel([]);
+  };
 
   // ── Exam centers (for the Exam Center filter dropdown) ─────────────────
   useEffect(() => {
@@ -195,7 +202,6 @@ const RollNumberManagement = () => {
           { value: 'unpaid', label: 'Unpaid' },
         ],
       },
-      { name: 'working_state', label: 'Slip Status', type: 'select', options: WORKING_STATE_OPTIONS },
     ];
   }, [advertisements, centers]);
 
@@ -315,7 +321,7 @@ const RollNumberManagement = () => {
         payment_status:      debouncedFilters.payment_status,
         exam_center_id:      debouncedFilters.exam_center_id,
         preferred_exam_city: debouncedFilters.preferred_exam_city,
-        slip_status:         debouncedFilters.working_state,
+        slip_status:         activeTab === 'published' ? 'published' : 'generated',
         has_roll_number:     1, // only candidates whose slip has been generated belong on this list
       });
 
@@ -388,7 +394,7 @@ const RollNumberManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel, debouncedFilters, debouncedHierarchyFilters, activeDesignations]);
+  }, [paginationModel, debouncedFilters, debouncedHierarchyFilters, activeDesignations, activeTab]);
 
   useEffect(() => {
     fetchApplications();
@@ -805,8 +811,36 @@ const RollNumberManagement = () => {
           </div>
         )}
 
-        {/* GRID */}
+        {/* GRID — Published / Unpublished Slips tabs live inside the same card, same style as the All Requisitions page */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="grid w-full grid-cols-2 overflow-hidden rounded-t-lg bg-white p-1">
+            {TABS.map((t) => {
+              const isActive = activeTab === t.id;
+              const count = t.id === 'published' ? stats.published : stats.generated;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => handleTabChange(t.id)}
+                  className={`flex w-full items-center justify-center rounded-md px-5 py-3 text-sm font-semibold transition-all duration-200 ${
+                    isActive
+                      ? 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-sm'
+                      : 'bg-white text-emerald-900 hover:bg-emerald-50'
+                  }`}
+                >
+                  {t.label}
+                  <span
+                    className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-900'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           {loading && allRows.length === 0 ? (
             <div className="p-10 flex justify-center">
               <InlineLoader text="Loading applications..." variant="ring" size="lg" />

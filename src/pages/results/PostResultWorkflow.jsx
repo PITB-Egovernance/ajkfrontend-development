@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { IconButton, Menu, MenuItem } from '@mui/material';
-import { ArrowLeft, ClipboardCheck, Download, FileSpreadsheet, RefreshCw, Plus, EyeOff, ShieldCheck, MapPin, Calendar, Users, CheckCircle2, MoreVertical, Pencil, Send, X, Trash2 } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Download, FileSpreadsheet, RefreshCw, Plus, EyeOff, ShieldCheck, MapPin, Calendar, Users, CheckCircle2, MoreVertical, Pencil, Send, Trash2, X, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Card, CardContent } from 'components/ui/Card';
@@ -58,36 +58,6 @@ const TABS = [
   { id: 'onboarding', label: 'Onboarding' },
 ];
 
-// Mandatory-reason confirmation toast — mirrors the pattern already used for
-// emergency result withdrawal (ResultsExamFlow.jsx / ResultsDashboard.jsx).
-const confirmWithReason = ({ title, label = 'Provide a reason:', confirmLabel = 'Confirm', confirmColor = 'bg-rose-600 hover:bg-rose-700' }) =>
-  new Promise((resolve) => {
-    let reasonText = '';
-    toast((t) => (
-      <div className="flex flex-col gap-3 min-w-[340px] p-1 text-left">
-        <div>
-          <p className="font-bold text-slate-800 text-sm">{title}</p>
-          <p className="text-xs text-slate-500 mt-1">{label}</p>
-        </div>
-        <textarea rows={3} placeholder="Enter reason..."
-          onChange={(e) => { reasonText = e.target.value; }}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 bg-white" />
-        <div className="flex gap-2 justify-end">
-          <button onClick={() => { toast.dismiss(t.id); resolve(null); }}
-            className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors">
-            Cancel
-          </button>
-          <button onClick={() => {
-            const trimmed = reasonText.trim();
-            if (!trimmed) { toast.error('A reason is required.', { id: 'reason-validation' }); return; }
-            toast.dismiss(t.id); resolve(trimmed);
-          }} className={`px-3 py-1.5 text-xs font-semibold text-white rounded-md transition-colors ${confirmColor}`}>
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    ), { duration: Infinity, position: 'top-center' });
-  });
 
 const numberCol = (field, headerName, width = 110) => ({ field, headerName, width, sortable: false });
 const textCol = (field, headerName, flex = 1) => ({ field, headerName, flex, minWidth: 140, sortable: false });
@@ -260,21 +230,44 @@ const PostResultWorkflow = () => {
   const [phasesLoading, setPhasesLoading] = useState(false);
   const [newPhase, setNewPhase] = useState(EMPTY_NEW_PHASE);
 
-  // Interview Candidates row action menu (three-dot menu) + Edit Interview
-  // Details modal — same IconButton/Menu/MenuItem pattern as the row menu on
-  // the All Candidates (Roll Number Management) page.
+  // Interview Candidates row action menu (three-dot menu) — same
+  // IconButton/Menu/MenuItem pattern as the row menu on the All Candidates
+  // (Roll Number Management) page. "Edit Interview Details" navigates to the
+  // dedicated Edit Candidate Interview page (same pattern as Edit Roll
+  // Number Slip / Edit Interview Phase) rather than a modal.
   const [actionAnchorEl, setActionAnchorEl] = useState(null);
   const [actionRow, setActionRow] = useState(null);
-  const [editPhaseOpen, setEditPhaseOpen] = useState(false);
-  const [editPhaseRow, setEditPhaseRow] = useState(null);
-  const [editPhaseSelection, setEditPhaseSelection] = useState('');
-  const [editPhaseSaving, setEditPhaseSaving] = useState(false);
 
   // Interview Phase Allocation table row menu (three-dot menu, same pattern
   // as the Interview Candidates row menu above) — Publish/Unpublish + Edit
   // Interview (opens the dedicated Edit Interview Phase page).
   const [phaseMenuAnchor, setPhaseMenuAnchor] = useState(null);
   const [phaseMenuRow, setPhaseMenuRow] = useState(null);
+
+  // Mandatory-reason confirmation dialog (Initial/Final Rejection) — a real
+  // backdrop modal rather than a react-hot-toast popup, since a toast has no
+  // dimmed backdrop and looked visually broken (page content showing through
+  // behind it) for a dialog this prominent.
+  const [reasonPrompt, setReasonPrompt] = useState(null); // { title, label, confirmLabel, confirmColor, resolve } | null
+  const [reasonText, setReasonText] = useState('');
+
+  const askForReason = ({ title, label = 'Provide a reason:', confirmLabel = 'Confirm', confirmColor = 'bg-rose-600 hover:bg-rose-700' }) =>
+    new Promise((resolve) => {
+      setReasonText('');
+      setReasonPrompt({ title, label, confirmLabel, confirmColor, resolve });
+    });
+
+  const handleReasonCancel = () => {
+    reasonPrompt?.resolve(null);
+    setReasonPrompt(null);
+  };
+
+  const handleReasonConfirm = () => {
+    const trimmed = reasonText.trim();
+    if (!trimmed) { toast.error('A reason is required.'); return; }
+    reasonPrompt?.resolve(trimmed);
+    setReasonPrompt(null);
+  };
 
   // Onboarding tab has two sub-views: candidates eligible to start, and
   // candidates already started/onboarded (who need the "Mark Onboarded" action).
@@ -384,14 +377,14 @@ const PostResultWorkflow = () => {
 
   const handleInitialRejection = async () => {
     if (selectedIds.length === 0) return;
-    const reason = await confirmWithReason({ title: 'Initial Rejection', label: `Reason for rejecting ${selectedIds.length} candidate(s):`, confirmLabel: 'Reject' });
+    const reason = await askForReason({ title: 'Initial Rejection', label: `Reason for rejecting ${selectedIds.length} candidate(s):`, confirmLabel: 'Reject' });
     if (!reason) return;
     await runAction(() => PostResultApi.generateInitialRejection(jobId, selectedIds, reason), 'Candidates initially rejected');
   };
 
   const handleFinalRejectionDirect = async () => {
     if (selectedIds.length === 0) return;
-    const reason = await confirmWithReason({ title: 'Final Rejection', label: `This is a direct FINAL rejection for ${selectedIds.length} candidate(s). Reason:`, confirmLabel: 'Finally Reject' });
+    const reason = await askForReason({ title: 'Final Rejection', label: `This is a direct FINAL rejection for ${selectedIds.length} candidate(s). Reason:`, confirmLabel: 'Finally Reject' });
     if (!reason) return;
     await runAction(() => PostResultApi.generateFinalRejectionDirect(jobId, selectedIds, reason), 'Candidates finally rejected');
   };
@@ -411,7 +404,7 @@ const PostResultWorkflow = () => {
 
   const handleFinalRejectionFromInitial = async () => {
     if (selectedIds.length === 0) return;
-    const reason = await confirmWithReason({ title: 'Generate Final Rejection', label: `Confirm/update the final rejection reason for ${selectedIds.length} candidate(s):`, confirmLabel: 'Finally Reject' });
+    const reason = await askForReason({ title: 'Generate Final Rejection', label: `Confirm/update the final rejection reason for ${selectedIds.length} candidate(s):`, confirmLabel: 'Finally Reject' });
     if (!reason) return;
     await runAction(() => PostResultApi.generateFinalRejectionFromInitial(jobId, selectedIds, reason), 'Candidates finally rejected');
   };
@@ -570,31 +563,20 @@ const PostResultWorkflow = () => {
     } catch (err) { toast.error(err.message || 'Failed to unpublish call letter'); }
   };
 
-  const handleOpenEditPhase = (row) => {
-    setEditPhaseRow(row);
-    setEditPhaseSelection(row.interview_phase_id ? String(row.interview_phase_id) : '');
-    setEditPhaseOpen(true);
-  };
-
-  const handleSaveEditPhase = async () => {
-    if (!editPhaseRow?.call_letter_id) return;
-    setEditPhaseSaving(true);
-    try {
-      await PostResultApi.moveCandidate(editPhaseRow.call_letter_id, editPhaseSelection || null);
-      toast.success('Interview details updated');
-      setEditPhaseOpen(false);
-      setEditPhaseRow(null);
-      fetchPhases();
-      fetchList();
-    } catch (err) {
-      toast.error(err.message || 'Failed to update interview details');
-    } finally {
-      setEditPhaseSaving(false);
-    }
+  const handleEditCandidateInterview = (row) => {
+    navigate(`/dashboard/results/post-result/${jobId}/interview-candidate/${row.call_letter_id}/edit`, { state: { row } });
   };
 
   const handleExport = async (format) => {
-    const tabMap = { shortlisted: 'shortlisted', 'initial-rejection': 'initial-rejections', 'final-rejection': 'final-rejections' };
+    const tabMap = {
+      passed: 'passed',
+      shortlisted: 'shortlisted',
+      'initial-rejection': 'initial-rejections',
+      'final-rejection': 'final-rejections',
+      interview: 'interview',
+      'award-list': 'award-list',
+      onboarding: 'onboarding',
+    };
     const tab = tabMap[activeTab];
     if (!tab) return;
     try {
@@ -721,8 +703,6 @@ const PostResultWorkflow = () => {
     return null;
   };
 
-  const exportable = ['shortlisted', 'initial-rejection', 'final-rejection'].includes(activeTab);
-
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="max-w-8xl mx-auto space-y-6">
@@ -744,17 +724,13 @@ const PostResultWorkflow = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="md" onClick={fetchList} disabled={loading}
+            {/* <Button variant="outline" size="md" onClick={fetchList} disabled={loading}
               className="h-10 w-10 min-w-[2.5rem] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
               title="Refresh" aria-label="Refresh">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            </Button>
-            {exportable && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => handleExport('pdf')}><FileSpreadsheet size={14} className="mr-1" /> Export PDF</Button>
-                <Button size="sm" variant="outline" onClick={() => handleExport('excel')}><FileSpreadsheet size={14} className="mr-1" /> Export Excel</Button>
-              </>
-            )}
+            </Button> */}
+            <Button size="sm" variant="outline" onClick={() => handleExport('pdf')}><FileSpreadsheet size={14} className="mr-1" /> Export PDF</Button>
+            <Button size="sm" variant="outline" onClick={() => handleExport('excel')}><FileSpreadsheet size={14} className="mr-1" /> Export Excel</Button>
           </div>
         </div>
 
@@ -1010,8 +986,8 @@ const PostResultWorkflow = () => {
           disabled={!actionRow?.call_letter_id}>
           <Download size={16} style={{ marginRight: '8px' }} className="text-violet-600" /> Download Call Letter
         </MenuItem>
-        <MenuItem key="edit" onClick={() => { const row = actionRow; handleActionMenuClose(); if (row) handleOpenEditPhase(row); }}
-          disabled={!actionRow?.call_letter_id || actionRow?.call_letter_status === 'published'}>
+        <MenuItem key="edit" onClick={() => { const row = actionRow; handleActionMenuClose(); if (row) handleEditCandidateInterview(row); }}
+          disabled={!actionRow?.call_letter_id}>
           <Pencil size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Edit Interview Details
         </MenuItem>
         {actionRow?.call_letter_status !== 'published' && (
@@ -1049,37 +1025,54 @@ const PostResultWorkflow = () => {
         </MenuItem>
       </Menu>
 
-      {/* ── Edit Interview Details modal — reassign the candidate's interview phase ── */}
-      {editPhaseOpen && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-md p-6 space-y-4 shadow-lg border border-slate-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">Edit Interview Details</h3>
-              <button onClick={() => setEditPhaseOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+      {/* ── Mandatory-reason dialog (Initial/Final Rejection) — real backdrop modal, not a toast ── */}
+      {reasonPrompt && (
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl border border-slate-200">
+            <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle size={16} className="text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{reasonPrompt.title}</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">{reasonPrompt.label}</p>
+                </div>
+              </div>
+              <button onClick={handleReasonCancel} className="p-1.5 -mt-1 -mr-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 flex-shrink-0">
                 <X size={16} />
               </button>
             </div>
-            <p className="text-sm text-slate-500">
-              Candidate: <span className="font-semibold text-slate-800">{editPhaseRow?.candidate_name}</span> ({editPhaseRow?.roll_number})
-            </p>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-500">Interview Phase / Batch</label>
-              <SearchableSelect
-                value={editPhaseSelection}
-                onChange={(e) => setEditPhaseSelection(e.target.value)}
-                options={phases.map((p) => ({ value: String(p.id), label: `${p.phase_name} — ${p.interview_date}${p.interview_time ? ` · ${p.interview_time}` : ''}` }))}
-                placeholder="Select a phase"
+
+            <div className="px-6 pb-2">
+              <textarea
+                rows={4}
+                autoFocus
+                value={reasonText}
+                onChange={(e) => setReasonText(e.target.value)}
+                placeholder="Enter reason..."
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 bg-white resize-none"
               />
             </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setEditPhaseOpen(false)} disabled={editPhaseSaving}>Cancel</Button>
-              <Button className="flex-1" onClick={handleSaveEditPhase} disabled={editPhaseSaving || !editPhaseSelection}>
-                {editPhaseSaving ? 'Saving…' : 'Save Changes'}
-              </Button>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-100">
+              <button
+                onClick={handleReasonCancel}
+                className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReasonConfirm}
+                className={`flex-1 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${reasonPrompt.confirmColor}`}
+              >
+                {reasonPrompt.confirmLabel}
+              </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };
