@@ -104,6 +104,8 @@ import TermsAndConditionsManagement from "pages/settings/TermsAndConditions/Term
 import VerificationPage from 'pages/results/VerificationPage';
 import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
 import ResultsExamFlow from 'pages/results/ResultsExamFlow';
+import PostResultWorkflow from 'pages/results/PostResultWorkflow';
+import PostResultLanding from 'pages/results/PostResultLanding';
 import StatisticalSummary from 'pages/results/StatisticalSummary';
 import AuditTrailReport from 'pages/results/AuditTrailReport';
 import ScrutinyRequests from 'pages/results/ScrutinyRequests';
@@ -350,6 +352,22 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'director']}>
                 <InterviewShortlistPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/post-result"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'secretary', 'interview_secretary', 'senior_admin', 'chairman', 'director']}>
+                <PostResultLanding />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/post-result/:jobId"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'secretary', 'interview_secretary', 'senior_admin', 'chairman', 'director']}>
+                <PostResultWorkflow />
               </ProtectedRoute>
             }
           />

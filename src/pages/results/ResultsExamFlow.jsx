@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Award, ArrowLeft, Search, ChevronDown, Filter,
   FileSpreadsheet, ArrowRight, Send, FileText,
-  LayoutDashboard, ShieldAlert,
+  LayoutDashboard, ShieldAlert, ClipboardCheck,
 } from 'lucide-react';
 import { TextField } from '@mui/material';
 import toast from 'react-hot-toast';
@@ -149,6 +149,16 @@ const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShor
         ) : (
           <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50">
             <Send size={14} /> Prepare Shortlist
+          </div>
+        )}
+        {isShortlistable ? (
+          <Link to={`/dashboard/results/post-result/${rId}`} onClick={() => setActiveId(null)}
+            className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors">
+            <ClipboardCheck size={14} className="text-slate-400" /> Post-Result Processing
+          </Link>
+        ) : (
+          <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50">
+            <ClipboardCheck size={14} /> Post-Result Processing
           </div>
         )}
         <div className="my-1 border-t border-slate-100" />

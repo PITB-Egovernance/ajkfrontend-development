@@ -169,7 +169,12 @@ const ActionCell = ({ job, isAdmin, isDirector, userRole, handleOpenPublish, han
           Manage Results
         </MenuItem>
 
-        {isShortlistable ? (
+        <MenuItem onClick={() => { handleClose(); navigate(`/dashboard/results/verification`); }}>
+          <ArrowRight className="h-4 w-4 text-slate-400 mr-2" />
+          Verification Results
+        </MenuItem>
+
+        {/* {isShortlistable ? (
           <MenuItem onClick={() => { handleClose(); navigate(`/dashboard/results/shortlist/${rId}`); }}>
             <Send className="h-4 w-4 text-slate-400 mr-2" />
             Prepare Shortlist
@@ -179,11 +184,11 @@ const ActionCell = ({ job, isAdmin, isDirector, userRole, handleOpenPublish, han
             <Send className="h-4 w-4 text-slate-400 mr-2" />
             Prepare Shortlist
           </MenuItem>
-        )}
+        )} */}
 
         <div className="my-1 border-t border-slate-105" />
 
-        {isGazetteReady ? (
+        {/* {isGazetteReady ? (
           <MenuItem onClick={() => { handleClose(); handleDownloadGazette(job); }}>
             <FileText className="h-4 w-4 text-slate-400 mr-2" />
             Official Gazette
@@ -232,7 +237,7 @@ const ActionCell = ({ job, isAdmin, isDirector, userRole, handleOpenPublish, han
             <ShieldAlert className="h-4 w-4 text-slate-400 mr-2" />
             Withdraw Gazette
           </MenuItem>
-        )}
+        )} */}
       </Menu>
     </div>
   );
@@ -379,38 +384,38 @@ const ResultsDashboard = () => {
       iconBg: 'bg-indigo-600',
       show: isAdmin
     },
-    {
-      title: 'Statistical Summary',
-      desc: 'Pass %, score distribution, toppers & category breakdown',
-      link: '/dashboard/results/statistical-summary',
-      icon: BarChart2,
-      iconBg: 'bg-emerald-600',
-      show: isAdmin
-    },
-    {
-      title: 'Audit Trail Report',
-      desc: 'Chronological vigilance log of mark uploads, changes & approvals',
-      link: '/dashboard/results/audit-trail',
-      icon: History,
-      iconBg: 'bg-slate-700',
-      show: isAdmin
-    },
-    {
-      title: 'Scrutiny & Rechecking',
-      desc: 'Verify, review & resolve candidate paper recounting appeals',
-      link: '/dashboard/results/scrutiny',
-      icon: ClipboardCheck,
-      iconBg: 'bg-amber-600',
-      show: isAdmin
-    },
-    {
-      title: 'Award Lists',
-      desc: 'View, track & manage final candidate recommendation and merit award lists',
-      link: '/dashboard/award-lists',
-      icon: Award,
-      iconBg: 'bg-blue-600',
-      show: isAdmin
-    }
+    // {
+    //   title: 'Statistical Summary',
+    //   desc: 'Pass %, score distribution, toppers & category breakdown',
+    //   link: '/dashboard/results/statistical-summary',
+    //   icon: BarChart2,
+    //   iconBg: 'bg-emerald-600',
+    //   show: isAdmin
+    // },
+    // {
+    //   title: 'Audit Trail Report',
+    //   desc: 'Chronological vigilance log of mark uploads, changes & approvals',
+    //   link: '/dashboard/results/audit-trail',
+    //   icon: History,
+    //   iconBg: 'bg-slate-700',
+    //   show: isAdmin
+    // },
+    // {
+    //   title: 'Scrutiny & Rechecking',
+    //   desc: 'Verify, review & resolve candidate paper recounting appeals',
+    //   link: '/dashboard/results/scrutiny',
+    //   icon: ClipboardCheck,
+    //   iconBg: 'bg-amber-600',
+    //   show: isAdmin
+    // },
+    // {
+    //   title: 'Award Lists',
+    //   desc: 'View, track & manage final candidate recommendation and merit award lists',
+    //   link: '/dashboard/award-lists',
+    //   icon: Award,
+    //   iconBg: 'bg-blue-600',
+    //   show: isAdmin
+    // }
   ];
 
   const columns = useMemo(() => [
@@ -550,7 +555,7 @@ const ResultsDashboard = () => {
           )}
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions
         <div className="space-y-4">
           <h2 className="text-base font-semibold text-slate-900">Featured Workflows</h2>
 
@@ -574,7 +579,7 @@ const ResultsDashboard = () => {
               </Link>
             ))}
           </div>
-        </div>
+        </div> */}
 
 
 
