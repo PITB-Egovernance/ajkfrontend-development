@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, Download, FileSpreadsheet, RefreshCw, Plus, EyeOff, Eye, ShieldCheck, MapPin, Calendar, Users, CheckCircle2 } from 'lucide-react';
+import { IconButton, Menu, MenuItem } from '@mui/material';
+import { ArrowLeft, ClipboardCheck, Download, FileSpreadsheet, RefreshCw, Plus, EyeOff, Eye, ShieldCheck, MapPin, Calendar, Users, CheckCircle2, MoreVertical, Pencil, Send, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Card, CardContent } from 'components/ui/Card';
@@ -243,6 +244,16 @@ const PostResultWorkflow = () => {
   const [phasesLoading, setPhasesLoading] = useState(false);
   const [newPhase, setNewPhase] = useState(EMPTY_NEW_PHASE);
 
+  // Interview Candidates row action menu (three-dot menu) + Edit Interview
+  // Details modal — same IconButton/Menu/MenuItem pattern as the row menu on
+  // the All Candidates (Roll Number Management) page.
+  const [actionAnchorEl, setActionAnchorEl] = useState(null);
+  const [actionRow, setActionRow] = useState(null);
+  const [editPhaseOpen, setEditPhaseOpen] = useState(false);
+  const [editPhaseRow, setEditPhaseRow] = useState(null);
+  const [editPhaseSelection, setEditPhaseSelection] = useState('');
+  const [editPhaseSaving, setEditPhaseSaving] = useState(false);
+
   // Onboarding tab has two sub-views: candidates eligible to start, and
   // candidates already started/onboarded (who need the "Mark Onboarded" action).
   const [onboardingView, setOnboardingView] = useState('eligible');
@@ -472,6 +483,63 @@ const PostResultWorkflow = () => {
     } catch (err) { toast.error(err.message || 'Download failed'); }
   };
 
+  // ── Interview Candidates row menu ──
+  const handleActionMenuOpen = (e, row) => { setActionAnchorEl(e.currentTarget); setActionRow(row); };
+  const handleActionMenuClose = () => { setActionAnchorEl(null); setActionRow(null); };
+
+  const handlePublishRow = async (row) => {
+    if (!row?.call_letter_id) return;
+    const ok = await confirmDelete({
+      title: 'Publish Call Letter',
+      message: `Publish the interview call letter for ${row.candidate_name}? It will become visible to the candidate immediately.`,
+      confirmLabel: 'Publish', confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
+    });
+    if (!ok) return;
+    try {
+      await PostResultApi.bulkPublishCallLetters([row.call_letter_id]);
+      toast.success('Call letter published');
+      fetchList();
+    } catch (err) { toast.error(err.message || 'Failed to publish call letter'); }
+  };
+
+  const handleUnpublishRow = async (row) => {
+    if (!row?.call_letter_id) return;
+    const ok = await confirmDelete({
+      title: 'Unpublish Call Letter',
+      message: `Unpublish the interview call letter for ${row.candidate_name}? It will no longer be visible to the candidate.`,
+      confirmLabel: 'Unpublish', confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!ok) return;
+    try {
+      await PostResultApi.bulkUnpublishCallLetters([row.call_letter_id]);
+      toast.success('Call letter unpublished');
+      fetchList();
+    } catch (err) { toast.error(err.message || 'Failed to unpublish call letter'); }
+  };
+
+  const handleOpenEditPhase = (row) => {
+    setEditPhaseRow(row);
+    setEditPhaseSelection(row.interview_phase_id ? String(row.interview_phase_id) : '');
+    setEditPhaseOpen(true);
+  };
+
+  const handleSaveEditPhase = async () => {
+    if (!editPhaseRow?.call_letter_id) return;
+    setEditPhaseSaving(true);
+    try {
+      await PostResultApi.moveCandidate(editPhaseRow.call_letter_id, editPhaseSelection || null);
+      toast.success('Interview details updated');
+      setEditPhaseOpen(false);
+      setEditPhaseRow(null);
+      fetchPhases();
+      fetchList();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update interview details');
+    } finally {
+      setEditPhaseSaving(false);
+    }
+  };
+
   const handleExport = async (format) => {
     const tabMap = { shortlisted: 'shortlisted', 'initial-rejection': 'initial-rejections', 'final-rejection': 'final-rejections' };
     const tab = tabMap[activeTab];
@@ -516,11 +584,12 @@ const PostResultWorkflow = () => {
         textCol('interview_date', 'Interview Date', 0.8),
         statusCol('call_letter_status', 'Call Letter Status', 1),
         {
-          field: 'actions', headerName: 'Call Letter', width: 130, sortable: false,
+          field: 'actions', headerName: 'Actions', width: 90, sortable: false,
+          align: 'center', headerAlign: 'center', resizable: false,
           renderCell: (params) => (
-            <button onClick={() => handleDownloadCallLetter(params.row)} className="text-emerald-700 hover:text-emerald-900 flex items-center gap-1 text-xs font-semibold">
-              <Download size={14} /> PDF
-            </button>
+            <IconButton size="small" onClick={(e) => handleActionMenuOpen(e, params.row)}>
+              <MoreVertical size={18} />
+            </IconButton>
           ),
         },
       ];
@@ -878,6 +947,63 @@ const PostResultWorkflow = () => {
         </div>
 
       </div>
+
+      {/* ── Interview Candidates row menu — same IconButton/Menu/MenuItem pattern as All Candidates (Roll Number Management) ── */}
+      <Menu anchorEl={actionAnchorEl} open={Boolean(actionAnchorEl)} onClose={handleActionMenuClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <MenuItem key="download" onClick={() => { handleDownloadCallLetter(actionRow); handleActionMenuClose(); }}
+          disabled={!actionRow?.call_letter_id}>
+          <Download size={16} style={{ marginRight: '8px' }} className="text-violet-600" /> Download Call Letter
+        </MenuItem>
+        <MenuItem key="edit" onClick={() => { const row = actionRow; handleActionMenuClose(); if (row) handleOpenEditPhase(row); }}
+          disabled={!actionRow?.call_letter_id || actionRow?.call_letter_status === 'published'}>
+          <Pencil size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Edit Interview Details
+        </MenuItem>
+        {actionRow?.call_letter_status !== 'published' && (
+          <MenuItem key="publish" onClick={() => { const row = actionRow; handleActionMenuClose(); handlePublishRow(row); }}
+            disabled={!actionRow?.call_letter_id}>
+            <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-600" /> Publish
+          </MenuItem>
+        )}
+        {actionRow?.call_letter_status === 'published' && (
+          <MenuItem key="unpublish" onClick={() => { const row = actionRow; handleActionMenuClose(); handleUnpublishRow(row); }}>
+            <EyeOff size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Unpublish
+          </MenuItem>
+        )}
+      </Menu>
+
+      {/* ── Edit Interview Details modal — reassign the candidate's interview phase ── */}
+      {editPhaseOpen && (
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-md p-6 space-y-4 shadow-lg border border-slate-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900">Edit Interview Details</h3>
+              <button onClick={() => setEditPhaseOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500">
+              Candidate: <span className="font-semibold text-slate-800">{editPhaseRow?.candidate_name}</span> ({editPhaseRow?.roll_number})
+            </p>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-500">Interview Phase / Batch</label>
+              <SearchableSelect
+                value={editPhaseSelection}
+                onChange={(e) => setEditPhaseSelection(e.target.value)}
+                options={phases.map((p) => ({ value: String(p.id), label: `${p.phase_name} — ${p.interview_date}${p.interview_time ? ` · ${p.interview_time}` : ''}` }))}
+                placeholder="Select a phase"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setEditPhaseOpen(false)} disabled={editPhaseSaving}>Cancel</Button>
+              <Button className="flex-1" onClick={handleSaveEditPhase} disabled={editPhaseSaving || !editPhaseSelection}>
+                {editPhaseSaving ? 'Saving…' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
