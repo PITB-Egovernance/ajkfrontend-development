@@ -1,0 +1,39 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "feat-results-cce-design",
+    "feat-results-v2-bugfix",
+    "feat-results-v3",
+    "fix/results-exam-filtering",
+    "fix/results-production-schema-phase3",
+    "fix/verification-queue-clubbed-dropdown",
+    "fix/written-exam-import-discrepancies",
+    "main",
+    "master",
+    "origin"
+  ],
+  "parent": {
+    "feat-results-cce-design": "main",
+    "feat-results-v2-bugfix": "main",
+    "feat-results-v3": "main",
+    "fix/results-exam-filtering": "main",
+    "fix/results-production-schema-phase3": "main",
+    "fix/verification-queue-clubbed-dropdown": "main",
+    "fix/written-exam-import-discrepancies": "main",
+    "main": null,
+    "master": "main",
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "feat-results-cce-design",
+    "feat-results-v2-bugfix",
+    "feat-results-v3",
+    "fix/results-exam-filtering",
+    "fix/results-production-schema-phase3",
+    "fix/verification-queue-clubbed-dropdown",
+    "fix/written-exam-import-discrepancies",
+    "master",
+    "origin"
+  ]
+}

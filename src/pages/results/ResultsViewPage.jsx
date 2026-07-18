@@ -80,11 +80,17 @@ const ResultsViewPage = () => {
     return () => clearTimeout(timer);
   }, [fetchData]);
 
+  const [clubbedJobIds, setClubbedJobIds] = useState([]);
+  const [examType, setExamType] = useState('');
+
   // Fetch Job details to show designation
   useEffect(() => {
     const fetchJobDetails = async () => {
       try {
-        const res = await AdvertisementApi.getAll(1);
+        const [res, groupsRes] = await Promise.all([
+          AdvertisementApi.getAll(1).catch(() => ({})),
+          ResultsApi.getClubbedGroups([jobId], 'combined_competitive_exam', 'cce-exams').catch(() => ({})),
+        ]);
         let advertisements = [];
         if (res && res.data) {
           if (Array.isArray(res.data.data)) {
@@ -107,7 +113,19 @@ const ResultsViewPage = () => {
           }
         );
         if (matched) {
-          setJobName(`${matched.designation} (Adv: ${matched.adv_number || 'N/A'})`);
+          const category = matched.resolved_test_type_exam_category || matched.pivot?.test_type_exam_category || '';
+          if (category === 'combined_competitive_exam') {
+            setExamType('cce-exams');
+          }
+          const groups = groupsRes?.data?.groups ?? groupsRes?.groups ?? [];
+          const activeGroup = groups.find(g => (g.post_ids || []).includes(jobId));
+          if (activeGroup && activeGroup.posts) {
+            setClubbedJobIds(activeGroup.post_ids || []);
+            const designations = activeGroup.posts.map(p => p.post_name).join(' & ');
+            setJobName(`${designations} (Adv: ${matched.adv_number || 'N/A'})`);
+          } else {
+            setJobName(`${matched.designation} (Adv: ${matched.adv_number || 'N/A'})`);
+          }
         }
       } catch (err) {
         console.error('Failed to load job details:', err);
@@ -297,7 +315,13 @@ const ResultsViewPage = () => {
           <Button
             variant="outline"
             className="border-slate-200 bg-white text-slate-600 font-semibold text-xs px-4 h-9 rounded-lg hover:bg-slate-50 flex items-center gap-2"
-            onClick={() => navigate(`/dashboard/results/import/${jobId}`)}
+            onClick={() => {
+              const queryParams = new URLSearchParams();
+              if (examType) queryParams.set('examType', examType);
+              if (clubbedJobIds.length > 0) queryParams.set('clubbedJobIds', clubbedJobIds.join(','));
+              const queryString = queryParams.toString();
+              navigate(`/dashboard/results/import/${jobId}${queryString ? '?' + queryString : ''}`);
+            }}
           >
             <Plus size={16} />
             Bulk Import
