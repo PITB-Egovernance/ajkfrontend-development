@@ -706,11 +706,16 @@ const ImportResultsPage = () => {
           }))
         );
 
-        // Find primary matching job name
+        // Find matching designations for all selected job IDs
+        const selectedJobs = fetchedJobs.filter(j => selectedJobIds.includes(j.hash_id || String(j.id)));
+        const combinedDesignation = selectedJobs.length > 0 
+          ? [...new Set(selectedJobs.map(j => j.designation))].join(' & ')
+          : '';
+
         const job = fetchedJobs.find(j => (j.hash_id || String(j.id)) === jobId);
         let activeExamType = examType;
         if (job) {
-          setPostName(job.designation || '');
+          setPostName(combinedDesignation || job.designation || '');
           const category = job.resolved_test_type_exam_category || job.pivot?.test_type_exam_category || '';
           if (category === 'one_paper_mcq') activeExamType = 'one-paper-mcqs';
           if (category === 'two_paper_mcq') activeExamType = 'two-paper-mcqs';
