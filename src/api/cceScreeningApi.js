@@ -85,6 +85,52 @@ const CceScreeningApi = {
     });
     return handleResponse(res);
   },
+
+  downloadTemplate: async (advertisementIds) => {
+    const ids = Array.isArray(advertisementIds) ? advertisementIds : [advertisementIds];
+    const res = await fetch(`${ADMIN_API_BASE}/cce/screening/template?advertisement_id=${ids.join(',')}`, {
+      method: 'GET',
+      headers: getAdminHeaders(false),
+    });
+
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({}));
+      const error = new Error(result.message || 'Download failed');
+      error.status = res.status;
+      throw error;
+    }
+
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition');
+    let filename = 'CCE_Screening_Template.xlsx';
+    if (disposition && disposition.indexOf('attachment') !== -1) {
+      const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+      const matches = filenameRegex.exec(disposition);
+      if (matches != null && matches[1]) {
+        filename = matches[1].replace(/['"]/g, '');
+      }
+    }
+
+    return { blob, filename };
+  },
+
+  importMarks: async (formData) => {
+    const token = AuthService.getToken();
+    const headers = {
+      'Accept': 'application/json',
+      'X-API-KEY': ADMIN_API_KEY,
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${ADMIN_API_BASE}/cce/screening/import`, {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+    });
+    return handleResponse(res);
+  },
 };
 
 export default CceScreeningApi;
