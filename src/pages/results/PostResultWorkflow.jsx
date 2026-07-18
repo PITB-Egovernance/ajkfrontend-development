@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { IconButton, Menu, MenuItem } from '@mui/material';
-import { ArrowLeft, ClipboardCheck, Download, FileSpreadsheet, RefreshCw, Plus, EyeOff, Eye, ShieldCheck, MapPin, Calendar, Users, CheckCircle2, MoreVertical, Pencil, Send, X } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Download, FileSpreadsheet, RefreshCw, Plus, EyeOff, ShieldCheck, MapPin, Calendar, Users, CheckCircle2, MoreVertical, Pencil, Send, X, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Card, CardContent } from 'components/ui/Card';
@@ -91,6 +91,22 @@ const confirmWithReason = ({ title, label = 'Provide a reason:', confirmLabel = 
 
 const numberCol = (field, headerName, width = 110) => ({ field, headerName, width, sortable: false });
 const textCol = (field, headerName, flex = 1) => ({ field, headerName, flex, minWidth: 140, sortable: false });
+
+// "14:30" / "14:30:00" -> "2:30 PM" — same 12-hour display convention as
+// the Roll Number Slip editor's formatTime12h().
+const formatTime12h = (value) => {
+  if (!value) return '—';
+  const [h, m] = value.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return value;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+const timeCol = (field, headerName, flex = 0.7) => ({
+  field, headerName, flex, minWidth: 120, sortable: false,
+  renderCell: (params) => <span className="text-slate-600">{formatTime12h(params.value)}</span>,
+});
 
 // Same colored-pill convention used for Exam Status / Verification Status on
 // the Verification Queue page (emerald = positive/final, blue = in progress,
@@ -253,6 +269,12 @@ const PostResultWorkflow = () => {
   const [editPhaseRow, setEditPhaseRow] = useState(null);
   const [editPhaseSelection, setEditPhaseSelection] = useState('');
   const [editPhaseSaving, setEditPhaseSaving] = useState(false);
+
+  // Interview Phase Allocation table row menu (three-dot menu, same pattern
+  // as the Interview Candidates row menu above) — Publish/Unpublish + Edit
+  // Interview (opens the dedicated Edit Interview Phase page).
+  const [phaseMenuAnchor, setPhaseMenuAnchor] = useState(null);
+  const [phaseMenuRow, setPhaseMenuRow] = useState(null);
 
   // Onboarding tab has two sub-views: candidates eligible to start, and
   // candidates already started/onboarded (who need the "Mark Onboarded" action).
@@ -476,6 +498,37 @@ const PostResultWorkflow = () => {
     } catch (err) { toast.error(err.message || 'Failed to unpublish phase'); }
   };
 
+  const handlePhaseMenuOpen = (e, row) => { setPhaseMenuAnchor(e.currentTarget); setPhaseMenuRow(row); };
+  const handlePhaseMenuClose = () => { setPhaseMenuAnchor(null); setPhaseMenuRow(null); };
+
+  const handleEditPhasePage = (row) => {
+    navigate(`/dashboard/results/post-result/${jobId}/interview-phase/${row.id}/edit`, { state: { row } });
+  };
+
+  const handleDeletePhase = async (row) => {
+    if (!row) return;
+    if ((row.call_letters_count ?? 0) > 0) {
+      toast.error('Cannot delete a phase that has assigned candidates — move them out first');
+      return;
+    }
+    const ok = await confirmDelete({
+      title: 'Delete Interview Phase',
+      message: `Delete the interview phase "${row.phase_name}"? This cannot be undone.`,
+      identifier: row.phase_name,
+      warning: 'This only works for phases with no candidates assigned.',
+      confirmLabel: 'Delete',
+      confirmColor: 'bg-rose-600 hover:bg-rose-700',
+    });
+    if (!ok) return;
+    try {
+      const res = await PostResultApi.deleteInterviewPhase(row.id);
+      toast.success(res?.message || 'Interview phase deleted');
+      fetchPhases();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete interview phase');
+    }
+  };
+
   const handleDownloadCallLetter = async (row) => {
     if (!row.call_letter_id) { toast.error('No call letter generated yet'); return; }
     try {
@@ -582,6 +635,8 @@ const PostResultWorkflow = () => {
         numberCol('obtained_marks', 'Obtained Marks'),
         textCol('interview_phase_name', 'Interview Phase', 1),
         textCol('interview_date', 'Interview Date', 0.8),
+        timeCol('reporting_time', 'Reporting Time'),
+        timeCol('interview_time', 'Interview Time'),
         statusCol('call_letter_status', 'Call Letter Status', 1),
         {
           field: 'actions', headerName: 'Actions', width: 90, sortable: false,
@@ -611,6 +666,7 @@ const PostResultWorkflow = () => {
         numberCol('obtained_marks', 'Obtained Marks'),
         textCol('interview_phase', 'Interview Phase', 1),
         textCol('interview_date', 'Interview Date', 0.8),
+        timeCol('interview_time', 'Interview Time'),
         statusCol('call_letter_status', 'Call Letter Status', 0.9),
         statusCol('interview_award_status', 'Interview/Award Status', 1),
       ];
@@ -861,8 +917,8 @@ const PostResultWorkflow = () => {
                             {p.interview_day && <p className="text-xs text-slate-400">{p.interview_day}</p>}
                           </td>
                           <td className="px-4 py-3 text-slate-600">{p.interview_date || '—'}</td>
-                          <td className="px-4 py-3 text-slate-600">{p.reporting_time || '—'}</td>
-                          <td className="px-4 py-3 text-slate-600">{p.interview_time || '—'}</td>
+                          <td className="px-4 py-3 text-slate-600">{formatTime12h(p.reporting_time)}</td>
+                          <td className="px-4 py-3 text-slate-600">{formatTime12h(p.interview_time)}</td>
                           <td className="px-4 py-3 text-right text-slate-600">{hasCapacity ? p.capacity : 'Unlimited'}</td>
                           <td className="px-4 py-3 text-right font-medium text-blue-600">{assigned}</td>
                           <td className="px-4 py-3 text-right font-bold text-emerald-700">{hasCapacity ? remaining : '—'}</td>
@@ -877,11 +933,9 @@ const PostResultWorkflow = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {p.status === 'published' ? (
-                              <button onClick={() => handleUnpublishPhase(p.id)} className="text-amber-600 hover:text-amber-800" title="Unpublish"><EyeOff size={16} /></button>
-                            ) : (
-                              <button onClick={() => handlePublishPhase(p.id)} className="text-emerald-600 hover:text-emerald-800" title="Publish"><Eye size={16} /></button>
-                            )}
+                            <IconButton size="small" onClick={(e) => handlePhaseMenuOpen(e, p)}>
+                              <MoreVertical size={18} />
+                            </IconButton>
                           </td>
                         </tr>
                       );
@@ -971,6 +1025,28 @@ const PostResultWorkflow = () => {
             <EyeOff size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Unpublish
           </MenuItem>
         )}
+      </Menu>
+
+      {/* ── Interview Phase Allocation table row menu — Publish/Unpublish + Edit Interview ── */}
+      <Menu anchorEl={phaseMenuAnchor} open={Boolean(phaseMenuAnchor)} onClose={handlePhaseMenuClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <MenuItem key="edit-phase" onClick={() => { const row = phaseMenuRow; handlePhaseMenuClose(); if (row) handleEditPhasePage(row); }}>
+          <Pencil size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Edit Interview
+        </MenuItem>
+        {phaseMenuRow?.status === 'published' ? (
+          <MenuItem key="unpublish-phase" onClick={() => { const row = phaseMenuRow; handlePhaseMenuClose(); handleUnpublishPhase(row.id); }}>
+            <EyeOff size={16} style={{ marginRight: '8px' }} className="text-amber-600" /> Unpublish
+          </MenuItem>
+        ) : (
+          <MenuItem key="publish-phase" onClick={() => { const row = phaseMenuRow; handlePhaseMenuClose(); handlePublishPhase(row.id); }}>
+            <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-600" /> Publish
+          </MenuItem>
+        )}
+        <MenuItem key="delete-phase" onClick={() => { const row = phaseMenuRow; handlePhaseMenuClose(); handleDeletePhase(row); }}
+          disabled={(phaseMenuRow?.call_letters_count ?? 0) > 0}>
+          <Trash2 size={16} style={{ marginRight: '8px' }} className="text-red-600" /> Delete
+        </MenuItem>
       </Menu>
 
       {/* ── Edit Interview Details modal — reassign the candidate's interview phase ── */}

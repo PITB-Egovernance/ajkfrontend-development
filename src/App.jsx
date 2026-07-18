@@ -106,6 +106,7 @@ import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
 import ResultsExamFlow from 'pages/results/ResultsExamFlow';
 import PostResultWorkflow from 'pages/results/PostResultWorkflow';
 import PostResultLanding from 'pages/results/PostResultLanding';
+import InterviewPhaseEditor from 'pages/results/InterviewPhaseEditor';
 import StatisticalSummary from 'pages/results/StatisticalSummary';
 import AuditTrailReport from 'pages/results/AuditTrailReport';
 import ScrutinyRequests from 'pages/results/ScrutinyRequests';
@@ -368,6 +369,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'secretary', 'interview_secretary', 'senior_admin', 'chairman', 'director']}>
                 <PostResultWorkflow />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/post-result/:jobId/interview-phase/:phaseId/edit"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'secretary', 'interview_secretary', 'senior_admin', 'chairman', 'director']}>
+                <InterviewPhaseEditor />
               </ProtectedRoute>
             }
           />
