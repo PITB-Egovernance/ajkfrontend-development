@@ -652,8 +652,16 @@ const ImportResultsPage = () => {
 
   const isMcq = isMcqExamType(resolvedExamType);
 
-  // Clubbed jobs selection states
-  const [selectedJobIds, setSelectedJobIds] = useState([jobId]);
+  // Clubbed jobs selection states — pre-populated from the job list's
+  // combined "Import Marks" action (?clubbedJobIds=id1,id2,...) so a clubbed
+  // group opens as one ready-to-go combined import instead of requiring the
+  // admin to manually re-add each sibling post.
+  const [selectedJobIds, setSelectedJobIds] = useState(() => {
+    const clubbedParam = searchParams.get('clubbedJobIds');
+    if (!clubbedParam) return [jobId];
+    const ids = clubbedParam.split(',').map((s) => s.trim()).filter(Boolean);
+    return ids.includes(jobId) ? ids : [jobId, ...ids];
+  });
   const [availableJobs, setAvailableJobs] = useState([]);
 
   // Column mapper state (non-MCQ exams only)
@@ -1075,7 +1083,10 @@ const ImportResultsPage = () => {
         open={showCompletion}
         total={importResult?.total ?? 0}
         imported={importResult?.imported ?? 0}
-        onClose={() => setShowCompletion(false)}
+        onClose={() => {
+          setShowCompletion(false);
+          navigate(`/dashboard/results/verification/${jobId}`);
+        }}
       />
 
       {/* Import rejected modal */}

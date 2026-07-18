@@ -21,6 +21,7 @@ import { getJobRouteId } from 'utils/jobMapper';
 import { useAuth } from 'context/AuthContext';
 import { getUserRole } from 'utils/roleUtils';
 import SearchableSelect from 'components/ui/SearchableSelect';
+import { examTypeToCategory, applyClubbedGroups } from 'utils/resultsClubbing';
 
 const examTypeMeta = {
   'one-paper-mcqs': { title: 'One Paper MCQs — Results', badge: 'One Paper MCQs', testTypeFilter: (tt) => /mcq/i.test(tt) && !/two/i.test(tt) },
@@ -123,7 +124,11 @@ const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShor
       </button>
       <PortalDropdown anchorRef={btnRef} open={open} onClose={() => setActiveId(null)}>
         {isImportable ? (
-          <Link to={`/dashboard/results/import/${rId}?examType=${examType || ''}`} onClick={() => setActiveId(null)}
+          <Link
+            to={`/dashboard/results/import/${rId}?examType=${examType || ''}${
+              job.isClubbedGroup ? `&clubbedJobIds=${job.clubbedJobIds.join(',')}` : ''
+            }`}
+            onClick={() => setActiveId(null)}
             className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer rounded transition-colors">
             <FileSpreadsheet size={14} className="text-slate-400" /> Import Marks (CSV)
           </Link>
@@ -244,11 +249,31 @@ const ResultsExamFlow = () => {
 
       const adsToUse = matchedAds;
 
-      setAllJobRows(
-        adsToUse.flatMap(({ ad, jobs }) =>
-          jobs.map((job) => ({ ...job, adv: ad }))
-        )
+      const flatJobs = adsToUse.flatMap(({ ad, jobs }) =>
+        jobs.map((job) => ({ ...job, adv: ad }))
       );
+
+      // Seeded by exam_category (not just the locally-loaded job ids) so a
+      // clubbed group is discovered in full even when none of its member
+      // posts individually pass this page's own advertisement/eligibility
+      // fetch above.
+      let clubbedGroups = [];
+      // hash_id, not id — JobDetail hides its raw numeric id from every API
+      // response, so id is always undefined here.
+      const jobIds = flatJobs.map((j) => j.hash_id).filter(Boolean);
+      const examCategory = examTypeToCategory[examType];
+      try {
+        // examType (the route slug, e.g. 'one-paper-mcqs') is also the exact
+        // string RollNumberGenerationBatch.exam_type stores — passing it lets
+        // the backend catch clubs where no single candidate applied to more
+        // than one member post (clubbed_group_id alone would miss those).
+        const groupsRes = await ResultsApi.getClubbedGroups(jobIds, examCategory, examType);
+        clubbedGroups = groupsRes?.data?.groups ?? groupsRes?.groups ?? [];
+      } catch {
+        // Clubbing info is a display enhancement — fall back to ungrouped rows.
+      }
+
+      setAllJobRows(applyClubbedGroups(flatJobs, clubbedGroups));
     } catch {
       toast.error('Failed to load data');
     } finally {

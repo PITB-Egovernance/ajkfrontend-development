@@ -35,6 +35,7 @@ import {
 import OfficialPublicationModal from 'components/results/OfficialPublicationModal';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
+import { fetchAndApplyClubbedGroups } from 'utils/resultsClubbing';
 
 const PERM = 'result.result_publishing'; // permission scope for publishing actions
 
@@ -148,7 +149,11 @@ const ActionCell = ({ job, isAdmin, isDirector, userRole, handleOpenPublish, han
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
         {isImportable ? (
-          <MenuItem onClick={() => { handleClose(); navigate(`/dashboard/results/import/${rId}?examType=${getExamTypeParam(job)}`); }}>
+          <MenuItem onClick={() => {
+            handleClose();
+            const clubbedParam = job.isClubbedGroup ? `&clubbedJobIds=${job.clubbedJobIds.join(',')}` : '';
+            navigate(`/dashboard/results/import/${rId}?examType=${getExamTypeParam(job)}${clubbedParam}`);
+          }}>
             <FileSpreadsheet className="h-4 w-4 text-emerald-600 mr-2" />
             Import Marks (CSV)
           </MenuItem>
@@ -260,7 +265,7 @@ const ResultsDashboard = () => {
     { label: 'Published Results', value: '0', icon: Send, bg: 'bg-emerald-50', iconBg: 'bg-emerald-600' },
   ]);
 
-  const [jobs, setJobs] = useState([]);
+  const [allJobRows, setAllJobRows] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [fetchingJobs, setFetchingJobs] = useState(true);
   const [selectedJob, setSelectedJob] = useState(null);
@@ -273,7 +278,19 @@ const ResultsDashboard = () => {
     setFetchingJobs(true);
     try {
       const res = await AdvertisementApi.getAll(1, { results_only: true });
-      setJobs(res.data?.data || res.data || []);
+      const advertisements = res.data?.data || res.data || [];
+
+      // This list spans all four exam types at once (unlike the per-category
+      // One Paper/Two Paper/Written/CCE result pages), so clubbing is
+      // resolved per exam-type bucket and merged — see fetchAndApplyClubbedGroups.
+      const flatJobs = advertisements.flatMap((adv) =>
+        (adv.job_details || adv.jobDetails || []).map((job) => ({ ...job, adv }))
+      );
+      try {
+        setAllJobRows(await fetchAndApplyClubbedGroups(ResultsApi, flatJobs));
+      } catch {
+        setAllJobRows(flatJobs); // clubbing info is a display enhancement — fall back to ungrouped rows
+      }
     } catch (err) {
       toast.error('Failed to load active jobs for result management');
     } finally {
@@ -582,16 +599,17 @@ const ResultsDashboard = () => {
 
           <div className="bg-white rounded-lg shadow-sm p-4">
             {(() => {
-              const allJobRows = jobs.flatMap(adv => 
-                (adv.job_details || adv.jobDetails || []).filter(job =>
-                  job.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  adv.adv_number.toLowerCase().includes(searchTerm.toLowerCase())
-                ).map((job, idx) => ({ ...job, adv, id: job.hash_id || job.id || `${adv.adv_number}-${idx}` }))
-              );
+              const q = searchTerm.toLowerCase();
+              const filteredRows = allJobRows
+                .filter((job) =>
+                  (job.designation || '').toLowerCase().includes(q) ||
+                  (job.adv?.adv_number || '').toLowerCase().includes(q)
+                )
+                .map((job, idx) => ({ ...job, id: job.hash_id || job.id || `${job.adv?.adv_number}-${idx}` }));
 
               return (
                 <TooltipDataGrid
-                  rows={allJobRows}
+                  rows={filteredRows}
                   columns={columns}
                   autoHeight
                   pageSizeOptions={[10, 25, 50]}

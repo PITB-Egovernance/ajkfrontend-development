@@ -450,6 +450,28 @@ const ResultsApi = {
   },
 
   /**
+   * Resolve which job posts were clubbed together at roll-number-generation
+   * time (persistent clubbed_group_id / RollNumberGenerationBatch
+   * relationship, not inferred from advertisement/test-type/roll-number).
+   * examCategory seeds discovery with every post of that TestType category.
+   * rollNumberExamType (the roll-number module's own exam_type slug, e.g.
+   * 'one-paper-mcqs') additionally inspects generation batches of that type —
+   * this is what catches a club where no single candidate applied to more
+   * than one member post.
+   */
+  getClubbedGroups: async (jobDetailIds = [], examCategory = '', rollNumberExamType = '') => {
+    const params = { job_detail_ids: jobDetailIds.join(',') };
+    if (examCategory) params.exam_category = examCategory;
+    if (rollNumberExamType) params.roll_number_exam_type = rollNumberExamType;
+    const query = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE}/results/clubbed-groups?${query}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Get paginated list of candidates for a job
    */
   getCandidates: async (jobId, params = {}) => {

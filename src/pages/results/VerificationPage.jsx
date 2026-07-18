@@ -28,54 +28,7 @@ import { Card, CardContent } from 'components/ui/Card';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import toast from 'react-hot-toast';
 import { getJobRouteId } from 'utils/jobMapper';
-
-const getGroupedJobs = (flatJobs) => {
-  const groups = {};
-  const order = [];
-
-  flatJobs.forEach(job => {
-    const adv = job.advertisements?.[0] || {};
-    const adId = adv.id || adv.hash_id || adv.hashId || job.advertisement_id || job.advertisementId || job.pivot?.advertisement_id || job.pivot?.advertisementId;
-    const testType = job.pivot?.test_type || job.pivot?.testType || job.test_type || job.testType;
-
-    if (adId && testType) {
-      const key = `${adId}_${testType}`;
-      if (!groups[key]) {
-        groups[key] = [];
-        order.push({ type: 'grouped', key });
-      }
-      groups[key].push(job);
-    } else {
-      order.push({ type: 'single', job });
-    }
-  });
-
-  const processed = [];
-  const seenGroupKeys = new Set();
-
-  order.forEach(item => {
-    if (item.type === 'single') {
-      processed.push(item.job);
-    } else if (item.type === 'grouped' && !seenGroupKeys.has(item.key)) {
-      seenGroupKeys.add(item.key);
-      const groupedList = groups[item.key];
-      if (groupedList.length > 1) {
-        groupedList.sort((a, b) => a.id - b.id);
-        const designations = groupedList.map(j => j.designation).join(' & ');
-        processed.push({
-          ...groupedList[0],
-          isClubbedGroup: true,
-          clubbedJobIds: groupedList.map(j => j.id),
-          designation: designations,
-        });
-      } else {
-        processed.push(groupedList[0]);
-      }
-    }
-  });
-
-  return processed;
-};
+import { fetchAndApplyClubbedGroups } from 'utils/resultsClubbing';
 
 const VerificationPage = () => {
   const { jobId: urlJobId } = useParams();
@@ -131,29 +84,25 @@ const VerificationPage = () => {
           }))
         );
 
-        const groupedJobs = getGroupedJobs(fetchedJobs);
+        let groupedJobs;
+        try {
+          groupedJobs = await fetchAndApplyClubbedGroups(ResultsApi, fetchedJobs);
+        } catch {
+          groupedJobs = fetchedJobs; // clubbing info is a display enhancement — fall back to ungrouped rows
+        }
         setJobs(groupedJobs);
 
         if (groupedJobs.length > 0) {
           let matched = null;
           if (urlJobId) {
             matched = groupedJobs.find(
-              j => {
-                if (j.isClubbedGroup) {
-                  return j.clubbedJobIds.some(cid => cid.toString() === urlJobId) || 
-                         getJobRouteId(j) === urlJobId || 
-                         j.id?.toString() === urlJobId;
-                }
-                const routeId = getJobRouteId(j);
-                const stringId = j.id ? j.id.toString() : '';
-                return (routeId && routeId === urlJobId) || (stringId && stringId === urlJobId);
-              }
+              j => (j.isClubbedGroup && j.clubbedJobIds.includes(urlJobId)) || getJobRouteId(j) === urlJobId
             );
           }
 
           const defaultJob = matched || groupedJobs[0];
           setSelectedJob(defaultJob);
-          setSelectedJobId(getJobRouteId(defaultJob) || (defaultJob.id ? defaultJob.id.toString() : ''));
+          setSelectedJobId(getJobRouteId(defaultJob) || '');
         }
       } catch (err) {
         console.error('Failed to load active jobs:', err);
@@ -205,11 +154,7 @@ const VerificationPage = () => {
   const handleJobChange = (e) => {
     const jobId = e.target.value;
     setSelectedJobId(jobId);
-    const matched = jobs.find(j => {
-      const routeId = getJobRouteId(j);
-      const stringId = j.id ? j.id.toString() : '';
-      return routeId === jobId || stringId === jobId;
-    });
+    const matched = jobs.find(j => getJobRouteId(j) === jobId);
     setSelectedJob(matched || null);
     setSelectedApps([]);
     setCursor(null);
