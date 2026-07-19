@@ -11,11 +11,6 @@ import Config from "../../config/baseUrl";
 import AuthService from "../../services/authService";
 import "../job-creation/JobCreationForm.css";
 
-const FALLBACK_TESTS = [
-  { id: "1", test_name: "MCQs", test_fees: 505 },
-  { id: "2", test_name: "Written Exam", test_fees: 1010 },
-];
-
 const formatDateForDisplay = (value) => {
   if (!value) return "";
   if (/^\d{2}-\d{2}-\d{4}$/.test(value)) return value;
@@ -89,7 +84,12 @@ const AdvertisementCreateForm = () => {
   const [termsConditions, setTermsConditions] = useState([""]);
   const [jobConfigs, setJobConfigs] = useState({});
   const [jobTitles, setJobTitles] = useState({});
-  const [examTests, setExamTests] = useState(FALLBACK_TESTS);
+  // No hardcoded fallback here — a fake numeric "1"/"2" id previously stood
+  // in for a real TestType hash_id when this fetch failed, which either
+  // matched nothing or silently matched the wrong TestType row. If the real
+  // fetch fails, the Test Type dropdown below just stays empty (and the
+  // catch blocks below surface a toast) rather than offering fake options.
+  const [examTests, setExamTests] = useState([]);
   const [testTypes, setTestTypes] = useState([]);
   const [existingAdvNumbers, setExistingAdvNumbers] = useState([]);
 
@@ -119,7 +119,9 @@ const AdvertisementCreateForm = () => {
             }))
           );
         }
-      } catch {}
+      } catch {
+        if (!aborted) toast.error('Failed to load test types — the Test Type dropdown may be empty. Please refresh.');
+      }
     })();
 
     return () => {
@@ -164,7 +166,9 @@ const AdvertisementCreateForm = () => {
 
           if (active.length) setExamTests(active);
         }
-      } catch {}
+      } catch {
+        if (!aborted) toast.error('Failed to load exam fee/test data — Test Type fees may be unavailable. Please refresh.');
+      }
     })();
 
     return () => {

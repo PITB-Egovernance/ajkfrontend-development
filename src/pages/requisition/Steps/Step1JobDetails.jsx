@@ -38,8 +38,9 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
     quota_percentage: data.quota_percentage ?? '',
     num_posts: data.num_posts ?? '',
     vacancy_date: data.vacancy_date || '',
-    // test_type is no longer collected in the UI (see getCleanedFormData
-    // for the default value sent to the live API).
+    // test_type is not collected here — it's chosen later per-job in the
+    // Advertisement create/edit flow (see AdvertisementCreateForm.jsx) and
+    // saved on the advertisement_job_detail pivot, not on job_details.
     quota_promotion: data.quota_promotion ?? '',
     service_rules: data.service_rules || null,
     service_rules_text: data.service_rules_text || data.service_rule_text || '',
@@ -240,11 +241,12 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
       if (!Number.isNaN(n)) cleanedFormData.quota_promotion = `${n}%`;
     }
 
-    // Test Type is hidden in the UI but the live API marks it as required.
-    // Send a default garbage value so the live backend's validator passes.
-    // The admin-facing choice for test type happens later in the
-    // advertisement creation flow (see AdvertisementCreateForm.jsx).
-    cleanedFormData.test_type = cleanedFormData.test_type || 'MCQs Base';
+    // Do NOT default test_type here — it must stay null/absent until the
+    // admin picks a real TestType later in the Advertisement flow. A
+    // placeholder value here used to get saved verbatim to job_details.test_type
+    // (no backend validation catches it), which then permanently broke test-type
+    // lookups for that job on the Advertisement and Roll Number pages, since
+    // nothing could ever match a fake value against the real TestType table.
     cleanedFormData.service_rules_text = formData.service_rules_text || '';
 
     return cleanedFormData;

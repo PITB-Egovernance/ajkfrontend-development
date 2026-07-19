@@ -843,13 +843,19 @@ const RollNumberExamFlow = () => {
             if (pivotCat && validCategories.has(pivotCat)) return true;
             if (jobCat   && validCategories.has(jobCat))   return true;
 
-            // 2. Regex match on resolved name
+            // 2. Regex match on resolved name — deliberately NOT falling back to
+            // the raw job.test_type/pivot.test_type reference itself. Those are
+            // hash_id references, not names, and a corrupted/legacy value (e.g.
+            // the literal string "MCQs Base" some old requisitions were saved
+            // with) can coincidentally match one of these regexes (contains
+            // "mcq"), silently mis-tagging the job into the wrong section. If
+            // nothing resolved to a real TestType name, treat it as untagged
+            // instead — it'll be picked up by the untagged-jobs fallback below.
             const resolved =
               job.pivot?.test_type_name ||
               job.resolved_test_type_name ||
               testTypeMap[pivotHt] ||
               testTypeMap[jobHt] ||
-              job.test_type ||
               '';
             return resolved ? meta.testTypeFilter(resolved) : false;
           });

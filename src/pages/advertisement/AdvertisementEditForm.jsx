@@ -11,12 +11,6 @@ import Config from "../../config/baseUrl";
 import AuthService from "../../services/authService";
 import "../job-creation/JobCreationForm.css";
 
-// Fallback test-fee records used until the live /settings/tests endpoint responds.
-const FALLBACK_TESTS = [
-  { id: '1', test_type_id: '1', test_name: 'MCQs',         test_fees: 505  },
-  { id: '2', test_type_id: '2', test_name: 'Written Exam', test_fees: 1010 },
-];
-
 const STATUS_OPTIONS = [
   // { value: 'pending', label: 'Pending' },
   { value: 'active', label: 'Published' },
@@ -322,7 +316,12 @@ const AdvertisementEditForm = () => {
   const [importantNotes, setImportantNotes] = useState("");
   const [termsConditions, setTermsConditions] = useState([""]);
   const [jobConfigs, setJobConfigs] = useState({});
-  const [examTests, setExamTests] = useState(FALLBACK_TESTS);
+  // No hardcoded fallback — a fake numeric "1"/"2" id previously stood in
+  // for a real TestType hash_id when this fetch failed, which either
+  // matched nothing or silently matched the wrong TestType row. If the real
+  // fetch fails, the dropdown below just stays empty (see the catch blocks
+  // below) rather than offering fake options.
+  const [examTests, setExamTests] = useState([]);
   const [testTypes, setTestTypes] = useState([]);
   const [status, setStatus] = useState("pending");
   const [originalStatus, setOriginalStatus] = useState("pending");
@@ -365,7 +364,9 @@ const AdvertisementEditForm = () => {
             name:    t.name || t.label || '',
           })));
         }
-      } catch { /* dropdown falls back to the test-fee records below */ }
+      } catch {
+        if (!aborted) toast.error('Failed to load test types — the Test Type dropdown may be empty. Please refresh.');
+      }
     })();
     return () => { aborted = true; };
   }, []);
@@ -399,7 +400,9 @@ const AdvertisementEditForm = () => {
             });
           if (active.length) setExamTests(active);
         }
-      } catch { /* keep fallback */ }
+      } catch {
+        if (!aborted) toast.error('Failed to load exam fee/test data — Test Type fees may be unavailable. Please refresh.');
+      }
     })();
     return () => { aborted = true; };
   }, []);
