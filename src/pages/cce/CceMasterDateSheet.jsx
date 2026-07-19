@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { TextField, MenuItem, Tabs, Tab } from '@mui/material';
+import { TextField, MenuItem, Tabs, Tab, ListItemText } from '@mui/material';
 import { Calendar, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import CceScreeningApi from 'api/cceScreeningApi';
 import CceDateSheetApi from 'api/cceDateSheetApi';
+import { groupByClubbedAdvertisements } from 'utils/cceClubbing';
 
 // Same group ordering as the public CCE syllabus page (SubjectsSyllabus.jsx).
 const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G'];
@@ -20,7 +21,15 @@ const dayFromDate = (date) => (date ? new Date(date).toLocaleDateString(undefine
 const CceMasterDateSheet = () => {
   const [advertisements, setAdvertisements] = useState([]);
   const [advertisementsLoading, setAdvertisementsLoading] = useState(true);
+  const [groupedJobs, setGroupedJobs] = useState([]);
+  // advertisementId is the one shown/edited in the grid below; advertisementIds
+  // is the full clubbed group it belongs to (just itself when not clubbed) —
+  // a clubbed candidate sits one written exam covering every clubbed post, so
+  // the schedule must be saved identically to every id in that group, never
+  // just the one selected in the dropdown.
   const [advertisementId, setAdvertisementId] = useState('');
+  const [advertisementIds, setAdvertisementIds] = useState([]);
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,11 +42,22 @@ const CceMasterDateSheet = () => {
       setAdvertisementsLoading(true);
       try {
         // Reuse the CCE Screening advertisement list — already scoped to
-        // advertisements with at least one generated CCE roll number.
+        // advertisements with at least one generated CCE roll number, and
+        // already annotated with clubbed_advertisement_ids.
         const res = await CceScreeningApi.advertisements();
         const list = res?.data ?? [];
-        setAdvertisements(Array.isArray(list) ? list : []);
-        if (list.length > 0) setAdvertisementId(list[0].hash_id || list[0].id);
+        const safeList = Array.isArray(list) ? list : [];
+        setAdvertisements(safeList);
+
+        const groups = groupByClubbedAdvertisements(safeList);
+        setGroupedJobs(groups);
+
+        if (groups.length > 0) {
+          const defaultEntry = groups[0];
+          setAdvertisementId(defaultEntry.advId);
+          setAdvertisementIds(defaultEntry.advIds);
+          setSelectedEntry(defaultEntry);
+        }
       } catch (err) {
         toast.error(err?.message || 'Failed to load advertisements');
       } finally {
@@ -122,8 +142,10 @@ const CceMasterDateSheet = () => {
 
     setSaving(true);
     try {
+      // Saved to every advertisement in the clubbed group at once (just
+      // [advertisementId] when not clubbed) — see CceMasterDateSheetService::save().
       await CceDateSheetApi.saveMasterDateSheet(
-        advertisementId,
+        advertisementIds.length > 0 ? advertisementIds : advertisementId,
         complete.map((r) => ({
           subject_id:        r.subject_id,
           paper_label:       r.paper_label,
@@ -211,23 +233,59 @@ const CceMasterDateSheet = () => {
               <p className="text-sm text-slate-500 mt-1">Set the written-paper schedule used to auto-fill every candidate's date sheet.</p>
             </div>
           </div>
-          {advertisements.length > 0 && (
+          {groupedJobs.length > 0 && (
             <TextField
               select
               size="small"
-              label="Advertisement"
+              label="Job Post / Exam"
               value={advertisementId}
-              onChange={(e) => setAdvertisementId(e.target.value)}
-              sx={{ minWidth: 260, backgroundColor: 'white' }}
+              onChange={(e) => {
+                const val = e.target.value;
+                const matchedEntry = groupedJobs.find((j) => j.advId === val);
+                setAdvertisementId(val);
+                setAdvertisementIds(matchedEntry?.advIds || [val]);
+                setSelectedEntry(matchedEntry || null);
+              }}
+              sx={{ minWidth: 280, maxWidth: 380, backgroundColor: 'white' }}
+              SelectProps={{
+                renderValue: (val) => {
+                  const entry = groupedJobs.find((j) => j.advId === val);
+                  return (
+                    <span
+                      title={entry?.designation || ''}
+                      style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {entry?.designation || ''}
+                    </span>
+                  );
+                },
+              }}
             >
-              {advertisements.map((ad) => (
-                <MenuItem key={ad.hash_id || ad.id} value={ad.hash_id || ad.id}>
-                  {ad.adv_number || ad.title || `Advertisement #${ad.id}`}
+              {groupedJobs.map((entry) => (
+                <MenuItem key={entry.advId} value={entry.advId} title={entry.designation}>
+                  <ListItemText
+                    primary={entry.designation}
+                    secondary={entry.isClubbedGroup ? 'Clubbed Job Post Group' : `Adv: ${entry.adv_number || 'N/A'}`}
+                    primaryTypographyProps={{ noWrap: true, sx: { maxWidth: 340 } }}
+                  />
                 </MenuItem>
               ))}
             </TextField>
           )}
         </div>
+
+        {/* Full, non-truncated post list for the selected job/exam — the same
+            schedule below is saved to every clubbed advertisement together. */}
+        {selectedEntry && (
+          <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+              {selectedEntry.isClubbedGroup ? 'Clubbed Job Posts — schedule saved to all of them' : 'Job Post'}
+            </p>
+            <p className="text-sm font-medium text-indigo-900 mt-1 break-words">
+              {selectedEntry.designation}
+            </p>
+          </div>
+        )}
 
         {advertisementsLoading ? (
           <div className="bg-white rounded-lg shadow-sm p-10 flex justify-center">

@@ -19,79 +19,9 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import CceScreeningApi from 'api/cceScreeningApi';
 import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+import { groupByClubbedAdvertisements } from 'utils/cceClubbing';
 
 const DEFAULT_FILTERS = { search: '', status: '' };
-
-/**
- * CCE Screening uses advertisement-level clubbing (clubbed_advertisement_ids)
- * returned by GET /cce/screening/advertisements — not the Results Module's
- * job-level clubbed-groups endpoint. This function collapses advertisements
- * that share a clubbed group into a single dropdown entry, identical in
- * behaviour to how the Results Module collapses job posts.
- *
- * Each returned entry has:
- *   designation    — combined job designations joined with ' & '
- *   advId          — hash_id of the anchor advertisement
- *   advIds         — all advertisement hash_ids in the group (for API calls)
- *   isClubbedGroup — true when more than one advertisement is in the group
- *   adv_number     — adv_number of the anchor advertisement
- */
-const groupByClubbedAdvertisements = (advertisements) => {
-  const seen = new Set();
-  const entries = [];
-
-  advertisements.forEach((adv) => {
-    const advId = adv.hash_id || adv.id;
-    if (seen.has(advId)) return;
-
-    const siblingIds = Array.isArray(adv.clubbed_advertisement_ids)
-      ? adv.clubbed_advertisement_ids.filter(Boolean)
-      : [];
-
-    if (siblingIds.length > 0) {
-      // Clubbed group: collect this advertisement and all its siblings.
-      const allAdvIds  = [advId, ...siblingIds];
-      const siblingAdvs = siblingIds.map(sid =>
-        advertisements.find(a => (a.hash_id || a.id) === sid)
-      ).filter(Boolean);
-
-      allAdvIds.forEach(id => seen.add(id));
-
-      // Combined designation from all advertisements' job lists.
-      const allJobs = [adv, ...siblingAdvs].flatMap(a =>
-        (a.jobs || a.job_details || a.jobDetails || []).map(j => j.designation).filter(Boolean)
-      );
-      const designation = [...new Set(allJobs)].join(' & ') || adv.adv_number || advId;
-
-      entries.push({
-        id:             advId,
-        hash_id:        advId,
-        advId,
-        advIds:         allAdvIds,
-        designation,
-        isClubbedGroup: true,
-        adv_number:     adv.adv_number,
-      });
-    } else {
-      // Individual advertisement — show its own jobs' designations.
-      seen.add(advId);
-      const jobs = adv.jobs || adv.job_details || adv.jobDetails || [];
-      const designation = jobs.map(j => j.designation).filter(Boolean).join(' & ') || adv.adv_number || advId;
-
-      entries.push({
-        id:             advId,
-        hash_id:        advId,
-        advId,
-        advIds:         [advId],
-        designation,
-        isClubbedGroup: false,
-        adv_number:     adv.adv_number,
-      });
-    }
-  });
-
-  return entries;
-};
 
 const FILTER_CONFIG = [
   { name: 'search', label: 'Search (Name / CNIC / Roll No)', type: 'text', placeholder: 'Search by name, CNIC, or roll number' },
@@ -132,6 +62,10 @@ const CceScreeningResults = () => {
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
   const [groupedJobs, setGroupedJobs] = useState([]);
+  const selectedEntry = useMemo(
+    () => groupedJobs.find((j) => (j.advId || j.id) === selectedJobId) || null,
+    [groupedJobs, selectedJobId]
+  );
 
   const fileInputRef = useRef(null);
 
@@ -497,16 +431,16 @@ const CceScreeningResults = () => {
       <div className="max-w-8xl mx-auto">
 
         {/* HEADER */}
-        <div className="flex justify-between items-start mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg"><ShieldCheck size={22} className="text-emerald-700" /></div>
-            <div>
+        <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 bg-emerald-100 rounded-lg flex-shrink-0"><ShieldCheck size={22} className="text-emerald-700" /></div>
+            <div className="min-w-0">
               <h1 className="text-2xl font-bold text-slate-900">CCE Screening Results</h1>
               <p className="text-sm text-slate-500 mt-1">Set pass/fail for CCE screening candidates and publish results to the candidate portal.</p>
             </div>
           </div>
           {groupedJobs.length > 0 && (
-            <div className="flex flex-col md:flex-row gap-3 items-center">
+            <div className="flex flex-wrap gap-3 items-center">
               <TextField
                 select
                 size="small"
@@ -521,19 +455,37 @@ const CceScreeningResults = () => {
                   }
                   setPaginationModel((prev) => ({ ...prev, page: 0 }));
                 }}
-                sx={{ minWidth: 280, backgroundColor: 'white' }}
+                sx={{
+                  minWidth: 280,
+                  maxWidth: 380,
+                  backgroundColor: 'white',
+                }}
+                SelectProps={{
+                  renderValue: (val) => {
+                    const entry = groupedJobs.find(j => (j.advId || j.id) === val);
+                    return (
+                      <span
+                        title={entry?.designation || ''}
+                        style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
+                        {entry?.designation || ''}
+                      </span>
+                    );
+                  },
+                }}
               >
                 {groupedJobs.map((entry) => (
-                  <MenuItem key={entry.advId} value={entry.advId}>
+                  <MenuItem key={entry.advId} value={entry.advId} title={entry.designation}>
                     <ListItemText
                       primary={entry.designation}
                       secondary={entry.isClubbedGroup ? 'Clubbed Job Post Group' : `Adv: ${entry.adv_number || 'N/A'}`}
+                      primaryTypographyProps={{ noWrap: true, sx: { maxWidth: 340 } }}
                     />
                   </MenuItem>
                 ))}
               </TextField>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button onClick={handleDownloadTemplate} variant="outline" className="flex items-center gap-2" disabled={busy}>
                   <Download size={16} /> Download Template
                 </Button>
@@ -551,6 +503,19 @@ const CceScreeningResults = () => {
             </div>
           )}
         </div>
+
+        {/* Full, non-truncated post list for the selected job/exam — the
+            dropdown above truncates for layout, this always shows everything. */}
+        {selectedEntry && (
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+              {selectedEntry.isClubbedGroup ? 'Clubbed Job Posts' : 'Job Post'}
+            </p>
+            <p className="text-sm font-medium text-emerald-900 mt-1 break-words">
+              {selectedEntry.designation}
+            </p>
+          </div>
+        )}
 
         {advertisementsLoading ? (
           <div className="bg-white rounded-lg shadow-sm p-10 flex justify-center">
