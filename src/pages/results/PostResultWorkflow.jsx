@@ -134,6 +134,7 @@ const PostResultWorkflow = () => {
 
   const [activeTab, setActiveTab] = useState('passed');
   const [jobInfo, setJobInfo] = useState(null);
+  const [maxVivaMarks, setMaxVivaMarks] = useState(null);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -271,7 +272,11 @@ const PostResultWorkflow = () => {
 
   // Onboarding tab has two sub-views: candidates eligible to start, and
   // candidates already started/onboarded (who need the "Mark Onboarded" action).
-  const [onboardingView, setOnboardingView] = useState('eligible');
+  const [onboardingView, setOnboardingView] = useState('all');
+
+  // Interview Candidates tab has two sub-views by call letter status, same
+  // Unpublished/Published split as Roll Number Management's Slips tabs.
+  const [interviewView, setInterviewView] = useState('unpublished');
 
   const idField = activeTab === 'passed' ? 'exam_result_id' : 'award_list_entry_id';
 
@@ -287,7 +292,9 @@ const PostResultWorkflow = () => {
       switch (activeTab) {
         case 'passed': res = await PostResultApi.getPassedCandidates(jobId, params); break;
         case 'shortlisted': res = await PostResultApi.getShortlisted(jobId, params); break;
-        case 'interview': res = await PostResultApi.getInterviewCandidates(jobId, params); break;
+        case 'interview':
+          res = await PostResultApi.getInterviewCandidates(jobId, { ...params, call_letter_status: interviewView === 'published' ? 'published' : 'draft' });
+          break;
         case 'initial-rejection': res = await PostResultApi.getInitialRejections(jobId, params); break;
         case 'final-rejection': res = await PostResultApi.getFinalRejections(jobId, params); break;
         case 'award-list': res = await PostResultApi.getAwardList(jobId, params); break;
@@ -300,6 +307,7 @@ const PostResultWorkflow = () => {
       }
       const payload = res?.data || {};
       setJobInfo(payload.job || null);
+      setMaxVivaMarks(payload.max_viva_marks ?? null);
       const candidates = payload.candidates || {};
       const list = candidates.data || (Array.isArray(payload.candidates) ? payload.candidates : []) || [];
       setRows(list.map((r) => ({ id: r.award_list_entry_id ?? r.exam_result_id ?? r.sr_no, ...r })));
@@ -311,7 +319,7 @@ const PostResultWorkflow = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, jobId, page, pageSize, debouncedFilters.search, onboardingView]);
+  }, [activeTab, jobId, page, pageSize, debouncedFilters.search, onboardingView, interviewView]);
 
   useEffect(() => { fetchList(); }, [fetchList]);
 
@@ -434,9 +442,9 @@ const PostResultWorkflow = () => {
   const handleCompleteOnboarding = async () => {
     if (selectedIds.length === 0) return;
     const ok = await confirmDelete({
-      title: 'Mark Onboarded',
+      title: 'Candidate Onboarded',
       message: `Mark ${selectedIds.length} candidate(s) as fully onboarded?`,
-      confirmLabel: 'Mark Onboarded', confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
+      confirmLabel: 'Candidate Onboarded', confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
     });
     if (!ok) return;
     await runAction(() => PostResultApi.completeOnboarding(jobId, selectedIds), 'Candidates onboarded');
@@ -567,6 +575,34 @@ const PostResultWorkflow = () => {
     navigate(`/dashboard/results/post-result/${jobId}/interview-candidate/${row.call_letter_id}/edit`, { state: { row } });
   };
 
+  // Award List tab's "Viva Marks" cell is inline-editable (MUI DataGrid
+  // editable+processRowUpdate) — Final Marks (written + viva) comes back
+  // from the API already computed, never calculated client-side, so it can
+  // never drift from the server's own written-marks resolution.
+  const handleAwardListRowUpdate = async (newRow, oldRow) => {
+    if (newRow.viva_marks === oldRow.viva_marks) return oldRow;
+
+    const vivaMarks = Number(newRow.viva_marks);
+    if (Number.isNaN(vivaMarks) || vivaMarks < 0) {
+      toast.error('Viva marks must be a non-negative number');
+      throw new Error('Invalid viva marks');
+    }
+    if (maxVivaMarks !== null && vivaMarks > maxVivaMarks) {
+      toast.error(`Viva marks cannot exceed ${maxVivaMarks} for this post`);
+      throw new Error('Viva marks out of range');
+    }
+
+    try {
+      const res = await PostResultApi.updateVivaMarks(jobId, newRow.award_list_entry_id, vivaMarks);
+      const updated = res?.data || {};
+      toast.success('Viva marks updated');
+      return { ...newRow, viva_marks: updated.viva_marks, final_marks: updated.final_marks };
+    } catch (err) {
+      toast.error(err.message || 'Failed to update viva marks');
+      throw err;
+    }
+  };
+
   const handleExport = async (format) => {
     const tabMap = {
       passed: 'passed',
@@ -645,7 +681,24 @@ const PostResultWorkflow = () => {
     if (activeTab === 'award-list') {
       return [
         ...base,
-        numberCol('obtained_marks', 'Obtained Marks'),
+        numberCol('obtained_marks', 'Written Marks'),
+        {
+          field: 'viva_marks', headerName: `Viva Marks${maxVivaMarks ? ` (max ${maxVivaMarks})` : ''}`,
+          width: 150, sortable: false, editable: true, type: 'number',
+          renderCell: (params) => (
+            params.value === null || params.value === undefined
+              ? <span className="text-xs text-slate-400 italic">Click to enter</span>
+              : <span className="font-semibold text-blue-700">{Number(params.value).toFixed(2)}</span>
+          ),
+        },
+        {
+          field: 'final_marks', headerName: 'Final Marks', width: 130, sortable: false,
+          renderCell: (params) => (
+            params.value === null || params.value === undefined
+              ? <span className="text-xs text-slate-400">—</span>
+              : <span className="font-bold text-emerald-700">{Number(params.value).toFixed(2)}</span>
+          ),
+        },
         textCol('interview_phase', 'Interview Phase', 1),
         textCol('interview_date', 'Interview Date', 0.8),
         timeCol('interview_time', 'Interview Time'),
@@ -657,7 +710,7 @@ const PostResultWorkflow = () => {
       return [...base, statusCol('post_result_status', 'Status', 0.9), statusCol('onboarding_status', 'Onboarding Status', 0.9)];
     }
     return base;
-  }, [activeTab]);
+  }, [activeTab, maxVivaMarks]);
 
   const renderBulkActions = () => {
     if (selectedIds.length === 0) return null;
@@ -697,7 +750,7 @@ const PostResultWorkflow = () => {
     if (activeTab === 'onboarding') return wrap(
       onboardingView === 'eligible'
         ? <Button size="sm" onClick={handleStartOnboarding} disabled={busy}>Start Onboarding</Button>
-        : <Button size="sm" onClick={handleCompleteOnboarding} disabled={busy}>Mark Onboarded</Button>
+        : <Button size="sm" onClick={handleCompleteOnboarding} disabled={busy}>Candidate Onboarded</Button>
     );
 
     return null;
@@ -924,25 +977,56 @@ const PostResultWorkflow = () => {
         </Card>
       )}
 
-      {activeTab === 'onboarding' && (
-        <div className="flex gap-2">
-          {[{ id: 'eligible', label: 'Eligible to Start' }, { id: 'all', label: 'In Progress / Onboarded' }].map((v) => (
-            <button key={v.id}
-              onClick={() => { setOnboardingView(v.id); resetSelectionAndPage(); }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-full border ${
-                onboardingView === v.id ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-slate-600 border-slate-200'
-              }`}>
-              {v.label}
-            </button>
-          ))}
-        </div>
-      )}
-
         {/* BULK BAR */}
         {renderBulkActions()}
 
-        {/* GRID */}
+        {/* GRID — Onboarding tab's In Progress/Onboarded + Eligible to Start
+            tabs live inside the same card, same style as Roll Number
+            Management's Published/Unpublished Slips tabs. */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          {activeTab === 'onboarding' && (
+            <div className="grid w-full grid-cols-1 overflow-hidden rounded-t-lg bg-white p-1">
+              {/* { id: 'eligible', label: 'Eligible to Start' } */}
+              {[{ id: 'all', label: 'In Progress / Onboarded Candidates' }, ].map((v) => {
+                const isActive = onboardingView === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => { setOnboardingView(v.id); resetSelectionAndPage(); }}
+                    className={`flex w-full items-center justify-center rounded-md px-5 py-3 text-sm font-semibold transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-sm'
+                        : 'bg-white text-emerald-900 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {activeTab === 'interview' && (
+            <div className="grid w-full grid-cols-2 overflow-hidden rounded-t-lg bg-white p-1">
+              {[{ id: 'unpublished', label: 'Unpublished Call Letter' }, { id: 'published', label: 'Published Call Letter' }].map((v) => {
+                const isActive = interviewView === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => { setInterviewView(v.id); resetSelectionAndPage(); }}
+                    className={`flex w-full items-center justify-center rounded-md px-5 py-3 text-sm font-semibold transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-sm'
+                        : 'bg-white text-emerald-900 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {loading && rows.length === 0 ? (
             <div className="p-10 flex justify-center">
               <InlineLoader text="Loading candidates..." variant="ring" size="lg" />
@@ -972,6 +1056,10 @@ const PostResultWorkflow = () => {
               pageSizeOptions={[10, 25, 50, 100]}
               disableRowSelectionOnClick
               autoHeight
+              {...(activeTab === 'award-list' ? {
+                processRowUpdate: handleAwardListRowUpdate,
+                onProcessRowUpdateError: () => {},
+              } : {})}
             />
           )}
         </div>

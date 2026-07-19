@@ -213,6 +213,12 @@ const PostResultApi = {
     });
     return handleResponse(res);
   },
+  updateVivaMarks: async (jobId, entryId, vivaMarks) => {
+    const res = await fetch(`${API_BASE}/post-result/${jobId}/award-list/${entryId}/viva-marks`, {
+      method: 'PUT', headers: getHeaders(), body: JSON.stringify({ viva_marks: vivaMarks }),
+    });
+    return handleResponse(res);
+  },
 
   // ── Onboarding ──
   getOnboardingEligible: async (jobId, params = {}) => {
