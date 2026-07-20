@@ -82,11 +82,30 @@ export const applyClubbedGroups = (flatJobs, apiGroups) => {
 
     const anchor = postIds.map((id) => byId.get(id)).find(Boolean) || memberDisplays[0];
 
+    // A club can span multiple advertisements/departments (see comment above),
+    // but the anchor only carries its own single `advertisements[0]` — collect
+    // every member's advertisement number too, so pages can let the admin
+    // filter/select among all advertisements actually present in this group
+    // instead of only ever seeing the anchor's.
+    const memberAdvNumber = (m) => m.advertisements?.[0]?.adv_number || m.adv?.adv_number;
+    const clubbedAdvNumbers = Array.from(new Set(memberDisplays.map(memberAdvNumber).filter(Boolean)));
+
+    // Per-member detail (id/designation/adv_number), kept alongside the merged
+    // display fields above — lets a page list each clubbed post as its own
+    // selectable row instead of only the single merged "X & Y" designation.
+    const clubbedMembers = memberDisplays.map((m) => ({
+      id: m.hash_id || m.id,
+      designation: m.designation,
+      adv_number: memberAdvNumber(m),
+    }));
+
     processed.push({
       ...anchor,
       designation: memberDisplays.map((m) => m.designation).join(' & '),
       isClubbedGroup: true,
       clubbedJobIds: memberDisplays.map((m) => m.hash_id || m.id),
+      clubbedAdvNumbers,
+      clubbedMembers,
     });
   });
 

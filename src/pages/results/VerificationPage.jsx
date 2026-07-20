@@ -27,6 +27,42 @@ const FILTER_DEBOUNCE_MS = 400;
 
 const DEFAULT_FILTERS = { search: '', status: 'all', adv_number: '' };
 
+// A clubbed group can combine posts from more than one advertisement (see
+// resultsClubbing.js) — its own `advertisements[0]` is only the anchor post's,
+// so callers that need every advertisement actually present in a job entry
+// (clubbed or not) should go through this instead of reading `advertisements`
+// directly.
+const getJobAdvNumbers = (job) => {
+  if (job?.isClubbedGroup && job.clubbedAdvNumbers?.length) return job.clubbedAdvNumbers;
+  const advNo = job?.advertisements?.[0]?.adv_number;
+  return advNo ? [advNo] : [];
+};
+
+// Encodes "this clubbed group, narrowed to one member's advertisement" into a
+// single dropdown option value (job route id + member adv number), since a
+// clubbed group's several member posts need to be picked independently even
+// though they all resolve to the one shared job id used for fetching.
+const CLUB_MEMBER_SEP = '::adv::';
+
+// Builds Job Post dropdown options for a list of jobs. A clubbed group is
+// expanded into one row per member post (so they're picked separately, not
+// hidden behind a single merged "X & Y" designation) plus one "All Combined"
+// row for its shared/merged candidate view; a normal job gets a single row.
+const buildJobOptions = (jobList) => jobList.flatMap((j, idx) => {
+  const routeId = getJobRouteId(j) || (j.id ? j.id.toString() : '') || String(idx);
+  if (j.isClubbedGroup && j.clubbedMembers?.length) {
+    const memberOptions = j.clubbedMembers.map((m) => ({
+      value: `${routeId}${CLUB_MEMBER_SEP}${m.adv_number || ''}`,
+      label: `↳ ${m.designation} (Adv: ${m.adv_number || 'N/A'})`,
+    }));
+    return [
+      { value: routeId, label: `${j.designation} — All Combined (Adv: ${j.clubbedAdvNumbers.join(', ')})` },
+      ...memberOptions,
+    ];
+  }
+  return [{ value: routeId, label: `${j.designation} (Adv: ${getJobAdvNumbers(j).join(', ') || 'N/A'})` }];
+});
+
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Candidates' },
   { value: 'passed', label: 'Passed' },
@@ -146,19 +182,45 @@ const VerificationPage = () => {
   const advertisementOptions = useMemo(() => {
     const seen = new Map();
     jobs.forEach((j) => {
-      const advNo = j.advertisements?.[0]?.adv_number;
-      if (advNo && !seen.has(advNo)) seen.set(advNo, `${advNo}`);
+      getJobAdvNumbers(j).forEach((advNo) => {
+        if (!seen.has(advNo)) seen.set(advNo, `${advNo}`);
+      });
     });
     return Array.from(seen.entries()).map(([value, label]) => ({ value, label }));
   }, [jobs]);
 
+  const jobsForSelectedAdv = useMemo(
+    () => (filters.adv_number ? jobs.filter((j) => getJobAdvNumbers(j).includes(filters.adv_number)) : []),
+    [jobs, filters.adv_number]
+  );
+
   const jobPostOptions = useMemo(() => {
-    const scoped = filters.adv_number ? jobs.filter((j) => j.advertisements?.[0]?.adv_number === filters.adv_number) : jobs;
-    return scoped.map((j, idx) => {
-      const val = getJobRouteId(j) || (j.id ? j.id.toString() : '') || idx;
-      return { value: val, label: `${j.designation} (Adv: ${j.advertisements?.[0]?.adv_number || 'N/A'})` };
-    });
-  }, [jobs, filters.adv_number]);
+    const scoped = filters.adv_number ? jobsForSelectedAdv : jobs;
+    const options = buildJobOptions(scoped);
+    // Combined view across every post under the selected Advertisement — lets
+    // the admin approve/reject candidates advertisement-wide instead of
+    // picking through one job post at a time.
+    if (filters.adv_number && scoped.length > 1) {
+      options.unshift({ value: '', label: `All Job Posts — Adv ${filters.adv_number} (Combined)` });
+    }
+    return options;
+  }, [jobs, jobsForSelectedAdv, filters.adv_number]);
+
+  // Whether we're showing the combined, advertisement-wide candidate list
+  // rather than a single job post's candidates.
+  const isCombinedView = Boolean(filters.adv_number) && !selectedJobId;
+
+  // The Job Post dropdowns need to display a clubbed group's member row (not
+  // just the group itself) once the admin has narrowed to one of its
+  // advertisements — selectedJobId alone can't carry that, so re-derive the
+  // exact option value here for display purposes only.
+  const selectedJobOptionValue = useMemo(() => {
+    if (!selectedJobId) return '';
+    if (selectedJob?.isClubbedGroup && filters.adv_number && selectedJob.clubbedAdvNumbers?.includes(filters.adv_number)) {
+      return `${selectedJobId}${CLUB_MEMBER_SEP}${filters.adv_number}`;
+    }
+    return selectedJobId;
+  }, [selectedJobId, selectedJob, filters.adv_number]);
 
   // Combined filter config for the single filters card: Search + Exam Status
   // + Advertisement. Job Post is rendered separately via `extraFilters` since
@@ -172,7 +234,11 @@ const VerificationPage = () => {
   // Keep the Advertisement filter in sync with whichever job is actually
   // selected (e.g. on first load via the URL's :jobId), without fighting the
   // user's own Advertisement pick — only auto-syncs when it doesn't match.
+  // Clubbed groups are skipped: they can have several valid advertisements,
+  // and handleJobChange/handleFilterChange already manage adv_number for
+  // them explicitly (picking a member vs. "All Combined").
   useEffect(() => {
+    if (selectedJob?.isClubbedGroup) return;
     const advNo = selectedJob?.advertisements?.[0]?.adv_number;
     if (advNo && advNo !== filters.adv_number) {
       setFilters((prev) => ({ ...prev, adv_number: advNo }));
@@ -183,6 +249,34 @@ const VerificationPage = () => {
   // Selection
   const [selectedApps, setSelectedApps] = useState([]);
   const [processingAction, setProcessingAction] = useState(false);
+
+  // Clubbed-group Approve gate: a clubbed group only makes sense to approve
+  // as a whole, so at least one candidate from EVERY member post must be in
+  // the current selection first — never just some of them. Candidate rows
+  // don't carry a job post id (see CandidateListService::transformResults),
+  // so each member post is matched by its own designation, which is unique
+  // within the group (members are joined with " & " to build the group's
+  // merged designation).
+  const missingClubbedMembers = useMemo(() => {
+    if (!selectedJob?.isClubbedGroup || !selectedJob.clubbedMembers?.length) return [];
+    const selectedSet = new Set(selectedApps);
+    const coveredDesignations = new Set(
+      candidates.filter((c) => selectedSet.has(c.app_id)).map((c) => c.job_designation)
+    );
+    return selectedJob.clubbedMembers.filter((m) => {
+      if (coveredDesignations.has(m.designation)) return false;
+      // A member post that has already had every one of its own candidates
+      // resolved (Approved/Rejected) has nothing left to select — don't keep
+      // demanding representation from it forever on later cleanup batches
+      // that only touch the OTHER posts' remaining stragglers.
+      const hasUnresolvedCandidate = candidates.some(
+        (c) => c.job_designation === m.designation && !['Approved', 'Rejected'].includes(c.marks_status)
+      );
+      return hasUnresolvedCandidate;
+    });
+  }, [selectedJob, selectedApps, candidates]);
+
+  const isClubbedApproveBlocked = Boolean(selectedJob?.isClubbedGroup) && missingClubbedMembers.length > 0;
 
   // Fetch active jobs
   useEffect(() => {
@@ -215,9 +309,27 @@ const VerificationPage = () => {
               (j) => (j.isClubbedGroup && j.clubbedJobIds.includes(urlJobId)) || getJobRouteId(j) === urlJobId
             );
           }
-          const defaultJob = matched || groupedJobs[0];
-          setSelectedJob(defaultJob);
-          setSelectedJobId(getJobRouteId(defaultJob) || '');
+
+          if (matched) {
+            setSelectedJob(matched);
+            setSelectedJobId(getJobRouteId(matched) || '');
+          } else {
+            // No specific job requested via the URL — default to the
+            // Advertisement filter already having a value selected, with
+            // every candidate under it shown (combined view), rather than
+            // landing on one arbitrary job post.
+            const firstAdvJob = groupedJobs.find((j) => getJobAdvNumbers(j).length > 0);
+            const defaultAdv = firstAdvJob ? getJobAdvNumbers(firstAdvJob)[0] : '';
+            if (defaultAdv) {
+              setFilters((prev) => ({ ...prev, adv_number: defaultAdv }));
+              setSelectedJobId('');
+              setSelectedJob(null);
+            } else {
+              // No advertisement info at all — fall back to the old default.
+              setSelectedJob(groupedJobs[0]);
+              setSelectedJobId(getJobRouteId(groupedJobs[0]) || '');
+            }
+          }
         }
       } catch (err) {
         toast.error('Failed to load active jobs: ' + err.message);
@@ -228,7 +340,43 @@ const VerificationPage = () => {
     fetchJobs();
   }, [urlJobId]);
 
+  // Combined view: no single job post backs this, so fetch every post under
+  // the selected Advertisement in parallel and merge — there's no backend
+  // endpoint for "all candidates under an advertisement" today, but each
+  // application belongs to exactly one job post, so a client-side merge is
+  // safe and keyset pagination isn't needed at advertisement scale.
+  const fetchCombinedCandidates = async () => {
+    if (jobsForSelectedAdv.length === 0) return;
+    try {
+      setLoading(true);
+      const params = {
+        limit: 200,
+        search: debouncedFilters.search || undefined,
+        status_filter: debouncedFilters.status !== 'all' ? debouncedFilters.status : undefined,
+      };
+      const results = await Promise.all(
+        jobsForSelectedAdv.map((j) => {
+          const routeId = getJobRouteId(j);
+          return routeId ? ResultsApi.getCandidates(routeId, params).catch(() => null) : null;
+        })
+      );
+      // A job entry in jobsForSelectedAdv can itself be a clubbed group with
+      // OTHER member advertisements — re-filter by each candidate's own
+      // adv_number so those unrelated members don't leak into this view.
+      const merged = results.filter(Boolean).flatMap((res) => res.data || [])
+        .filter((c) => c.adv_number === filters.adv_number);
+      setCandidates(merged);
+      setPagination({ total: merged.length, has_more: false, next_cursor: null });
+      setSelectedApps([]);
+    } catch (err) {
+      toast.error('Failed to load candidates for verification');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchCandidates = async (reset = false) => {
+    if (isCombinedView) return fetchCombinedCandidates();
     if (!selectedJobId) return;
     try {
       setLoading(true);
@@ -255,10 +403,17 @@ const VerificationPage = () => {
     }
   };
 
+  // Deliberately keyed on debouncedFilters.search/.status rather than the
+  // whole debouncedFilters object — adv_number narrowing within an already-
+  // selected clubbed group is handled client-side (see displayedCandidates)
+  // and must NOT refetch (which would also wipe the in-progress selection,
+  // see handleJobChange/handleFilterChange). A genuine advertisement/job
+  // switch still refetches via the selectedJobId/isCombinedView/
+  // jobsForSelectedAdv deps below.
   useEffect(() => {
-    if (selectedJobId) fetchCandidates(true);
+    if (selectedJobId || isCombinedView) fetchCandidates(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, debouncedFilters]);
+  }, [selectedJobId, isCombinedView, jobsForSelectedAdv, debouncedFilters.search, debouncedFilters.status]);
 
   useEffect(() => {
     if (cursor) fetchCandidates(false);
@@ -266,12 +421,42 @@ const VerificationPage = () => {
   }, [cursor]);
 
   const handleJobChange = (e) => {
-    const jobId = e.target.value;
+    const raw = e.target.value;
+    setCursor(null);
+
+    if (!raw) {
+      // "All Job Posts" combined view — a genuinely different candidate set
+      // (across separate job posts), so the previous selection is stale.
+      setSelectedApps([]);
+      setSelectedJobId('');
+      setSelectedJob(null);
+      return;
+    }
+
+    // A clubbed member row encodes its own advertisement into the option
+    // value (`jobId::adv::advNumber`) — split it back apart so the actual
+    // fetch still targets the shared clubbed job id, while the Advertisement
+    // filter narrows the table to just that member's candidates.
+    const [jobId, memberAdv] = raw.split(CLUB_MEMBER_SEP);
+    // Switching between a clubbed group's own member rows (or "All Combined")
+    // keeps the same underlying job id and the same already-loaded candidate
+    // data — only the display narrowing changes — so keep the selection the
+    // admin has already built up instead of wiping it. Only a genuine switch
+    // to a different job/clubbed group clears it.
+    if (jobId !== selectedJobId) setSelectedApps([]);
     setSelectedJobId(jobId);
     const matched = jobs.find((j) => getJobRouteId(j) === jobId);
     setSelectedJob(matched || null);
-    setSelectedApps([]);
-    setCursor(null);
+
+    if (memberAdv) {
+      setFilters((prev) => ({ ...prev, adv_number: memberAdv }));
+    } else if (matched?.isClubbedGroup) {
+      // "All Combined" row — show every member's candidates, unfiltered.
+      setFilters((prev) => ({ ...prev, adv_number: '' }));
+    } else if (matched) {
+      setFilters((prev) => ({ ...prev, adv_number: getJobAdvNumbers(matched)[0] || prev.adv_number }));
+    }
+
     if (matched) {
       navigate(`/dashboard/results/verification/${getJobRouteId(matched)}`, { replace: true });
     }
@@ -282,24 +467,36 @@ const VerificationPage = () => {
     setFilters((prev) => ({ ...prev, [name]: value }));
     setCursor(null);
 
-    // Picking an Advertisement: if the currently selected job post doesn't
-    // belong to it, fall back to the first post under it so the page never
-    // ends up showing a post that contradicts the Advertisement filter.
+    // Picking an Advertisement: land on the combined "All Job Posts" view for
+    // it (every candidate under that advertisement, ready to approve/reject
+    // together) unless the currently selected post already belongs to it —
+    // which, for a clubbed group spanning multiple advertisements, also
+    // covers picking one of its *other* member advertisements: stay put and
+    // let the candidate table narrow itself down (see displayedCandidates)
+    // instead of jumping away to a different job post.
     if (name === 'adv_number' && value) {
-      const stillValid = jobs.some(
-        (j) => getJobRouteId(j) === selectedJobId && j.advertisements?.[0]?.adv_number === value
+      const stillValid = selectedJobId && jobs.some(
+        (j) => getJobRouteId(j) === selectedJobId && getJobAdvNumbers(j).includes(value)
       );
       if (!stillValid) {
-        const firstMatch = jobs.find((j) => j.advertisements?.[0]?.adv_number === value);
-        if (firstMatch) handleJobChange({ target: { value: getJobRouteId(firstMatch) } });
+        setSelectedJobId('');
+        setSelectedJob(null);
       }
     }
   };
 
   const handleClearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-    setDebouncedFilters(DEFAULT_FILTERS);
     setCursor(null);
+    setSelectedJobId('');
+    setSelectedJob(null);
+
+    // Same default as initial load: land back on the first advertisement's
+    // combined view (every candidate under it) rather than an arbitrary
+    // single job post.
+    const firstAdvJob = jobs.find((j) => getJobAdvNumbers(j).length > 0);
+    const defaultAdv = firstAdvJob ? getJobAdvNumbers(firstAdvJob)[0] : '';
+    setFilters({ ...DEFAULT_FILTERS, adv_number: defaultAdv });
+    setDebouncedFilters({ ...DEFAULT_FILTERS, adv_number: defaultAdv });
   };
 
   // ── Bulk execution ──
@@ -310,7 +507,10 @@ const VerificationPage = () => {
     const tid = toast.loading('Processing action...');
     try {
       await ResultsApi.bulkAction({
-        job_post_id: selectedJobId,
+        // Combined view spans multiple job posts, so there's no single job
+        // post id to report — the Advertisement number stands in for it
+        // (each application still resolves to its own job post server-side).
+        job_post_id: selectedJobId || `adv-${filters.adv_number}`,
         action,
         application_ids: selectedApps,
         reason: reasonStr,
@@ -336,6 +536,12 @@ const VerificationPage = () => {
   };
 
   const handleBulkApprove = async () => {
+    if (isClubbedApproveBlocked) {
+      toast.error(
+        `Select at least one candidate for every clubbed post before approving — still missing: ${missingClubbedMembers.map((m) => m.designation).join(', ')}.`
+      );
+      return;
+    }
     const ok = await confirmApprove(selectedApps.length);
     if (ok) executeBulkAction('approve');
   };
@@ -489,6 +695,17 @@ const VerificationPage = () => {
     },
   ], []);
 
+  // A clubbed group's fetch already returns every member post's candidates
+  // merged together (tagged per-row with their own adv_number) — so once
+  // the admin picks one of that group's several advertisements, narrow the
+  // table down client-side rather than refetching.
+  const displayedCandidates = useMemo(() => {
+    if (selectedJob?.isClubbedGroup && filters.adv_number && selectedJob.clubbedAdvNumbers?.includes(filters.adv_number)) {
+      return candidates.filter((c) => c.adv_number === filters.adv_number);
+    }
+    return candidates;
+  }, [candidates, selectedJob, filters.adv_number]);
+
   if (jobsLoading) {
     return (
       <div className="p-6 bg-slate-50 min-h-screen flex items-center justify-center">
@@ -520,12 +737,9 @@ const VerificationPage = () => {
           <div className="flex items-center gap-2">
             <div className="min-w-[280px]">
               <SearchableSelect
-                value={selectedJobId}
+                value={selectedJobOptionValue}
                 onChange={handleJobChange}
-                options={jobs.map((j, idx) => {
-                  const val = getJobRouteId(j) || (j.id ? j.id.toString() : '') || idx;
-                  return { value: val, label: `${j.designation} (Adv: ${j.advertisements?.[0]?.adv_number || 'N/A'})` };
-                })}
+                options={buildJobOptions(jobs)}
               />
             </div>
             {/*<Button variant="outline" size="md" onClick={() => fetchCandidates(true)} disabled={loading}
@@ -537,13 +751,37 @@ const VerificationPage = () => {
         </div>
 
         {/* INFO STRIP */}
-        {selectedJob && (
+        {isCombinedView ? (
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
             <CardContent className="p-4 flex flex-wrap items-center justify-between gap-6">
               <div>
-                <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Active Post</span>
+                <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Advertisement (Combined View)</span>
+                <h3 className="text-base font-bold text-emerald-900">Adv: {filters.adv_number}</h3>
+                <p className="text-xs text-emerald-700/80">
+                  Showing candidates across all {jobsForSelectedAdv.length} job post{jobsForSelectedAdv.length === 1 ? '' : 's'} under this advertisement.
+                </p>
+              </div>
+              <div className="px-4 py-2 bg-white rounded-lg text-center border border-emerald-200">
+                <span className="block text-xs font-medium text-slate-500">Candidates Loaded</span>
+                <span className="text-sm font-bold text-emerald-700">{pagination.total}</span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : selectedJob && (
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
+            <CardContent className="p-4 flex flex-wrap items-center justify-between gap-6">
+              <div>
+                <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
+                  {selectedJob.isClubbedGroup ? 'Active Post (Clubbed Group)' : 'Active Post'}
+                </span>
                 <h3 className="text-base font-bold text-emerald-900">{selectedJob.designation}</h3>
-                <p className="text-xs text-emerald-700/80">Department: {selectedJob.department?.name || 'AJK PSC'}</p>
+                {selectedJob.isClubbedGroup && selectedJob.clubbedAdvNumbers?.length > 0 ? (
+                  <p className="text-xs text-emerald-700/80">
+                    Advertisements: {selectedJob.clubbedAdvNumbers.join(', ')} — use the Advertisement filter above to narrow the table to one of them.
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-700/80">Department: {selectedJob.department?.name || 'AJK PSC'}</p>
+                )}
               </div>
               <div className="px-4 py-2 bg-white rounded-lg text-center border border-emerald-200">
                 <span className="block text-xs font-medium text-slate-500">Passing Criteria</span>
@@ -563,7 +801,7 @@ const VerificationPage = () => {
           extraFilters={
             <SearchableSelect
               label="Job Post"
-              value={selectedJobId}
+              value={selectedJobOptionValue}
               onChange={handleJobChange}
               options={jobPostOptions}
               placeholder="All Job Posts"
@@ -579,8 +817,15 @@ const VerificationPage = () => {
                 {selectedApps.length} candidate{selectedApps.length === 1 ? '' : 's'} selected
               </span>
               <div className="flex gap-2">
-                <Button onClick={handleBulkApprove} disabled={processingAction} size="sm"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white">
+                <Button
+                  onClick={handleBulkApprove}
+                  disabled={processingAction || isClubbedApproveBlocked}
+                  size="sm"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white"
+                  title={isClubbedApproveBlocked
+                    ? `Select at least one candidate for every clubbed post first — still missing: ${missingClubbedMembers.map((m) => m.designation).join(', ')}.`
+                    : undefined}
+                >
                   <UserCheck size={14} /> Approve
                 </Button>
                 <Button onClick={handleBulkReject} disabled={processingAction} variant="outline" size="sm"
@@ -593,6 +838,12 @@ const VerificationPage = () => {
                 </Button>
               </div>
             </div>
+            {isClubbedApproveBlocked && (
+              <p className="text-xs text-amber-700 mt-2">
+                This is a clubbed group of {selectedJob.clubbedMembers.length} posts — select at least one candidate for each before Approve is enabled.
+                Still missing: {missingClubbedMembers.map((m) => m.designation).join(', ')}.
+              </p>
+            )}
           </div>
         )}
 
@@ -602,7 +853,7 @@ const VerificationPage = () => {
             <div className="p-10 flex justify-center">
               <InlineLoader text="Fetching candidate records..." variant="ring" size="lg" />
             </div>
-          ) : candidates.length === 0 ? (
+          ) : displayedCandidates.length === 0 ? (
             <div className="p-16 flex flex-col items-center justify-center text-center gap-3">
               <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center">
                 <ShieldCheck size={26} />
@@ -615,12 +866,12 @@ const VerificationPage = () => {
           ) : (
             <TooltipDataGrid
               sx={gridSx}
-              rows={candidates.map((cand) => ({ ...cand, id: cand.app_id }))}
+              rows={displayedCandidates.map((cand) => ({ ...cand, id: cand.app_id }))}
               columns={columns}
               checkboxSelection
               rowSelectionModel={selectedApps}
               onRowSelectionModelChange={(newSelection) => setSelectedApps(newSelection)}
-              autoHeight
+              // autoHeight
               disableRowSelectionOnClick
               hideFooter
             />
