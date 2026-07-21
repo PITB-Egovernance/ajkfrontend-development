@@ -142,6 +142,13 @@ const RequisitionList = () => {
     },
   ];
 
+  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedFilters(filters), 400);
+    return () => clearTimeout(handle);
+  }, [filters]);
+
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
@@ -226,11 +233,20 @@ const RequisitionList = () => {
     return matched ? matched.name : str;
   };
 
-  const fetchRequisitions = async (pageNum = 0, pageSize = 10) => {
+  const fetchRequisitions = async (pageNum = 0, pageSize = 10, filterParams = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const url = `${API_BASE}/requisitions?page=${pageNum + 1}&per_page=${pageSize}`;
+      const params = new URLSearchParams({
+        page: pageNum + 1,
+        per_page: pageSize,
+      });
+      Object.entries(filterParams).forEach(([key, value]) => {
+        if (value !== "" && value !== null && value !== undefined) {
+          params.set(key, value);
+        }
+      });
+      const url = `${API_BASE}/requisitions?${params.toString()}`;
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
@@ -299,55 +315,23 @@ const RequisitionList = () => {
   };
 
   useEffect(() => {
-    fetchRequisitions(paginationModel.page, paginationModel.pageSize);
+    fetchRequisitions(
+      paginationModel.page,
+      paginationModel.pageSize,
+      debouncedFilters,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize]);
+  }, [paginationModel.page, paginationModel.pageSize, debouncedFilters]);
 
+  // Designation/department/scale/status/id filtering now happens server-side
+  // (see fetchRequisitions) so results are searched across the whole dataset,
+  // not just the rows already loaded for the current page. This memo only
+  // still needs to split the server-fetched page by requisition source tab.
   const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      if (getRequisitionSource(row.requisition_status) !== requisitionSourceTab) {
-        return false;
-      }
-
-      if (
-        filters.id &&
-        !String(row.id).toLowerCase().includes(filters.id.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.designation &&
-        !row.designation
-          ?.toLowerCase()
-          .includes(filters.designation.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.department &&
-        !row.department
-          ?.toLowerCase()
-          .includes(filters.department.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.scale &&
-        !getScaleName(row.scale)
-          .toLowerCase()
-          .includes(filters.scale.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.status &&
-        row.status?.toLowerCase() !== filters.status.toLowerCase()
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [rows, filters, requisitionSourceTab]);
+    return rows.filter(
+      (row) => getRequisitionSource(row.requisition_status) === requisitionSourceTab,
+    );
+  }, [rows, requisitionSourceTab]);
 
   const sourceCounts = useMemo(
     () => ({
