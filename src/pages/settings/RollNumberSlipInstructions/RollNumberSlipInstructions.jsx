@@ -35,6 +35,8 @@ const authHeaders = (json = true) => ({
 const SLIP_TEXT_TYPES = [
   { value: "note",        label: "Roll Number Slip Note" },
   { value: "instruction", label: "Roll Number Slip Instruction" },
+  { value: "interview_note", label: "Interview Note" },
+  { value: "interview_instruction", label: "Interview Instruction" },
 ];
 
 const STATUSES = [
