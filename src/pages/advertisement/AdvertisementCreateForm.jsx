@@ -386,6 +386,27 @@ const AdvertisementCreateForm = () => {
       return;
     }
 
+    const missingTestTypeIds = selectedIds.filter(
+      (jobId) => !jobConfigs[jobId]?.testType
+    );
+    if (missingTestTypeIds.length > 0) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          missingTestTypeIds.map((jobId) => [
+            `test_type_${jobId}`,
+            ["Test type is required for every selected post"],
+          ])
+        ),
+      }));
+      toast.error(
+        missingTestTypeIds.length === 1
+          ? "Please select a Test Type for the highlighted post before saving"
+          : "Please select a Test Type for every post before saving"
+      );
+      return;
+    }
+
     const filteredTerms = termsConditions.filter(
       (t) => t.trim().length > 0
     );
@@ -416,7 +437,7 @@ const AdvertisementCreateForm = () => {
       const subjectsPayload = {};
       const cceStagesPayload = {};
 
-      Object.keys(jobConfigs).forEach((jobId) => {
+      selectedIds.forEach((jobId) => {
         const config = jobConfigs[jobId] || {};
 
         feesPayload[jobId] = config.fee || "";

@@ -849,6 +849,27 @@ const AdvertisementEditForm = () => {
       return;
     }
 
+    const missingTestTypeIds = selectedIds.filter(
+      (jobId) => !jobConfigs[jobId]?.testType
+    );
+    if (missingTestTypeIds.length > 0) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          missingTestTypeIds.map((jobId) => [
+            `test_type_${jobId}`,
+            ["Test type is required for every selected post"],
+          ])
+        ),
+      }));
+      toast.error(
+        missingTestTypeIds.length === 1
+          ? "Please select a Test Type for the highlighted post before saving"
+          : "Please select a Test Type for every post before saving"
+      );
+      return;
+    }
+
     for (const jobId of selectedIds) {
       const jobMeta = availableJobs.find((job) => String(job.id) === String(jobId));
       if (!jobMeta?.quotaBased) continue;
