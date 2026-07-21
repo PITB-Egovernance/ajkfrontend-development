@@ -291,9 +291,10 @@ const RequisitionList = () => {
             item.current_step || item.step || item.currentStep || null,
           designation: item.designation,
           department:
-            typeof item.department === "object"
+            item.department_label ||
+            (typeof item.department === "object"
               ? item.department?.name || item.department?.department_name || ""
-              : item.department || "",
+              : item.department || ""),
           scale: item.scale,
           num_posts: item.num_posts,
           status: item.status || (item.temp_id ? "Draft" : "Pending"),
