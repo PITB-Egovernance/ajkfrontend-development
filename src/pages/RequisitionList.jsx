@@ -230,7 +230,7 @@ const RequisitionList = () => {
     setLoading(true);
     setError(null);
     try {
-      const url = `${API_BASE}/requisitions?per_page=500`;
+      const url = `${API_BASE}/requisitions?page=${pageNum + 1}&per_page=${pageSize}`;
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
@@ -251,13 +251,11 @@ const RequisitionList = () => {
       const data = result.data || result;
       const dataArray = Array.isArray(data) ? data : data.data || [];
       const total =
-        result.meta?.total ||
-        result.total ||
-        data.total ||
-        data.meta?.total ||
-        data.last_page * pageSize ||
+        data.total ??
+        data.meta?.total ??
+        result.meta?.total ??
+        result.total ??
         (Array.isArray(dataArray) ? dataArray.length : 0);
-      console.log("Data Array Requisiotnn", dataArray);
       if (Array.isArray(dataArray) && dataArray.length > 0) {
         const requisitions = dataArray.map((item, index) => ({
           id:
@@ -290,7 +288,7 @@ const RequisitionList = () => {
         setTotal(total);
       } else {
         setRows([]);
-        setTotal(0);
+        setTotal(total);
       }
     } catch (err) {
       const errorMsg = err.message || "Failed to fetch requisitions";
@@ -301,9 +299,9 @@ const RequisitionList = () => {
   };
 
   useEffect(() => {
-    fetchRequisitions();
+    fetchRequisitions(paginationModel.page, paginationModel.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [paginationModel.page, paginationModel.pageSize]);
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -616,7 +614,7 @@ const RequisitionList = () => {
 
       if (result.success) {
         toast.success(result.message || "Requisition deleted successfully");
-        fetchRequisitions();
+        fetchRequisitions(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(
           result.error || result.message || "Failed to delete requisition",
@@ -990,8 +988,8 @@ const RequisitionList = () => {
                 paginationModel={paginationModel}
                 onPaginationModelChange={setPaginationModel}
                 pageSizeOptions={[10, 25, 50]}
-                paginationMode="client"
-                rowCount={filteredRows.length}
+                paginationMode="server"
+                rowCount={total}
                 loading={loading}
                 disableRowSelectionOnClick
                 autoHeight

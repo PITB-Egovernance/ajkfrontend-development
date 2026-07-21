@@ -24,8 +24,20 @@ import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import { hasPermission } from "utils/permissions";
 import { GRID_SX } from 'utils/gridStyles';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 
 const PERM = "settings.companies";
+
+const COMPANY_TYPE_OPTIONS = [
+  { value: "Government", label: "Government" },
+  { value: "Construction", label: "Construction" },
+  { value: "IT Services", label: "IT Services" },
+  { value: "Consulting", label: "Consulting" },
+  { value: "Engineering", label: "Engineering" },
+  { value: "Supply & Services", label: "Supply & Services" },
+  { value: "Maintenance", label: "Maintenance" },
+  { value: "Other", label: "Other" },
+];
 
 const CompaniesManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);
@@ -42,7 +54,38 @@ const CompaniesManagement = () => {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [filters, setFilters] = useState({
+    name: "",
+    company_type: "",
+    ntn: "",
+    status: "",
+  });
+
+  const filterConfig = [
+    { name: 'name', label: 'Company Name', type: 'text', placeholder: 'Filter by company name' },
+    { name: 'company_type', label: 'Company Type', type: 'select', options: COMPANY_TYPE_OPTIONS },
+    { name: 'ntn', label: 'NTN', type: 'text', placeholder: 'Filter by NTN' },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+    },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ name: "", company_type: "", ntn: "", status: "" });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
 
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
@@ -135,14 +178,15 @@ const CompaniesManagement = () => {
   ).length;
 
   /* ===============================
-     SEARCH FILTER
+     FILTERS
   =============================== */
-  const filteredRows = rows.filter(
-    (row) =>
-      row.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.ntn?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRows = rows.filter((row) => {
+    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) return false;
+    if (filters.company_type && row.type !== filters.company_type) return false;
+    if (filters.ntn && !row.ntn?.toLowerCase().includes(filters.ntn.toLowerCase())) return false;
+    if (filters.status && (row.status ?? "active").toLowerCase() !== filters.status.toLowerCase()) return false;
+    return true;
+  });
 
   /* ===============================
      ADD / UPDATE COMPANY
@@ -379,15 +423,14 @@ const CompaniesManagement = () => {
           </Card>
         </div>
 
-        {/* SEARCH */}
-        <div className="mb-6">
-          <TextField
-            fullWidth
-            placeholder="Search companies..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setPaginationModel((prev) => ({ ...prev, page: 0 })); }}
-          />
-        </div>
+        {/* ADVANCED FILTERS */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Companies"
+        />
 
         {/* TABLE */}
         <TooltipDataGrid
@@ -460,16 +503,7 @@ const CompaniesManagement = () => {
               onChange={(e) =>
                 setFormData({ ...formData, company_type: e.target.value })
               }
-              options={[
-                { value: "Government", label: "Government" },
-                { value: "Construction", label: "Construction" },
-                { value: "IT Services", label: "IT Services" },
-                { value: "Consulting", label: "Consulting" },
-                { value: "Engineering", label: "Engineering" },
-                { value: "Supply & Services", label: "Supply & Services" },
-                { value: "Maintenance", label: "Maintenance" },
-                { value: "Other", label: "Other" },
-              ]}
+              options={COMPANY_TYPE_OPTIONS}
               placeholder="Select Company Type"
             />
             <TextField

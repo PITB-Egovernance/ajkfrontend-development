@@ -17,6 +17,7 @@ import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
 import settingsCatalogApi from 'api/settingsCatalogApi';
 import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 const PERM = 'settings.qualifications';
 
 const API_BASE = Config.apiUrl;
@@ -45,9 +46,42 @@ const QualificationsManagement = () => {
     status: 'active',
   });
   const [saving,   setSaving]   = useState(false);
-  const [search,   setSearch]   = useState('');
+  const [filters,  setFilters]  = useState({ name: '', type: '', status: '' });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
-  const hasActiveFilters = search.trim().length > 0;
+  const hasActiveFilters = Object.values(filters).some((v) => v.trim().length > 0);
+
+  const filterConfig = [
+    { name: 'name', label: 'Qualification Name', type: 'text', placeholder: 'Search qualifications...' },
+    {
+      name: 'type',
+      label: 'Type',
+      type: 'select',
+      options: [
+        { value: 'required', label: 'Required' },
+        { value: 'professional', label: 'Professional' },
+      ],
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+    },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ name: '', type: '', status: '' });
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
 
   const fetchPage = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
@@ -107,9 +141,12 @@ const QualificationsManagement = () => {
   }, [hasActiveFilters, paginationModel.page, paginationModel.pageSize]);
 
 
-  const filtered = (hasActiveFilters ? allRows : rows).filter((r) =>
-    !search.trim() || r.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = (hasActiveFilters ? allRows : rows).filter((r) => {
+    if (filters.name.trim() && !r.name?.toLowerCase().includes(filters.name.trim().toLowerCase())) return false;
+    if (filters.type && r.type !== filters.type) return false;
+    if (filters.status && r.status !== filters.status) return false;
+    return true;
+  });
 
   const openAdd = () => {
     setEditing(null);
@@ -237,7 +274,7 @@ const QualificationsManagement = () => {
     }] : []),
   ];
 
-  if (loading) return <InlineLoader text="Loading qualifications..." variant="ring" size="lg" />;
+  if (loading && rows.length === 0 && allRows.length === 0) return <InlineLoader text="Loading qualifications..." variant="ring" size="lg" />;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
@@ -259,7 +296,7 @@ const QualificationsManagement = () => {
           </div>
           {canAdd && (
             <button onClick={openAdd}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm">
               <Plus size={15} /> Add Qualification
             </button>
           )}
@@ -271,10 +308,13 @@ const QualificationsManagement = () => {
           </Card>
         </div>
 
-        <div className="mb-4">
-          <TextField size="small" placeholder="Search qualifications..."
-            value={search} onChange={(e) => { setSearch(e.target.value); setPaginationModel((p) => ({ ...p, page: 0 })); }} sx={{ width: 320 }} />
-        </div>
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Qualifications"
+        />
 
         <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}

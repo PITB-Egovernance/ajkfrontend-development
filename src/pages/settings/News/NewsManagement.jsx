@@ -15,6 +15,7 @@ import { GRID_SX } from "utils/gridStyles";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
+import AdvancedFilter from "components/tables/AdvancedFilter";
 
 const PERM = "settings.news";
 
@@ -106,10 +107,31 @@ const NewsManagement = () => {
   const [open,    setOpen]    = useState(false);
   const [editing, setEditing] = useState(null);
   const [form,    setForm]    = useState(EMPTY_FORM);
-  const [search,  setSearch]  = useState("");
-  const [filterType,   setFilterType]   = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filters, setFilters] = useState({ title: "", category: "", news_type: "", status: "" });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+
+  const filterConfig = [
+    { name: "title", label: "Title", type: "text", placeholder: "Search by title..." },
+    {
+      name: "category",
+      label: "Category",
+      type: "select",
+      options: NEWS_CATEGORIES.map((c) => ({ value: c, label: c })),
+    },
+    { name: "news_type", label: "Type", type: "select", options: NEWS_TYPES },
+    { name: "status", label: "Status", type: "select", options: STATUSES },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ title: "", category: "", news_type: "", status: "" });
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
 
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -167,10 +189,11 @@ const NewsManagement = () => {
   const featuredCount  = rows.filter((r) => r.is_featured).length;
 
   const filtered = rows.filter((r) => {
-    const matchSearch = !search.trim() || r.title?.toLowerCase().includes(search.toLowerCase());
-    const matchType   = !filterType   || r.news_type === filterType;
-    const matchStatus = !filterStatus || r.status === filterStatus;
-    return matchSearch && matchType && matchStatus;
+    if (filters.title.trim() && !r.title?.toLowerCase().includes(filters.title.trim().toLowerCase())) return false;
+    if (filters.category && r.category !== filters.category) return false;
+    if (filters.news_type && r.news_type !== filters.news_type) return false;
+    if (filters.status && r.status !== filters.status) return false;
+    return true;
   });
 
   /* ── MENU ── */
@@ -374,7 +397,7 @@ const NewsManagement = () => {
           </div>
           {canAdd && (
             <button onClick={openAdd}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm">
               <Plus size={15} /> Add News
             </button>
           )}
@@ -396,35 +419,14 @@ const NewsManagement = () => {
           </Card>
         </div>
 
-        {/* FILTERS */}
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <TextField size="small" placeholder="Search by title..."
-            value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 280 }} />
-          <div style={{ minWidth: 180 }}>
-            <SearchableSelect
-              label="Type"
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              options={[
-                { value: "", label: "All Types" },
-                ...NEWS_TYPES,
-              ]}
-              placeholder="All Types"
-            />
-          </div>
-          <div style={{ minWidth: 160 }}>
-            <SearchableSelect
-              label="Status"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              options={[
-                { value: "", label: "All Status" },
-                ...STATUSES,
-              ]}
-              placeholder="All Status"
-            />
-          </div>
-        </div>
+        {/* ADVANCED FILTERS */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter News & Notices"
+        />
 
         {/* GRID */}
         <TooltipDataGrid

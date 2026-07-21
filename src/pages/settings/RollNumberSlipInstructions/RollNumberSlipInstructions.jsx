@@ -17,6 +17,7 @@ import { hasPermission } from "utils/permissions";
 import RichTextEditor from "components/ui/RichTextEditor";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
+import AdvancedFilter from "components/tables/AdvancedFilter";
 
 const PERM = "settings.roll_number_slip_instructions";
 
@@ -62,9 +63,25 @@ const RollNumberSlipInstructions = () => {
   const [open,    setOpen]    = useState(false);
   const [editing, setEditing] = useState(null);
   const [form,    setForm]    = useState(EMPTY_FORM);
-  const [filterType,   setFilterType]   = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filters, setFilters] = useState({ slip_text: "", slip_text_type: "", status: "" });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+
+  const filterConfig = [
+    { name: "slip_text", label: "Text", type: "text", placeholder: "Search slip text..." },
+    { name: "slip_text_type", label: "Slip Text Type", type: "select", options: SLIP_TEXT_TYPES },
+    { name: "status", label: "Status", type: "select", options: STATUSES },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ slip_text: "", slip_text_type: "", status: "" });
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
 
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -108,9 +125,10 @@ const RollNumberSlipInstructions = () => {
   const instrCount    = rows.filter((r) => r.slip_text_type === "instruction").length;
 
   const filtered = rows.filter((r) => {
-    const matchType   = !filterType   || r.slip_text_type === filterType;
-    const matchStatus = !filterStatus || r.status === filterStatus;
-    return matchType && matchStatus;
+    if (filters.slip_text.trim() && !stripHtml(r.slip_text).toLowerCase().includes(filters.slip_text.trim().toLowerCase())) return false;
+    if (filters.slip_text_type && r.slip_text_type !== filters.slip_text_type) return false;
+    if (filters.status && r.status !== filters.status) return false;
+    return true;
   });
 
   /* ── MENU ── */
@@ -299,7 +317,7 @@ const RollNumberSlipInstructions = () => {
           </div>
           {canAdd && (
             <button onClick={openAdd}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm">
               <Plus size={15} /> Add Slip Text
             </button>
           )}
@@ -321,33 +339,14 @@ const RollNumberSlipInstructions = () => {
           </Card>
         </div>
 
-        {/* FILTERS */}
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <div style={{ minWidth: 220 }}>
-            <SearchableSelect
-              label="Slip Text Type"
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              options={[
-                { value: "", label: "All Types" },
-                ...SLIP_TEXT_TYPES,
-              ]}
-              placeholder="All Types"
-            />
-          </div>
-          <div style={{ minWidth: 160 }}>
-            <SearchableSelect
-              label="Status"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              options={[
-                { value: "", label: "All Status" },
-                ...STATUSES,
-              ]}
-              placeholder="All Status"
-            />
-          </div>
-        </div>
+        {/* ADVANCED FILTERS */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Slip Instructions"
+        />
 
         {/* GRID */}
         <TooltipDataGrid
