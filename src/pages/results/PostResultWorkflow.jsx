@@ -718,6 +718,11 @@ const PostResultWorkflow = () => {
       <div className="flex flex-wrap items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 mb-3">
         <span className="text-sm font-semibold text-emerald-800 mr-2">{selectedIds.length} selected</span>
         {children}
+        {busy && (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+            <RefreshCw size={13} className="animate-spin" /> Processing…
+          </span>
+        )}
       </div>
     );
 
@@ -735,8 +740,8 @@ const PostResultWorkflow = () => {
     </>);
 
     if (activeTab === 'interview') return wrap(
-      <select onChange={(e) => e.target.value && handleAssignToPhase(e.target.value)} defaultValue=""
-        className="text-xs border border-emerald-300 rounded-md px-2 py-1.5 bg-white">
+      <select onChange={(e) => e.target.value && handleAssignToPhase(e.target.value)} defaultValue="" disabled={busy}
+        className="text-xs border border-emerald-300 rounded-md px-2 py-1.5 bg-white disabled:opacity-50 disabled:cursor-not-allowed">
         <option value="" disabled>Assign to phase…</option>
         {phases.map((p) => <option key={p.id} value={p.id}>{p.phase_name} — {p.interview_date}</option>)}
       </select>

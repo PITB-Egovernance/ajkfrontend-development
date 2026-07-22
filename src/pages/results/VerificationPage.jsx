@@ -682,8 +682,16 @@ const VerificationPage = () => {
           'Rejected':            { label: 'Rejected',            cls: 'bg-rose-50 border-rose-200 text-rose-700', Icon: XCircle },
           'Under Verification':  { label: 'Under Verification',  cls: 'bg-amber-50 border-amber-200 text-amber-700', Icon: AlertCircle },
           'Uploaded':            { label: 'Uploaded',            cls: 'bg-slate-100 border-slate-200 text-slate-600', Icon: null },
+          'Published':           { label: 'Published',           cls: 'bg-emerald-50 border-emerald-200 text-emerald-700', Icon: CheckCircle2 },
+          // Backend default for a candidate with no exam_results.marks_status
+          // value yet (CandidateListService::transformResults falls back to
+          // 'Pending') — without this entry the cell silently rendered
+          // nothing, making the whole column look broken/blank.
+          'Pending':             { label: 'Pending',             cls: 'bg-slate-100 border-slate-200 text-slate-500', Icon: null },
         };
-        const conf = map[status];
+        // Fall back to the raw status label instead of rendering nothing, so
+        // any future/unmapped marks_status value stays visible.
+        const conf = map[status] || (status ? { label: status, cls: 'bg-slate-100 border-slate-200 text-slate-500', Icon: null } : null);
         if (!conf) return null;
         const { Icon } = conf;
         return (
@@ -868,10 +876,11 @@ const VerificationPage = () => {
               sx={gridSx}
               rows={displayedCandidates.map((cand) => ({ ...cand, id: cand.app_id }))}
               columns={columns}
+              rowHeight={64}
               checkboxSelection
               rowSelectionModel={selectedApps}
               onRowSelectionModelChange={(newSelection) => setSelectedApps(newSelection)}
-              // autoHeight
+              autoHeight
               disableRowSelectionOnClick
               hideFooter
             />

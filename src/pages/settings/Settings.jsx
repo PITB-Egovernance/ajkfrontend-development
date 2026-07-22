@@ -144,7 +144,7 @@ const Settings = () => {
     },
     {
       icon: ScrollText,
-      title: 'Roll Number Slip Instructions',
+      title: 'Roll Number / Interview Slip Instructions',
       description: 'Manage note and instruction text for roll number slips',
       iconBg: 'bg-fuchsia-600',
       link: '/dashboard/settings/roll-number-slip-instructions',

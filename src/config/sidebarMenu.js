@@ -13,14 +13,14 @@ export const MENU_ITEMS = [
     icon: Home,
     path: "/dashboard",
   },
-  {
-    id: "candidates",
-    label: "Candidates",
-    icon: Users,
-    submenu: [
-      { label: "Award Lists",            path: "/dashboard/award-lists",   icon: Award },
-    ],
-  },
+  // {
+  //   id: "candidates",
+  //   label: "Candidates",
+  //   icon: Users,
+  //   submenu: [
+  //     { label: "Award Lists",            path: "/dashboard/award-lists",   icon: Award },
+  //   ],
+  // },
   
   {
     id: "employees",
@@ -132,7 +132,7 @@ export const MENU_ITEMS = [
       { label: "Stamps",             path: "/dashboard/settings/stamps",             icon: Stamp },
       { label: "Groups",             path: "/dashboard/settings/groups",             icon: Boxes },
       { label: "News & Notices",     path: "/dashboard/settings/news",               icon: Newspaper },
-      { label: "Roll Number Slip Instructions", path: "/dashboard/settings/roll-number-slip-instructions", icon: Hash },
+      { label: "Roll Number / Interview Slip Instructions", path: "/dashboard/settings/roll-number-slip-instructions", icon: Hash },
       { label: "Terms & Condition",        path: "/dashboard/settings/terms-conditions",     icon: ScrollText },
       { label: "Roles & Permissions", path: "/dashboard/settings/roles",              icon: ShieldCheck },
     ],
