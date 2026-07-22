@@ -96,6 +96,9 @@ const CceRollSlipGeneration = () => {
   const [candidates, setCandidates] = useState([]);
   const [masterRowsByAd, setMasterRowsByAd] = useState({});
   const [selectionsByKey, setSelectionsByKey] = useState({});
+  // advertisement hash_id -> display title, used only as a fallback when a
+  // candidate's own subject-selection response doesn't carry one.
+  const [advertisementTitleById, setAdvertisementTitleById] = useState({});
 
   // Stage 1 — search/filter + post selection
   const [search, setSearch] = useState('');
@@ -123,35 +126,50 @@ const CceRollSlipGeneration = () => {
       try {
         const adsRes = await CceScreeningApi.advertisements();
         const adList = Array.isArray(adsRes?.data) ? adsRes.data : [];
-
-        const perAd = await Promise.all(adList.map(async (ad) => {
+        const adTitleById = {};
+        adList.forEach((ad) => {
           const adId = ad.hash_id || ad.id;
-          const adTitle = ad.adv_number || ad.title || `Advertisement #${ad.id}`;
-          const [masterRes, candRes] = await Promise.all([
-            CceDateSheetApi.getMasterDateSheet(adId).catch(() => ({ data: [] })),
-            CceDateSheetApi.getEligibleCandidatesFromPortal({ advertisementId: adId, perPage: 500, page: 1 }).catch(() => ({ data: [] })),
-          ]);
-          const masterRows = Array.isArray(masterRes?.data) ? masterRes.data : [];
-          const candPayload = candRes?.data;
-          const candList = Array.isArray(candPayload) ? candPayload : (candPayload ? [candPayload] : []);
-          return { adId, adTitle, masterRows, candList };
-        }));
+          adTitleById[adId] = ad.adv_number || ad.title || `Advertisement #${ad.id}`;
+        });
+        setAdvertisementTitleById(adTitleById);
 
         const masterMap = {};
-        const flatCandidates = [];
-        perAd.forEach(({ adId, adTitle, masterRows, candList }) => {
-          masterMap[adId] = masterRows;
-          candList.forEach((c) => flatCandidates.push({ ...c, advertisementId: adId, advertisementTitle: adTitle }));
-        });
+        await Promise.all(adList.map(async (ad) => {
+          const adId = ad.hash_id || ad.id;
+          const masterRes = await CceDateSheetApi.getMasterDateSheet(adId).catch(() => ({ data: [] }));
+          masterMap[adId] = Array.isArray(masterRes?.data) ? masterRes.data : [];
+        }));
         setMasterRowsByAd(masterMap);
+
+        // Every submitted CCE subject selection, fetched once with no
+        // advertisement_id filter. The candidate portal's advertisement_id
+        // filter only reliably matches a candidate clubbed across several
+        // advertisements (any one of the group can match) — looping this
+        // fetch per advertisement (the previous approach) silently dropped
+        // every single-post, non-clubbed candidate whose one advertisement
+        // didn't happen to match the filter. Paginated through every page
+        // the portal reports, same as CceCandidateDateSheet.jsx's own
+        // "All Advertisements" (unfiltered) fetch.
+        const flatCandidates = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          // eslint-disable-next-line no-await-in-loop
+          const res = await CceDateSheetApi.getEligibleCandidatesFromPortal({ perPage: 500, page }).catch(() => null);
+          const payload = res?.data;
+          const list = Array.isArray(payload) ? payload : (payload ? [payload] : []);
+          flatCandidates.push(...list);
+          const total = Number(res?.meta?.pagination?.total ?? 0);
+          totalPages = total > 0 ? Math.min(50, Math.ceil(total / 500)) : 1;
+          page += 1;
+        } while (page <= totalPages);
         setCandidates(flatCandidates);
 
-        // Subject selection is per-candidate/roll-number, never per
-        // advertisement — a clubbed candidate appears once per advertisement
-        // in flatCandidates, so fetching per unique roll_number (not per row)
-        // avoids redundant duplicate calls and, more importantly, is what
-        // lets every clubbed row below resolve to the exact same selection
-        // object (and its `advertisements` list of clubbed posts).
+        // Subject selection is per-candidate/roll-number — fetching per
+        // unique roll_number (not per row) avoids redundant duplicate calls
+        // and, more importantly, is what lets every clubbed row below
+        // resolve to the exact same selection object (and its
+        // `advertisements` list of clubbed posts).
         const uniqueRollNumbers = [...new Set(flatCandidates.map((c) => c.roll_number).filter(Boolean))];
         const selEntries = await Promise.all(uniqueRollNumbers.map(async (rollNumber) => {
           try {
@@ -193,22 +211,36 @@ const CceRollSlipGeneration = () => {
   // entry already has advertisement_id/advertisement_number/post_id/
   // post_name/department/status) — the single source of truth for clubbing
   // on this page, so nothing here re-derives it independently.
+  //
+  // A row's own advertisement/post is resolved from that same array (its
+  // first entry) rather than from the raw candidate-portal item's own
+  // advertisement_id/post_name fields — those aren't reliable for a
+  // single-post candidate (see the loader effect above), whereas
+  // `advertisements` is populated for every roll number, clubbed or not.
   const candidateRows = useMemo(() => candidates.map((c) => {
-    const masterRows = masterRowsByAd[c.advertisementId] || [];
     const selection = selectionsByKey[c.roll_number];
+    const clubbedPosts = Array.isArray(selection?.advertisements) ? selection.advertisements : [];
+    const ownPost = clubbedPosts[0] || null;
+    const advertisementId = ownPost?.advertisement_id || null;
+    const advertisementTitle = ownPost?.advertisement_number || advertisementTitleById[advertisementId] || '—';
+    const postName = ownPost?.post_name || '—';
+
+    const masterRows = advertisementId ? (masterRowsByAd[advertisementId] || []) : [];
     const groups = buildCandidateDateSheetGroups(masterRows, selection?.selections);
     const papers = flattenPapers(groups);
-    const clubbedPosts = Array.isArray(selection?.advertisements) ? selection.advertisements : [];
     return {
       ...c,
+      advertisementId,
+      advertisementTitle,
+      post_name: postName,
       papers,
       papersCount: papers.length,
       complete: isDateSheetComplete(papers),
       clubbedPosts,
       isClubbed: clubbedPosts.length > 1,
-      postKey: `${c.advertisementId}::${c.post_name || '—'}`,
+      postKey: `${advertisementId || 'unresolved'}::${postName}`,
     };
-  }), [candidates, masterRowsByAd, selectionsByKey]);
+  }), [candidates, masterRowsByAd, selectionsByKey, advertisementTitleById]);
 
   // The same clubbed candidate appears once per advertisement in
   // candidateRows (their raw applicant pool is fetched per-advertisement) —
