@@ -6,7 +6,7 @@ import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import CceScreeningApi from 'api/cceScreeningApi';
 import CceDateSheetApi from 'api/cceDateSheetApi';
-import { groupByClubbedAdvertisements } from 'utils/cceClubbing';
+import { listIndividualPosts } from 'utils/cceClubbing';
 
 // Same group ordering as the public CCE syllabus page (SubjectsSyllabus.jsx).
 const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G'];
@@ -21,17 +21,18 @@ const dayFromDate = (date) => (date ? new Date(date).toLocaleDateString(undefine
 const CceMasterDateSheet = () => {
   const [advertisements, setAdvertisements] = useState([]);
   const [advertisementsLoading, setAdvertisementsLoading] = useState(true);
-  const [groupedJobs, setGroupedJobs] = useState([]);
-  // advertisementId is the one shown/edited in the grid below; advertisementIds
-  // is the full clubbed group it belongs to (just itself when not clubbed) —
-  // a clubbed candidate sits one written exam covering every clubbed post, so
-  // the schedule must be saved identically to every id in that group, never
-  // just the one selected in the dropdown.
+  const [posts, setPosts] = useState([]);
+  // The one post shown/edited in the grid below. Master date sheets are
+  // always saved per-post now — whether that post turns out to be clubbed
+  // with others (and therefore shares its schedule with them) is resolved
+  // server-side on every fetch/save, never assumed client-side.
   const [advertisementId, setAdvertisementId] = useState('');
-  const [advertisementIds, setAdvertisementIds] = useState([]);
+  const [jobPostId, setJobPostId] = useState('');
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   const [rows, setRows] = useState([]);
+  const [isClubbed, setIsClubbed] = useState(false);
+  const [clubbedPosts, setClubbedPosts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -43,19 +44,19 @@ const CceMasterDateSheet = () => {
       try {
         // Reuse the CCE Screening advertisement list — already scoped to
         // advertisements with at least one generated CCE roll number, and
-        // already annotated with clubbed_advertisement_ids.
+        // already carrying each advertisement's own job posts.
         const res = await CceScreeningApi.advertisements();
         const list = res?.data ?? [];
         const safeList = Array.isArray(list) ? list : [];
         setAdvertisements(safeList);
 
-        const groups = groupByClubbedAdvertisements(safeList);
-        setGroupedJobs(groups);
+        const postList = listIndividualPosts(safeList);
+        setPosts(postList);
 
-        if (groups.length > 0) {
-          const defaultEntry = groups[0];
+        if (postList.length > 0) {
+          const defaultEntry = postList[0];
           setAdvertisementId(defaultEntry.advId);
-          setAdvertisementIds(defaultEntry.advIds);
+          setJobPostId(defaultEntry.jobPostId);
           setSelectedEntry(defaultEntry);
         }
       } catch (err) {
@@ -67,19 +68,23 @@ const CceMasterDateSheet = () => {
   }, []);
 
   const loadRows = useCallback(async () => {
-    if (!advertisementId) return;
+    if (!advertisementId || !jobPostId) return;
     setLoading(true);
     try {
-      const res = await CceDateSheetApi.getMasterDateSheet(advertisementId);
-      const list = Array.isArray(res?.data) ? res.data : [];
-      setRows(list);
+      const res = await CceDateSheetApi.getMasterDateSheet(advertisementId, jobPostId);
+      const data = res?.data ?? {};
+      setRows(Array.isArray(data.rows) ? data.rows : []);
+      setIsClubbed(!!data.is_clubbed);
+      setClubbedPosts(Array.isArray(data.posts) ? data.posts : []);
     } catch (err) {
       toast.error(err?.message || 'Failed to load master date sheet');
       setRows([]);
+      setIsClubbed(false);
+      setClubbedPosts([]);
     } finally {
       setLoading(false);
     }
-  }, [advertisementId]);
+  }, [advertisementId, jobPostId]);
 
   useEffect(() => { loadRows(); }, [loadRows]);
 
@@ -142,10 +147,12 @@ const CceMasterDateSheet = () => {
 
     setSaving(true);
     try {
-      // Saved to every advertisement in the clubbed group at once (just
-      // [advertisementId] when not clubbed) — see CceMasterDateSheetService::save().
+      // The backend resolves whether this post is clubbed with others and,
+      // if so, saves the same schedule for the whole club — see
+      // CceMasterDateSheetService::save().
       await CceDateSheetApi.saveMasterDateSheet(
-        advertisementIds.length > 0 ? advertisementIds : advertisementId,
+        advertisementId,
+        jobPostId,
         complete.map((r) => ({
           subject_id:        r.subject_id,
           paper_label:       r.paper_label,
@@ -233,23 +240,23 @@ const CceMasterDateSheet = () => {
               <p className="text-sm text-slate-500 mt-1">Set the written-paper schedule used to auto-fill every candidate's date sheet.</p>
             </div>
           </div>
-          {groupedJobs.length > 0 && (
+          {posts.length > 0 && (
             <TextField
               select
               size="small"
-              label="Job Post / Exam"
-              value={advertisementId}
+              label="Job Post"
+              value={selectedEntry?.id || ''}
               onChange={(e) => {
                 const val = e.target.value;
-                const matchedEntry = groupedJobs.find((j) => j.advId === val);
-                setAdvertisementId(val);
-                setAdvertisementIds(matchedEntry?.advIds || [val]);
+                const matchedEntry = posts.find((p) => p.id === val);
+                setAdvertisementId(matchedEntry?.advId || '');
+                setJobPostId(matchedEntry?.jobPostId || '');
                 setSelectedEntry(matchedEntry || null);
               }}
               sx={{ minWidth: 280, maxWidth: 380, backgroundColor: 'white' }}
               SelectProps={{
                 renderValue: (val) => {
-                  const entry = groupedJobs.find((j) => j.advId === val);
+                  const entry = posts.find((p) => p.id === val);
                   return (
                     <span
                       title={entry?.designation || ''}
@@ -261,11 +268,11 @@ const CceMasterDateSheet = () => {
                 },
               }}
             >
-              {groupedJobs.map((entry) => (
-                <MenuItem key={entry.advId} value={entry.advId} title={entry.designation}>
+              {posts.map((entry) => (
+                <MenuItem key={entry.id} value={entry.id} title={entry.designation}>
                   <ListItemText
                     primary={entry.designation}
-                    secondary={entry.isClubbedGroup ? 'Clubbed Job Post Group' : `Adv: ${entry.adv_number || 'N/A'}`}
+                    secondary={`Adv: ${entry.adv_number || 'N/A'}`}
                     primaryTypographyProps={{ noWrap: true, sx: { maxWidth: 340 } }}
                   />
                 </MenuItem>
@@ -274,16 +281,22 @@ const CceMasterDateSheet = () => {
           )}
         </div>
 
-        {/* Full, non-truncated post list for the selected job/exam — the same
-            schedule below is saved to every clubbed advertisement together. */}
+        {/* Whether this post is clubbed is resolved server-side per
+            selection (see CceMasterDateSheetService::resolveGroup()) — not
+            assumed from the dropdown grouping. */}
         {selectedEntry && (
           <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-              {selectedEntry.isClubbedGroup ? 'Clubbed Job Posts — schedule saved to all of them' : 'Job Post'}
+              {isClubbed ? 'Clubbed Job Posts — schedule shared by all of them' : 'Individual Job Post'}
             </p>
             <p className="text-sm font-medium text-indigo-900 mt-1 break-words">
               {selectedEntry.designation}
             </p>
+            {isClubbed && clubbedPosts.length > 0 && (
+              <p className="text-xs text-indigo-700 mt-1 break-words">
+                Shared with: {clubbedPosts.map((p) => p.post_name).filter(Boolean).join(', ')}
+              </p>
+            )}
           </div>
         )}
 

@@ -71,3 +71,42 @@ export const groupByClubbedAdvertisements = (advertisements) => {
 
   return entries;
 };
+
+/**
+ * One dropdown entry per individual job post (advertisement_id + job_post_id
+ * pair), used by the Master Date Sheet page — never collapsed by
+ * advertisement, since one advertisement can bundle several CCE posts and
+ * each post needs its own master date sheet. Whether a given post turns out
+ * to be clubbed with others is resolved server-side per selection (see
+ * CceMasterDateSheetService::resolveGroup()) — this list only has to offer
+ * every post, not pre-group them.
+ *
+ * Each returned entry has:
+ *   advId       — hash_id of the advertisement this post is listed under
+ *   jobPostId   — hash_id of the post (job_details.id)
+ *   designation — the post's own designation
+ *   adv_number  — adv_number of the advertisement
+ */
+export const listIndividualPosts = (advertisements) => {
+  const entries = [];
+
+  advertisements.forEach((adv) => {
+    const advId = adv.hash_id || adv.id;
+    const jobs = adv.jobs || adv.job_details || adv.jobDetails || [];
+
+    jobs.forEach((job) => {
+      const jobPostId = job.hash_id || job.id;
+      if (!jobPostId) return;
+
+      entries.push({
+        id:          `${advId}-${jobPostId}`,
+        advId,
+        jobPostId,
+        designation: job.designation || adv.adv_number || advId,
+        adv_number:  adv.adv_number,
+      });
+    });
+  });
+
+  return entries;
+};

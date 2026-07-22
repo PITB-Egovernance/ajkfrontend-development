@@ -41,20 +41,28 @@ const handleResponse = async (response) => {
 
 const CceDateSheetApi = {
   // ── Master Date Sheet ───────────────────────────────────────────────────
-  getMasterDateSheet: async (advertisementId) => {
+  // Keyed by the specific post (job_post_id) under the specific
+  // advertisement — an advertisement can bundle several CCE posts, each
+  // with its own master date sheet. The backend resolves server-side
+  // whether that post is clubbed with others (and, if so, returns/saves the
+  // one schedule shared by the whole club) — see
+  // CceMasterDateSheetService::resolveGroup(). Response/payload shape:
+  // { rows: [...], is_clubbed: bool, posts: [{post_id, post_name}, ...] }.
+  getMasterDateSheet: async (advertisementId, jobPostId) => {
     const search = new URLSearchParams();
     if (advertisementId) search.set('advertisement_id', advertisementId);
+    if (jobPostId) search.set('job_post_id', jobPostId);
     const res = await fetch(`${ADMIN_API_BASE}/cce/master-date-sheet?${search}`, {
       headers: getAdminHeaders(false),
     });
     return handleResponse(res);
   },
 
-  saveMasterDateSheet: async (advertisementId, rows) => {
+  saveMasterDateSheet: async (advertisementId, jobPostId, rows) => {
     const res = await fetch(`${ADMIN_API_BASE}/cce/master-date-sheet/save`, {
       method:  'POST',
       headers: getAdminHeaders(),
-      body:    JSON.stringify({ advertisement_id: advertisementId, rows }),
+      body:    JSON.stringify({ advertisement_id: advertisementId, job_post_id: jobPostId, rows }),
     });
     return handleResponse(res);
   },
