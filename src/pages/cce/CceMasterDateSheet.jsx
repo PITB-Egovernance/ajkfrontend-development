@@ -6,7 +6,6 @@ import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import CceScreeningApi from 'api/cceScreeningApi';
 import CceDateSheetApi from 'api/cceDateSheetApi';
-import { listIndividualPosts } from 'utils/cceClubbing';
 
 // Same group ordering as the public CCE syllabus page (SubjectsSyllabus.jsx).
 const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G'];
@@ -21,18 +20,15 @@ const dayFromDate = (date) => (date ? new Date(date).toLocaleDateString(undefine
 const CceMasterDateSheet = () => {
   const [advertisements, setAdvertisements] = useState([]);
   const [advertisementsLoading, setAdvertisementsLoading] = useState(true);
-  const [posts, setPosts] = useState([]);
-  // The one post shown/edited in the grid below. Master date sheets are
-  // always saved per-post now — whether that post turns out to be clubbed
-  // with others (and therefore shares its schedule with them) is resolved
-  // server-side on every fetch/save, never assumed client-side.
+  // The one advertisement shown/edited in the grid below. Master date sheets
+  // are saved per-advertisement — shared by every CCE post that
+  // advertisement bundles (resolved server-side, see
+  // CceMasterDateSheetService::resolveGroup()).
   const [advertisementId, setAdvertisementId] = useState('');
-  const [jobPostId, setJobPostId] = useState('');
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   const [rows, setRows] = useState([]);
-  const [isClubbed, setIsClubbed] = useState(false);
-  const [clubbedPosts, setClubbedPosts] = useState([]);
+  const [sharedPosts, setSharedPosts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -43,21 +39,22 @@ const CceMasterDateSheet = () => {
       setAdvertisementsLoading(true);
       try {
         // Reuse the CCE Screening advertisement list — already scoped to
-        // advertisements with at least one generated CCE roll number, and
-        // already carrying each advertisement's own job posts.
+        // advertisements with at least one generated CCE roll number.
         const res = await CceScreeningApi.advertisements();
         const list = res?.data ?? [];
         const safeList = Array.isArray(list) ? list : [];
-        setAdvertisements(safeList);
 
-        const postList = listIndividualPosts(safeList);
-        setPosts(postList);
+        const entries = safeList.map((adv) => {
+          const advId = adv.hash_id || adv.id;
+          const jobs = adv.jobs || adv.job_details || adv.jobDetails || [];
+          const designation = jobs.map((j) => j.designation).filter(Boolean).join(' & ') || adv.adv_number || advId;
+          return { id: advId, advId, designation, adv_number: adv.adv_number };
+        });
+        setAdvertisements(entries);
 
-        if (postList.length > 0) {
-          const defaultEntry = postList[0];
-          setAdvertisementId(defaultEntry.advId);
-          setJobPostId(defaultEntry.jobPostId);
-          setSelectedEntry(defaultEntry);
+        if (entries.length > 0) {
+          setAdvertisementId(entries[0].advId);
+          setSelectedEntry(entries[0]);
         }
       } catch (err) {
         toast.error(err?.message || 'Failed to load advertisements');
@@ -68,23 +65,21 @@ const CceMasterDateSheet = () => {
   }, []);
 
   const loadRows = useCallback(async () => {
-    if (!advertisementId || !jobPostId) return;
+    if (!advertisementId) return;
     setLoading(true);
     try {
-      const res = await CceDateSheetApi.getMasterDateSheet(advertisementId, jobPostId);
+      const res = await CceDateSheetApi.getMasterDateSheet(advertisementId);
       const data = res?.data ?? {};
       setRows(Array.isArray(data.rows) ? data.rows : []);
-      setIsClubbed(!!data.is_clubbed);
-      setClubbedPosts(Array.isArray(data.posts) ? data.posts : []);
+      setSharedPosts(Array.isArray(data.posts) ? data.posts : []);
     } catch (err) {
       toast.error(err?.message || 'Failed to load master date sheet');
       setRows([]);
-      setIsClubbed(false);
-      setClubbedPosts([]);
+      setSharedPosts([]);
     } finally {
       setLoading(false);
     }
-  }, [advertisementId, jobPostId]);
+  }, [advertisementId]);
 
   useEffect(() => { loadRows(); }, [loadRows]);
 
@@ -147,12 +142,10 @@ const CceMasterDateSheet = () => {
 
     setSaving(true);
     try {
-      // The backend resolves whether this post is clubbed with others and,
-      // if so, saves the same schedule for the whole club — see
-      // CceMasterDateSheetService::save().
+      // Saves one shared schedule for every CCE post under this
+      // advertisement — see CceMasterDateSheetService::save().
       await CceDateSheetApi.saveMasterDateSheet(
         advertisementId,
-        jobPostId,
         complete.map((r) => ({
           subject_id:        r.subject_id,
           paper_label:       r.paper_label,
@@ -240,23 +233,22 @@ const CceMasterDateSheet = () => {
               <p className="text-sm text-slate-500 mt-1">Set the written-paper schedule used to auto-fill every candidate's date sheet.</p>
             </div>
           </div>
-          {posts.length > 0 && (
+          {advertisements.length > 0 && (
             <TextField
               select
               size="small"
-              label="Job Post"
+              label="Advertisement"
               value={selectedEntry?.id || ''}
               onChange={(e) => {
                 const val = e.target.value;
-                const matchedEntry = posts.find((p) => p.id === val);
+                const matchedEntry = advertisements.find((a) => a.id === val);
                 setAdvertisementId(matchedEntry?.advId || '');
-                setJobPostId(matchedEntry?.jobPostId || '');
                 setSelectedEntry(matchedEntry || null);
               }}
               sx={{ minWidth: 280, maxWidth: 380, backgroundColor: 'white' }}
               SelectProps={{
                 renderValue: (val) => {
-                  const entry = posts.find((p) => p.id === val);
+                  const entry = advertisements.find((a) => a.id === val);
                   return (
                     <span
                       title={entry?.designation || ''}
@@ -268,7 +260,7 @@ const CceMasterDateSheet = () => {
                 },
               }}
             >
-              {posts.map((entry) => (
+              {advertisements.map((entry) => (
                 <MenuItem key={entry.id} value={entry.id} title={entry.designation}>
                   <ListItemText
                     primary={entry.designation}
@@ -281,20 +273,20 @@ const CceMasterDateSheet = () => {
           )}
         </div>
 
-        {/* Whether this post is clubbed is resolved server-side per
-            selection (see CceMasterDateSheetService::resolveGroup()) — not
-            assumed from the dropdown grouping. */}
+        {/* Every CCE post under this advertisement shares this one
+            schedule — the full list comes from the backend (see
+            CceMasterDateSheetService::describePosts()), not assumed here. */}
         {selectedEntry && (
           <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-              {isClubbed ? 'Clubbed Job Posts — schedule shared by all of them' : 'Individual Job Post'}
+              Shared by every CCE post in this advertisement
             </p>
             <p className="text-sm font-medium text-indigo-900 mt-1 break-words">
               {selectedEntry.designation}
             </p>
-            {isClubbed && clubbedPosts.length > 0 && (
+            {sharedPosts.length > 0 && (
               <p className="text-xs text-indigo-700 mt-1 break-words">
-                Shared with: {clubbedPosts.map((p) => p.post_name).filter(Boolean).join(', ')}
+                Posts: {sharedPosts.map((p) => p.post_name).filter(Boolean).join(', ')}
               </p>
             )}
           </div>

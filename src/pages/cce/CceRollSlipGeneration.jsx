@@ -136,8 +136,8 @@ const CceRollSlipGeneration = () => {
         const masterMap = {};
         await Promise.all(adList.map(async (ad) => {
           const adId = ad.hash_id || ad.id;
-          const masterRes = await CceDateSheetApi.getMasterDateSheet(adId).catch(() => ({ data: [] }));
-          masterMap[adId] = Array.isArray(masterRes?.data) ? masterRes.data : [];
+          const masterRes = await CceDateSheetApi.getMasterDateSheet(adId).catch(() => ({ data: { rows: [] } }));
+          masterMap[adId] = Array.isArray(masterRes?.data?.rows) ? masterRes.data.rows : [];
         }));
         setMasterRowsByAd(masterMap);
 
