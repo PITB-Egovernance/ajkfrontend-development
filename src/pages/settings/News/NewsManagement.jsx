@@ -49,6 +49,7 @@ const NEWS_TYPES = [
   { value: "result",        label: "Result" },
   { value: "schedule",      label: "Schedule" },
   { value: "corrigendum",   label: "Corrigendum" },
+  { value: "announcement",   label: "Announcement" },
   { value: "public_notice", label: "Public Notice" },
 ];
 

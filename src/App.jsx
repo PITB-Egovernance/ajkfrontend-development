@@ -67,6 +67,8 @@ import DigitalSignatureManagement from 'pages/settings/DigitalSignature/DigitalS
 import SystemSettings from 'pages/settings/SystemSettings/SystemSettings';
 import WingsManagement from 'pages/settings/Wings/WingsManagement';
 import StampManagement from 'pages/settings/Stamp/StampManagement';
+import ImageManagement from 'pages/settings/Images/ImageManagement';
+import SyllabusManagement from 'pages/settings/Syllabus/SyllabusManagement';
 import GroupsManagement from 'pages/settings/Groups/GroupsManagement';
 import NewsManagement from 'pages/settings/News/NewsManagement';
 import RollNumberSlipInstructions from 'pages/settings/RollNumberSlipInstructions/RollNumberSlipInstructions';
@@ -235,6 +237,8 @@ function App() {
           <Route path="settings/system-settings" element={<SystemSettings />} />
           <Route path="settings/wings" element={<WingsManagement />} />
           <Route path="settings/stamps" element={<StampManagement />} />
+          <Route path="settings/images" element={<ImageManagement />} />
+          <Route path="settings/syllabus" element={<SyllabusManagement />} />
           <Route path="settings/groups" element={<GroupsManagement />} />
           <Route path="settings/news" element={<NewsManagement />} />
           <Route path="settings/roll-number-slip-instructions" element={<RollNumberSlipInstructions />} />

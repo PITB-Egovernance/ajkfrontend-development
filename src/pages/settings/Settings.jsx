@@ -21,7 +21,8 @@ import {
   Boxes,
   Newspaper,
   Hash,
-  FileText
+  FileText,
+  ImageIcon
 } from 'lucide-react';
 import { hasSubModuleAccess, isAdminUser } from 'utils/permissions';
 
@@ -125,6 +126,22 @@ const Settings = () => {
       iconBg: 'bg-orange-500',
       link: '/dashboard/settings/stamps',
       permModule: 'settings', permSub: 'stamps',
+    },
+    {
+      icon: ImageIcon,
+      title: 'Image Management',
+      description: 'Manage image assets used across the system',
+      iconBg: 'bg-pink-500',
+      link: '/dashboard/settings/images',
+      permModule: 'settings', permSub: 'images',
+    },
+    {
+      icon: BookOpen,
+      title: 'Syllabus Management',
+      description: 'Manage syllabus documents linked to case numbers',
+      iconBg: 'bg-cyan-600',
+      link: '/dashboard/settings/syllabus',
+      permModule: 'settings', permSub: 'syllabus',
     },
     {
       icon: Boxes,

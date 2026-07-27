@@ -3,7 +3,7 @@ import {
   Award, Settings, Package, Briefcase, MapPin, Map, Hash,
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
-  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket
+  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -129,6 +129,8 @@ export const MENU_ITEMS = [
       { label: "System Settings",    path: "/dashboard/settings/system-settings",    icon: UserCog },
       { label: "Wings / Sections",        path: "/dashboard/settings/wings",        icon: LayoutList },
       { label: "Stamps",             path: "/dashboard/settings/stamps",             icon: Stamp },
+      { label: "Images",             path: "/dashboard/settings/images",             icon: ImageIcon },
+      { label: "Syllabus",           path: "/dashboard/settings/syllabus",           icon: BookOpen },
       { label: "Groups",             path: "/dashboard/settings/groups",             icon: Boxes },
       { label: "News & Notices",     path: "/dashboard/settings/news",               icon: Newspaper },
       { label: "Roll Number Slip Instructions", path: "/dashboard/settings/roll-number-slip-instructions", icon: Hash },
