@@ -3,7 +3,8 @@ import {
   Award, Settings, Package, Briefcase, MapPin, Map, Hash,
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
-  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon
+  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon,
+  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ClipboardCheck
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -13,14 +14,14 @@ export const MENU_ITEMS = [
     icon: Home,
     path: "/dashboard",
   },
-  {
-    id: "candidates",
-    label: "Candidates",
-    icon: Users,
-    submenu: [
-      { label: "Award Lists",            path: "/dashboard/award-lists",   icon: Award },
-    ],
-  },
+  // {
+  //   id: "candidates",
+  //   label: "Candidates",
+  //   icon: Users,
+  //   submenu: [
+  //     { label: "Award Lists",            path: "/dashboard/award-lists",   icon: Award },
+  //   ],
+  // },
   
   {
     id: "employees",
@@ -90,9 +91,10 @@ export const MENU_ITEMS = [
         path: "/dashboard/results/exam/cce-exams",        
         icon: FileQuestion ,
         children:[
-           { label: "CCE Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
+          { label: "CCE Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
         ],
       },
+      { label: "Post Result Processing", path: "/dashboard/results/post-result",    icon: ClipboardCheck },
     ],
   },
   // {
@@ -133,7 +135,7 @@ export const MENU_ITEMS = [
       { label: "Syllabus",           path: "/dashboard/settings/syllabus",           icon: BookOpen },
       { label: "Groups",             path: "/dashboard/settings/groups",             icon: Boxes },
       { label: "News & Notices",     path: "/dashboard/settings/news",               icon: Newspaper },
-      { label: "Roll Number Slip Instructions", path: "/dashboard/settings/roll-number-slip-instructions", icon: Hash },
+      { label: "Roll Number / Interview Slip Instructions", path: "/dashboard/settings/roll-number-slip-instructions", icon: Hash },
       { label: "Terms & Condition",        path: "/dashboard/settings/terms-conditions",     icon: ScrollText },
       { label: "Roles & Permissions", path: "/dashboard/settings/roles",              icon: ShieldCheck },
     ],

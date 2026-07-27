@@ -248,7 +248,7 @@ const TermsConditions = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6">
+      <div className="mx-auto bg-white rounded-xl shadow-sm p-6" style={{ minWidth: "-webkit-fill-available" }}>
 
         {/* Header */}
         <div className="flex justify-between items-center mb-8">

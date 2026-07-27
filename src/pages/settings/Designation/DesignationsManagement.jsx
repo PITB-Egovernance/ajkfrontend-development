@@ -89,7 +89,9 @@ const DesignationsManagement = () => {
       name: 'grade_id',
       label: 'Grade',
       type: 'select',
-      options: grades.map(g => ({ value: g.id || g.hash_id, label: g.name }))
+      options: grades
+        .filter((g) => (g.status ?? "active").toLowerCase() === "active")
+        .map(g => ({ value: g.id || g.hash_id, label: g.name }))
     },
     {
       name: 'status',

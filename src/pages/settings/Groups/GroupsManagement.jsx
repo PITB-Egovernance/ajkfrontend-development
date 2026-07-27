@@ -15,6 +15,7 @@ import { GRID_SX } from "utils/gridStyles";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
+import AdvancedFilter from "components/tables/AdvancedFilter";
 
 const PERM = "settings.groups";
 
@@ -43,8 +44,32 @@ const GroupsManagement = () => {
   const [open,    setOpen]    = useState(false);
   const [editing, setEditing] = useState(null);
   const [form,    setForm]    = useState(emptyForm);
-  const [search,  setSearch]  = useState("");
+  const [filters, setFilters] = useState({ group_name: "", status: "" });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+
+  const filterConfig = [
+    { name: "group_name", label: "Group Name", type: "text", placeholder: "Filter by group name" },
+    {
+      name: "status",
+      label: "Status",
+      type: "select",
+      options: [
+        { value: "active", label: "Active" },
+        { value: "inactive", label: "Inactive" },
+      ],
+    },
+  ];
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ group_name: "", status: "" });
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
 
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -84,9 +109,11 @@ const GroupsManagement = () => {
   const activeCount   = rows.filter((r) => r.status === "active").length;
   const inactiveCount = rows.filter((r) => r.status === "inactive").length;
 
-  const filtered = rows.filter((r) =>
-    !search.trim() || r.group_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = rows.filter((r) => {
+    if (filters.group_name.trim() && !r.group_name?.toLowerCase().includes(filters.group_name.trim().toLowerCase())) return false;
+    if (filters.status && r.status !== filters.status) return false;
+    return true;
+  });
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -244,7 +271,7 @@ const GroupsManagement = () => {
           </div>
           {canAdd && (
           <button onClick={openAdd}
-            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+            className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm">
             <Plus size={15} /> Add Group
           </button>
           )}
@@ -263,11 +290,14 @@ const GroupsManagement = () => {
           </Card>
         </div>
 
-        {/* SEARCH */}
-        <div className="mb-4">
-          <TextField size="small" placeholder="Search groups..."
-            value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 320 }} />
-        </div>
+        {/* ADVANCED FILTERS */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Groups"
+        />
 
         {/* GRID */}
         <TooltipDataGrid

@@ -339,7 +339,7 @@ const DepartmentsManagement = () => {
           </div>
           {canAdd && (
             <button onClick={openAdd}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm">
               <Plus size={15} /> Add Department
             </button>
           )}
@@ -394,8 +394,13 @@ const DepartmentsManagement = () => {
               placeholder="e.g. Ali Khan" />
             <TextField fullWidth required label="Phone Number" margin="normal" size="small"
               value={formData.phone_number}
-              onChange={(e) => { setFormData((f) => ({ ...f, phone_number: e.target.value })); setFormError(''); }}
-              placeholder="e.g. 05822-123456" />
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                if (val.length <= 11) setFormData((f) => ({ ...f, phone_number: val }));
+                setFormError('');
+              }}
+              inputProps={{ inputMode: 'numeric', maxLength: 11 }}
+              placeholder="e.g. 05822123456" />
             <TextField fullWidth label="Mobile Number (optional)" margin="normal" size="small"
               value={formData.mobile_number}
               onChange={(e) => {

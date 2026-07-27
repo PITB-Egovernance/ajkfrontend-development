@@ -41,6 +41,9 @@ const handleResponse = async (response) => {
 
 const CceDateSheetApi = {
   // ── Master Date Sheet ───────────────────────────────────────────────────
+  // Keyed by advertisement — one shared schedule for every CCE post that
+  // advertisement bundles. See CceMasterDateSheetService::resolveGroup().
+  // Response/payload shape: { rows: [...], posts: [{post_id, post_name}, ...] }.
   getMasterDateSheet: async (advertisementId) => {
     const search = new URLSearchParams();
     if (advertisementId) search.set('advertisement_id', advertisementId);

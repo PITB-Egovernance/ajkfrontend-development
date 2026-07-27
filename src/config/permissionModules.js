@@ -130,6 +130,19 @@ const PERMISSION_MODULES_BASE = {
       permissions: { label: 'Permissions', actions: ['add', 'edit', 'delete', 'view', 'assign_permission'] },
     },
   },
+  post_result: {
+    label: 'Post-Result Processing',
+    modules: {
+      passed_candidates:     { label: 'Passed Candidates',       actions: ['view'] },
+      document_shortlist:    { label: 'Shortlist for Documents', actions: ['view', 'add', 'export'] },
+      interview_phase:       { label: 'Interview Phase',         actions: ['view', 'add', 'edit', 'delete', 'publish'] },
+      interview_call_letter: { label: 'Interview Call Letter',   actions: ['view', 'add', 'publish'] },
+      initial_rejection:     { label: 'Initial Rejection',       actions: ['view', 'add', 'export'] },
+      final_rejection:       { label: 'Final Rejection',         actions: ['view', 'add', 'export'] },
+      award_list:            { label: 'Award List',              actions: ['view', 'add'] },
+      onboarding:            { label: 'Candidate Onboarding',    actions: ['view', 'add'] },
+    },
+  },
 };
 
 // The canonical matrix structure. Built dynamically so EVERY sidebar page is

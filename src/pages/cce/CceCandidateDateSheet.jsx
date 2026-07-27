@@ -69,7 +69,7 @@ const CceCandidateDateSheet = () => {
       setMasterRowsLoading(true);
       try {
         const res = await CceDateSheetApi.getMasterDateSheet(advertisementId);
-        const list = res?.data ?? [];
+        const list = res?.data?.rows ?? [];
         setMasterRows(Array.isArray(list) ? list : []);
       } catch (err) {
         toast.error(err?.message || 'Failed to load master date sheet');

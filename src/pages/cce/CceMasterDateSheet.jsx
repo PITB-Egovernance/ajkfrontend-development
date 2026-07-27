@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { TextField, MenuItem, Tabs, Tab } from '@mui/material';
+import { TextField, MenuItem, Tabs, Tab, ListItemText } from '@mui/material';
 import { Calendar, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
@@ -20,9 +20,15 @@ const dayFromDate = (date) => (date ? new Date(date).toLocaleDateString(undefine
 const CceMasterDateSheet = () => {
   const [advertisements, setAdvertisements] = useState([]);
   const [advertisementsLoading, setAdvertisementsLoading] = useState(true);
+  // The one advertisement shown/edited in the grid below. Master date sheets
+  // are saved per-advertisement — shared by every CCE post that
+  // advertisement bundles (resolved server-side, see
+  // CceMasterDateSheetService::resolveGroup()).
   const [advertisementId, setAdvertisementId] = useState('');
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
   const [rows, setRows] = useState([]);
+  const [sharedPosts, setSharedPosts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -36,8 +42,20 @@ const CceMasterDateSheet = () => {
         // advertisements with at least one generated CCE roll number.
         const res = await CceScreeningApi.advertisements();
         const list = res?.data ?? [];
-        setAdvertisements(Array.isArray(list) ? list : []);
-        if (list.length > 0) setAdvertisementId(list[0].hash_id || list[0].id);
+        const safeList = Array.isArray(list) ? list : [];
+
+        const entries = safeList.map((adv) => {
+          const advId = adv.hash_id || adv.id;
+          const jobs = adv.jobs || adv.job_details || adv.jobDetails || [];
+          const designation = jobs.map((j) => j.designation).filter(Boolean).join(' & ') || adv.adv_number || advId;
+          return { id: advId, advId, designation, adv_number: adv.adv_number };
+        });
+        setAdvertisements(entries);
+
+        if (entries.length > 0) {
+          setAdvertisementId(entries[0].advId);
+          setSelectedEntry(entries[0]);
+        }
       } catch (err) {
         toast.error(err?.message || 'Failed to load advertisements');
       } finally {
@@ -51,11 +69,13 @@ const CceMasterDateSheet = () => {
     setLoading(true);
     try {
       const res = await CceDateSheetApi.getMasterDateSheet(advertisementId);
-      const list = Array.isArray(res?.data) ? res.data : [];
-      setRows(list);
+      const data = res?.data ?? {};
+      setRows(Array.isArray(data.rows) ? data.rows : []);
+      setSharedPosts(Array.isArray(data.posts) ? data.posts : []);
     } catch (err) {
       toast.error(err?.message || 'Failed to load master date sheet');
       setRows([]);
+      setSharedPosts([]);
     } finally {
       setLoading(false);
     }
@@ -122,6 +142,8 @@ const CceMasterDateSheet = () => {
 
     setSaving(true);
     try {
+      // Saves one shared schedule for every CCE post under this
+      // advertisement — see CceMasterDateSheetService::save().
       await CceDateSheetApi.saveMasterDateSheet(
         advertisementId,
         complete.map((r) => ({
@@ -216,18 +238,59 @@ const CceMasterDateSheet = () => {
               select
               size="small"
               label="Advertisement"
-              value={advertisementId}
-              onChange={(e) => setAdvertisementId(e.target.value)}
-              sx={{ minWidth: 260, backgroundColor: 'white' }}
+              value={selectedEntry?.id || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                const matchedEntry = advertisements.find((a) => a.id === val);
+                setAdvertisementId(matchedEntry?.advId || '');
+                setSelectedEntry(matchedEntry || null);
+              }}
+              sx={{ minWidth: 280, maxWidth: 380, backgroundColor: 'white' }}
+              SelectProps={{
+                renderValue: (val) => {
+                  const entry = advertisements.find((a) => a.id === val);
+                  return (
+                    <span
+                      title={entry?.designation || ''}
+                      style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {entry?.designation || ''}
+                    </span>
+                  );
+                },
+              }}
             >
-              {advertisements.map((ad) => (
-                <MenuItem key={ad.hash_id || ad.id} value={ad.hash_id || ad.id}>
-                  {ad.adv_number || ad.title || `Advertisement #${ad.id}`}
+              {advertisements.map((entry) => (
+                <MenuItem key={entry.id} value={entry.id} title={entry.designation}>
+                  <ListItemText
+                    primary={entry.designation}
+                    secondary={`Adv: ${entry.adv_number || 'N/A'}`}
+                    primaryTypographyProps={{ noWrap: true, sx: { maxWidth: 340 } }}
+                  />
                 </MenuItem>
               ))}
             </TextField>
           )}
         </div>
+
+        {/* Every CCE post under this advertisement shares this one
+            schedule — the full list comes from the backend (see
+            CceMasterDateSheetService::describePosts()), not assumed here. */}
+        {selectedEntry && (
+          <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+              Shared by every CCE post in this advertisement
+            </p>
+            <p className="text-sm font-medium text-indigo-900 mt-1 break-words">
+              {selectedEntry.designation}
+            </p>
+            {sharedPosts.length > 0 && (
+              <p className="text-xs text-indigo-700 mt-1 break-words">
+                Posts: {sharedPosts.map((p) => p.post_name).filter(Boolean).join(', ')}
+              </p>
+            )}
+          </div>
+        )}
 
         {advertisementsLoading ? (
           <div className="bg-white rounded-lg shadow-sm p-10 flex justify-center">

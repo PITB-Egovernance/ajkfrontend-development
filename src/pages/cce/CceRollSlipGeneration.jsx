@@ -96,6 +96,9 @@ const CceRollSlipGeneration = () => {
   const [candidates, setCandidates] = useState([]);
   const [masterRowsByAd, setMasterRowsByAd] = useState({});
   const [selectionsByKey, setSelectionsByKey] = useState({});
+  // advertisement hash_id -> display title, used only as a fallback when a
+  // candidate's own subject-selection response doesn't carry one.
+  const [advertisementTitleById, setAdvertisementTitleById] = useState({});
 
   // Stage 1 — search/filter + post selection
   const [search, setSearch] = useState('');
@@ -123,36 +126,57 @@ const CceRollSlipGeneration = () => {
       try {
         const adsRes = await CceScreeningApi.advertisements();
         const adList = Array.isArray(adsRes?.data) ? adsRes.data : [];
-
-        const perAd = await Promise.all(adList.map(async (ad) => {
+        const adTitleById = {};
+        adList.forEach((ad) => {
           const adId = ad.hash_id || ad.id;
-          const adTitle = ad.adv_number || ad.title || `Advertisement #${ad.id}`;
-          const [masterRes, candRes] = await Promise.all([
-            CceDateSheetApi.getMasterDateSheet(adId).catch(() => ({ data: [] })),
-            CceDateSheetApi.getEligibleCandidatesFromPortal({ advertisementId: adId, perPage: 500, page: 1 }).catch(() => ({ data: [] })),
-          ]);
-          const masterRows = Array.isArray(masterRes?.data) ? masterRes.data : [];
-          const candPayload = candRes?.data;
-          const candList = Array.isArray(candPayload) ? candPayload : (candPayload ? [candPayload] : []);
-          return { adId, adTitle, masterRows, candList };
-        }));
+          adTitleById[adId] = ad.adv_number || ad.title || `Advertisement #${ad.id}`;
+        });
+        setAdvertisementTitleById(adTitleById);
 
         const masterMap = {};
-        const flatCandidates = [];
-        perAd.forEach(({ adId, adTitle, masterRows, candList }) => {
-          masterMap[adId] = masterRows;
-          candList.forEach((c) => flatCandidates.push({ ...c, advertisementId: adId, advertisementTitle: adTitle }));
-        });
+        await Promise.all(adList.map(async (ad) => {
+          const adId = ad.hash_id || ad.id;
+          const masterRes = await CceDateSheetApi.getMasterDateSheet(adId).catch(() => ({ data: { rows: [] } }));
+          masterMap[adId] = Array.isArray(masterRes?.data?.rows) ? masterRes.data.rows : [];
+        }));
         setMasterRowsByAd(masterMap);
+
+        // Every submitted CCE subject selection, fetched once with no
+        // advertisement_id filter. The candidate portal's advertisement_id
+        // filter only reliably matches a candidate clubbed across several
+        // advertisements (any one of the group can match) — looping this
+        // fetch per advertisement (the previous approach) silently dropped
+        // every single-post, non-clubbed candidate whose one advertisement
+        // didn't happen to match the filter. Paginated through every page
+        // the portal reports, same as CceCandidateDateSheet.jsx's own
+        // "All Advertisements" (unfiltered) fetch.
+        const flatCandidates = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          // eslint-disable-next-line no-await-in-loop
+          const res = await CceDateSheetApi.getEligibleCandidatesFromPortal({ perPage: 500, page }).catch(() => null);
+          const payload = res?.data;
+          const list = Array.isArray(payload) ? payload : (payload ? [payload] : []);
+          flatCandidates.push(...list);
+          const total = Number(res?.meta?.pagination?.total ?? 0);
+          totalPages = total > 0 ? Math.min(50, Math.ceil(total / 500)) : 1;
+          page += 1;
+        } while (page <= totalPages);
         setCandidates(flatCandidates);
 
-        const selEntries = await Promise.all(flatCandidates.map(async (c) => {
-          const key = rollKey(c.advertisementId, c.roll_number);
+        // Subject selection is per-candidate/roll-number — fetching per
+        // unique roll_number (not per row) avoids redundant duplicate calls
+        // and, more importantly, is what lets every clubbed row below
+        // resolve to the exact same selection object (and its
+        // `advertisements` list of clubbed posts).
+        const uniqueRollNumbers = [...new Set(flatCandidates.map((c) => c.roll_number).filter(Boolean))];
+        const selEntries = await Promise.all(uniqueRollNumbers.map(async (rollNumber) => {
           try {
-            const res = await CceDateSheetApi.getSubjectSelection(c.roll_number);
-            return [key, res?.data ?? null];
+            const res = await CceDateSheetApi.getSubjectSelection(rollNumber);
+            return [rollNumber, res?.data ?? null];
           } catch (err) {
-            return [key, null];
+            return [rollNumber, null];
           }
         }));
         setSelectionsByKey(Object.fromEntries(selEntries));
@@ -181,26 +205,65 @@ const CceRollSlipGeneration = () => {
   }, []);
 
   // Compulsory papers + only each candidate's own selected optional papers,
-  // scheduled from their own advertisement's master date sheet.
+  // scheduled from their own advertisement's master date sheet. Also carries
+  // `clubbedPosts` — every CCE post clubbed under this roll number, straight
+  // from the subject-selection response's own `advertisements` array (each
+  // entry already has advertisement_id/advertisement_number/post_id/
+  // post_name/department/status) — the single source of truth for clubbing
+  // on this page, so nothing here re-derives it independently.
+  //
+  // A row's own advertisement/post is resolved from that same array (its
+  // first entry) rather than from the raw candidate-portal item's own
+  // advertisement_id/post_name fields — those aren't reliable for a
+  // single-post candidate (see the loader effect above), whereas
+  // `advertisements` is populated for every roll number, clubbed or not.
   const candidateRows = useMemo(() => candidates.map((c) => {
-    const masterRows = masterRowsByAd[c.advertisementId] || [];
-    const groups = buildCandidateDateSheetGroups(masterRows, selectionsByKey[rollKey(c.advertisementId, c.roll_number)]?.selections);
+    const selection = selectionsByKey[c.roll_number];
+    const clubbedPosts = Array.isArray(selection?.advertisements) ? selection.advertisements : [];
+    const ownPost = clubbedPosts[0] || null;
+    const advertisementId = ownPost?.advertisement_id || null;
+    const advertisementTitle = ownPost?.advertisement_number || advertisementTitleById[advertisementId] || '—';
+    const postName = ownPost?.post_name || '—';
+
+    const masterRows = advertisementId ? (masterRowsByAd[advertisementId] || []) : [];
+    const groups = buildCandidateDateSheetGroups(masterRows, selection?.selections);
     const papers = flattenPapers(groups);
     return {
       ...c,
+      advertisementId,
+      advertisementTitle,
+      post_name: postName,
       papers,
       papersCount: papers.length,
       complete: isDateSheetComplete(papers),
-      postKey: `${c.advertisementId}::${c.post_name || '—'}`,
+      clubbedPosts,
+      isClubbed: clubbedPosts.length > 1,
+      postKey: `${advertisementId || 'unresolved'}::${postName}`,
     };
-  }), [candidates, masterRowsByAd, selectionsByKey]);
+  }), [candidates, masterRowsByAd, selectionsByKey, advertisementTitleById]);
+
+  // The same clubbed candidate appears once per advertisement in
+  // candidateRows (their raw applicant pool is fetched per-advertisement) —
+  // collapsed here to one row per roll_number, keeping the first-seen row as
+  // the representative (its own clubbedPosts already lists every post, so no
+  // information is lost), so nothing downstream double-counts or
+  // double-generates a clubbed candidate.
+  const dedupedCandidateRows = useMemo(() => {
+    const byRoll = new Map();
+    candidateRows.forEach((c) => {
+      if (!byRoll.has(c.roll_number)) byRoll.set(c.roll_number, c);
+    });
+    return [...byRoll.values()];
+  }, [candidateRows]);
 
   // Posts aggregated across every advertisement — the unit Stage 1 selects,
   // same as Roll Number Management's post table (there scoped to the general
   // application system; here scoped to actual CCE subject-selection data).
+  // Built from the deduped rows so a clubbed candidate is only ever counted
+  // once, under their representative post.
   const posts = useMemo(() => {
     const byKey = {};
-    candidateRows.forEach((c) => {
+    dedupedCandidateRows.forEach((c) => {
       if (!byKey[c.postKey]) {
         byKey[c.postKey] = {
           key: c.postKey,
@@ -209,13 +272,26 @@ const CceRollSlipGeneration = () => {
           postName: c.post_name || '—',
           applicants: 0,
           complete: 0,
+          clubbed: 0,
+          clubbedWith: [], // deduped {advertisement_number, post_name} pairs, excluding this row's own post
         };
       }
-      byKey[c.postKey].applicants += 1;
-      if (c.complete) byKey[c.postKey].complete += 1;
+      const entry = byKey[c.postKey];
+      entry.applicants += 1;
+      if (c.complete) entry.complete += 1;
+      if (c.isClubbed) {
+        entry.clubbed += 1;
+        c.clubbedPosts.forEach((p) => {
+          if (p.post_name === entry.postName && p.advertisement_number === entry.advertisementTitle) return;
+          const label = `${p.advertisement_number || '—'} — ${p.post_name || '—'}`;
+          if (!entry.clubbedWith.some((x) => x.label === label)) {
+            entry.clubbedWith.push({ label, advertisement_number: p.advertisement_number, post_name: p.post_name });
+          }
+        });
+      }
     });
     return Object.values(byKey);
-  }, [candidateRows]);
+  }, [dedupedCandidateRows]);
 
   const advertisementOptions = useMemo(() => {
     const seen = new Map();
@@ -244,7 +320,7 @@ const CceRollSlipGeneration = () => {
   const resetFilters = () => { setSearch(''); setFilterAdvertisement('all'); setFilterPost('all'); };
 
   const selectedPosts = posts.filter((p) => selectedPostKeys.includes(p.key));
-  const selectedCandidateRows = candidateRows.filter((c) => selectedPostKeys.includes(c.postKey));
+  const selectedCandidateRows = dedupedCandidateRows.filter((c) => selectedPostKeys.includes(c.postKey));
   const completeCandidateRows = selectedCandidateRows.filter((c) => c.complete);
   const generatedCount = progress.filter((p) => p.status === 'done').length;
 
@@ -308,7 +384,14 @@ const CceRollSlipGeneration = () => {
     const slips = [];
 
     try {
-      const distinctAdIds = [...new Set(completeCandidateRows.map((r) => r.advertisementId))];
+      // Every advertisement any selected candidate's clubbed posts belong to —
+      // not just each row's own advertisementId — so a clubbed candidate's
+      // sibling application_numbers under OTHER advertisements can still be
+      // resolved below, even though the row itself only represents one of
+      // their posts.
+      const distinctAdIds = [...new Set(completeCandidateRows.flatMap((r) => (
+        r.clubbedPosts.length > 0 ? r.clubbedPosts.map((p) => p.advertisement_id) : [r.advertisementId]
+      )))].filter(Boolean);
       // Resolve each post's application_number scoped to the SAME
       // advertisement it belongs to (via rollKey), not by roll_number alone —
       // a candidate with two CCE posts under different advertisements shares
@@ -335,6 +418,17 @@ const CceRollSlipGeneration = () => {
         });
       });
       const resolveAppNumber = (row) => appNumberByRollKey[rollKey(row.advertisementId, row.roll_number)];
+      // Every clubbed post's own application_number, resolved via its own
+      // advertisement_id — this, not resolveAppNumber() above, is what feeds
+      // the actual generateSlips() call, so one candidate's whole clubbed
+      // group is generated together as a single roll slip instead of once
+      // per post.
+      const resolveAllAppNumbers = (row) => {
+        const posts = row.clubbedPosts.length > 0 ? row.clubbedPosts : [{ advertisement_id: row.advertisementId }];
+        return [...new Set(
+          posts.map((p) => appNumberByRollKey[rollKey(p.advertisement_id, row.roll_number)]).filter(Boolean)
+        )];
+      };
 
       let centerByPost;
       if (centerSelectionMode === 'auto') {
@@ -366,8 +460,12 @@ const CceRollSlipGeneration = () => {
 
         setProgress((prev) => prev.map((p) => (p.postKey === row.postKey ? { ...p, status: 'generating', center: allocation.center.center } : p)));
         try {
-          const applicationNumber = resolveAppNumber(row);
-          if (!applicationNumber) throw new Error('Not yet linked to an admin application record');
+          // Every clubbed post's application_number goes into ONE
+          // generateSlips() call — the same roll number, single date sheet,
+          // and single generated slip must cover the whole clubbed group,
+          // never one call (and one slip) per post.
+          const applicationNumbers = resolveAllAppNumbers(row);
+          if (applicationNumbers.length === 0) throw new Error('Not yet linked to an admin application record');
 
           // subject_id/paper_label/duration_minutes (and the raw, unformatted
           // time) are what let the backend actually write + publish this
@@ -385,7 +483,7 @@ const CceRollSlipGeneration = () => {
 
           // eslint-disable-next-line no-await-in-loop
           const genRes = await RollNumberApi.generateSlips({
-            application_numbers: [applicationNumber],
+            application_numbers: applicationNumbers,
             exam_center_id:      Number(allocation.center.id),
             exam_type:            'cce-exams',
             stage:               'written',
@@ -408,12 +506,18 @@ const CceRollSlipGeneration = () => {
           if (finalStatus?.status !== 'completed') {
             throw new Error(finalStatus?.message || 'Timed out waiting for generation to finish');
           }
+          // Any one of the clubbed application_numbers works for View/Download
+          // below — buildCceWrittenSlipViewData() on the backend already
+          // resolves and merges every clubbed sibling's date sheet rows into
+          // one PDF regardless of which specific application_number is given.
           slips.push({
             postKey:             row.postKey,
             roll_number:         row.roll_number,
             candidate_name:      row.candidate?.name,
             candidate_cnic:      row.candidate?.cnic,
-            application_number:  applicationNumber,
+            application_number:  applicationNumbers[0],
+            isClubbed:           row.isClubbed,
+            clubbedPosts:        row.clubbedPosts,
             center:              allocation.center.center,
           });
           setProgress((prev) => prev.map((p) => (p.postKey === row.postKey ? { ...p, status: 'done' } : p)));
@@ -550,20 +654,34 @@ const CceRollSlipGeneration = () => {
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {postGroups.map(({ advertisementTitle, items }) => (
                           <React.Fragment key={advertisementTitle}>
-                            <tr className="bg-emerald-50/60">
+                            {/* <tr className="bg-emerald-50/60">
                               <td colSpan={3} className="px-4 py-1.5 text-xs font-bold uppercase text-emerald-800">{advertisementTitle}</td>
-                            </tr>
+                            </tr> */}
                             {items.map((p) => (
                               <tr key={p.key} className="hover:bg-slate-50">
                                 <td className="px-4 py-3">
-                                  <label className="flex cursor-pointer items-center gap-3">
+                                  <label className="flex cursor-pointer items-start gap-3">
                                     <input
                                       type="checkbox"
-                                      className="h-4 w-4 rounded border-slate-300 accent-emerald-800"
+                                      className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-slate-300 accent-emerald-800"
                                       checked={selectedPostKeys.includes(p.key)}
                                       onChange={() => togglePost(p.key)}
                                     />
-                                    <span className="font-semibold text-slate-900">{p.postName}</span>
+                                    <span>
+                                      <span className="font-semibold text-slate-900">{p.postName}</span>
+                                      {p.clubbedWith.length > 0 && (
+                                        <span className="mt-1 flex flex-wrap gap-1">
+                                          {p.clubbedWith.map((w) => (
+                                            <span
+                                              key={w.label}
+                                              className="inline-block rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800"
+                                            >
+                                              {w.label}
+                                            </span>
+                                          ))}
+                                        </span>
+                                      )}
+                                    </span>
                                   </label>
                                 </td>
                                 <td className="px-4 py-3 text-right font-bold text-slate-900">{p.applicants}</td>
@@ -733,6 +851,7 @@ const CceRollSlipGeneration = () => {
                           <th className="px-4 py-3">Roll Number</th>
                           <th className="px-4 py-3">Candidate</th>
                           <th className="px-4 py-3">CNIC</th>
+                          <th className="px-4 py-3">Posts</th>
                           <th className="px-4 py-3">Exam Center</th>
                           <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
@@ -743,6 +862,22 @@ const CceRollSlipGeneration = () => {
                             <td className="px-4 py-3 font-mono font-bold text-emerald-800">{s.roll_number}</td>
                             <td className="px-4 py-3 font-medium text-slate-800">{s.candidate_name}</td>
                             <td className="px-4 py-3 text-slate-500">{s.candidate_cnic}</td>
+                            <td className="px-4 py-3">
+                              {s.isClubbed ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {s.clubbedPosts.map((p, idx) => (
+                                    <span
+                                      key={`${p.advertisement_id || idx}-${p.post_id || idx}`}
+                                      className="inline-block rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800"
+                                    >
+                                      {p.advertisement_number || '—'} — {p.post_name || '—'}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-500">{s.clubbedPosts?.[0]?.post_name || '—'}</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-slate-500">{s.center}</td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex justify-end gap-2">

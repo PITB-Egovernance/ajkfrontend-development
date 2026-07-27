@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
-import { IconButton, Menu, MenuItem, TextField, Checkbox, ListItemText, Chip, Box } from '@mui/material';
+import { IconButton, Menu, MenuItem, TextField, ListItemText } from '@mui/material';
 import {
   ShieldCheck,
   MoreVertical,
@@ -9,6 +9,7 @@ import {
   Clock3,
   Send,
   EyeOff,
+  Download,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
@@ -18,6 +19,7 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import CceScreeningApi from 'api/cceScreeningApi';
 import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+import { groupByClubbedAdvertisements } from 'utils/cceClubbing';
 
 const DEFAULT_FILTERS = { search: '', status: '' };
 
@@ -48,9 +50,8 @@ const StatusPill = ({ status }) => {
 const CceScreeningResults = () => {
   const [advertisements, setAdvertisements] = useState([]);
   const [advertisementsLoading, setAdvertisementsLoading] = useState(true);
-  // Multi-select — a candidate's clubbed posts can span several advertisements
-  // sharing one roll number, so more than one can be selected at once.
   const [advertisementIds, setAdvertisementIds] = useState([]);
+  const [selectedJobId, setSelectedJobId] = useState('');
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -59,6 +60,77 @@ const CceScreeningResults = () => {
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+
+  const [groupedJobs, setGroupedJobs] = useState([]);
+  const selectedEntry = useMemo(
+    () => groupedJobs.find((j) => (j.advId || j.id) === selectedJobId) || null,
+    [groupedJobs, selectedJobId]
+  );
+
+  const fileInputRef = useRef(null);
+
+  const handleDownloadTemplate = async () => {
+    if (advertisementIds.length === 0) {
+      toast.error('Select at least one advertisement');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { blob, filename } = await CceScreeningApi.downloadTemplate(advertisementIds);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Template downloaded successfully');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to download template');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleImportClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImportMarks = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (advertisementIds.length === 0) {
+      toast.error('Select at least one advertisement');
+      e.target.value = '';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('advertisement_id', advertisementIds.join(','));
+
+    setBusy(true);
+    try {
+      const res = await CceScreeningApi.importMarks(formData);
+      toast.success(res?.message || 'Marks imported successfully');
+      await loadResults();
+    } catch (err) {
+      if (err.errors && Array.isArray(err.errors.file)) {
+        err.errors.file.forEach((errMsg) => {
+          toast.error(errMsg, { duration: 6000 });
+        });
+      } else {
+        toast.error(err?.message || 'Failed to import marks');
+      }
+    } finally {
+      setBusy(false);
+      e.target.value = '';
+    }
+  };
 
   const [selectionModel, setSelectionModel] = useState([]);
   const selectedIds = useMemo(() => {
@@ -79,11 +151,16 @@ const CceScreeningResults = () => {
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
 
+  // ── Resolve the advertisement ID(s) to query for a dropdown group entry.
+  // For individual entries this is just [advId]; for clubbed groups it is
+  // the full advIds list the grouper already computed.
+  const resolveAdIdsForJob = (entry) => entry.advIds || [entry.advId || entry.id];
+
   // ── Advertisements eligible for CCE screening (roll numbers already
-  // generated) — feeds the advertisement selector next to the header. ──────
-  // Default selection: the first advertisement plus any others it shares a
-  // clubbed roll number with (clubbed_advertisement_ids, from the backend).
-  // A non-clubbed advertisement just gets itself selected.
+  // generated) — feeds the job post selector next to the header.
+  // Clubbing is resolved from clubbed_advertisement_ids returned by the CCE
+  // backend — a CCE-specific signal, separate from the Results Module's
+  // job-level clubbed_group_id / RollNumberGenerationBatch mechanism.
   useEffect(() => {
     (async () => {
       setAdvertisementsLoading(true);
@@ -92,11 +169,16 @@ const CceScreeningResults = () => {
         const list = res?.data ?? [];
         const safeList = Array.isArray(list) ? list : [];
         setAdvertisements(safeList);
-        if (safeList.length > 0) {
-          const first = safeList[0];
-          const firstId = first.hash_id || first.id;
-          const clubbedIds = Array.isArray(first.clubbed_advertisement_ids) ? first.clubbed_advertisement_ids : [];
-          setAdvertisementIds([firstId, ...clubbedIds]);
+
+        // Collapse advertisements into grouped dropdown entries using the
+        // clubbed_advertisement_ids field the CCE backend already provides.
+        const groups = groupByClubbedAdvertisements(safeList);
+        setGroupedJobs(groups);
+
+        if (groups.length > 0) {
+          const defaultEntry = groups[0];
+          setSelectedJobId(defaultEntry.advId);
+          setAdvertisementIds(resolveAdIdsForJob(defaultEntry));
         }
       } catch (err) {
         toast.error(err?.message || 'Failed to load advertisements');
@@ -349,54 +431,91 @@ const CceScreeningResults = () => {
       <div className="max-w-8xl mx-auto">
 
         {/* HEADER */}
-        <div className="flex justify-between items-start mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg"><ShieldCheck size={22} className="text-emerald-700" /></div>
-            <div>
+        <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 bg-emerald-100 rounded-lg flex-shrink-0"><ShieldCheck size={22} className="text-emerald-700" /></div>
+            <div className="min-w-0">
               <h1 className="text-2xl font-bold text-slate-900">CCE Screening Results</h1>
               <p className="text-sm text-slate-500 mt-1">Set pass/fail for CCE screening candidates and publish results to the candidate portal.</p>
             </div>
           </div>
-          {advertisements.length > 0 && (
-            <TextField
-              select
-              size="small"
-              label="Advertisement"
-              value={advertisementIds}
-              onChange={(e) => {
-                const { value } = e.target;
-                setAdvertisementIds(typeof value === 'string' ? value.split(',') : value);
-                setPaginationModel((prev) => ({ ...prev, page: 0 }));
-              }}
-              SelectProps={{
-                multiple: true,
-                renderValue: (selected) => (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selected.map((val) => {
-                      const ad = advertisements.find((a) => (a.hash_id || a.id) === val);
-                      return <Chip key={val} size="small" label={ad?.adv_number || ad?.title || val} />;
-                    })}
-                  </Box>
-                ),
-              }}
-              sx={{ minWidth: 280, backgroundColor: 'white' }}
-            >
-              {advertisements.map((ad) => {
-                const value = ad.hash_id || ad.id;
-                const isClubbed = Array.isArray(ad.clubbed_advertisement_ids) && ad.clubbed_advertisement_ids.length > 0;
-                return (
-                  <MenuItem key={value} value={value}>
-                    <Checkbox size="small" checked={advertisementIds.includes(value)} />
+          {groupedJobs.length > 0 && (
+            <div className="flex flex-wrap gap-3 items-center">
+              <TextField
+                select
+                size="small"
+                label="Job Post / Exam"
+                value={selectedJobId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedJobId(val);
+                  const matchedEntry = groupedJobs.find(j => (j.advId || j.id) === val);
+                  if (matchedEntry) {
+                    setAdvertisementIds(resolveAdIdsForJob(matchedEntry));
+                  }
+                  setPaginationModel((prev) => ({ ...prev, page: 0 }));
+                }}
+                sx={{
+                  minWidth: 280,
+                  maxWidth: 380,
+                  backgroundColor: 'white',
+                }}
+                SelectProps={{
+                  renderValue: (val) => {
+                    const entry = groupedJobs.find(j => (j.advId || j.id) === val);
+                    return (
+                      <span
+                        title={entry?.designation || ''}
+                        style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
+                        {entry?.designation || ''}
+                      </span>
+                    );
+                  },
+                }}
+              >
+                {groupedJobs.map((entry) => (
+                  <MenuItem key={entry.advId} value={entry.advId} title={entry.designation}>
                     <ListItemText
-                      primary={ad.adv_number || ad.title || `Advertisement #${ad.id}`}
-                      secondary={isClubbed ? 'Clubbed with other advertisements' : null}
+                      primary={entry.designation}
+                      secondary={entry.isClubbedGroup ? 'Clubbed Job Post Group' : `Adv: ${entry.adv_number || 'N/A'}`}
+                      primaryTypographyProps={{ noWrap: true, sx: { maxWidth: 340 } }}
                     />
                   </MenuItem>
-                );
-              })}
-            </TextField>
+                ))}
+              </TextField>
+
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleDownloadTemplate} variant="outline" className="flex items-center gap-2" disabled={busy}>
+                  <Download size={16} /> Download Template
+                </Button>
+                <Button onClick={handleImportClick} variant="outline" className="flex items-center gap-2" disabled={busy}>
+                  <Download size={16} className="rotate-180" /> Import Marks
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".xlsx,.xls"
+                  onChange={handleImportMarks}
+                  className="hidden"
+                />
+              </div>
+            </div>
           )}
         </div>
+
+        {/* Full, non-truncated post list for the selected job/exam — the
+            dropdown above truncates for layout, this always shows everything. */}
+        {selectedEntry && (
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+              {selectedEntry.isClubbedGroup ? 'Clubbed Job Posts' : 'Job Post'}
+            </p>
+            <p className="text-sm font-medium text-emerald-900 mt-1 break-words">
+              {selectedEntry.designation}
+            </p>
+          </div>
+        )}
 
         {advertisementsLoading ? (
           <div className="bg-white rounded-lg shadow-sm p-10 flex justify-center">
@@ -457,18 +576,6 @@ const CceScreeningResults = () => {
                     {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
                   </span>
                   <div className="flex gap-2">
-                    <Button onClick={() => handleBulkStatus('pass')} variant="outline" size="sm" disabled={busy}
-                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-50">
-                      Mark Pass
-                    </Button>
-                    <Button onClick={() => handleBulkStatus('fail')} variant="outline" size="sm" disabled={busy}
-                      className="border-red-300 text-red-700 hover:bg-red-50">
-                      Mark Fail
-                    </Button>
-                    <Button onClick={() => handleBulkStatus('pending')} variant="outline" size="sm" disabled={busy}
-                      className="border-slate-300 text-slate-600 hover:bg-slate-50">
-                      Mark Pending
-                    </Button>
                     <Button onClick={handlePublish} size="sm" disabled={busy} className="flex items-center gap-2">
                       <Send size={14} /> Publish Selected
                     </Button>
@@ -529,18 +636,6 @@ const CceScreeningResults = () => {
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
-        <MenuItem disabled={!!selectedRow?.published_at}
-          onClick={() => { const r = selectedRow; handleMenuClose(); if (r) setRowStatus(r, 'pass'); }}>
-          <CheckCircle2 size={16} style={{ marginRight: '8px' }} className="text-emerald-600" /> Mark Pass
-        </MenuItem>
-        <MenuItem disabled={!!selectedRow?.published_at}
-          onClick={() => { const r = selectedRow; handleMenuClose(); if (r) setRowStatus(r, 'fail'); }}>
-          <XCircle size={16} style={{ marginRight: '8px' }} className="text-red-600" /> Mark Fail
-        </MenuItem>
-        <MenuItem disabled={!!selectedRow?.published_at}
-          onClick={() => { const r = selectedRow; handleMenuClose(); if (r) setRowStatus(r, 'pending'); }}>
-          <Clock3 size={16} style={{ marginRight: '8px' }} className="text-slate-500" /> Mark Pending
-        </MenuItem>
         {!selectedRow?.published_at && (
           <MenuItem disabled={selectedRow?.status === 'pending'}
             onClick={() => { const r = selectedRow; handleMenuClose(); publishRow(r); }}>

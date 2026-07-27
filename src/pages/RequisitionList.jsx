@@ -142,6 +142,13 @@ const RequisitionList = () => {
     },
   ];
 
+  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedFilters(filters), 400);
+    return () => clearTimeout(handle);
+  }, [filters]);
+
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
@@ -226,11 +233,20 @@ const RequisitionList = () => {
     return matched ? matched.name : str;
   };
 
-  const fetchRequisitions = async (pageNum = 0, pageSize = 10) => {
+  const fetchRequisitions = async (pageNum = 0, pageSize = 10, filterParams = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const url = `${API_BASE}/requisitions?per_page=500`;
+      const params = new URLSearchParams({
+        page: pageNum + 1,
+        per_page: pageSize,
+      });
+      Object.entries(filterParams).forEach(([key, value]) => {
+        if (value !== "" && value !== null && value !== undefined) {
+          params.set(key, value);
+        }
+      });
+      const url = `${API_BASE}/requisitions?${params.toString()}`;
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
@@ -251,13 +267,11 @@ const RequisitionList = () => {
       const data = result.data || result;
       const dataArray = Array.isArray(data) ? data : data.data || [];
       const total =
-        result.meta?.total ||
-        result.total ||
-        data.total ||
-        data.meta?.total ||
-        data.last_page * pageSize ||
+        data.total ??
+        data.meta?.total ??
+        result.meta?.total ??
+        result.total ??
         (Array.isArray(dataArray) ? dataArray.length : 0);
-      console.log("Data Array Requisiotnn", dataArray);
       if (Array.isArray(dataArray) && dataArray.length > 0) {
         const requisitions = dataArray.map((item, index) => ({
           id:
@@ -277,9 +291,10 @@ const RequisitionList = () => {
             item.current_step || item.step || item.currentStep || null,
           designation: item.designation,
           department:
-            typeof item.department === "object"
+            item.department_label ||
+            (typeof item.department === "object"
               ? item.department?.name || item.department?.department_name || ""
-              : item.department || "",
+              : item.department || ""),
           scale: item.scale,
           num_posts: item.num_posts,
           status: item.status || (item.temp_id ? "Draft" : "Pending"),
@@ -290,7 +305,7 @@ const RequisitionList = () => {
         setTotal(total);
       } else {
         setRows([]);
-        setTotal(0);
+        setTotal(total);
       }
     } catch (err) {
       const errorMsg = err.message || "Failed to fetch requisitions";
@@ -301,55 +316,23 @@ const RequisitionList = () => {
   };
 
   useEffect(() => {
-    fetchRequisitions();
+    fetchRequisitions(
+      paginationModel.page,
+      paginationModel.pageSize,
+      debouncedFilters,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [paginationModel.page, paginationModel.pageSize, debouncedFilters]);
 
+  // Designation/department/scale/status/id filtering now happens server-side
+  // (see fetchRequisitions) so results are searched across the whole dataset,
+  // not just the rows already loaded for the current page. This memo only
+  // still needs to split the server-fetched page by requisition source tab.
   const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      if (getRequisitionSource(row.requisition_status) !== requisitionSourceTab) {
-        return false;
-      }
-
-      if (
-        filters.id &&
-        !String(row.id).toLowerCase().includes(filters.id.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.designation &&
-        !row.designation
-          ?.toLowerCase()
-          .includes(filters.designation.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.department &&
-        !row.department
-          ?.toLowerCase()
-          .includes(filters.department.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.scale &&
-        !getScaleName(row.scale)
-          .toLowerCase()
-          .includes(filters.scale.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.status &&
-        row.status?.toLowerCase() !== filters.status.toLowerCase()
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [rows, filters, requisitionSourceTab]);
+    return rows.filter(
+      (row) => getRequisitionSource(row.requisition_status) === requisitionSourceTab,
+    );
+  }, [rows, requisitionSourceTab]);
 
   const sourceCounts = useMemo(
     () => ({
@@ -616,7 +599,7 @@ const RequisitionList = () => {
 
       if (result.success) {
         toast.success(result.message || "Requisition deleted successfully");
-        fetchRequisitions();
+        fetchRequisitions(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(
           result.error || result.message || "Failed to delete requisition",
@@ -990,8 +973,8 @@ const RequisitionList = () => {
                 paginationModel={paginationModel}
                 onPaginationModelChange={setPaginationModel}
                 pageSizeOptions={[10, 25, 50]}
-                paginationMode="client"
-                rowCount={filteredRows.length}
+                paginationMode="server"
+                rowCount={total}
                 loading={loading}
                 disableRowSelectionOnClick
                 autoHeight

@@ -312,7 +312,7 @@ const DegreesManagement = () => {
           </div>
           {canAdd && (
             <button onClick={openAdd}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg flex items-center gap-2 text-sm">
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2 text-sm">
               <Plus size={15} /> Add Degree
             </button>
           )}

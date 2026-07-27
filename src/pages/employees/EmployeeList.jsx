@@ -494,12 +494,12 @@ const EmployeeList = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {canAdd && (
+            {/* {canAdd && (
               <Button variant="outline" onClick={() => navigate('/dashboard/employees')}>
                 <Upload size={16} className="mr-2" />
                 Import Employees
               </Button>
-            )}
+            )} */}
             {canAdd && (
               <Button onClick={() => navigate('/dashboard/employees')}>
                 <Plus size={16} className="mr-2" />

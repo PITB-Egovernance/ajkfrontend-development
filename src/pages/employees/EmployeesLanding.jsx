@@ -109,10 +109,10 @@ const EmployeesLanding = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={handleDownloadTemplate}>
+            {/* <Button variant="outline" onClick={handleDownloadTemplate}>
               <Download size={16} className="mr-2" />
               Download Employee Template
-            </Button>
+            </Button> */}
             <Button variant="secondary" onClick={() => navigate('/dashboard/employees/list')}>
               <ListChecks size={16} className="mr-2" />
               View All Employees
@@ -120,10 +120,10 @@ const EmployeesLanding = () => {
           </div>
         </div>
 
-        {/* Registration Options */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Card 1: Import Excel */}
-          <Card>
+        
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+          
+          {/* <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center shrink-0">
@@ -159,7 +159,7 @@ const EmployeesLanding = () => {
 
               <ExcelUploadZone onFileSelect={(f) => { setSelectedFile(f); setImportErrors([]); setImportResult(null); }} loading={importing} />
 
-              {/* Result panel — adapts to full success / partial / full failure */}
+             
               {importResult && (() => {
                 const allOk = importResult.imported > 0 && importResult.failed === 0;
                 const partial = importResult.imported > 0 && importResult.failed > 0;
@@ -171,7 +171,7 @@ const EmployeesLanding = () => {
                     partial  ? 'bg-amber-50 border-amber-200'     :
                                'bg-red-50 border-red-200'
                   }`}>
-                    {/* Header */}
+                   
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {allOk
@@ -187,7 +187,7 @@ const EmployeesLanding = () => {
                       </button>
                     </div>
 
-                    {/* Stats badges */}
+                   
                     <div className="flex flex-wrap gap-2 text-xs font-semibold">
                       <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">
                         Total rows: {importResult.totalRows}
@@ -204,7 +204,7 @@ const EmployeesLanding = () => {
                       )}
                     </div>
 
-                    {/* Per-row failure details */}
+                   
                     {importResult.failures?.length > 0 && (
                       <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                         <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Failed rows</p>
@@ -236,7 +236,7 @@ const EmployeesLanding = () => {
                 );
               })()}
 
-              {/* HTTP-level error panel */}
+            
               {importErrors.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -264,7 +264,7 @@ const EmployeesLanding = () => {
                 {importing ? 'Importing...' : 'Import'}
               </Button>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Card 2: Manual Registration */}
           <Card>
