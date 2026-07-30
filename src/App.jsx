@@ -114,6 +114,11 @@ import StatisticalSummary from 'pages/results/StatisticalSummary';
 import AuditTrailReport from 'pages/results/AuditTrailReport';
 import ScrutinyRequests from 'pages/results/ScrutinyRequests';
 
+// Reporting & Analytics Module Imports
+import ApplicationSummaryReport from 'pages/reports/ApplicationSummaryReport';
+import CenterWiseCandidateReport from 'pages/reports/CenterWiseCandidateReport';
+import CandidateDistributionReport from 'pages/reports/CandidateDistributionReport';
+
 
 function App() {
   return (
@@ -393,6 +398,11 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Reporting & Analytics Module Routes */}
+          <Route path="reports/application-summary" element={<ApplicationSummaryReport />} />
+          <Route path="reports/center-wise-candidates" element={<CenterWiseCandidateReport />} />
+          <Route path="reports/candidate-distribution" element={<CandidateDistributionReport />} />
         </Route>
 
         

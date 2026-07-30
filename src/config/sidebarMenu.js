@@ -3,8 +3,8 @@ import {
   Award, Settings, Package, Briefcase, MapPin, Map, Hash,
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
-  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon,
-  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ClipboardCheck
+  Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon, ClipboardCheck,
+  BarChart3, FileBarChart2, PieChart
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -104,6 +104,30 @@ export const MENU_ITEMS = [
   //   path: "/dashboard/workflow-tracking",
   //   roles: ["admin"],
   // },
+  {
+    id: "reporting-analytics",
+    label: "Reporting & Analytics",
+    icon: BarChart3,
+    submenu: [
+      {
+        label: "Application & Candidate Reports",
+        path: "/dashboard/reports/application-summary",
+        icon: FileBarChart2,
+        children: [
+          { label: "Application Summary Report", path: "/dashboard/reports/application-summary", icon: FileText },
+        ],
+      },
+      {
+        label: "Examination Logistics Reports",
+        path: "/dashboard/reports/center-wise-candidates",
+        icon: MapPin,
+        children: [
+          { label: "Center-wise Candidate Report",  path: "/dashboard/reports/center-wise-candidates",  icon: MapPin },
+          { label: "Candidate Distribution Report", path: "/dashboard/reports/candidate-distribution", icon: PieChart },
+        ],
+      },
+    ],
+  },
   {
     id: "settings",
     label: "Settings",
