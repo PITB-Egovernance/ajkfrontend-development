@@ -1,22 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileBarChart2, Users, UserRound, UserRoundCheck, Building2, Briefcase } from 'lucide-react';
+import toast from 'react-hot-toast';
 import SummaryCard from 'components/reports/SummaryCard';
 import ReportPageHeader from 'components/reports/ReportPageHeader';
 import ReportFilterBar from 'components/reports/ReportFilterBar';
 import ReportTable from 'components/reports/ReportTable';
 import { StatCardsSkeleton } from 'components/reports/LoadingSkeleton';
-import {
-  applicationSummaryRows,
-  ADVERTISEMENTS,
-  POSTS,
-  DEPARTMENTS,
-  CATEGORIES,
-  GENDERS,
-  DISTRICTS,
-  DEGREES,
-  UNIVERSITIES,
-  BADGES,
-} from 'pages/reports/mockData';
+import ReportsApi from 'api/reportsApi';
 
 const EMPTY_FILTERS = {
   advertisement: '',
@@ -32,26 +22,114 @@ const EMPTY_FILTERS = {
   dateTo: '',
 };
 
+const EMPTY_STATS = { totalApplications: 0, maleApplicants: 0, femaleApplicants: 0, totalDepartments: 0, totalPosts: 0 };
+
+const mapRow = (row, index) => ({
+  id: `${row.advertisement || ''}-${row.post_name || ''}-${row.department || ''}-${row.gender || ''}-${row.district || ''}-${row.degree || ''}-${index}`,
+  srNo: row.sr_no,
+  advertisement: row.advertisement,
+  postName: row.post_name,
+  department: row.department,
+  category: row.category,
+  gender: row.gender,
+  district: row.district,
+  degree: row.degree,
+  university: row.university,
+  badge: row.badge,
+  totalApplications: row.total_applications,
+});
+
 const ApplicationSummaryReport = () => {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
   const [searching, setSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const filterConfig = [
-    { name: 'advertisement', label: 'Advertisement', type: 'select', options: ADVERTISEMENTS },
-    { name: 'postName',      label: 'Post / Designation', type: 'select', options: POSTS.map((p) => ({ value: p, label: p })) },
-    { name: 'department',    label: 'Department', type: 'select', options: DEPARTMENTS.map((d) => ({ value: d, label: d })) },
-    { name: 'category',      label: 'Category', type: 'select', options: CATEGORIES.map((c) => ({ value: c, label: c })) },
-    { name: 'gender',        label: 'Gender', type: 'select', options: GENDERS.map((g) => ({ value: g, label: g })) },
-    { name: 'district',      label: 'Domicile District', type: 'select', options: DISTRICTS.map((d) => ({ value: d, label: d })) },
-    { name: 'degree',        label: 'Degree', type: 'select', options: DEGREES.map((d) => ({ value: d, label: d })) },
-    { name: 'university',    label: 'University', type: 'select', options: UNIVERSITIES.map((u) => ({ value: u, label: u })) },
-    { name: 'badge',         label: 'Badge', type: 'select', options: BADGES.map((b) => ({ value: b, label: b })) },
+  const [rows, setRows] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [filterOptions, setFilterOptions] = useState(null);
+
+  // Filter dropdown options come from real data (distinct values actually
+  // present on applications), not a fixed master list — see ReportController::filters().
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await ReportsApi.getFilters();
+        setFilterOptions(result?.data ?? {});
+      } catch (err) {
+        toast.error(err?.message || 'Failed to load filter options');
+        setFilterOptions({});
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchTerm(searchTerm), 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearchTerm]);
+
+  const fetchReport = useCallback(async () => {
+    setSearching(true);
+    try {
+      const result = await ReportsApi.getApplicationSummary({
+        advertisement: appliedFilters.advertisement,
+        post_name:     appliedFilters.postName,
+        department:    appliedFilters.department,
+        gender:        appliedFilters.gender,
+        district:      appliedFilters.district,
+        degree:        appliedFilters.degree,
+        date_from:     appliedFilters.dateFrom,
+        date_to:       appliedFilters.dateTo,
+        search:        debouncedSearchTerm,
+        page:          paginationModel.page + 1,
+        per_page:      paginationModel.pageSize,
+      });
+      const payload = result?.data ?? {};
+      const items = Array.isArray(payload.data) ? payload.data : [];
+      setRows(items.map(mapRow));
+      setTotalCount(payload.total ?? items.length);
+      setStats({
+        totalApplications: payload.stats?.total_applications ?? 0,
+        maleApplicants:    payload.stats?.male_applicants ?? 0,
+        femaleApplicants:  payload.stats?.female_applicants ?? 0,
+        totalDepartments:  payload.stats?.total_departments ?? 0,
+        totalPosts:        payload.stats?.total_posts ?? 0,
+      });
+    } catch (err) {
+      toast.error(err?.message || 'Failed to load application summary report');
+      setRows([]);
+      setTotalCount(0);
+      setStats(EMPTY_STATS);
+    } finally {
+      setSearching(false);
+    }
+  }, [appliedFilters, debouncedSearchTerm, paginationModel]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  const filterConfig = useMemo(() => ([
+    { name: 'advertisement', label: 'Advertisement', type: 'select', options: filterOptions?.advertisements || [] },
+    { name: 'postName',      label: 'Post / Designation', type: 'select', options: filterOptions?.posts || [] },
+    { name: 'department',    label: 'Department', type: 'select', options: filterOptions?.departments || [] },
+    { name: 'category',      label: 'Category', type: 'select', options: filterOptions?.categories || [] },
+    { name: 'gender',        label: 'Gender', type: 'select', options: filterOptions?.genders || [] },
+    { name: 'district',      label: 'Domicile District', type: 'select', options: filterOptions?.districts || [] },
+    { name: 'degree',        label: 'Degree', type: 'select', options: filterOptions?.degrees || [] },
+    { name: 'university',    label: 'University', type: 'select', options: filterOptions?.universities || [] },
+    { name: 'badge',         label: 'Badge', type: 'select', options: filterOptions?.badges || [] },
     { name: 'dateFrom',      label: 'Date From', type: 'date' },
     { name: 'dateTo',        label: 'Date To', type: 'date' },
-  ];
+  ]), [filterOptions]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -65,45 +143,9 @@ const ApplicationSummaryReport = () => {
   };
 
   const handleSearch = () => {
-    setSearching(true);
+    setAppliedFilters(filters);
     setPaginationModel((p) => ({ ...p, page: 0 }));
-    // Simulated network/query delay so the loading state is visible against mock data.
-    setTimeout(() => {
-      setAppliedFilters(filters);
-      setSearching(false);
-    }, 500);
   };
-
-  const filteredRows = useMemo(() => {
-    return applicationSummaryRows.filter((r) => {
-      if (appliedFilters.advertisement && r.advertisement !== ADVERTISEMENTS.find((a) => a.value === appliedFilters.advertisement)?.label) return false;
-      if (appliedFilters.postName && r.postName !== appliedFilters.postName) return false;
-      if (appliedFilters.department && r.department !== appliedFilters.department) return false;
-      if (appliedFilters.category && r.category !== appliedFilters.category) return false;
-      if (appliedFilters.gender && r.gender !== appliedFilters.gender) return false;
-      if (appliedFilters.district && r.district !== appliedFilters.district) return false;
-      if (appliedFilters.degree && r.degree !== appliedFilters.degree) return false;
-      if (appliedFilters.university && r.university !== appliedFilters.university) return false;
-      if (appliedFilters.badge && r.badge !== appliedFilters.badge) return false;
-      if (appliedFilters.dateFrom && r.submittedDate < appliedFilters.dateFrom) return false;
-      if (appliedFilters.dateTo && r.submittedDate > appliedFilters.dateTo) return false;
-      if (searchTerm.trim()) {
-        const term = searchTerm.trim().toLowerCase();
-        const haystack = [r.advertisement, r.postName, r.department, r.category, r.district, r.degree, r.university].join(' ').toLowerCase();
-        if (!haystack.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [appliedFilters, searchTerm]);
-
-  const stats = useMemo(() => {
-    const totalApplications = filteredRows.reduce((sum, r) => sum + r.totalApplications, 0);
-    const maleApplicants = filteredRows.filter((r) => r.gender === 'Male').reduce((sum, r) => sum + r.totalApplications, 0);
-    const femaleApplicants = filteredRows.filter((r) => r.gender === 'Female').reduce((sum, r) => sum + r.totalApplications, 0);
-    const totalDepartments = new Set(filteredRows.map((r) => r.department)).size;
-    const totalPosts = new Set(filteredRows.map((r) => r.postName)).size;
-    return { totalApplications, maleApplicants, femaleApplicants, totalDepartments, totalPosts };
-  }, [filteredRows]);
 
   const columns = [
     { field: 'srNo', headerName: '#', width: 65 },
@@ -133,7 +175,7 @@ const ApplicationSummaryReport = () => {
           ]}
         />
 
-        {searching ? (
+        {searching && rows.length === 0 ? (
           <StatCardsSkeleton count={5} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -157,7 +199,7 @@ const ApplicationSummaryReport = () => {
         />
 
         <ReportTable
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           loading={searching}
           searchTerm={searchTerm}
@@ -165,6 +207,8 @@ const ApplicationSummaryReport = () => {
           searchPlaceholder="Search by advertisement, post, department..."
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={totalCount}
           resultsLabel="rows"
           emptyTitle="No applications found"
           emptyDescription="Try adjusting your filters or search criteria to find application records."

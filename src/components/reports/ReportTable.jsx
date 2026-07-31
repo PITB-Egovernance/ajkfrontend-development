@@ -22,15 +22,20 @@ const ReportTable = ({
   emptyTitle,
   emptyDescription,
   resultsLabel = 'records',
+  // Server-side pagination: pass the backend's total row count for the
+  // current filters (not just rows.length, which is only the current page).
+  paginationMode = 'client',
+  rowCount,
 }) => {
   const showInitialSkeleton = loading && rows.length === 0;
   const showEmpty = !loading && rows.length === 0;
+  const foundCount = paginationMode === 'server' ? (rowCount ?? rows.length) : rows.length;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-slate-100">
         <p className="text-sm text-slate-600">
-          <span className="font-semibold text-slate-900">{rows.length}</span> {resultsLabel} found
+          <span className="font-semibold text-slate-900">{foundCount}</span> {resultsLabel} found
         </p>
         {onSearchTermChange && (
           <SearchToolbar value={searchTerm} onChange={onSearchTermChange} placeholder={searchPlaceholder} />
@@ -47,6 +52,8 @@ const ReportTable = ({
             rows={rows}
             columns={columns}
             getRowId={getRowId}
+            paginationMode={paginationMode}
+            rowCount={paginationMode === 'server' ? (rowCount ?? 0) : undefined}
             paginationModel={paginationModel}
             onPaginationModelChange={onPaginationModelChange}
             pageSizeOptions={pageSizeOptions}

@@ -1,17 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PieChart, Building2, Users, Sunrise, Sunset } from 'lucide-react';
+import toast from 'react-hot-toast';
 import SummaryCard from 'components/reports/SummaryCard';
 import ReportPageHeader from 'components/reports/ReportPageHeader';
 import ReportFilterBar from 'components/reports/ReportFilterBar';
 import ReportTable from 'components/reports/ReportTable';
 import { StatCardsSkeleton } from 'components/reports/LoadingSkeleton';
-import {
-  candidateDistributionRows,
-  ADVERTISEMENTS,
-  POSTS,
-  EXAM_CENTERS,
-  SHIFTS,
-} from 'pages/reports/mockData';
+import ReportsApi from 'api/reportsApi';
 
 const EMPTY_FILTERS = {
   advertisement: '',
@@ -21,20 +16,99 @@ const EMPTY_FILTERS = {
   date: '',
 };
 
+const EMPTY_STATS = { totalCenters: 0, totalCandidates: 0, morningShift: 0, eveningShift: 0 };
+
+const mapRow = (row, index) => ({
+  id: `${row.center_name || ''}-${row.date || ''}-${row.time || ''}-${row.post_name || ''}-${index}`,
+  srNo: row.sr_no,
+  centerName: row.center_name,
+  advertisementNo: row.advertisement_no,
+  postName: row.post_name,
+  date: row.date,
+  time: row.time,
+  shift: row.shift,
+  totalCandidates: row.total_candidates,
+});
+
 const CandidateDistributionReport = () => {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
   const [searching, setSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  const filterConfig = [
-    { name: 'advertisement',     label: 'Advertisement', type: 'select', options: ADVERTISEMENTS },
-    { name: 'postName',          label: 'Post', type: 'select', options: POSTS.map((p) => ({ value: p, label: p })) },
-    { name: 'examinationCenter', label: 'Examination Center', type: 'select', options: EXAM_CENTERS.map((c) => ({ value: c, label: c })) },
-    { name: 'shift',             label: 'Shift', type: 'select', options: SHIFTS.map((s) => ({ value: s, label: s })) },
+  const [rows, setRows] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [filterOptions, setFilterOptions] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await ReportsApi.getFilters();
+        setFilterOptions(result?.data ?? {});
+      } catch (err) {
+        toast.error(err?.message || 'Failed to load filter options');
+        setFilterOptions({});
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchTerm(searchTerm), 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearchTerm]);
+
+  const fetchReport = useCallback(async () => {
+    setSearching(true);
+    try {
+      const result = await ReportsApi.getCandidateDistribution({
+        advertisement: appliedFilters.advertisement,
+        post_name:     appliedFilters.postName,
+        exam_center:   appliedFilters.examinationCenter,
+        shift:         appliedFilters.shift,
+        date:          appliedFilters.date,
+        search:        debouncedSearchTerm,
+        page:          paginationModel.page + 1,
+        per_page:      paginationModel.pageSize,
+      });
+      const payload = result?.data ?? {};
+      const items = Array.isArray(payload.data) ? payload.data : [];
+      setRows(items.map(mapRow));
+      setTotalCount(payload.total ?? items.length);
+      setStats({
+        totalCenters:    payload.stats?.total_centers ?? 0,
+        totalCandidates: payload.stats?.total_candidates ?? 0,
+        morningShift:    payload.stats?.morning_shift ?? 0,
+        eveningShift:    payload.stats?.evening_shift ?? 0,
+      });
+    } catch (err) {
+      toast.error(err?.message || 'Failed to load candidate distribution report');
+      setRows([]);
+      setTotalCount(0);
+      setStats(EMPTY_STATS);
+    } finally {
+      setSearching(false);
+    }
+  }, [appliedFilters, debouncedSearchTerm, paginationModel]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  const filterConfig = useMemo(() => ([
+    { name: 'advertisement',     label: 'Advertisement', type: 'select', options: filterOptions?.advertisements || [] },
+    { name: 'postName',          label: 'Post', type: 'select', options: filterOptions?.posts || [] },
+    { name: 'examinationCenter', label: 'Examination Center', type: 'select', options: filterOptions?.exam_centers || [] },
+    { name: 'shift',             label: 'Shift', type: 'select', options: filterOptions?.shifts || [] },
     { name: 'date',              label: 'Date', type: 'date' },
-  ];
+  ]), [filterOptions]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -48,37 +122,9 @@ const CandidateDistributionReport = () => {
   };
 
   const handleSearch = () => {
-    setSearching(true);
+    setAppliedFilters(filters);
     setPaginationModel((p) => ({ ...p, page: 0 }));
-    setTimeout(() => {
-      setAppliedFilters(filters);
-      setSearching(false);
-    }, 500);
   };
-
-  const filteredRows = useMemo(() => {
-    return candidateDistributionRows.filter((r) => {
-      if (appliedFilters.advertisement && r.advertisementNo !== ADVERTISEMENTS.find((a) => a.value === appliedFilters.advertisement)?.label) return false;
-      if (appliedFilters.postName && r.postName !== appliedFilters.postName) return false;
-      if (appliedFilters.examinationCenter && r.centerName !== appliedFilters.examinationCenter) return false;
-      if (appliedFilters.shift && r.shift !== appliedFilters.shift) return false;
-      if (appliedFilters.date && r.date !== appliedFilters.date) return false;
-      if (searchTerm.trim()) {
-        const term = searchTerm.trim().toLowerCase();
-        const haystack = [r.centerName, r.advertisementNo, r.postName, r.shift].join(' ').toLowerCase();
-        if (!haystack.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [appliedFilters, searchTerm]);
-
-  const stats = useMemo(() => {
-    const totalCenters = new Set(filteredRows.map((r) => r.centerName)).size;
-    const totalCandidates = filteredRows.reduce((sum, r) => sum + r.totalCandidates, 0);
-    const morningShift = filteredRows.filter((r) => r.shift === 'Morning').reduce((sum, r) => sum + r.totalCandidates, 0);
-    const eveningShift = filteredRows.filter((r) => r.shift === 'Evening').reduce((sum, r) => sum + r.totalCandidates, 0);
-    return { totalCenters, totalCandidates, morningShift, eveningShift };
-  }, [filteredRows]);
 
   const columns = [
     { field: 'srNo', headerName: '#', width: 65 },
@@ -105,7 +151,7 @@ const CandidateDistributionReport = () => {
           ]}
         />
 
-        {searching ? (
+        {searching && rows.length === 0 ? (
           <StatCardsSkeleton count={4} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -128,7 +174,7 @@ const CandidateDistributionReport = () => {
         />
 
         <ReportTable
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           loading={searching}
           searchTerm={searchTerm}
@@ -136,6 +182,8 @@ const CandidateDistributionReport = () => {
           searchPlaceholder="Search by center, advertisement, shift..."
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={totalCount}
           resultsLabel="entries"
           emptyTitle="No distribution data found"
           emptyDescription="Try adjusting your filters or search criteria to find distribution records."
