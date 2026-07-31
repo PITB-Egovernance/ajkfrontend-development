@@ -4,7 +4,7 @@ import {
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
   Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon, ClipboardCheck,
-  BarChart3, FileBarChart2, PieChart
+  BarChart3, FileBarChart2, PieChart, Percent, FileSpreadsheet, TrendingUp
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -124,6 +124,16 @@ export const MENU_ITEMS = [
         children: [
           { label: "Center-wise Candidate Report",  path: "/dashboard/reports/center-wise-candidates",  icon: MapPin },
           { label: "Candidate Distribution Report", path: "/dashboard/reports/candidate-distribution", icon: PieChart },
+        ],
+      },
+      {
+        label: "Marks & Result Reports",
+        path: "/dashboard/reports/marksheet-written",
+        icon: Percent,
+        children: [
+          { label: "Compiled Marksheet (Written Exam)", path: "/dashboard/reports/marksheet-written", icon: FileSpreadsheet },
+          { label: "Compiled Marksheet (CCE)",           path: "/dashboard/reports/marksheet-cce",     icon: BookOpen },
+          { label: "Pass / Fail Statistics Report",      path: "/dashboard/reports/pass-fail-statistics", icon: TrendingUp },
         ],
       },
     ],
