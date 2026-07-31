@@ -14,7 +14,12 @@ const ReportFilterBar = ({
   title = 'Filters',
   onSearch,
   searching = false,
+  searchLabel = 'Search',
+  searchingLabel,
+  searchIcon: SearchActionIcon = SearchIcon,
+  showResetButton = true,
   showPdfExport = false,
+  showExcelExport = true,
   onExportExcel,
   onExportPdf,
 }) => {
@@ -31,13 +36,20 @@ const ReportFilterBar = ({
       <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button variant="primary" size="sm" className="gap-1.5" disabled={searching} onClick={onSearch}>
-            <SearchIcon size={15} /> {searching ? 'Searching…' : 'Search'}
+            <SearchActionIcon size={15} /> {searching ? (searchingLabel || `${searchLabel}…`) : searchLabel}
           </Button>
-          <Button variant="secondary" size="sm" className="gap-1.5" onClick={onClearFilters}>
-            <RotateCcw size={15} /> Reset
-          </Button>
+          {showResetButton && (
+            <Button variant="secondary" size="sm" className="gap-1.5" onClick={onClearFilters}>
+              <RotateCcw size={15} /> Reset
+            </Button>
+          )}
         </div>
-        <ExportButtons showPdf={showPdfExport} onExportExcel={onExportExcel} onExportPdf={onExportPdf} />
+        <ExportButtons
+          showPdf={showPdfExport}
+          showExcel={showExcelExport}
+          onExportExcel={onExportExcel}
+          onExportPdf={onExportPdf}
+        />
       </div>
     </div>
   );

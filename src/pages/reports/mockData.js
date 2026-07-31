@@ -191,3 +191,136 @@ export const candidateDistributionRows = Array.from({ length: 24 }).map((_, i) =
     totalCandidates: intBetween(20, 180),
   };
 });
+
+// ── Module 3: Marks & Result Reports ────────────────────────────────────────
+
+export const WRITTEN_EXAM_SUBJECTS = [
+  'General Knowledge',
+  'English',
+  'Pakistan Studies',
+  'Islamic Studies',
+  'Professional Subject',
+];
+
+export const CCE_OPTIONAL_SUBJECTS = [
+  'Economics',
+  'Political Science',
+  'Public Administration',
+  'International Relations',
+  'Sociology',
+  'History',
+];
+
+export const CCE_COMPULSORY_SUBJECTS = [
+  'General Knowledge',
+  'Essay & Precis',
+  'Islamic Studies / Pakistan Affairs',
+  'English (Compulsory)',
+];
+
+// One row per candidate per subject — mirrors how a "compiled marksheet" is
+// laid out on paper (subject-wise rows grouped by roll number).
+export const writtenMarksheetRows = (() => {
+  const rows = [];
+  let rowId = 1;
+  const CANDIDATE_COUNT = 10;
+  for (let c = 0; c < CANDIDATE_COUNT; c++) {
+    const gender = pickIndexed(GENDERS, c);
+    const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, c) : pickIndexed(FIRST_NAMES_F, c);
+    const fatherName = pickIndexed(FATHER_NAMES, c + 3);
+    const rollNo = `WEX-${31000 + c}`;
+    const advertisementNo = pickIndexed(ADVERTISEMENTS, c + 1).label;
+    const post = pickIndexed(POSTS, c + 2);
+
+    // Compute all subject scores first so "Aggregate" (candidate average) can
+    // be embedded on every one of that candidate's subject rows.
+    const subjectScores = WRITTEN_EXAM_SUBJECTS.map((subject, s) => ({
+      subject,
+      obtainedMarks: intBetween(28, 98),
+      totalMarks: 100,
+    }));
+    const aggregate = Math.round(
+      (subjectScores.reduce((sum, s) => sum + s.obtainedMarks, 0) / (subjectScores.length * 100)) * 10000
+    ) / 100;
+    const overallResult = aggregate >= 40 ? 'Pass' : 'Fail';
+
+    for (let s = 0; s < subjectScores.length; s++) {
+      const { subject, obtainedMarks, totalMarks } = subjectScores[s];
+      rows.push({
+        id: rowId,
+        srNo: rowId,
+        rollNo,
+        candidateName,
+        fatherName,
+        advertisementNo,
+        post,
+        subject,
+        obtainedMarks,
+        totalMarks,
+        percentage: Math.round((obtainedMarks / totalMarks) * 10000) / 100,
+        // Candidate's overall aggregate % and final result — repeated on
+        // every subject row, matching how a compiled marksheet is printed.
+        aggregate,
+        result: overallResult,
+      });
+      rowId++;
+    }
+  }
+  return rows;
+})();
+
+// One row per candidate — CCE marksheets aggregate optional + compulsory
+// subject marks into a single written score plus a viva score.
+export const cceMarksheetRows = Array.from({ length: 18 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i + 1);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 4) : pickIndexed(FIRST_NAMES_F, i + 4);
+  const optionalSubjects = [
+    pickIndexed(CCE_OPTIONAL_SUBJECTS, i),
+    pickIndexed(CCE_OPTIONAL_SUBJECTS, i + 3),
+  ];
+  const writtenMarks = intBetween(320, 720);
+  const vivaMarks = intBetween(60, 190);
+  const aggregate = writtenMarks + vivaMarks;
+  const aggregatePercent = Math.round((aggregate / 1000) * 10000) / 100;
+  return {
+    id: i + 1,
+    srNo: i + 1,
+    rollNo: `CCE-${42000 + i}`,
+    candidateName,
+    advertisementNo: pickIndexed(ADVERTISEMENTS, i + 3).label,
+    post: pickIndexed(POSTS, i + 5),
+    optionalSubjects,
+    compulsorySubjects: CCE_COMPULSORY_SUBJECTS,
+    writtenMarks,
+    totalWrittenMarks: 800,
+    vivaMarks,
+    totalVivaMarks: 200,
+    aggregate,
+    aggregatePercent,
+    result: aggregatePercent >= 50 ? 'Pass' : 'Fail',
+  };
+});
+
+// Curated (hand-authored, not generated) summary used by the Pass/Fail
+// Statistics Report — stat cards, pie/bar charts, and the table view all
+// derive from this single object.
+export const passFailStatistics = {
+  overall: { totalCandidates: 1240, pass: 812, fail: 428 },
+  examTypes: [
+    { examType: 'One Paper MCQs', totalCandidates: 310, pass: 221, fail: 89 },
+    { examType: 'Two Paper MCQs', totalCandidates: 268, pass: 174, fail: 94 },
+    { examType: 'Written Exam', totalCandidates: 412, pass: 261, fail: 151 },
+    { examType: 'CCE', totalCandidates: 250, pass: 156, fail: 94 },
+  ],
+  subjectWise: [
+    { examType: 'Written Exam', subject: 'General Knowledge', totalCandidates: 412, pass: 300, fail: 112 },
+    { examType: 'Written Exam', subject: 'English', totalCandidates: 412, pass: 268, fail: 144 },
+    { examType: 'Written Exam', subject: 'Pakistan Studies', totalCandidates: 412, pass: 312, fail: 100 },
+    { examType: 'Written Exam', subject: 'Islamic Studies', totalCandidates: 412, pass: 330, fail: 82 },
+    { examType: 'Written Exam', subject: 'Professional Subject', totalCandidates: 412, pass: 245, fail: 167 },
+    { examType: 'CCE', subject: 'General Knowledge', totalCandidates: 250, pass: 192, fail: 58 },
+    { examType: 'CCE', subject: 'Essay & Precis', totalCandidates: 250, pass: 165, fail: 85 },
+    { examType: 'CCE', subject: 'English (Compulsory)', totalCandidates: 250, pass: 178, fail: 72 },
+    { examType: 'CCE', subject: 'Optional Subjects (avg.)', totalCandidates: 250, pass: 170, fail: 80 },
+  ],
+};

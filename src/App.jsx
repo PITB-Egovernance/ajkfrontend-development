@@ -118,6 +118,9 @@ import ScrutinyRequests from 'pages/results/ScrutinyRequests';
 import ApplicationSummaryReport from 'pages/reports/ApplicationSummaryReport';
 import CenterWiseCandidateReport from 'pages/reports/CenterWiseCandidateReport';
 import CandidateDistributionReport from 'pages/reports/CandidateDistributionReport';
+import CompiledMarksheetWritten from 'pages/reports/CompiledMarksheetWritten';
+import CompiledMarksheetCce from 'pages/reports/CompiledMarksheetCce';
+import PassFailStatisticsReport from 'pages/reports/PassFailStatisticsReport';
 
 
 function App() {
@@ -403,6 +406,9 @@ function App() {
           <Route path="reports/application-summary" element={<ApplicationSummaryReport />} />
           <Route path="reports/center-wise-candidates" element={<CenterWiseCandidateReport />} />
           <Route path="reports/candidate-distribution" element={<CandidateDistributionReport />} />
+          <Route path="reports/marksheet-written" element={<CompiledMarksheetWritten />} />
+          <Route path="reports/marksheet-cce" element={<CompiledMarksheetCce />} />
+          <Route path="reports/pass-fail-statistics" element={<PassFailStatisticsReport />} />
         </Route>
 
         
