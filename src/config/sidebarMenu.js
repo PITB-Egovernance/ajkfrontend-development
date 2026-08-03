@@ -4,7 +4,8 @@ import {
   GraduationCap, BookOpen, Building2, Flag, DollarSign,
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
   Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon, ClipboardCheck,
-  BarChart3, FileBarChart2, PieChart, Percent, FileSpreadsheet, TrendingUp
+  BarChart3, FileBarChart2, PieChart, Percent, FileSpreadsheet, TrendingUp,
+  Trophy, Scale, GitCompare
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -134,6 +135,9 @@ export const MENU_ITEMS = [
           { label: "Compiled Marksheet (Written Exam)", path: "/dashboard/reports/marksheet-written", icon: FileSpreadsheet },
           { label: "Compiled Marksheet (CCE)",           path: "/dashboard/reports/marksheet-cce",     icon: BookOpen },
           { label: "Pass / Fail Statistics Report",      path: "/dashboard/reports/pass-fail-statistics", icon: TrendingUp },
+          { label: "Merit List (Category Wise)",         path: "/dashboard/reports/merit-list",       icon: Trophy },
+          { label: "Tie-Breaking Report",                path: "/dashboard/reports/tie-breaking",     icon: Scale },
+          { label: "Import Discrepancy Report",          path: "/dashboard/reports/import-discrepancy", icon: GitCompare },
         ],
       },
     ],

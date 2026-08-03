@@ -5,7 +5,15 @@ import Button from 'components/ui/Button';
 
 // Reusable export controls — UI only, no backend wired up yet. Simulates a
 // short export delay and confirms via toast so the flow feels complete.
-const ExportButtons = ({ showPdf = false, showExcel = true, onExportExcel, onExportPdf, disabled = false }) => {
+const ExportButtons = ({
+  showPdf = false,
+  showExcel = true,
+  pdfLabel = 'Export PDF',
+  excelLabel = 'Export Excel',
+  onExportExcel,
+  onExportPdf,
+  disabled = false,
+}) => {
   const [busy, setBusy] = useState('');
 
   const run = async (kind, cb) => {
@@ -27,7 +35,7 @@ const ExportButtons = ({ showPdf = false, showExcel = true, onExportExcel, onExp
           onClick={() => run('pdf', onExportPdf)}
         >
           {busy === 'pdf' ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
-          Export PDF
+          {pdfLabel}
         </Button>
       )}
       {showExcel && (
@@ -39,7 +47,7 @@ const ExportButtons = ({ showPdf = false, showExcel = true, onExportExcel, onExp
           onClick={() => run('excel', onExportExcel)}
         >
           {busy === 'excel' ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
-          Export Excel
+          {excelLabel}
         </Button>
       )}
     </div>

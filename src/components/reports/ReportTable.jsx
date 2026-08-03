@@ -22,6 +22,8 @@ const ReportTable = ({
   emptyTitle,
   emptyDescription,
   resultsLabel = 'records',
+  getRowClassName,
+  rowSx,
 }) => {
   const showInitialSkeleton = loading && rows.length === 0;
   const showEmpty = !loading && rows.length === 0;
@@ -53,7 +55,8 @@ const ReportTable = ({
             autoHeight
             disableRowSelectionOnClick
             loading={loading}
-            sx={GRID_SX}
+            getRowClassName={getRowClassName}
+            sx={rowSx ? { ...GRID_SX, ...rowSx } : GRID_SX}
           />
         )}
       </div>

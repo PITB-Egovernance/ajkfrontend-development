@@ -20,6 +20,8 @@ const ReportFilterBar = ({
   showResetButton = true,
   showPdfExport = false,
   showExcelExport = true,
+  pdfExportLabel = 'Export PDF',
+  excelExportLabel = 'Export Excel',
   onExportExcel,
   onExportPdf,
 }) => {
@@ -47,6 +49,8 @@ const ReportFilterBar = ({
         <ExportButtons
           showPdf={showPdfExport}
           showExcel={showExcelExport}
+          pdfLabel={pdfExportLabel}
+          excelLabel={excelExportLabel}
           onExportExcel={onExportExcel}
           onExportPdf={onExportPdf}
         />

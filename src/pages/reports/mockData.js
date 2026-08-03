@@ -324,3 +324,157 @@ export const passFailStatistics = {
     { examType: 'CCE', subject: 'Optional Subjects (avg.)', totalCandidates: 250, pass: 170, fail: 80 },
   ],
 };
+
+export const MERIT_STATUSES = ['Recommended', 'Waitlisted', 'Not Recommended'];
+
+// One row per candidate, ranked within its (advertisement, post) group —
+// simulates a category-wise merit list (open merit / gender / district quota
+// resolution happens per group in a real system; the mock keeps ranking
+// simple and deterministic).
+export const meritListRows = (() => {
+  const rows = [];
+  const GROUP_COUNT = 6;
+  const CANDIDATES_PER_GROUP = 5;
+  const TOTAL_POSSIBLE_MARKS = 500;
+
+  for (let g = 0; g < GROUP_COUNT; g++) {
+    const advertisementNo = pickIndexed(ADVERTISEMENTS, g).label;
+    const post = pickIndexed(POSTS, g + 1);
+    const candidates = [];
+
+    for (let c = 0; c < CANDIDATES_PER_GROUP; c++) {
+      const idx = g * CANDIDATES_PER_GROUP + c;
+      const gender = pickIndexed(GENDERS, idx);
+      candidates.push({
+        rollNo: `MER-${51000 + idx}`,
+        candidateName: gender === 'Male' ? pickIndexed(FIRST_NAMES_M, idx + 1) : pickIndexed(FIRST_NAMES_F, idx + 1),
+        fatherName: pickIndexed(FATHER_NAMES, idx + 4),
+        district: pickIndexed(DISTRICTS, idx + 2),
+        gender,
+        totalMarks: intBetween(360, 480),
+      });
+    }
+
+    // Rank within the group by total marks, highest first.
+    candidates.sort((a, b) => b.totalMarks - a.totalMarks);
+
+    for (let rankIdx = 0; rankIdx < candidates.length; rankIdx++) {
+      const rank = rankIdx + 1;
+      const cand = candidates[rankIdx];
+      rows.push({
+        id: `${g}-${rankIdx}`,
+        rank,
+        rollNo: cand.rollNo,
+        candidateName: cand.candidateName,
+        fatherName: cand.fatherName,
+        district: cand.district,
+        advertisementNo,
+        gender: cand.gender,
+        post,
+        totalMarks: cand.totalMarks,
+        totalPossibleMarks: TOTAL_POSSIBLE_MARKS,
+        percentage: Math.round((cand.totalMarks / TOTAL_POSSIBLE_MARKS) * 10000) / 100,
+        meritStatus: rank <= 2 ? 'Recommended' : rank <= 3 ? 'Waitlisted' : 'Not Recommended',
+      });
+    }
+  }
+  return rows;
+})();
+
+// Curated tie groups — every candidate in this report shares its group's
+// aggregate with at least one other candidate. Earlier roll number wins the
+// tie, per the stated rule.
+export const tieBreakingRows = (() => {
+  const TIE_GROUPS = [
+    { aggregate: 412.5, size: 2 },
+    { aggregate: 398.0, size: 3 },
+    { aggregate: 445.25, size: 2 },
+    { aggregate: 375.75, size: 2 },
+    { aggregate: 420.0, size: 3 },
+  ];
+  const rows = [];
+  let srNo = 1;
+
+  for (let g = 0; g < TIE_GROUPS.length; g++) {
+    const { aggregate, size } = TIE_GROUPS[g];
+    const advertisementNo = pickIndexed(ADVERTISEMENTS, g).label;
+    const post = pickIndexed(POSTS, g + 2);
+    const candidates = [];
+
+    for (let c = 0; c < size; c++) {
+      const idx = g * 10 + c;
+      const gender = pickIndexed(GENDERS, idx);
+      candidates.push({
+        rollNo: `TIE-${6000 + idx}`,
+        candidateName: gender === 'Male' ? pickIndexed(FIRST_NAMES_M, idx + 2) : pickIndexed(FIRST_NAMES_F, idx + 2),
+        fatherName: pickIndexed(FATHER_NAMES, idx + 5),
+        district: pickIndexed(DISTRICTS, idx + 1),
+        gender,
+      });
+    }
+
+    // Earlier roll number is preferred when aggregates are equal.
+    candidates.sort((a, b) => (a.rollNo < b.rollNo ? -1 : 1));
+
+    for (let c = 0; c < candidates.length; c++) {
+      const cand = candidates[c];
+      rows.push({
+        id: srNo,
+        srNo,
+        rollNo: cand.rollNo,
+        candidateName: cand.candidateName,
+        fatherName: cand.fatherName,
+        district: cand.district,
+        advertisementNo,
+        post,
+        gender: cand.gender,
+        aggregate,
+        tieBreakRule: 'Earlier Roll Number Preferred',
+        finalRank: c + 1,
+        // Used only for row highlighting — not a display column.
+        tieGroup: g,
+      });
+      srNo++;
+    }
+  }
+  return rows;
+})();
+
+export const IMPORT_DISCREPANCY_STATUSES = ['Match', 'Modified', 'Missing', 'Duplicate'];
+
+// Simulates comparing a freshly imported Excel batch against previously
+// recorded marks.
+export const importDiscrepancyRows = (() => {
+  const rows = [];
+  const COUNT = 20;
+
+  for (let i = 0; i < COUNT; i++) {
+    const gender = pickIndexed(GENDERS, i);
+    const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 5) : pickIndexed(FIRST_NAMES_F, i + 5);
+    const status = pickIndexed(IMPORT_DISCREPANCY_STATUSES, i);
+    const basePrevious = intBetween(120, 480);
+
+    let previousMarks = basePrevious;
+    let importedMarks = basePrevious;
+    if (status === 'Modified') {
+      importedMarks = basePrevious + intBetween(5, 35) * (i % 2 === 0 ? 1 : -1);
+    } else if (status === 'Missing') {
+      previousMarks = null; // no prior record on file
+      importedMarks = basePrevious;
+    }
+    // 'Match' and 'Duplicate' keep imported === previous — a duplicate is
+    // flagged because the roll number appears more than once in the import,
+    // not because the marks themselves differ.
+
+    rows.push({
+      id: i + 1,
+      candidateName,
+      rollNo: `IMP-${71000 + i}`,
+      previousMarks,
+      importedMarks,
+      difference: previousMarks === null ? null : importedMarks - previousMarks,
+      status,
+    });
+  }
+  return rows;
+})();

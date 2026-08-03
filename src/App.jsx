@@ -121,6 +121,9 @@ import CandidateDistributionReport from 'pages/reports/CandidateDistributionRepo
 import CompiledMarksheetWritten from 'pages/reports/CompiledMarksheetWritten';
 import CompiledMarksheetCce from 'pages/reports/CompiledMarksheetCce';
 import PassFailStatisticsReport from 'pages/reports/PassFailStatisticsReport';
+import MeritListReport from 'pages/reports/MeritListReport';
+import TieBreakingReport from 'pages/reports/TieBreakingReport';
+import ImportDiscrepancyReport from 'pages/reports/ImportDiscrepancyReport';
 
 
 function App() {
@@ -409,6 +412,9 @@ function App() {
           <Route path="reports/marksheet-written" element={<CompiledMarksheetWritten />} />
           <Route path="reports/marksheet-cce" element={<CompiledMarksheetCce />} />
           <Route path="reports/pass-fail-statistics" element={<PassFailStatisticsReport />} />
+          <Route path="reports/merit-list" element={<MeritListReport />} />
+          <Route path="reports/tie-breaking" element={<TieBreakingReport />} />
+          <Route path="reports/import-discrepancy" element={<ImportDiscrepancyReport />} />
         </Route>
 
         

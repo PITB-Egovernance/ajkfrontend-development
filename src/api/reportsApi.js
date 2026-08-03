@@ -11,6 +11,9 @@ import {
   writtenMarksheetRows,
   cceMarksheetRows,
   passFailStatistics,
+  meritListRows,
+  tieBreakingRows,
+  importDiscrepancyRows,
 } from 'pages/reports/mockData';
 
 const MOCK_LATENCY_MS = 500;
@@ -31,6 +34,15 @@ const applyCceFilters = (rows, filters = {}) =>
     if (filters.advertisementNo && r.advertisementNo !== filters.advertisementNo) return false;
     if (filters.post && r.post !== filters.post) return false;
     if (filters.optionalSubject && !r.optionalSubjects.includes(filters.optionalSubject)) return false;
+    return true;
+  });
+
+const applyMeritListFilters = (rows, filters = {}) =>
+  rows.filter((r) => {
+    if (filters.advertisementNo && r.advertisementNo !== filters.advertisementNo) return false;
+    if (filters.post && r.post !== filters.post) return false;
+    if (filters.gender && r.gender !== filters.gender) return false;
+    if (filters.district && r.district !== filters.district) return false;
     return true;
   });
 
@@ -55,6 +67,25 @@ const reportsApi = {
    * API-shape parity even though the mock summary itself is static.
    */
   getPassFailStatistics: async (filters = {}) => resolveAfter(passFailStatistics), // eslint-disable-line no-unused-vars
+
+  /**
+   * Merit List (Category Wise) — ranked within each (advertisement, post) group.
+   */
+  getMeritList: async (filters = {}) => resolveAfter({
+    rows: applyMeritListFilters(meritListRows, filters),
+  }),
+
+  /**
+   * Tie-Breaking Report — candidates sharing an aggregate; no filters yet
+   * on the frontend, so the full curated set is returned as-is.
+   */
+  getTieBreaking: async () => resolveAfter({ rows: tieBreakingRows }),
+
+  /**
+   * Import Discrepancy Report — compares an imported batch against
+   * previously recorded marks; no filters yet on the frontend.
+   */
+  getImportDiscrepancy: async () => resolveAfter({ rows: importDiscrepancyRows }),
 };
 
 export default reportsApi;
