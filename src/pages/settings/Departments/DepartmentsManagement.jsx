@@ -223,7 +223,7 @@ const DepartmentsManagement = () => {
       } else {
         toast.error(result.message || (isUpdate ? 'Failed to update department' : 'Failed to create department'));
       }
-    } catch { toast.error('Server error while saving department'); }
+    } catch (err) { toast.error(err?.message || 'Server error while saving department'); }
     finally { setSaving(false); }
   };
 
@@ -414,7 +414,7 @@ const DepartmentsManagement = () => {
             <button onClick={() => setOpenModal(false)} disabled={saving}
               className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 text-sm">Cancel</button>
             <button onClick={handleSubmit} disabled={saving}
-              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 text-white font-medium rounded-lg text-sm disabled:opacity-60">
+              className="px-4 py-2 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 hover:from-emerald-900 hover:to-emerald-950 text-white font-medium rounded-lg transition-all duration-200 text-sm disabled:opacity-60">
               {saving ? 'Saving…' : editing ? 'Update' : 'Create'}
             </button>
           </DialogActions>

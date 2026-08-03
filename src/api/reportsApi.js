@@ -1,12 +1,5 @@
-// Marks & Result Reports API layer.
-//
-// Backed by static mock data (src/pages/reports/mockData.js) until the real
-// endpoints exist. Every method already returns the { success, data }
-// envelope + accepts the same filter shape the real API will use (see
-// src/api/resultsApi.js for that convention), so swapping a method body for
-// a real `fetch()` call later will not require any change in the pages that
-// consume it.
-
+import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import {
   writtenMarksheetRows,
   cceMarksheetRows,
@@ -16,6 +9,40 @@ import {
   importDiscrepancyRows,
 } from 'pages/reports/mockData';
 
+const API_BASE = Config.apiUrl;
+const API_KEY  = Config.apiKey;
+
+const getHeaders = () => ({
+  Accept:        'application/json',
+  'X-API-KEY':   API_KEY,
+  Authorization: `Bearer ${AuthService.getToken()}`,
+});
+
+const handleResponse = async (response) => {
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error  = new Error(result.message || `Request failed (${response.status})`);
+    error.status = response.status;
+    error.errors = result.errors || {};
+    throw error;
+  }
+  return result;
+};
+
+const buildQuery = (params = {}) => {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) {
+      search.set(key, value);
+    }
+  });
+  return search.toString();
+};
+
+// Marks & Result Reports — still mock-backed until the real endpoints exist.
+// Every method returns the same { success, data } envelope the live
+// endpoints below use, so swapping a method body for a real fetch() call
+// later will not require any change in the pages that consume it.
 const MOCK_LATENCY_MS = 500;
 
 const resolveAfter = (data) =>
@@ -46,7 +73,38 @@ const applyMeritListFilters = (rows, filters = {}) =>
     return true;
   });
 
-const reportsApi = {
+//const reportsApi = {
+const ReportsApi = {
+  // ── Application & Candidate / Examination Logistics reports — live API ──
+  // (see ReportController on the backend); pass every active filter here
+  // rather than fetching everything and filtering client-side.
+  getFilters: async () => {
+    const res = await fetch(`${API_BASE}/reports/filters`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getApplicationSummary: async (params = {}) => {
+    const res = await fetch(`${API_BASE}/reports/application-summary?${buildQuery(params)}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse(res);
+  },
+
+  getCenterWiseCandidates: async (params = {}) => {
+    const res = await fetch(`${API_BASE}/reports/center-wise-candidates?${buildQuery(params)}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse(res);
+  },
+
+  getCandidateDistribution: async (params = {}) => {
+    const res = await fetch(`${API_BASE}/reports/candidate-distribution?${buildQuery(params)}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse(res);
+  },
+
+  // ── Marks & Result reports — mock-backed, see note above ──
   /**
    * Compiled Marksheet (Written Exam) — subject-wise rows per candidate.
    */
@@ -86,6 +144,6 @@ const reportsApi = {
    * previously recorded marks; no filters yet on the frontend.
    */
   getImportDiscrepancy: async () => resolveAfter({ rows: importDiscrepancyRows }),
-};
+}
 
-export default reportsApi;
+export default ReportsApi;

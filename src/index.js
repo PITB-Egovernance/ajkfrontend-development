@@ -22,8 +22,14 @@ const appTheme = createTheme({
     },
     MuiOutlinedInput: {
       styleOverrides: {
-        root: {
-          height: 40,
+        // height: 40 is the single-line form-control token — forcing it on
+        // multiline (textarea) inputs clamps the bordered container while
+        // the actual textarea grows to its real height (minRows), so the
+        // label's shrink position ends up landing inside the visible text
+        // instead of on the border. Only single-line inputs get the fixed
+        // height; multiline ones grow naturally.
+        root: ({ ownerState }) => ({
+          ...(!ownerState.multiline && { height: 40 }),
           borderRadius: 6,
           backgroundColor: '#ffffff',
           boxSizing: 'border-box',
@@ -40,7 +46,7 @@ const appTheme = createTheme({
           '&.Mui-error .MuiOutlinedInput-notchedOutline': {
             borderColor: '#dc2626',
           },
-        },
+        }),
         input: {
           padding: '8px 12px',
           boxSizing: 'border-box',
