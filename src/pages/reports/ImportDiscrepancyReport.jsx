@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { GitCompare, AlertTriangle } from 'lucide-react';
+import toast from 'react-hot-toast';
 import ReportPageHeader from 'components/reports/ReportPageHeader';
 import ReportTable from 'components/reports/ReportTable';
 import StatusBadge from 'components/reports/StatusBadge';
 import AlertCard from 'components/reports/AlertCard';
 import ExportButtons from 'components/reports/ExportButtons';
-import reportsApi from 'api/reportsApi';
+import ReportsApi from 'api/reportsApi';
 
 const rowSx = {
   '& .status-missing': { backgroundColor: '#fef2f2' },   // rose-50
@@ -15,20 +16,35 @@ const rowSx = {
 
 const getRowClassName = (params) => `status-${String(params.row.status).toLowerCase()}`;
 
+const mapRow = (row, index) => ({
+  id: `${row.roll_no || ''}-${index}`,
+  candidateName: row.candidate_name,
+  rollNo: row.roll_no,
+  previousMarks: row.previous_marks,
+  importedMarks: row.imported_marks,
+  difference: row.difference,
+  status: row.status,
+});
+
 const ImportDiscrepancyReport = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  // Loads through the reportsApi service layer (currently mock-backed) so
-  // swapping to a live endpoint later only changes reportsApi, not this page.
+  // A MarkEdit row only ever exists when a re-import's marks conflicted with
+  // an already-recorded result, so this is naturally a short list — fetched
+  // in one page rather than wiring up server-side pagination for it.
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const res = await reportsApi.getImportDiscrepancy();
-        setRows(res.data.rows);
+        const res = await ReportsApi.getImportDiscrepancy({ per_page: 200 });
+        const items = res?.data?.data ?? [];
+        setRows(items.map(mapRow));
+      } catch (err) {
+        toast.error(err?.message || 'Failed to load import discrepancy report');
+        setRows([]);
       } finally {
         setLoading(false);
       }
