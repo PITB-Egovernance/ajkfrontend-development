@@ -7,6 +7,9 @@ import {
   meritListRows,
   tieBreakingRows,
   importDiscrepancyRows,
+  topMarksMeritRows,
+  candidateRejectionRows,
+  finalRejectedCandidateRows,
 } from 'pages/reports/mockData';
 
 const API_BASE = Config.apiUrl;
@@ -64,7 +67,10 @@ const applyCceFilters = (rows, filters = {}) =>
     return true;
   });
 
-const applyMeritListFilters = (rows, filters = {}) =>
+// Shared by every mock report that filters on the common
+// Advertisement / Post / Gender / District quartet (merit list, top marks
+// merit, candidate rejection, final rejected candidates).
+const applyStandardCandidateFilters = (rows, filters = {}) =>
   rows.filter((r) => {
     if (filters.advertisementNo && r.advertisementNo !== filters.advertisementNo) return false;
     if (filters.post && r.post !== filters.post) return false;
@@ -130,7 +136,7 @@ const ReportsApi = {
    * Merit List (Category Wise) — ranked within each (advertisement, post) group.
    */
   getMeritList: async (filters = {}) => resolveAfter({
-    rows: applyMeritListFilters(meritListRows, filters),
+    rows: applyStandardCandidateFilters(meritListRows, filters),
   }),
 
   /**
@@ -144,6 +150,28 @@ const ReportsApi = {
    * previously recorded marks; no filters yet on the frontend.
    */
   getImportDiscrepancy: async () => resolveAfter({ rows: importDiscrepancyRows }),
+
+  /**
+   * Top Marks Merit Candidate List — highest scorers eligible for
+   * document verification.
+   */
+  getTopMarksMerit: async (filters = {}) => resolveAfter({
+    rows: applyStandardCandidateFilters(topMarksMeritRows, filters),
+  }),
+
+  /**
+   * Candidate Rejection List — candidates rejected at document verification.
+   */
+  getCandidateRejectionList: async (filters = {}) => resolveAfter({
+    rows: applyStandardCandidateFilters(candidateRejectionRows, filters),
+  }),
+
+  /**
+   * Final Rejected Candidate List — rejections upheld after appeal.
+   */
+  getFinalRejectedCandidates: async (filters = {}) => resolveAfter({
+    rows: applyStandardCandidateFilters(finalRejectedCandidateRows, filters),
+  }),
 }
 
 export default ReportsApi;

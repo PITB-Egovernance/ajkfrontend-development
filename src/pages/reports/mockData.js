@@ -478,3 +478,82 @@ export const importDiscrepancyRows = (() => {
   }
   return rows;
 })();
+
+export const TOP_MARKS_STATUSES = ['Pending Verification', 'Verified', 'Documents Submitted'];
+
+// Highest-scoring candidates who cleared the merit cutoff and are now in the
+// document verification pipeline.
+export const topMarksMeritRows = Array.from({ length: 20 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 6) : pickIndexed(FIRST_NAMES_F, i + 6);
+  return {
+    id: i + 1,
+    srNo: i + 1,
+    rollNo: `TOP-${81000 + i}`,
+    candidateName,
+    fatherName: pickIndexed(FATHER_NAMES, i + 1),
+    district: pickIndexed(DISTRICTS, i + 4),
+    advertisementNo: pickIndexed(ADVERTISEMENTS, i + 1).label,
+    post: pickIndexed(POSTS, i + 3),
+    gender,
+    marks: intBetween(420, 495),
+    status: pickIndexed(TOP_MARKS_STATUSES, i),
+  };
+});
+
+export const REJECTION_REASONS = [
+  'CNIC Mismatch',
+  'Age Limit Exceeded',
+  'Invalid Domicile Certificate',
+  'Missing Educational Documents',
+  'Forged / Fake Documents',
+  'Experience Certificate Not Verified',
+  'Photograph Mismatch',
+  'Duplicate Application',
+];
+
+// Candidates rejected at the initial document verification stage.
+export const candidateRejectionRows = Array.from({ length: 18 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i + 1);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 2) : pickIndexed(FIRST_NAMES_F, i + 2);
+  return {
+    id: i + 1,
+    srNo: i + 1,
+    rollNo: `REJ-${91000 + i}`,
+    candidateName,
+    fatherName: pickIndexed(FATHER_NAMES, i + 6),
+    district: pickIndexed(DISTRICTS, i + 6),
+    advertisementNo: pickIndexed(ADVERTISEMENTS, i + 2).label,
+    post: pickIndexed(POSTS, i + 4),
+    gender,
+    rejectionReason: pickIndexed(REJECTION_REASONS, i),
+    status: 'Rejected',
+  };
+});
+
+export const FINAL_REJECTION_REASONS = [
+  'Appeal Rejected — Document Mismatch Confirmed',
+  'Appeal Rejected — Age Limit Exceeded',
+  'Appeal Rejected — Fraudulent Documents',
+  'No Appeal Filed Within Deadline',
+  'Appeal Rejected — Domicile Verification Failed',
+];
+
+// Candidates whose rejection was upheld after the appeal process.
+export const finalRejectedCandidateRows = Array.from({ length: 14 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 7) : pickIndexed(FIRST_NAMES_F, i + 7);
+  return {
+    id: i + 1,
+    srNo: i + 1,
+    rollNo: `FRJ-${95000 + i}`,
+    candidateName,
+    fatherName: pickIndexed(FATHER_NAMES, i + 8),
+    district: pickIndexed(DISTRICTS, i + 8),
+    advertisementNo: pickIndexed(ADVERTISEMENTS, i + 3).label,
+    post: pickIndexed(POSTS, i + 7),
+    gender,
+    finalRejectionReason: pickIndexed(FINAL_REJECTION_REASONS, i),
+    finalStatus: 'Finally Rejected',
+  };
+});

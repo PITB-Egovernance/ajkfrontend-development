@@ -6,10 +6,15 @@ import React from 'react';
 const DEFAULT_STATUS_STYLES = {
   match: 'bg-emerald-100 text-emerald-700',
   recommended: 'bg-emerald-100 text-emerald-700',
+  verified: 'bg-emerald-100 text-emerald-700',
   modified: 'bg-amber-100 text-amber-700',
   waitlisted: 'bg-amber-100 text-amber-700',
+  'pending verification': 'bg-amber-100 text-amber-700',
+  'documents submitted': 'bg-blue-100 text-blue-700',
   missing: 'bg-rose-100 text-rose-700',
   'not recommended': 'bg-rose-100 text-rose-700',
+  rejected: 'bg-rose-100 text-rose-700',
+  'finally rejected': 'bg-rose-100 text-rose-700',
   duplicate: 'bg-violet-100 text-violet-700',
 };
 

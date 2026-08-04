@@ -5,7 +5,7 @@ import {
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
   Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon, ClipboardCheck,
   BarChart3, FileBarChart2, PieChart, Percent, FileSpreadsheet, TrendingUp,
-  Trophy, Scale, GitCompare
+  Trophy, Scale, GitCompare, Medal, UserX, ShieldAlert
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -138,6 +138,9 @@ export const MENU_ITEMS = [
           { label: "Merit List (Category Wise)",         path: "/dashboard/reports/merit-list",       icon: Trophy },
           { label: "Tie-Breaking Report",                path: "/dashboard/reports/tie-breaking",     icon: Scale },
           { label: "Import Discrepancy Report",          path: "/dashboard/reports/import-discrepancy", icon: GitCompare },
+          { label: "Top Marks Merit Candidate List",     path: "/dashboard/reports/top-marks-merit",  icon: Medal },
+          { label: "Candidate Rejection List",           path: "/dashboard/reports/candidate-rejection", icon: UserX },
+          { label: "Final Rejected Candidate List",      path: "/dashboard/reports/final-rejected",   icon: ShieldAlert },
         ],
       },
     ],

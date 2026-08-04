@@ -124,6 +124,9 @@ import PassFailStatisticsReport from 'pages/reports/PassFailStatisticsReport';
 import MeritListReport from 'pages/reports/MeritListReport';
 import TieBreakingReport from 'pages/reports/TieBreakingReport';
 import ImportDiscrepancyReport from 'pages/reports/ImportDiscrepancyReport';
+import TopMarksMeritList from 'pages/reports/TopMarksMeritList';
+import CandidateRejectionList from 'pages/reports/CandidateRejectionList';
+import FinalRejectedCandidateList from 'pages/reports/FinalRejectedCandidateList';
 
 
 function App() {
@@ -415,6 +418,9 @@ function App() {
           <Route path="reports/merit-list" element={<MeritListReport />} />
           <Route path="reports/tie-breaking" element={<TieBreakingReport />} />
           <Route path="reports/import-discrepancy" element={<ImportDiscrepancyReport />} />
+          <Route path="reports/top-marks-merit" element={<TopMarksMeritList />} />
+          <Route path="reports/candidate-rejection" element={<CandidateRejectionList />} />
+          <Route path="reports/final-rejected" element={<FinalRejectedCandidateList />} />
         </Route>
 
         
