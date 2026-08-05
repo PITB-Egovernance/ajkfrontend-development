@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Scale } from 'lucide-react';
+import toast from 'react-hot-toast';
 import ReportPageHeader from 'components/reports/ReportPageHeader';
 import ReportTable from 'components/reports/ReportTable';
 import ExportButtons from 'components/reports/ExportButtons';
-import reportsApi from 'api/reportsApi';
+import ReportsApi from 'api/reportsApi';
 
 const rowSx = {
   '& .tie-group-a': { backgroundColor: '#fffbeb' }, // amber-50
@@ -12,20 +13,41 @@ const rowSx = {
 
 const getRowClassName = (params) => `tie-group-${params.row.tieGroup % 2 === 0 ? 'a' : 'b'}`;
 
+const mapRow = (row) => ({
+  id: row.roll_no,
+  srNo: row.sr_no,
+  rollNo: row.roll_no,
+  candidateName: row.candidate_name,
+  fatherName: row.father_name,
+  district: row.district,
+  advertisementNo: row.advertisement_no,
+  post: row.post,
+  gender: row.gender,
+  aggregate: row.aggregate,
+  tieBreakRule: row.tie_break_rule,
+  finalRank: row.final_rank,
+  tieGroup: row.tie_group,
+});
+
 const TieBreakingReport = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
 
-  // Loads through the reportsApi service layer (currently mock-backed) so
-  // swapping to a live endpoint later only changes reportsApi, not this page.
+  // Tie groups are inherently small (only candidates sharing an identical
+  // aggregate), so this fetches the full set in one page rather than
+  // wiring up server-side pagination for what's normally a handful of rows.
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const res = await reportsApi.getTieBreaking();
-        setRows(res.data.rows);
+        const res = await ReportsApi.getTieBreaking({ per_page: 200 });
+        const items = res?.data?.data ?? [];
+        setRows(items.map(mapRow));
+      } catch (err) {
+        toast.error(err?.message || 'Failed to load tie-breaking report');
+        setRows([]);
       } finally {
         setLoading(false);
       }

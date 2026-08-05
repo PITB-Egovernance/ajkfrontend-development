@@ -1,19 +1,9 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import {
-  writtenMarksheetRows,
-  cceMarksheetRows,
-  passFailStatistics,
-  meritListRows,
-  tieBreakingRows,
-  importDiscrepancyRows,
-  topMarksMeritRows,
-  candidateRejectionRows,
-  finalRejectedCandidateRows,
   interviewShortlistRows,
   awardListInterviewRows,
 } from 'pages/reports/mockData';
-
 const API_BASE = Config.apiUrl;
 const API_KEY  = Config.apiKey;
 
@@ -44,6 +34,12 @@ const buildQuery = (params = {}) => {
   return search.toString();
 };
 
+const get = async (path, params = {}) => {
+  const qs = buildQuery(params);
+  const res = await fetch(`${API_BASE}${path}${qs ? `?${qs}` : ''}`, { headers: getHeaders() });
+  return handleResponse(res);
+};
+
 // Marks & Result Reports — still mock-backed until the real endpoints exist.
 // Every method returns the same { success, data } envelope the live
 // endpoints below use, so swapping a method body for a real fetch() call
@@ -52,22 +48,6 @@ const MOCK_LATENCY_MS = 500;
 
 const resolveAfter = (data) =>
   new Promise((resolve) => setTimeout(() => resolve({ success: true, data }), MOCK_LATENCY_MS));
-
-const applyWrittenFilters = (rows, filters = {}) =>
-  rows.filter((r) => {
-    if (filters.advertisementNo && r.advertisementNo !== filters.advertisementNo) return false;
-    if (filters.post && r.post !== filters.post) return false;
-    if (filters.subject && r.subject !== filters.subject) return false;
-    return true;
-  });
-
-const applyCceFilters = (rows, filters = {}) =>
-  rows.filter((r) => {
-    if (filters.advertisementNo && r.advertisementNo !== filters.advertisementNo) return false;
-    if (filters.post && r.post !== filters.post) return false;
-    if (filters.optionalSubject && !r.optionalSubjects.includes(filters.optionalSubject)) return false;
-    return true;
-  });
 
 // Shared by every mock report that filters on the common
 // Advertisement / Post / Gender / District quartet (merit list, top marks
@@ -80,100 +60,47 @@ const applyStandardCandidateFilters = (rows, filters = {}) =>
     if (filters.district && r.district !== filters.district) return false;
     return true;
   });
-
-//const reportsApi = {
+// Reporting & Analytics module — all filtering/pagination happens server-side
+// (see ReportController/MarksReportController on the backend); pass every
+// active filter here rather than fetching everything and filtering
+// client-side.
 const ReportsApi = {
-  // ── Application & Candidate / Examination Logistics reports — live API ──
-  // (see ReportController on the backend); pass every active filter here
-  // rather than fetching everything and filtering client-side.
-  getFilters: async () => {
-    const res = await fetch(`${API_BASE}/reports/filters`, { headers: getHeaders() });
-    return handleResponse(res);
-  },
+  // ── Application & Candidate / Examination Logistics reports ──
+  getFilters: async () => get('/reports/filters'),
+  getApplicationSummary: async (params = {}) => get('/reports/application-summary', params),
+  getCenterWiseCandidates: async (params = {}) => get('/reports/center-wise-candidates', params),
+  getCandidateDistribution: async (params = {}) => get('/reports/candidate-distribution', params),
 
-  getApplicationSummary: async (params = {}) => {
-    const res = await fetch(`${API_BASE}/reports/application-summary?${buildQuery(params)}`, {
-      headers: getHeaders(),
-    });
-    return handleResponse(res);
-  },
+  // ── Marks & Result reports (see MarksReportController) ──
+  /** Subject/category dropdown options specific to this module (written subjects, CCE optional subjects, quota categories). */
+  getMarksFilters: async () => get('/reports/marks-filters'),
 
-  getCenterWiseCandidates: async (params = {}) => {
-    const res = await fetch(`${API_BASE}/reports/center-wise-candidates?${buildQuery(params)}`, {
-      headers: getHeaders(),
-    });
-    return handleResponse(res);
-  },
+  /** Compiled Marksheet (Written Exam) — subject-wise rows per candidate. */
+  getWrittenMarksheet: async (params = {}) => get('/reports/marksheet-written', params),
 
-  getCandidateDistribution: async (params = {}) => {
-    const res = await fetch(`${API_BASE}/reports/candidate-distribution?${buildQuery(params)}`, {
-      headers: getHeaders(),
-    });
-    return handleResponse(res);
-  },
+  /** Compiled Marksheet (CCE) — one row per candidate. */
+  getCceMarksheet: async (params = {}) => get('/reports/marksheet-cce', params),
 
-  // ── Marks & Result reports — mock-backed, see note above ──
-  /**
-   * Compiled Marksheet (Written Exam) — subject-wise rows per candidate.
-   */
-  getWrittenMarksheet: async (filters = {}) => resolveAfter({
-    rows: applyWrittenFilters(writtenMarksheetRows, filters),
-  }),
+  /** Pass / Fail Statistics Report — stat cards, charts, and table view all derive from this single summary object. */
+  getPassFailStatistics: async (params = {}) => get('/reports/pass-fail-statistics', params),
 
-  /**
-   * Compiled Marksheet (CCE) — one row per candidate.
-   */
-  getCceMarksheet: async (filters = {}) => resolveAfter({
-    rows: applyCceFilters(cceMarksheetRows, filters),
-  }),
+  /** Merit List (Category Wise) — ranked within each (advertisement, post) group. */
+  getMeritList: async (params = {}) => get('/reports/merit-list', params),
 
-  /**
-   * Pass / Fail Statistics Report — stat cards, charts, and table view all
-   * derive from this single summary object. `filters` is accepted now for
-   * API-shape parity even though the mock summary itself is static.
-   */
-  getPassFailStatistics: async (filters = {}) => resolveAfter(passFailStatistics), // eslint-disable-line no-unused-vars
+  /** Tie-Breaking Report — candidates sharing an aggregate within the same post. */
+  getTieBreaking: async (params = {}) => get('/reports/tie-breaking', params),
 
-  /**
-   * Merit List (Category Wise) — ranked within each (advertisement, post) group.
-   */
-  getMeritList: async (filters = {}) => resolveAfter({
-    rows: applyStandardCandidateFilters(meritListRows, filters),
-  }),
+  /** Import Discrepancy Report — re-imports whose marks conflicted with an already-recorded result. */
+  getImportDiscrepancy: async (params = {}) => get('/reports/import-discrepancy', params),
 
-  /**
-   * Tie-Breaking Report — candidates sharing an aggregate; no filters yet
-   * on the frontend, so the full curated set is returned as-is.
-   */
-  getTieBreaking: async () => resolveAfter({ rows: tieBreakingRows }),
+  /** Top Marks Merit Candidate List — highest scorers within each post's vacancy count. */
+  getTopMarksMerit: async (params = {}) => get('/reports/top-marks-merit', params),
 
-  /**
-   * Import Discrepancy Report — compares an imported batch against
-   * previously recorded marks; no filters yet on the frontend.
-   */
-  getImportDiscrepancy: async () => resolveAfter({ rows: importDiscrepancyRows }),
+  /** Candidate Rejection List — candidates rejected at document verification. */
+  getCandidateRejectionList: async (params = {}) => get('/reports/candidate-rejection-list', params),
 
-  /**
-   * Top Marks Merit Candidate List — highest scorers eligible for
-   * document verification.
-   */
-  getTopMarksMerit: async (filters = {}) => resolveAfter({
-    rows: applyStandardCandidateFilters(topMarksMeritRows, filters),
-  }),
-
-  /**
-   * Candidate Rejection List — candidates rejected at document verification.
-   */
-  getCandidateRejectionList: async (filters = {}) => resolveAfter({
-    rows: applyStandardCandidateFilters(candidateRejectionRows, filters),
-  }),
-
-  /**
-   * Final Rejected Candidate List — rejections upheld after appeal.
-   */
-  getFinalRejectedCandidates: async (filters = {}) => resolveAfter({
-    rows: applyStandardCandidateFilters(finalRejectedCandidateRows, filters),
-  }),
+  /** Final Rejected Candidate List — rejections upheld after appeal. */
+  getFinalRejectedCandidates: async (params = {}) => get('/reports/final-rejected-candidates', params),
 
   /**
    * Interview Shortlisting List — candidates shortlisted for interview.
@@ -188,6 +115,6 @@ const ReportsApi = {
   getAwardListInterview: async (filters = {}) => resolveAfter({
     rows: applyStandardCandidateFilters(awardListInterviewRows, filters),
   }),
-}
+};
 
 export default ReportsApi;

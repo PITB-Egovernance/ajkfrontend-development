@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { TrendingUp, Users, CheckCircle2, XCircle, LayoutGrid } from 'lucide-react';
+import toast from 'react-hot-toast';
 import SummaryCard from 'components/reports/SummaryCard';
 import ReportPageHeader from 'components/reports/ReportPageHeader';
 import ReportFilterBar from 'components/reports/ReportFilterBar';
@@ -7,8 +8,7 @@ import ReportTable from 'components/reports/ReportTable';
 import PieChartCard from 'components/reports/PieChartCard';
 import BarChartCard from 'components/reports/BarChartCard';
 import { StatCardsSkeleton } from 'components/reports/LoadingSkeleton';
-import reportsApi from 'api/reportsApi';
-import { ADVERTISEMENTS, POSTS, CATEGORIES } from 'pages/reports/mockData';
+import ReportsApi from 'api/reportsApi';
 
 const EMPTY_FILTERS = {
   advertisementNo: '',
@@ -18,26 +18,65 @@ const EMPTY_FILTERS = {
 
 const pct = (num, den) => (den ? Math.round((num / den) * 10000) / 100 : 0);
 
+const mapStats = (data) => ({
+  overall: {
+    totalCandidates: data?.overall?.total_candidates ?? 0,
+    pass: data?.overall?.pass ?? 0,
+    fail: data?.overall?.fail ?? 0,
+  },
+  examTypes: (data?.exam_types ?? []).map((e) => ({
+    examType: e.exam_type,
+    totalCandidates: e.total_candidates,
+    pass: e.pass,
+    fail: e.fail,
+  })),
+  subjectWise: (data?.subject_wise ?? []).map((s) => ({
+    examType: s.exam_type,
+    subject: s.subject,
+    totalCandidates: s.total_candidates,
+    pass: s.pass,
+    fail: s.fail,
+  })),
+});
+
 const PassFailStatisticsReport = () => {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
+  const [filterOptions, setFilterOptions] = useState(null);
 
-  const filterConfig = [
-    { name: 'advertisementNo', label: 'Advertisement', type: 'select', options: ADVERTISEMENTS.map((a) => ({ value: a.label, label: a.label })) },
-    { name: 'post',            label: 'Post', type: 'select', options: POSTS.map((p) => ({ value: p, label: p })) },
-    { name: 'category',        label: 'Category', type: 'select', options: CATEGORIES.map((c) => ({ value: c, label: c })) },
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        const [general, marks] = await Promise.all([ReportsApi.getFilters(), ReportsApi.getMarksFilters()]);
+        setFilterOptions({ ...(general?.data ?? {}), ...(marks?.data ?? {}) });
+      } catch (err) {
+        toast.error(err?.message || 'Failed to load filter options');
+        setFilterOptions({});
+      }
+    })();
+  }, []);
 
-  // Loads through the reportsApi service layer (currently mock-backed) so
-  // swapping to a live endpoint later only changes reportsApi, not this page.
+  const filterConfig = useMemo(() => ([
+    { name: 'advertisementNo', label: 'Advertisement', type: 'select', options: filterOptions?.advertisements || [] },
+    { name: 'post',            label: 'Post', type: 'select', options: filterOptions?.posts || [] },
+    { name: 'category',        label: 'Category', type: 'select', options: filterOptions?.categories || [] },
+  ]), [filterOptions]);
+
   const loadData = async (activeFilters) => {
     setLoading(true);
     try {
-      const res = await reportsApi.getPassFailStatistics(activeFilters);
-      setStats(res.data);
+      const res = await ReportsApi.getPassFailStatistics({
+        advertisement: activeFilters.advertisementNo,
+        post_name:     activeFilters.post,
+        category:      activeFilters.category,
+      });
+      setStats(mapStats(res.data));
+    } catch (err) {
+      toast.error(err?.message || 'Failed to load pass/fail statistics report');
+      setStats(mapStats({}));
     } finally {
       setLoading(false);
     }
