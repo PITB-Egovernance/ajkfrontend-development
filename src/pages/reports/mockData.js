@@ -557,3 +557,52 @@ export const finalRejectedCandidateRows = Array.from({ length: 14 }).map((_, i) 
     finalStatus: 'Finally Rejected',
   };
 });
+
+// Candidates shortlisted for interview.
+export const interviewShortlistRows = Array.from({ length: 22 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 3) : pickIndexed(FIRST_NAMES_F, i + 3);
+  const day = 5 + (i % 20);
+  return {
+    id: i + 1,
+    srNo: i + 1,
+    rollNo: `INT-${61000 + i}`,
+    candidateName,
+    fatherName: pickIndexed(FATHER_NAMES, i + 9),
+    district: pickIndexed(DISTRICTS, i + 2),
+    advertisementNo: pickIndexed(ADVERTISEMENTS, i).label,
+    post: pickIndexed(POSTS, i + 1),
+    gender,
+    interviewDate: `2026-09-${String(day).padStart(2, '0')}`,
+    interviewTime: i % 2 === 0 ? '10:00 AM' : '02:30 PM',
+    status: 'Shortlisted',
+  };
+});
+
+// Final interview award list — includes qualification and DOB for
+// eligibility verification alongside the interview score.
+export const awardListInterviewRows = Array.from({ length: 16 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i + 1);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 5) : pickIndexed(FIRST_NAMES_F, i + 5);
+  const birthYear = 1990 + (i % 11);
+  const birthMonth = 1 + (i % 12);
+  const birthDay = 1 + (i % 28);
+  const interviewMarks = intBetween(55, 100);
+  const totalMarks = 100;
+  return {
+    id: i + 1,
+    srNo: i + 1,
+    rollNo: `AWD-${65000 + i}`,
+    candidateName,
+    fatherName: pickIndexed(FATHER_NAMES, i + 3),
+    qualification: pickIndexed(DEGREES, i + 5),
+    district: pickIndexed(DISTRICTS, i + 4),
+    dateOfBirth: `${birthYear}-${String(birthMonth).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`,
+    advertisementNo: pickIndexed(ADVERTISEMENTS, i + 1).label,
+    post: pickIndexed(POSTS, i + 2),
+    gender,
+    interviewMarks,
+    totalMarks,
+    finalStatus: interviewMarks >= 65 ? 'Selected' : 'Not Selected',
+  };
+});

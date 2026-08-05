@@ -127,6 +127,8 @@ import ImportDiscrepancyReport from 'pages/reports/ImportDiscrepancyReport';
 import TopMarksMeritList from 'pages/reports/TopMarksMeritList';
 import CandidateRejectionList from 'pages/reports/CandidateRejectionList';
 import FinalRejectedCandidateList from 'pages/reports/FinalRejectedCandidateList';
+import InterviewShortlistingList from 'pages/reports/InterviewShortlistingList';
+import AwardListForInterview from 'pages/reports/AwardListForInterview';
 
 
 function App() {
@@ -421,6 +423,8 @@ function App() {
           <Route path="reports/top-marks-merit" element={<TopMarksMeritList />} />
           <Route path="reports/candidate-rejection" element={<CandidateRejectionList />} />
           <Route path="reports/final-rejected" element={<FinalRejectedCandidateList />} />
+          <Route path="reports/interview-shortlist" element={<InterviewShortlistingList />} />
+          <Route path="reports/award-list-interview" element={<AwardListForInterview />} />
         </Route>
 
         

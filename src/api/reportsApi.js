@@ -10,6 +10,8 @@ import {
   topMarksMeritRows,
   candidateRejectionRows,
   finalRejectedCandidateRows,
+  interviewShortlistRows,
+  awardListInterviewRows,
 } from 'pages/reports/mockData';
 
 const API_BASE = Config.apiUrl;
@@ -171,6 +173,20 @@ const ReportsApi = {
    */
   getFinalRejectedCandidates: async (filters = {}) => resolveAfter({
     rows: applyStandardCandidateFilters(finalRejectedCandidateRows, filters),
+  }),
+
+  /**
+   * Interview Shortlisting List — candidates shortlisted for interview.
+   */
+  getInterviewShortlist: async (filters = {}) => resolveAfter({
+    rows: applyStandardCandidateFilters(interviewShortlistRows, filters),
+  }),
+
+  /**
+   * Award List for Interview — final interview award list.
+   */
+  getAwardListInterview: async (filters = {}) => resolveAfter({
+    rows: applyStandardCandidateFilters(awardListInterviewRows, filters),
   }),
 }
 
