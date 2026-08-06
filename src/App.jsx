@@ -129,6 +129,9 @@ import CandidateRejectionList from 'pages/reports/CandidateRejectionList';
 import FinalRejectedCandidateList from 'pages/reports/FinalRejectedCandidateList';
 import InterviewShortlistingList from 'pages/reports/InterviewShortlistingList';
 import AwardListForInterview from 'pages/reports/AwardListForInterview';
+import InterviewSchedule from 'pages/reports/InterviewSchedule';
+import InterviewMarksCompilation from 'pages/reports/InterviewMarksCompilation';
+import CombinedMerit from 'pages/reports/CombinedMerit';
 
 
 function App() {
@@ -425,6 +428,9 @@ function App() {
           <Route path="reports/final-rejected" element={<FinalRejectedCandidateList />} />
           <Route path="reports/interview-shortlist" element={<InterviewShortlistingList />} />
           <Route path="reports/award-list-interview" element={<AwardListForInterview />} />
+          <Route path="reports/interview-schedule" element={<InterviewSchedule />} />
+          <Route path="reports/interview-marks-compilation" element={<InterviewMarksCompilation />} />
+          <Route path="reports/combined-merit" element={<CombinedMerit />} />
         </Route>
 
         
