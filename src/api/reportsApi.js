@@ -1,9 +1,5 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
-import {
-  interviewShortlistRows,
-  awardListInterviewRows,
-} from 'pages/reports/mockData';
 const API_BASE = Config.apiUrl;
 const API_KEY  = Config.apiKey;
 
@@ -40,26 +36,6 @@ const get = async (path, params = {}) => {
   return handleResponse(res);
 };
 
-// Marks & Result Reports — still mock-backed until the real endpoints exist.
-// Every method returns the same { success, data } envelope the live
-// endpoints below use, so swapping a method body for a real fetch() call
-// later will not require any change in the pages that consume it.
-const MOCK_LATENCY_MS = 500;
-
-const resolveAfter = (data) =>
-  new Promise((resolve) => setTimeout(() => resolve({ success: true, data }), MOCK_LATENCY_MS));
-
-// Shared by every mock report that filters on the common
-// Advertisement / Post / Gender / District quartet (merit list, top marks
-// merit, candidate rejection, final rejected candidates).
-const applyStandardCandidateFilters = (rows, filters = {}) =>
-  rows.filter((r) => {
-    if (filters.advertisementNo && r.advertisementNo !== filters.advertisementNo) return false;
-    if (filters.post && r.post !== filters.post) return false;
-    if (filters.gender && r.gender !== filters.gender) return false;
-    if (filters.district && r.district !== filters.district) return false;
-    return true;
-  });
 // Reporting & Analytics module — all filtering/pagination happens server-side
 // (see ReportController/MarksReportController on the backend); pass every
 // active filter here rather than fetching everything and filtering
@@ -102,19 +78,11 @@ const ReportsApi = {
   /** Final Rejected Candidate List — rejections upheld after appeal. */
   getFinalRejectedCandidates: async (params = {}) => get('/reports/final-rejected-candidates', params),
 
-  /**
-   * Interview Shortlisting List — candidates shortlisted for interview.
-   */
-  getInterviewShortlist: async (filters = {}) => resolveAfter({
-    rows: applyStandardCandidateFilters(interviewShortlistRows, filters),
-  }),
+  /** Interview Shortlisting List — candidates shortlisted for interview. */
+  getInterviewShortlist: async (params = {}) => get('/reports/interview-shortlist', params),
 
-  /**
-   * Award List for Interview — final interview award list.
-   */
-  getAwardListInterview: async (filters = {}) => resolveAfter({
-    rows: applyStandardCandidateFilters(awardListInterviewRows, filters),
-  }),
+  /** Award List for Interview — final interview award list. */
+  getAwardListInterview: async (params = {}) => get('/reports/award-list-interview', params),
 };
 
 export default ReportsApi;
