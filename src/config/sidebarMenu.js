@@ -5,7 +5,8 @@ import {
   Megaphone, PenTool, UserCog, LayoutList, ShieldCheck, GitBranch, ScrollText, FileCheck,
   Stamp, Boxes, Newspaper, FileQuestion, Calendar, Ticket, ImageIcon, ClipboardCheck,
   BarChart3, FileBarChart2, PieChart, Percent, FileSpreadsheet, TrendingUp,
-  Trophy, Scale, GitCompare, Medal, UserX, ShieldAlert, CalendarCheck
+  Trophy, Scale, GitCompare, Medal, UserX, ShieldAlert, CalendarCheck,
+  Mic, CalendarClock, FileSignature, GitMerge
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -143,6 +144,16 @@ export const MENU_ITEMS = [
           { label: "Final Rejected Candidate List",      path: "/dashboard/reports/final-rejected",   icon: ShieldAlert },
           { label: "Interview Shortlisting List",        path: "/dashboard/reports/interview-shortlist", icon: CalendarCheck },
           { label: "Award List for Interview",           path: "/dashboard/reports/award-list-interview", icon: Award },
+        ],
+      },
+      {
+        label: "Interview / Viva Reports",
+        path: "/dashboard/reports/interview-schedule",
+        icon: Mic,
+        children: [
+          { label: "Interview Schedule",                 path: "/dashboard/reports/interview-schedule", icon: CalendarClock },
+          { label: "Interview Marks Compilation",         path: "/dashboard/reports/interview-marks-compilation", icon: FileSignature },
+          { label: "Combined Merit (Written + Interview)", path: "/dashboard/reports/combined-merit",  icon: GitMerge },
         ],
       },
     ],

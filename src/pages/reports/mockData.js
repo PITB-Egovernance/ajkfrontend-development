@@ -558,6 +558,129 @@ export const finalRejectedCandidateRows = Array.from({ length: 14 }).map((_, i) 
   };
 });
 
+// ── Module 4: Interview / Viva Reports ──────────────────────────────────────
+// Row fields below are snake_case on purpose — they mimic the shape the real
+// MarksReportController-style endpoints will return, so each page's mapRow()
+// (snake_case → camelCase) already matches the live response and needs no
+// changes once reportsApi's mock methods are swapped for real fetch() calls.
+
+export const INTERVIEW_BOARDS = ['Interview Board - I', 'Interview Board - II', 'Interview Board - III'];
+export const INTERVIEW_SCHEDULE_STATUSES = ['Scheduled', 'Completed', 'Rescheduled', 'Cancelled'];
+export const EVALUATION_STATUSES = ['Completed', 'Pending'];
+export const FINAL_MERIT_STATUSES = ['Selected', 'Waiting List', 'Not Selected', 'Reserved Category', 'Recommended'];
+
+const INTERVIEW_REMARKS = [
+  'Strong communication skills',
+  'Good subject knowledge',
+  'Satisfactory performance',
+  'Excellent overall impression',
+  'Needs improvement in confidence',
+];
+
+export const interviewScheduleApiRows = Array.from({ length: 20 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 1) : pickIndexed(FIRST_NAMES_F, i + 1);
+  const day = 3 + (i % 18);
+  return {
+    sr_no: i + 1,
+    roll_no: `SCH-${72000 + i}`,
+    candidate_name: candidateName,
+    father_name: pickIndexed(FATHER_NAMES, i + 4),
+    advertisement_no: pickIndexed(ADVERTISEMENTS, i).label,
+    post: pickIndexed(POSTS, i + 1),
+    interview_board: pickIndexed(INTERVIEW_BOARDS, i),
+    interview_date: `2026-10-${String(day).padStart(2, '0')}`,
+    interview_time: i % 3 === 0 ? '09:30 AM' : i % 3 === 1 ? '11:00 AM' : '02:00 PM',
+    venue: pickIndexed(EXAM_CENTERS, i + 2),
+    status: pickIndexed(INTERVIEW_SCHEDULE_STATUSES, i),
+  };
+});
+
+export const interviewMarksCompilationApiRows = Array.from({ length: 20 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i + 1);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 2) : pickIndexed(FIRST_NAMES_F, i + 2);
+  const status = pickIndexed(EVALUATION_STATUSES, i);
+  const totalInterviewMarks = 100;
+  const interviewMarks = status === 'Completed' ? intBetween(45, 98) : null;
+  return {
+    sr_no: i + 1,
+    roll_no: `IMC-${74000 + i}`,
+    candidate_name: candidateName,
+    father_name: pickIndexed(FATHER_NAMES, i + 5),
+    advertisement_no: pickIndexed(ADVERTISEMENTS, i + 1).label,
+    post: pickIndexed(POSTS, i + 2),
+    interview_board: pickIndexed(INTERVIEW_BOARDS, i + 1),
+    interview_marks: interviewMarks,
+    total_interview_marks: totalInterviewMarks,
+    percentage: interviewMarks === null ? null : Math.round((interviewMarks / totalInterviewMarks) * 10000) / 100,
+    remarks: status === 'Completed' ? pickIndexed(INTERVIEW_REMARKS, i) : 'Evaluation pending',
+    status,
+  };
+});
+
+// Ranked within each (advertisement, post) group by combined written +
+// interview score, mirroring how a real combined-merit computation groups
+// candidates per vacancy.
+export const combinedMeritApiRows = (() => {
+  const rows = [];
+  const GROUP_COUNT = 4;
+  const CANDIDATES_PER_GROUP = 5;
+  const WRITTEN_TOTAL = 500;
+  const INTERVIEW_TOTAL = 100;
+  const GRAND_TOTAL = WRITTEN_TOTAL + INTERVIEW_TOTAL;
+
+  for (let g = 0; g < GROUP_COUNT; g++) {
+    const advertisementNo = pickIndexed(ADVERTISEMENTS, g + 1).label;
+    const post = pickIndexed(POSTS, g + 2);
+    const candidates = [];
+
+    for (let c = 0; c < CANDIDATES_PER_GROUP; c++) {
+      const idx = g * CANDIDATES_PER_GROUP + c;
+      const gender = pickIndexed(GENDERS, idx);
+      candidates.push({
+        rollNo: `CMB-${76000 + idx}`,
+        candidateName: gender === 'Male' ? pickIndexed(FIRST_NAMES_M, idx + 3) : pickIndexed(FIRST_NAMES_F, idx + 3),
+        fatherName: pickIndexed(FATHER_NAMES, idx + 7),
+        gender,
+        writtenMarks: intBetween(300, 470),
+        interviewMarks: intBetween(45, 95),
+      });
+    }
+
+    // Rank within the group by combined written + interview score.
+    candidates.sort((a, b) => (b.writtenMarks + b.interviewMarks) - (a.writtenMarks + a.interviewMarks));
+
+    for (let rankIdx = 0; rankIdx < candidates.length; rankIdx++) {
+      const rank = rankIdx + 1;
+      const cand = candidates[rankIdx];
+      const aggregate = cand.writtenMarks + cand.interviewMarks;
+      const finalStatus =
+        rank === 1 ? 'Selected' :
+        rank === 2 ? 'Waiting List' :
+        rank === 3 ? 'Reserved Category' :
+        rank === 4 ? 'Recommended' : 'Not Selected';
+      rows.push({
+        merit_rank: rank,
+        roll_no: cand.rollNo,
+        candidate_name: cand.candidateName,
+        father_name: cand.fatherName,
+        advertisement_no: advertisementNo,
+        post,
+        gender: cand.gender,
+        written_marks: cand.writtenMarks,
+        interview_marks: cand.interviewMarks,
+        aggregate_marks: aggregate,
+        final_percentage: Math.round((aggregate / GRAND_TOTAL) * 10000) / 100,
+        final_merit_status: finalStatus,
+        remarks:
+          finalStatus === 'Selected' ? 'Recommended for appointment' :
+          finalStatus === 'Not Selected' ? 'Did not meet merit cutoff' : '',
+      });
+    }
+  }
+  return rows;
+})();
+
 // Candidates shortlisted for interview.
 export const interviewShortlistRows = Array.from({ length: 22 }).map((_, i) => {
   const gender = pickIndexed(GENDERS, i);
