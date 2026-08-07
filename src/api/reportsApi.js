@@ -1,15 +1,7 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import {
-  interviewShortlistRows,
-  awardListInterviewRows,
-  interviewScheduleApiRows,
-  interviewMarksCompilationApiRows,
-  combinedMeritApiRows,
-  INTERVIEW_BOARDS,
-  INTERVIEW_SCHEDULE_STATUSES,
-  EVALUATION_STATUSES,
-  FINAL_MERIT_STATUSES,
+  
   grievanceComplaintApiRows,
   vacancyFunnelApiRows,
   COMPLAINT_TYPES,
@@ -51,7 +43,6 @@ const get = async (path, params = {}) => {
   return handleResponse(res);
 };
 
-// Marks & Result Reports — still mock-backed until the real endpoints exist.
 // Every method returns the same { success, data } envelope the live
 // endpoints below use, so swapping a method body for a real fetch() call
 // later will not require any change in the pages that consume it.
@@ -60,17 +51,6 @@ const MOCK_LATENCY_MS = 500;
 const resolveAfter = (data) =>
   new Promise((resolve) => setTimeout(() => resolve({ success: true, data }), MOCK_LATENCY_MS));
 
-// Shared by every mock report that filters on the common
-// Advertisement / Post / Gender / District quartet (merit list, top marks
-// merit, candidate rejection, final rejected candidates).
-const applyStandardCandidateFilters = (rows, filters = {}) =>
-  rows.filter((r) => {
-    if (filters.advertisementNo && r.advertisementNo !== filters.advertisementNo) return false;
-    if (filters.post && r.post !== filters.post) return false;
-    if (filters.gender && r.gender !== filters.gender) return false;
-    if (filters.district && r.district !== filters.district) return false;
-    return true;
-  });
 
 // ── Interview / Viva + Administrative & Audit Reports — mock-backed,
 // snake_case rows (see mockData.js) ──
@@ -86,14 +66,6 @@ const applyAdvertisementPostStatusFilters = (rows, p = {}) =>
     return true;
   });
 
-const applyCombinedMeritFilters = (rows, p = {}) =>
-  rows.filter((r) => {
-    if (p.advertisement && r.advertisement_no !== p.advertisement) return false;
-    if (p.post_name && r.post !== p.post_name) return false;
-    if (p.gender && r.gender !== p.gender) return false;
-    if (p.status && r.final_merit_status !== p.status) return false;
-    return true;
-  });
 
 // Applies a free-text `search` across every field, then slices the page the
 // grid asked for. Mirrors what a real paginated endpoint would do server-side.
@@ -114,18 +86,7 @@ const paginateAndSearch = (rows, params = {}) => {
   return { pageRows: searched.slice(start, start + perPage), total, searched };
 };
 
-const computeMarksCompilationStats = (rows) => {
-  const completed = rows.filter((r) => r.status === 'Completed' && r.interview_marks !== null);
-  const marks = completed.map((r) => r.interview_marks);
-  return {
-    total_candidates: rows.length,
-    average_marks: marks.length ? Math.round((marks.reduce((a, b) => a + b, 0) / marks.length) * 100) / 100 : 0,
-    highest_marks: marks.length ? Math.max(...marks) : 0,
-    lowest_marks: marks.length ? Math.min(...marks) : 0,
-    completed_evaluations: completed.length,
-    pending_evaluations: rows.filter((r) => r.status === 'Pending').length,
-  };
-};
+
 
 const FUNNEL_STAGE_KEYS = ['vacancies', 'applications_received', 'eligible', 'written_qualified', 'interview_qualified', 'selected'];
 const computeFunnelTotals = (rows) =>
@@ -176,49 +137,24 @@ const ReportsApi = {
   /** Final Rejected Candidate List — rejections upheld after appeal. */
   getFinalRejectedCandidates: async (params = {}) => get('/reports/final-rejected-candidates', params),
 
-  /**
-   * Interview Shortlisting List — candidates shortlisted for interview.
-   */
-  getInterviewShortlist: async (filters = {}) => resolveAfter({
-    rows: applyStandardCandidateFilters(interviewShortlistRows, filters),
-  }),
+  /** Interview Shortlisting List — candidates shortlisted for interview. */
+  getInterviewShortlist: async (params = {}) => get('/reports/interview-shortlist', params),
 
-  /**
-   * Award List for Interview — final interview award list.
-   */
-  getAwardListInterview: async (filters = {}) => resolveAfter({
-    rows: applyStandardCandidateFilters(awardListInterviewRows, filters),
-  }),
+  /** Award List for Interview — final interview award list. */
+  getAwardListInterview: async (params = {}) => get('/reports/award-list-interview', params),
 
-  // ── Interview / Viva Reports ──
-  /** Interview board / status dropdown options specific to this module. */
-  getInterviewFilters: async () => resolveAfter({
-    interview_boards: toOptions(INTERVIEW_BOARDS),
-    interview_statuses: toOptions(INTERVIEW_SCHEDULE_STATUSES),
-    evaluation_statuses: toOptions(EVALUATION_STATUSES),
-    merit_statuses: toOptions(FINAL_MERIT_STATUSES),
-  }),
+  // ── Interview / Viva Reports (see MarksReportController) ──
+  /** Interview status / evaluation status / merit status dropdown options specific to this module. */
+  getInterviewFilters: async () => get('/reports/interview-filters'),
 
-  /** Interview Schedule — candidate-to-board/date/venue assignments. */
-  getInterviewSchedule: async (params = {}) => {
-    const filtered = applyAdvertisementPostStatusFilters(interviewScheduleApiRows, params);
-    const { pageRows, total } = paginateAndSearch(filtered, params);
-    return resolveAfter({ data: pageRows, total });
-  },
+  /** Interview Schedule — candidate-to-phase/date/venue assignments. */
+  getInterviewSchedule: async (params = {}) => get('/reports/interview-schedule', params),
 
-  /** Interview Marks Compilation — marks awarded by interview boards, plus summary stats. */
-  getInterviewMarksCompilation: async (params = {}) => {
-    const filtered = applyAdvertisementPostStatusFilters(interviewMarksCompilationApiRows, params);
-    const { pageRows, total, searched } = paginateAndSearch(filtered, params);
-    return resolveAfter({ data: pageRows, total, stats: computeMarksCompilationStats(searched) });
-  },
+  /** Interview Marks Compilation — viva marks per candidate, plus summary stats. */
+  getInterviewMarksCompilation: async (params = {}) => get('/reports/interview-marks-compilation', params),
 
   /** Combined Merit (Written + Interview) — final weighted merit list. */
-  getCombinedMerit: async (params = {}) => {
-    const filtered = applyCombinedMeritFilters(combinedMeritApiRows, params);
-    const { pageRows, total } = paginateAndSearch(filtered, params);
-    return resolveAfter({ data: pageRows, total });
-  },
+  getCombinedMerit: async (params = {}) => get('/reports/combined-merit', params),
 
   // ── Administrative & Audit Reports ──
   /** Complaint type / status dropdown options specific to this module. */
