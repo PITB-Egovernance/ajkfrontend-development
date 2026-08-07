@@ -10,6 +10,10 @@ import {
   INTERVIEW_SCHEDULE_STATUSES,
   EVALUATION_STATUSES,
   FINAL_MERIT_STATUSES,
+  grievanceComplaintApiRows,
+  vacancyFunnelApiRows,
+  COMPLAINT_TYPES,
+  COMPLAINT_STATUSES,
 } from 'pages/reports/mockData';
 const API_BASE = Config.apiUrl;
 const API_KEY  = Config.apiKey;
@@ -68,10 +72,13 @@ const applyStandardCandidateFilters = (rows, filters = {}) =>
     return true;
   });
 
-// ── Interview / Viva Reports — mock-backed, snake_case rows (see mockData.js) ──
+// ── Interview / Viva + Administrative & Audit Reports — mock-backed,
+// snake_case rows (see mockData.js) ──
 const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
 
-const applyInterviewScheduleFilters = (rows, p = {}) =>
+// Shared by every report that filters on the Advertisement / Post / Status
+// trio (interview schedule, interview marks compilation, grievance tracking).
+const applyAdvertisementPostStatusFilters = (rows, p = {}) =>
   rows.filter((r) => {
     if (p.advertisement && r.advertisement_no !== p.advertisement) return false;
     if (p.post_name && r.post !== p.post_name) return false;
@@ -119,6 +126,14 @@ const computeMarksCompilationStats = (rows) => {
     pending_evaluations: rows.filter((r) => r.status === 'Pending').length,
   };
 };
+
+const FUNNEL_STAGE_KEYS = ['vacancies', 'applications_received', 'eligible', 'written_qualified', 'interview_qualified', 'selected'];
+const computeFunnelTotals = (rows) =>
+  FUNNEL_STAGE_KEYS.reduce((totals, key) => {
+    totals[key] = rows.reduce((sum, r) => sum + (r[key] || 0), 0);
+    return totals;
+  }, {});
+
 // Reporting & Analytics module — all filtering/pagination happens server-side
 // (see ReportController/MarksReportController on the backend); pass every
 // active filter here rather than fetching everything and filtering
@@ -186,14 +201,14 @@ const ReportsApi = {
 
   /** Interview Schedule — candidate-to-board/date/venue assignments. */
   getInterviewSchedule: async (params = {}) => {
-    const filtered = applyInterviewScheduleFilters(interviewScheduleApiRows, params);
+    const filtered = applyAdvertisementPostStatusFilters(interviewScheduleApiRows, params);
     const { pageRows, total } = paginateAndSearch(filtered, params);
     return resolveAfter({ data: pageRows, total });
   },
 
   /** Interview Marks Compilation — marks awarded by interview boards, plus summary stats. */
   getInterviewMarksCompilation: async (params = {}) => {
-    const filtered = applyInterviewScheduleFilters(interviewMarksCompilationApiRows, params);
+    const filtered = applyAdvertisementPostStatusFilters(interviewMarksCompilationApiRows, params);
     const { pageRows, total, searched } = paginateAndSearch(filtered, params);
     return resolveAfter({ data: pageRows, total, stats: computeMarksCompilationStats(searched) });
   },
@@ -204,6 +219,30 @@ const ReportsApi = {
     const { pageRows, total } = paginateAndSearch(filtered, params);
     return resolveAfter({ data: pageRows, total });
   },
+
+  // ── Administrative & Audit Reports ──
+  /** Complaint type / status dropdown options specific to this module. */
+  getAdminAuditFilters: async () => resolveAfter({
+    complaint_types: toOptions(COMPLAINT_TYPES),
+    complaint_statuses: toOptions(COMPLAINT_STATUSES),
+  }),
+
+  /** Grievance / Complaint Tracking — candidate complaints and appeal status. */
+  getGrievanceComplaints: async (params = {}) => {
+    const filtered = applyAdvertisementPostStatusFilters(grievanceComplaintApiRows, params);
+    const { pageRows, total } = paginateAndSearch(filtered, params);
+    return resolveAfter({ data: pageRows, total });
+  },
+
+  /**
+   * Vacancy-to-Selection Funnel — one row per (advertisement, post) posting.
+   * Small, unpaginated dataset (a handful of postings per cycle), returned
+   * with pre-computed totals for the summary cards and funnel/bar charts.
+   */
+  getVacancySelectionFunnel: async () => resolveAfter({
+    data: vacancyFunnelApiRows,
+    totals: computeFunnelTotals(vacancyFunnelApiRows),
+  }),
 };
 
 export default ReportsApi;

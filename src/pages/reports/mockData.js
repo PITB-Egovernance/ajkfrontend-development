@@ -681,6 +681,78 @@ export const combinedMeritApiRows = (() => {
   return rows;
 })();
 
+// ── Module 5: Administrative & Audit Reports ────────────────────────────────
+// Row fields below are snake_case on purpose — see the Interview / Viva
+// Reports note above for why (mimics the anticipated live response shape).
+
+export const COMPLAINT_TYPES = [
+  'Marks Discrepancy',
+  'Result Delay',
+  'Document Rejection Appeal',
+  'Interview Scheduling Issue',
+  'Roll Number Error',
+  'Harassment Complaint',
+];
+
+export const COMPLAINT_STATUSES = ['Pending', 'Under Review', 'Resolved', 'Closed', 'Rejected'];
+
+const ASSIGNED_OFFICERS = [
+  'Ch. Abdul Rehman',
+  'Ms. Nazia Hameed',
+  'Mr. Tariq Farooq',
+  'Syed Kashif Hussain',
+  'Ms. Amina Malik',
+];
+
+const COMPLAINT_REMARKS = [
+  'Awaiting candidate response',
+  'Escalated to exam branch',
+  'Verified against original record',
+  'Resolved after re-checking marks',
+  'Closed — no further action required',
+];
+
+export const grievanceComplaintApiRows = Array.from({ length: 24 }).map((_, i) => {
+  const gender = pickIndexed(GENDERS, i);
+  const candidateName = gender === 'Male' ? pickIndexed(FIRST_NAMES_M, i + 8) : pickIndexed(FIRST_NAMES_F, i + 8);
+  const status = pickIndexed(COMPLAINT_STATUSES, i);
+  const complaintMonth = 1 + (i % 8);
+  const complaintDay = 1 + (i % 26);
+  const isResolvedLike = status === 'Resolved' || status === 'Closed';
+  const resolutionMonth = 1 + ((i + 1) % 8);
+  const resolutionDay = 3 + ((complaintDay + 2) % 25);
+  return {
+    complaint_id: `GRV-2026-${String(1000 + i)}`,
+    candidate_name: candidateName,
+    roll_no: `CND-${52000 + i}`,
+    advertisement_no: pickIndexed(ADVERTISEMENTS, i + 1).label,
+    post: pickIndexed(POSTS, i + 2),
+    complaint_type: pickIndexed(COMPLAINT_TYPES, i),
+    complaint_date: `2026-${String(complaintMonth).padStart(2, '0')}-${String(complaintDay).padStart(2, '0')}`,
+    assigned_officer: pickIndexed(ASSIGNED_OFFICERS, i),
+    status,
+    resolution_date: isResolvedLike
+      ? `2026-${String(resolutionMonth).padStart(2, '0')}-${String(resolutionDay).padStart(2, '0')}`
+      : null,
+    remarks: pickIndexed(COMPLAINT_REMARKS, i),
+  };
+});
+
+// One row per (advertisement, post) posting — an aggregate recruitment
+// funnel, not a per-candidate list.
+export const vacancyFunnelApiRows = [
+  { advertisement_no: 'Advertisement No. 01/2025', post: 'Assistant',           vacancies: 12, applications_received: 480, eligible: 410, written_qualified: 180, interview_qualified: 40, selected: 12 },
+  { advertisement_no: 'Advertisement No. 01/2025', post: 'Junior Clerk',        vacancies: 20, applications_received: 620, eligible: 545, written_qualified: 230, interview_qualified: 60, selected: 20 },
+  { advertisement_no: 'Advertisement No. 02/2025', post: 'Sub Inspector',       vacancies: 8,  applications_received: 390, eligible: 340, written_qualified: 120, interview_qualified: 24, selected: 8  },
+  { advertisement_no: 'Advertisement No. 02/2025', post: 'Naib Tehsildar',      vacancies: 6,  applications_received: 210, eligible: 175, written_qualified: 70,  interview_qualified: 18, selected: 6  },
+  { advertisement_no: 'Advertisement No. 03/2025', post: 'Lecturer',            vacancies: 15, applications_received: 340, eligible: 300, written_qualified: 150, interview_qualified: 45, selected: 15 },
+  { advertisement_no: 'Advertisement No. 03/2025', post: 'Medical Officer',     vacancies: 10, applications_received: 260, eligible: 230, written_qualified: 110, interview_qualified: 30, selected: 10 },
+  { advertisement_no: 'Advertisement No. 04/2025', post: 'Agriculture Officer', vacancies: 5,  applications_received: 150, eligible: 128, written_qualified: 55,  interview_qualified: 15, selected: 5  },
+].map((row) => ({
+  ...row,
+  selection_percentage: Math.round((row.selected / row.applications_received) * 10000) / 100,
+}));
+
 // Candidates shortlisted for interview.
 export const interviewShortlistRows = Array.from({ length: 22 }).map((_, i) => {
   const gender = pickIndexed(GENDERS, i);
