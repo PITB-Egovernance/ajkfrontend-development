@@ -7,7 +7,8 @@ import {
   BarChart3, FileBarChart2, PieChart, Percent, FileSpreadsheet, TrendingUp,
   Trophy, Scale, GitCompare, Medal, UserX, ShieldAlert, CalendarCheck,
   Mic, CalendarClock, FileSignature, GitMerge,
-  Landmark, MessageSquareWarning, Funnel
+  Landmark, MessageSquareWarning, Funnel,
+  History, Layers
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -164,6 +165,8 @@ export const MENU_ITEMS = [
         children: [
           { label: "Grievance / Complaint Tracking",  path: "/dashboard/reports/grievance-tracking", icon: MessageSquareWarning },
           { label: "Vacancy-to-Selection Funnel",     path: "/dashboard/reports/vacancy-selection-funnel", icon: Funnel },
+          { label: "Year-over-Year Comparison",       path: "/dashboard/reports/year-over-year-comparison", icon: History },
+          { label: "Category-wise Selection Ratio",   path: "/dashboard/reports/category-selection-ratio", icon: Layers },
         ],
       },
     ],

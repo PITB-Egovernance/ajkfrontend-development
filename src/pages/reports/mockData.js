@@ -753,6 +753,33 @@ export const vacancyFunnelApiRows = [
   selection_percentage: Math.round((row.selected / row.applications_received) * 10000) / 100,
 }));
 
+// One row per year — recruitment cycle totals used to compare performance
+// year over year.
+export const yearOverYearApiRows = [
+  { year: 2022, advertisements: 6,  applications: 12500, qualified: 5200, selected: 620 },
+  { year: 2023, advertisements: 7,  applications: 14800, qualified: 6100, selected: 710 },
+  { year: 2024, advertisements: 8,  applications: 16200, qualified: 7050, selected: 780 },
+  { year: 2025, advertisements: 9,  applications: 18400, qualified: 8100, selected: 860 },
+  { year: 2026, advertisements: 10, applications: 19600, qualified: 8900, selected: 940 },
+].map((row) => ({
+  ...row,
+  pass_percentage: Math.round((row.qualified / row.applications) * 10000) / 100,
+  selection_percentage: Math.round((row.selected / row.applications) * 10000) / 100,
+}));
+
+// One row per reservation/quota category.
+export const SELECTION_CATEGORIES = ['Open Merit', 'Women Quota', 'Disabled Quota', 'District Quota'];
+
+export const categorySelectionApiRows = [
+  { category: 'Open Merit',     applicants: 3800, qualified: 1650, selected: 210, reserved_seats: 210, filled_seats: 210, remaining_seats: 0 },
+  { category: 'Women Quota',    applicants: 620,  qualified: 260,  selected: 40,  reserved_seats: 45,  filled_seats: 40,  remaining_seats: 5 },
+  { category: 'Disabled Quota', applicants: 95,   qualified: 38,   selected: 8,   reserved_seats: 10,  filled_seats: 8,   remaining_seats: 2 },
+  { category: 'District Quota', applicants: 480,  qualified: 190,  selected: 30,  reserved_seats: 32,  filled_seats: 30,  remaining_seats: 2 },
+].map((row) => ({
+  ...row,
+  selection_ratio: Math.round((row.selected / row.applicants) * 10000) / 100,
+}));
+
 // Candidates shortlisted for interview.
 export const interviewShortlistRows = Array.from({ length: 22 }).map((_, i) => {
   const gender = pickIndexed(GENDERS, i);

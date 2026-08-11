@@ -134,6 +134,8 @@ import InterviewMarksCompilation from 'pages/reports/InterviewMarksCompilation';
 import CombinedMerit from 'pages/reports/CombinedMerit';
 import GrievanceComplaintTracking from 'pages/reports/GrievanceComplaintTracking';
 import VacancySelectionFunnel from 'pages/reports/VacancySelectionFunnel';
+import YearOverYearComparison from 'pages/reports/YearOverYearComparison';
+import CategorySelectionRatio from 'pages/reports/CategorySelectionRatio';
 
 
 function App() {
@@ -435,6 +437,8 @@ function App() {
           <Route path="reports/combined-merit" element={<CombinedMerit />} />
           <Route path="reports/grievance-tracking" element={<GrievanceComplaintTracking />} />
           <Route path="reports/vacancy-selection-funnel" element={<VacancySelectionFunnel />} />
+          <Route path="reports/year-over-year-comparison" element={<YearOverYearComparison />} />
+          <Route path="reports/category-selection-ratio" element={<CategorySelectionRatio />} />
         </Route>
 
         

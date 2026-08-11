@@ -1,9 +1,10 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import {
-  
   grievanceComplaintApiRows,
   vacancyFunnelApiRows,
+  yearOverYearApiRows,
+  categorySelectionApiRows,
   COMPLAINT_TYPES,
   COMPLAINT_STATUSES,
 } from 'pages/reports/mockData';
@@ -179,6 +180,17 @@ const ReportsApi = {
     data: vacancyFunnelApiRows,
     totals: computeFunnelTotals(vacancyFunnelApiRows),
   }),
+
+  /**
+   * Year-over-Year Comparison — one row per recruitment year. Small,
+   * unpaginated dataset (a handful of years per commission term).
+   */
+  getYearOverYearComparison: async () => resolveAfter({ data: yearOverYearApiRows }),
+
+  /**
+   * Category-wise Selection Ratio — one row per reservation/quota category.
+   */
+  getCategorySelectionRatio: async () => resolveAfter({ data: categorySelectionApiRows }),
 };
 
 export default ReportsApi;
