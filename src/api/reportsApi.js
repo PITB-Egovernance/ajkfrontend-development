@@ -1,13 +1,10 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import {
-  grievanceComplaintApiRows,
-  vacancyFunnelApiRows,
   yearOverYearApiRows,
   categorySelectionApiRows,
-  COMPLAINT_TYPES,
-  COMPLAINT_STATUSES,
 } from 'pages/reports/mockData';
+
 const API_BASE = Config.apiUrl;
 const API_KEY  = Config.apiKey;
 
@@ -44,6 +41,7 @@ const get = async (path, params = {}) => {
   return handleResponse(res);
 };
 
+// Marks & Result Reports — still mock-backed until the real endpoints exist.
 // Every method returns the same { success, data } envelope the live
 // endpoints below use, so swapping a method body for a real fetch() call
 // later will not require any change in the pages that consume it.
@@ -52,49 +50,6 @@ const MOCK_LATENCY_MS = 500;
 const resolveAfter = (data) =>
   new Promise((resolve) => setTimeout(() => resolve({ success: true, data }), MOCK_LATENCY_MS));
 
-
-// ── Interview / Viva + Administrative & Audit Reports — mock-backed,
-// snake_case rows (see mockData.js) ──
-const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
-
-// Shared by every report that filters on the Advertisement / Post / Status
-// trio (interview schedule, interview marks compilation, grievance tracking).
-const applyAdvertisementPostStatusFilters = (rows, p = {}) =>
-  rows.filter((r) => {
-    if (p.advertisement && r.advertisement_no !== p.advertisement) return false;
-    if (p.post_name && r.post !== p.post_name) return false;
-    if (p.status && r.status !== p.status) return false;
-    return true;
-  });
-
-
-// Applies a free-text `search` across every field, then slices the page the
-// grid asked for. Mirrors what a real paginated endpoint would do server-side.
-const paginateAndSearch = (rows, params = {}) => {
-  let searched = rows;
-  if (params.search) {
-    const term = String(params.search).trim().toLowerCase();
-    if (term) {
-      searched = searched.filter((r) =>
-        Object.values(r).some((v) => v !== null && v !== undefined && String(v).toLowerCase().includes(term))
-      );
-    }
-  }
-  const total = searched.length;
-  const page = Number(params.page) || 1;
-  const perPage = Number(params.per_page) || total || 1;
-  const start = (page - 1) * perPage;
-  return { pageRows: searched.slice(start, start + perPage), total, searched };
-};
-
-
-
-const FUNNEL_STAGE_KEYS = ['vacancies', 'applications_received', 'eligible', 'written_qualified', 'interview_qualified', 'selected'];
-const computeFunnelTotals = (rows) =>
-  FUNNEL_STAGE_KEYS.reduce((totals, key) => {
-    totals[key] = rows.reduce((sum, r) => sum + (r[key] || 0), 0);
-    return totals;
-  }, {});
 
 // Reporting & Analytics module — all filtering/pagination happens server-side
 // (see ReportController/MarksReportController on the backend); pass every
@@ -157,31 +112,21 @@ const ReportsApi = {
   /** Combined Merit (Written + Interview) — final weighted merit list. */
   getCombinedMerit: async (params = {}) => get('/reports/combined-merit', params),
 
-  // ── Administrative & Audit Reports ──
-  /** Complaint type / status dropdown options specific to this module. */
-  getAdminAuditFilters: async () => resolveAfter({
-    complaint_types: toOptions(COMPLAINT_TYPES),
-    complaint_statuses: toOptions(COMPLAINT_STATUSES),
-  }),
+  // ── Administrative & Audit Reports (see AdminAuditReportController) ──
+  /** Complaint status dropdown options specific to this module. */
+  getAdminAuditFilters: async () => get('/reports/admin-audit-filters'),
 
   /** Grievance / Complaint Tracking — candidate complaints and appeal status. */
-  getGrievanceComplaints: async (params = {}) => {
-    const filtered = applyAdvertisementPostStatusFilters(grievanceComplaintApiRows, params);
-    const { pageRows, total } = paginateAndSearch(filtered, params);
-    return resolveAfter({ data: pageRows, total });
-  },
+  getGrievanceComplaints: async (params = {}) => get('/reports/grievance-complaints', params),
 
   /**
    * Vacancy-to-Selection Funnel — one row per (advertisement, post) posting.
    * Small, unpaginated dataset (a handful of postings per cycle), returned
    * with pre-computed totals for the summary cards and funnel/bar charts.
    */
-  getVacancySelectionFunnel: async () => resolveAfter({
-    data: vacancyFunnelApiRows,
-    totals: computeFunnelTotals(vacancyFunnelApiRows),
-  }),
+  getVacancySelectionFunnel: async () => get('/reports/vacancy-selection-funnel'),
 
-  /**
+/**
    * Year-over-Year Comparison — one row per recruitment year. Small,
    * unpaginated dataset (a handful of years per commission term).
    */
@@ -191,6 +136,7 @@ const ReportsApi = {
    * Category-wise Selection Ratio — one row per reservation/quota category.
    */
   getCategorySelectionRatio: async () => resolveAfter({ data: categorySelectionApiRows }),
+
 };
 
 export default ReportsApi;
