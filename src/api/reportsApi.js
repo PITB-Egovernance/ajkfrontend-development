@@ -173,11 +173,11 @@ const ReportsApi = {
    */
   getVacancySelectionFunnel: async () => get('/reports/vacancy-selection-funnel'),
 
-/**
+  /**
    * Year-over-Year Comparison — one row per recruitment year. Small,
    * unpaginated dataset (a handful of years per commission term).
    */
-  getYearOverYearComparison: async () => resolveAfter({ data: yearOverYearApiRows }),
+  getYearOverYearComparison: async () => get('/reports/year-over-year-comparison'),
 
   /**
    * Category-wise Selection Ratio — one row per reservation/quota category.
@@ -200,6 +200,7 @@ const ReportsApi = {
     const { pageRows, total, searched } = paginateAndSearch(filtered, params);
     return resolveAfter({ data: pageRows, total, stats: computeGazetteStats(searched) });
   },
+  getCategorySelectionRatio: async () => get('/reports/category-selection-ratio'),
 };
 
 export default ReportsApi;
