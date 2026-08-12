@@ -72,10 +72,14 @@ const CategorySelectionRatio = () => {
     { field: 'applicants', headerName: 'Applicants', width: 120, type: 'number' },
     { field: 'qualified', headerName: 'Qualified', width: 120, type: 'number' },
     { field: 'selected', headerName: 'Selected', width: 110, type: 'number' },
-    { field: 'selectionRatio', headerName: 'Selection Ratio', width: 150, renderCell: (p) => `${p.value}%` },
-    { field: 'reservedSeats', headerName: 'Reserved Seats', width: 150, type: 'number' },
-    { field: 'filledSeats', headerName: 'Filled Seats', width: 130, type: 'number' },
-    { field: 'remainingSeats', headerName: 'Remaining Seats', width: 160, type: 'number' },
+    { field: 'selectionRatio', headerName: 'Selection Ratio', width: 150,
+      renderCell: (p) => (p.value === null || p.value === undefined ? <span className="text-slate-400 text-xs">—</span> : `${p.value}%`) },
+    { field: 'reservedSeats', headerName: 'Reserved Seats', width: 150, type: 'number',
+      renderCell: (p) => (p.value === null || p.value === undefined ? <span className="text-slate-400 text-xs">—</span> : p.value) },
+    { field: 'filledSeats', headerName: 'Filled Seats', width: 130, type: 'number',
+      renderCell: (p) => (p.value === null || p.value === undefined ? <span className="text-slate-400 text-xs">—</span> : p.value) },
+    { field: 'remainingSeats', headerName: 'Remaining Seats', width: 160, type: 'number',
+      renderCell: (p) => (p.value === null || p.value === undefined ? <span className="text-slate-400 text-xs">—</span> : p.value) },
   ];
 
   return (

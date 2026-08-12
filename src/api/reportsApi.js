@@ -1,10 +1,5 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
-import {
-  yearOverYearApiRows,
-  categorySelectionApiRows,
-} from 'pages/reports/mockData';
-
 const API_BASE = Config.apiUrl;
 const API_KEY  = Config.apiKey;
 
@@ -40,16 +35,6 @@ const get = async (path, params = {}) => {
   const res = await fetch(`${API_BASE}${path}${qs ? `?${qs}` : ''}`, { headers: getHeaders() });
   return handleResponse(res);
 };
-
-// Marks & Result Reports — still mock-backed until the real endpoints exist.
-// Every method returns the same { success, data } envelope the live
-// endpoints below use, so swapping a method body for a real fetch() call
-// later will not require any change in the pages that consume it.
-const MOCK_LATENCY_MS = 500;
-
-const resolveAfter = (data) =>
-  new Promise((resolve) => setTimeout(() => resolve({ success: true, data }), MOCK_LATENCY_MS));
-
 
 // Reporting & Analytics module — all filtering/pagination happens server-side
 // (see ReportController/MarksReportController on the backend); pass every
@@ -126,17 +111,16 @@ const ReportsApi = {
    */
   getVacancySelectionFunnel: async () => get('/reports/vacancy-selection-funnel'),
 
-/**
+  /**
    * Year-over-Year Comparison — one row per recruitment year. Small,
    * unpaginated dataset (a handful of years per commission term).
    */
-  getYearOverYearComparison: async () => resolveAfter({ data: yearOverYearApiRows }),
+  getYearOverYearComparison: async () => get('/reports/year-over-year-comparison'),
 
   /**
    * Category-wise Selection Ratio — one row per reservation/quota category.
    */
-  getCategorySelectionRatio: async () => resolveAfter({ data: categorySelectionApiRows }),
-
+  getCategorySelectionRatio: async () => get('/reports/category-selection-ratio'),
 };
 
 export default ReportsApi;
