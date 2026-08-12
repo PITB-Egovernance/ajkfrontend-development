@@ -780,6 +780,61 @@ export const categorySelectionApiRows = [
   selection_ratio: Math.round((row.selected / row.applicants) * 10000) / 100,
 }));
 
+// ── Module 6: Compliance & Public Reports ───────────────────────────────────
+
+export const EXAMINATIONS = ['One Paper MCQs', 'Two Paper MCQs', 'Written Exam', 'CCE'];
+export const RESULT_STATUSES = ['Selected', 'Qualified', 'Not Selected'];
+
+// One row per candidate, ranked (by merit) within each (advertisement, post,
+// examination) group — the final, publishable result/merit list.
+export const publicResultGazetteApiRows = (() => {
+  const rows = [];
+  const GROUP_COUNT = 5;
+  const CANDIDATES_PER_GROUP = 6;
+  let srNo = 1;
+
+  for (let g = 0; g < GROUP_COUNT; g++) {
+    const advertisementNo = pickIndexed(ADVERTISEMENTS, g).label;
+    const post = pickIndexed(POSTS, g + 1);
+    const examination = pickIndexed(EXAMINATIONS, g);
+    const candidates = [];
+
+    for (let c = 0; c < CANDIDATES_PER_GROUP; c++) {
+      const idx = g * CANDIDATES_PER_GROUP + c;
+      const gender = pickIndexed(GENDERS, idx);
+      candidates.push({
+        rollNo: `GAZ-${81000 + idx}`,
+        candidateName: gender === 'Male' ? pickIndexed(FIRST_NAMES_M, idx + 2) : pickIndexed(FIRST_NAMES_F, idx + 2),
+        fatherName: pickIndexed(FATHER_NAMES, idx + 3),
+        aggregate: intBetween(300, 490),
+      });
+    }
+
+    // Rank within the group by aggregate score, highest first.
+    candidates.sort((a, b) => b.aggregate - a.aggregate);
+
+    for (let rankIdx = 0; rankIdx < candidates.length; rankIdx++) {
+      const rank = rankIdx + 1;
+      const cand = candidates[rankIdx];
+      const status = rank <= 2 ? 'Selected' : rank <= 4 ? 'Qualified' : 'Not Selected';
+      rows.push({
+        sr_no: srNo,
+        roll_no: cand.rollNo,
+        candidate_name: cand.candidateName,
+        father_name: cand.fatherName,
+        advertisement_no: advertisementNo,
+        post,
+        // Used only for the "Examination" filter — not a display column.
+        examination,
+        merit: rank,
+        result_status: status,
+      });
+      srNo++;
+    }
+  }
+  return rows;
+})();
+
 // Candidates shortlisted for interview.
 export const interviewShortlistRows = Array.from({ length: 22 }).map((_, i) => {
   const gender = pickIndexed(GENDERS, i);

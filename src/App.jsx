@@ -136,6 +136,7 @@ import GrievanceComplaintTracking from 'pages/reports/GrievanceComplaintTracking
 import VacancySelectionFunnel from 'pages/reports/VacancySelectionFunnel';
 import YearOverYearComparison from 'pages/reports/YearOverYearComparison';
 import CategorySelectionRatio from 'pages/reports/CategorySelectionRatio';
+import PublicResultGazette from 'pages/reports/PublicResultGazette';
 
 
 function App() {
@@ -439,6 +440,7 @@ function App() {
           <Route path="reports/vacancy-selection-funnel" element={<VacancySelectionFunnel />} />
           <Route path="reports/year-over-year-comparison" element={<YearOverYearComparison />} />
           <Route path="reports/category-selection-ratio" element={<CategorySelectionRatio />} />
+          <Route path="reports/public-result-gazette" element={<PublicResultGazette />} />
         </Route>
 
         

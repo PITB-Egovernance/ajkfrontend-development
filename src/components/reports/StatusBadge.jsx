@@ -21,6 +21,7 @@ const DEFAULT_STATUS_STYLES = {
   scheduled: 'bg-blue-100 text-blue-700',
   'reserved category': 'bg-blue-100 text-blue-700',
   'under review': 'bg-blue-100 text-blue-700',
+  qualified: 'bg-blue-100 text-blue-700',
   closed: 'bg-slate-200 text-slate-700',
   missing: 'bg-rose-100 text-rose-700',
   'not recommended': 'bg-rose-100 text-rose-700',

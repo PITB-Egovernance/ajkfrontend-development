@@ -8,7 +8,8 @@ import {
   Trophy, Scale, GitCompare, Medal, UserX, ShieldAlert, CalendarCheck,
   Mic, CalendarClock, FileSignature, GitMerge,
   Landmark, MessageSquareWarning, Funnel,
-  History, Layers
+  History, Layers,
+  Gavel
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -167,6 +168,14 @@ export const MENU_ITEMS = [
           { label: "Vacancy-to-Selection Funnel",     path: "/dashboard/reports/vacancy-selection-funnel", icon: Funnel },
           { label: "Year-over-Year Comparison",       path: "/dashboard/reports/year-over-year-comparison", icon: History },
           { label: "Category-wise Selection Ratio",   path: "/dashboard/reports/category-selection-ratio", icon: Layers },
+        ],
+      },
+      {
+        label: "Compliance & Public Reports",
+        path: "/dashboard/reports/public-result-gazette",
+        icon: Gavel,
+        children: [
+          { label: "Public Result Gazette", path: "/dashboard/reports/public-result-gazette", icon: ScrollText },
         ],
       },
     ],

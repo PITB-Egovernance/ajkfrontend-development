@@ -3,6 +3,9 @@ import AuthService from 'services/authService';
 import {
   yearOverYearApiRows,
   categorySelectionApiRows,
+  publicResultGazetteApiRows,
+  EXAMINATIONS,
+  RESULT_STATUSES,
 } from 'pages/reports/mockData';
 
 const API_BASE = Config.apiUrl;
@@ -50,6 +53,50 @@ const MOCK_LATENCY_MS = 500;
 const resolveAfter = (data) =>
   new Promise((resolve) => setTimeout(() => resolve({ success: true, data }), MOCK_LATENCY_MS));
 
+// ── Compliance & Public Reports — mock-backed (see mockData.js) ──
+const toOptions = (arr) => arr.map((v) => ({ value: v, label: v }));
+
+const applyPublicResultGazetteFilters = (rows, p = {}) =>
+  rows.filter((r) => {
+    if (p.advertisement && r.advertisement_no !== p.advertisement) return false;
+    if (p.post_name && r.post !== p.post_name) return false;
+    if (p.examination && r.examination !== p.examination) return false;
+    if (p.status && r.result_status !== p.status) return false;
+    return true;
+  });
+
+// Every selected candidate fills exactly one vacancy, so "Total Vacancies"
+// is derived from the selected count rather than a separate mock field.
+const computeGazetteStats = (rows) => {
+  const totalSelected = rows.filter((r) => r.result_status === 'Selected').length;
+  const totalQualified = rows.filter((r) => r.result_status === 'Qualified').length;
+  return {
+    total_candidates: rows.length,
+    total_qualified: totalQualified,
+    total_selected: totalSelected,
+    total_merit_candidates: totalSelected + totalQualified,
+    total_vacancies: totalSelected,
+  };
+};
+
+// Applies a free-text `search` across every field, then slices the page the
+// grid asked for. Mirrors what a real paginated endpoint would do server-side.
+const paginateAndSearch = (rows, params = {}) => {
+  let searched = rows;
+  if (params.search) {
+    const term = String(params.search).trim().toLowerCase();
+    if (term) {
+      searched = searched.filter((r) =>
+        Object.values(r).some((v) => v !== null && v !== undefined && String(v).toLowerCase().includes(term))
+      );
+    }
+  }
+  const total = searched.length;
+  const page = Number(params.page) || 1;
+  const perPage = Number(params.per_page) || total || 1;
+  const start = (page - 1) * perPage;
+  return { pageRows: searched.slice(start, start + perPage), total, searched };
+};
 
 // Reporting & Analytics module — all filtering/pagination happens server-side
 // (see ReportController/MarksReportController on the backend); pass every
@@ -137,6 +184,22 @@ const ReportsApi = {
    */
   getCategorySelectionRatio: async () => resolveAfter({ data: categorySelectionApiRows }),
 
+  // ── Compliance & Public Reports ──
+  /** Examination / result status dropdown options specific to this module. */
+  getComplianceFilters: async () => resolveAfter({
+    examinations: toOptions(EXAMINATIONS),
+    result_statuses: toOptions(RESULT_STATUSES),
+  }),
+
+  /**
+   * Public Result Gazette — final, publishable result / merit list, plus
+   * summary stats computed over the filtered (pre-pagination) set.
+   */
+  getPublicResultGazette: async (params = {}) => {
+    const filtered = applyPublicResultGazetteFilters(publicResultGazetteApiRows, params);
+    const { pageRows, total, searched } = paginateAndSearch(filtered, params);
+    return resolveAfter({ data: pageRows, total, stats: computeGazetteStats(searched) });
+  },
 };
 
 export default ReportsApi;
