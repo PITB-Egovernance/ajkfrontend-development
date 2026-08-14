@@ -114,6 +114,17 @@ const TopMarksMeritList = () => {
     setPaginationModel((p) => ({ ...p, page: 0 }));
   };
 
+  const exportParams = () => ({
+    advertisement: appliedFilters.advertisementNo,
+    post_name:     appliedFilters.post,
+    gender:        appliedFilters.gender,
+    district:      appliedFilters.district,
+    search:        debouncedSearchTerm,
+  });
+
+  const handleExportExcel = () => ReportsApi.exportTopMarksMeritExcel(exportParams());
+  const handleExportPdf = () => ReportsApi.exportTopMarksMeritPdf(exportParams());
+
   const columns = [
     { field: 'srNo', headerName: 'Sr No', width: 80 },
     { field: 'rollNo', headerName: 'Roll No', width: 130 },
@@ -153,6 +164,8 @@ const TopMarksMeritList = () => {
           onSearch={handleSearch}
           searching={searching}
           showPdfExport
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
         />
 
         <ReportTable

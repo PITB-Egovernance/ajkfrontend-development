@@ -34,6 +34,7 @@ const mapRow = (row, index) => ({
   post: row.post,
   merit: row.merit,
   resultStatus: row.result_status,
+  publicationStatus: row.publication_status,
 });
 
 const mapStats = (s) => ({
@@ -133,6 +134,17 @@ const PublicResultGazette = () => {
     setPaginationModel((p) => ({ ...p, page: 0 }));
   };
 
+  const exportParams = () => ({
+    advertisement: appliedFilters.advertisementNo,
+    post_name:     appliedFilters.post,
+    examination:   appliedFilters.examination,
+    status:        appliedFilters.status,
+    search:        debouncedSearchTerm,
+  });
+
+  const handleExportExcel = () => ReportsApi.exportPublicResultGazetteExcel(exportParams());
+  const handleExportPdf = () => ReportsApi.exportPublicResultGazettePdf(exportParams());
+
   const columns = [
     { field: 'srNo', headerName: 'Sr. No.', width: 90 },
     { field: 'rollNo', headerName: 'Roll No.', width: 130 },
@@ -143,6 +155,13 @@ const PublicResultGazette = () => {
     { field: 'merit', headerName: 'Merit', width: 100, type: 'number' },
     {
       field: 'resultStatus', headerName: 'Result Status', width: 150, sortable: false,
+      renderCell: (p) => <StatusBadge status={p.value} />,
+    },
+    {
+      // reporting latest.pdf §3.1: merit lists must be versioned (provisional
+      // vs. final) — sourced from the real ResultPublication.status for this
+      // candidate's job post, not derived/guessed.
+      field: 'publicationStatus', headerName: 'Publication Status', width: 170, sortable: false,
       renderCell: (p) => <StatusBadge status={p.value} />,
     },
   ];
@@ -185,6 +204,8 @@ const PublicResultGazette = () => {
           showExcelExport
           pdfExportLabel="Download PDF"
           excelExportLabel="Download Excel"
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
         />
 
         <ReportTable

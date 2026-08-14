@@ -36,6 +36,35 @@ const get = async (path, params = {}) => {
   return handleResponse(res);
 };
 
+// Excel/PDF export endpoints stream a file rather than JSON — fetch as a
+// blob and trigger a browser download instead of going through
+// handleResponse(). Filename is read off Content-Disposition when the
+// backend sends one, falling back to the caller's default otherwise.
+const downloadFile = async (path, params = {}, fallbackFilename = 'export') => {
+  const qs = buildQuery(params);
+  const res = await fetch(`${API_BASE}${path}${qs ? `?${qs}` : ''}`, { headers: getHeaders() });
+
+  if (!res.ok) {
+    const result = await res.json().catch(() => ({}));
+    const error  = new Error(result.message || `Export failed (${res.status})`);
+    error.status = res.status;
+    throw error;
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const filename = disposition.match(/filename="?([^"]+)"?/)?.[1] || fallbackFilename;
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 // Reporting & Analytics module — all filtering/pagination happens server-side
 // (see ReportController/MarksReportController on the backend); pass every
 // active filter here rather than fetching everything and filtering
@@ -62,6 +91,8 @@ const ReportsApi = {
 
   /** Merit List (Category Wise) — ranked within each (advertisement, post) group. */
   getMeritList: async (params = {}) => get('/reports/merit-list', params),
+  exportMeritListExcel: async (params = {}) => downloadFile('/reports/merit-list/export/excel', params, 'merit_list.xlsx'),
+  exportMeritListPdf: async (params = {}) => downloadFile('/reports/merit-list/export/pdf', params, 'merit_list.pdf'),
 
   /** Tie-Breaking Report — candidates sharing an aggregate within the same post. */
   getTieBreaking: async (params = {}) => get('/reports/tie-breaking', params),
@@ -71,6 +102,8 @@ const ReportsApi = {
 
   /** Top Marks Merit Candidate List — highest scorers within each post's vacancy count. */
   getTopMarksMerit: async (params = {}) => get('/reports/top-marks-merit', params),
+  exportTopMarksMeritExcel: async (params = {}) => downloadFile('/reports/top-marks-merit/export/excel', params, 'top_marks_merit.xlsx'),
+  exportTopMarksMeritPdf: async (params = {}) => downloadFile('/reports/top-marks-merit/export/pdf', params, 'top_marks_merit.pdf'),
 
   /** Candidate Rejection List — candidates rejected at document verification. */
   getCandidateRejectionList: async (params = {}) => get('/reports/candidate-rejection-list', params),
@@ -83,6 +116,8 @@ const ReportsApi = {
 
   /** Award List for Interview — final interview award list. */
   getAwardListInterview: async (params = {}) => get('/reports/award-list-interview', params),
+  exportAwardListInterviewExcel: async (params = {}) => downloadFile('/reports/award-list-interview/export/excel', params, 'award_list_for_interview.xlsx'),
+  exportAwardListInterviewPdf: async (params = {}) => downloadFile('/reports/award-list-interview/export/pdf', params, 'award_list_for_interview.pdf'),
 
   // ── Interview / Viva Reports (see MarksReportController) ──
   /** Interview status / evaluation status / merit status dropdown options specific to this module. */
@@ -131,6 +166,8 @@ const ReportsApi = {
    * summary stats computed over the entire filtered (pre-pagination) set.
    */
   getPublicResultGazette: async (params = {}) => get('/reports/public-result-gazette', params),
+  exportPublicResultGazetteExcel: async (params = {}) => downloadFile('/reports/public-result-gazette/export/excel', params, 'public_result_gazette.xlsx'),
+  exportPublicResultGazettePdf: async (params = {}) => downloadFile('/reports/public-result-gazette/export/pdf', params, 'public_result_gazette.pdf'),
 };
 
 export default ReportsApi;

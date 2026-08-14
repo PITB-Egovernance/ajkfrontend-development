@@ -116,6 +116,16 @@ const MeritListReport = () => {
     setPaginationModel((p) => ({ ...p, page: 0 }));
   };
 
+  const exportParams = () => ({
+    advertisement: appliedFilters.advertisementNo,
+    post_name:     appliedFilters.post,
+    gender:        appliedFilters.gender,
+    district:      appliedFilters.district,
+    search:        debouncedSearchTerm,
+  });
+
+  const handleExportPdf = () => ReportsApi.exportMeritListPdf(exportParams());
+
   const columns = [
     { field: 'rank', headerName: 'Rank', width: 90 },
     { field: 'rollNo', headerName: 'Roll No', width: 130 },
@@ -159,6 +169,7 @@ const MeritListReport = () => {
           showPdfExport
           showExcelExport={false}
           pdfExportLabel="Export PDF (Gazette)"
+          onExportPdf={handleExportPdf}
         />
 
         <ReportTable
