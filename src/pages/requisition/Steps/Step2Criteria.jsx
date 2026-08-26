@@ -5,6 +5,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
+import { fetchPaginatedApiList } from 'utils';
 
 // Sentinel value used to detect "Other" selection in every dropdown.
 const OTHER = '__other__';
@@ -95,25 +96,22 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     const fetchAllDegrees = async () => {
       setLoadingDegrees(true);
       try {
-        const response = await fetch(`${API_BASE}/settings/degrees?per_page=1000`, {
+        const degrees = await fetchPaginatedApiList(`${API_BASE}/settings/degrees`, {
           headers: {
             Authorization: `Bearer ${TOKEN}`,
             Accept: 'application/json',
             'X-API-KEY': API_KEY,
           },
+          perPage: 200,
         });
-        const result = await response.json();
-        if (result.success || result.status === 200) {
-          const degrees = Array.isArray(result.data?.data) ? result.data.data : result.data || [];
-          setAllDegrees(
-            (Array.isArray(degrees) ? degrees : [])
-              .filter(Boolean)
-              .filter(
-                (degree) =>
-                  String(degree.status || 'active').toLowerCase() === 'active'
-              )
-          );
-        }
+        setAllDegrees(
+          degrees
+            .filter(Boolean)
+            .filter(
+              (degree) =>
+                String(degree.status || 'active').toLowerCase() === 'active'
+            )
+        );
       } catch (error) {
       } finally {
         setLoadingDegrees(false);

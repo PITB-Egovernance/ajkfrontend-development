@@ -5,7 +5,10 @@ export const getResponseList = (result) => {
   return [];
 };
 
-export const fetchPaginatedApiList = async (url, { headers = {}, perPage = 200, maxPages = 50 } = {}) => {
+// getPaginator: optional (result) => paginator override for endpoints whose
+// Laravel paginator isn't directly under `data` (e.g. `data.jobs`). When
+// omitted, behaves exactly as before (paginator = `data`, items = `data.data`).
+export const fetchPaginatedApiList = async (url, { headers = {}, perPage = 200, maxPages = 50, getPaginator } = {}) => {
   const allItems = [];
   let page = 1;
   let nextUrl = url;
@@ -24,9 +27,12 @@ export const fetchPaginatedApiList = async (url, { headers = {}, perPage = 200, 
       break;
     }
 
-    allItems.push(...getResponseList(result));
+    const paginator = getPaginator
+      ? (getPaginator(result) || {})
+      : (result.data && !Array.isArray(result.data) ? result.data : {});
 
-    const paginator = result.data && !Array.isArray(result.data) ? result.data : {};
+    allItems.push(...(getPaginator ? (Array.isArray(paginator.data) ? paginator.data : []) : getResponseList(result)));
+
     const currentPage = Number(paginator.current_page || page);
     const lastPage = Number(paginator.last_page || currentPage);
     const apiNextUrl = paginator.next_page_url || null;

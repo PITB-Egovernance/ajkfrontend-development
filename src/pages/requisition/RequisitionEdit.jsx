@@ -105,44 +105,36 @@ const RequisitionEdit = () => {
 
   const fetchGrades = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
+      const list = await fetchPaginatedApiList(`${API_BASE}/settings/grades`, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
           Accept: 'application/json',
           'X-API-KEY': API_KEY,
         },
       });
-      const result = await response.json();
-      if (result.success || result.status === 200) {
-        const list = result.data?.data ?? result.data ?? [];
-        setGradeOptions(
-          list
-            .filter((g) => (g.status ?? 'active') === 'active')
-            .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
-        );
-      }
+      setGradeOptions(
+        list
+          .filter((g) => (g.status ?? 'active') === 'active')
+          .map((g) => ({ id: g.hash_id || g.id, name: g.name }))
+      );
     } catch (error) {
     }
   };
 
   const fetchDesignations = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/designations?per_page=200`, {
+      const list = await fetchPaginatedApiList(`${API_BASE}/settings/designations`, {
         headers: {
           Authorization: `Bearer ${TOKEN}`,
           Accept: 'application/json',
           'X-API-KEY': API_KEY,
         },
       });
-      const result = await response.json();
-      if (result.success || result.status === 200) {
-        const list = result.data?.data ?? result.data ?? [];
-        setDesignationOptions(
-          list
-            .filter((d) => (d.status ?? 'active') === 'active' && !d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
-            .map((d) => ({ id: d.hash_id || d.id, name: d.name }))
-        );
-      }
+      setDesignationOptions(
+        list
+          .filter((d) => (d.status ?? 'active') === 'active' && !d.wings && !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
+          .map((d) => ({ id: d.hash_id || d.id, name: d.name }))
+      );
     } catch (error) {
     }
   };

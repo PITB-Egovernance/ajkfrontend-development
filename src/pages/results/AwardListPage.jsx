@@ -280,7 +280,7 @@ const AwardListPage = () => {
       if (res.success) {
         toast.success(res.message, { id: 'csv-import' });
         if (res.errors && res.errors.length > 0) {
-          toast.error(`${res.errors.length} rows failed to import. Check details.`, { duration: 6000 });
+          toast.error(`${res.errors.length} rows failed to import. Check details.`);
         }
         handleLoadList();
       } else {

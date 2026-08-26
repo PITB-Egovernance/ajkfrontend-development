@@ -126,7 +126,7 @@ const JobCreationForm = () => {
       Object.entries(stepErrors).forEach(([field, errorMessage], index) => {
         setTimeout(() => {
           toast.error(errorMessage, {
-            duration: 4000,
+            duration: 3000,
             id: `error-${field}`, // Prevent duplicate toasts
           });
         }, index * 150); // Stagger the toasts

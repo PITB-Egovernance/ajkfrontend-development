@@ -33,6 +33,7 @@ const ReportFilterBar = ({
         onClearFilters={onClearFilters}
         filterConfig={filterConfig}
         title={title}
+        deferApply={false}
       />
 
       <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

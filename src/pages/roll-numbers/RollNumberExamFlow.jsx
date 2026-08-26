@@ -13,6 +13,29 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { useGenerationGuard } from 'context/GenerationGuardContext';
 
+// "View Slip" opens a separate route (/dashboard/roll-numbers/slip/:rollNumber).
+// Navigating there and pressing Back unmounts this page, so its stage/results
+// state would normally reset — leaving the admin back on stage 1 instead of
+// the generated-slips list. Persisting the stage-3 snapshot per exam type in
+// sessionStorage (cleared on tab close, and on any intentional exit from this
+// flow) lets the page restore exactly where the admin left it.
+const STAGE3_SNAPSHOT_PREFIX = 'ajk_roll_number_stage3_';
+
+const readStage3Snapshot = (examType) => {
+  try {
+    const raw = sessionStorage.getItem(`${STAGE3_SNAPSHOT_PREFIX}${examType}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const clearStage3Snapshot = (examType) => {
+  try {
+    sessionStorage.removeItem(`${STAGE3_SNAPSHOT_PREFIX}${examType}`);
+  } catch {}
+};
+
 // ── AJK district → exam-center zone mapping ───────────────────────────────
 // Key: district name (lower-case) OR district code (string)
 // Value: zone key that is matched against the center name in `centers` list
@@ -462,11 +485,13 @@ const RollNumberExamFlow = () => {
   const meta = examTypeMeta[examType] || examTypeMeta['one-paper-mcqs'];
   const { setBusy } = useGenerationGuard();
 
-  const [stage, setStage] = useState(1);
+  // Read once per exam type — used only by the lazy useState initializers below.
+  const stage3Snapshot = useMemo(() => readStage3Snapshot(examType), [examType]);
+  const [stage, setStage] = useState(() => (stage3Snapshot ? 3 : 1));
   const [search, setSearch] = useState('');
-  const [selectedPostIds, setSelectedPostIds] = useState([]);
+  const [selectedPostIds, setSelectedPostIds] = useState(() => stage3Snapshot?.selectedPostIds || []);
   const [selectedCenterIds, setSelectedCenterIds] = useState([]);
-  const [generated, setGenerated] = useState(false);
+  const [generated, setGenerated] = useState(() => !!stage3Snapshot);
   const [allocationMethod, setAllocationMethod] = useState('district');
   const [centerSelectionMode, setCenterSelectionMode] = useState('auto');
   const [generating, setGenerating] = useState(false);
@@ -495,8 +520,8 @@ const RollNumberExamFlow = () => {
   const [rollStartSeq, setRollStartSeq] = useState('');
   const [manualUpdateCenterId, setManualUpdateCenterId] = useState('');
   const [updating, setUpdating] = useState(false);
-  const [s3BackStage, setS3BackStage] = useState(2);
-  const [scheduleDates, setScheduleDates] = useState(() => meta.papers.map(() => ''));
+  const [s3BackStage, setS3BackStage] = useState(() => stage3Snapshot?.s3BackStage ?? 2);
+  const [scheduleDates, setScheduleDates] = useState(() => stage3Snapshot?.scheduleDates || meta.papers.map(() => ''));
   const [scheduleTimes, setScheduleTimes] = useState(() => meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
   const [scheduleDurations, setScheduleDurations] = useState(() => meta.papers.map((_, i) => i === 1 ? 120 : 90));
   const [rollPrefix, setRollPrefix] = useState(() => DEFAULT_ROLL_PREFIXES[examType] ?? '');
@@ -505,8 +530,13 @@ const RollNumberExamFlow = () => {
   const [writtenExamSubjects, setWrittenExamSubjects] = useState([]);
   const [testTypeSubjectsMap, setTestTypeSubjectsMap] = useState({}); // testTypeId → subject[]
 
-  // Reset schedule state when exam type changes (same component, different route param)
+  // Reset schedule state when exam type actually changes (same component,
+  // different route param) — but NOT on first mount, which would otherwise
+  // immediately wipe out scheduleDates just restored from a stage-3 snapshot.
+  const prevExamTypeRef = useRef(examType);
   useEffect(() => {
+    if (prevExamTypeRef.current === examType) return;
+    prevExamTypeRef.current = examType;
     setScheduleDates(meta.papers.map(() => ''));
     setScheduleTimes(meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
     setScheduleDurations(meta.papers.map((_, i) => i === 1 ? 120 : 90));
@@ -517,7 +547,7 @@ const RollNumberExamFlow = () => {
   const [advertisements, setAdvertisements] = useState([]);
   const [centers, setCenters] = useState([]);
   const [examCities, setExamCities] = useState([]);
-  const [generatedCandidates, setGeneratedCandidates] = useState([]);
+  const [generatedCandidates, setGeneratedCandidates] = useState(() => stage3Snapshot?.generatedCandidates || []);
   const [allCandidateApps, setAllCandidateApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterAdvertisement, setFilterAdvertisement] = useState('all');
@@ -525,6 +555,19 @@ const RollNumberExamFlow = () => {
   const [filterDepartment, setFilterDepartment] = useState('all');
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [stage]);
+
+  // Keep the stage-3 snapshot (used to restore this page after "View Slip" → Back)
+  // up to date while the admin is on stage 3 — e.g. after a manual roll number
+  // reassignment updates generatedCandidates.
+  useEffect(() => {
+    if (stage !== 3) return;
+    try {
+      sessionStorage.setItem(
+        `${STAGE3_SNAPSHOT_PREFIX}${examType}`,
+        JSON.stringify({ generatedCandidates, selectedPostIds, scheduleDates, s3BackStage })
+      );
+    } catch {}
+  }, [stage, examType, generatedCandidates, selectedPostIds, scheduleDates, s3BackStage]);
 
   const [postsPage, setPostsPage] = useState(0);
   const postsPageSize = 10;
@@ -1625,7 +1668,7 @@ const RollNumberExamFlow = () => {
         } else {
           const zoneErrors = queue.filter(q => q.status === 'error');
           if (zoneErrors.length > 0) {
-            zoneErrors.forEach(q => toast.error(`${q.label}: ${q.error}`, { duration: 6000 }));
+            zoneErrors.forEach(q => toast.error(`${q.label}: ${q.error}`));
           } else {
             toast.error('No roll numbers generated — the API returned empty results. Check backend logs.');
           }
@@ -1892,7 +1935,7 @@ const RollNumberExamFlow = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" className="gap-2 bg-white" onClick={() => navigate('/dashboard/roll-numbers')}><ArrowLeft size={15} /> Back</Button>
+            <Button variant="outline" size="sm" className="gap-2 bg-white" onClick={() => { clearStage3Snapshot(examType); navigate('/dashboard/roll-numbers'); }}><ArrowLeft size={15} /> Back</Button>
           </div>
         </div>
 
@@ -2612,10 +2655,10 @@ const RollNumberExamFlow = () => {
 
               {/* ── Footer actions ── */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                <Button variant="outline" className="gap-2 bg-white" onClick={() => setStage(s3BackStage)}>
+                <Button variant="outline" className="gap-2 bg-white" onClick={() => { clearStage3Snapshot(examType); setStage(s3BackStage); }}>
                   <ArrowLeft size={15} /> {s3BackStage === 1 ? 'Back to Posts' : 'Back to Allocation'}
                 </Button>
-                <Button variant="outline" className="gap-2 bg-white" onClick={() => navigate('/dashboard/roll-numbers')}>
+                <Button variant="outline" className="gap-2 bg-white" onClick={() => { clearStage3Snapshot(examType); navigate('/dashboard/roll-numbers'); }}>
                   View All Slips <ArrowRight size={15} />
                 </Button>
               </div>

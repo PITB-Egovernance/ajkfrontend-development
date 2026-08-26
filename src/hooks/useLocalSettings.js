@@ -70,14 +70,16 @@ export const useLocalSettings = () => {
     const fetchLive = async () => {
       try {
         const headers = liveHeaders();
-        const [qItems, dRes] = await Promise.all([
+        const [qItems, dItems] = await Promise.all([
           fetchPaginatedApiList(`${LIVE_API}/settings/qualifications`, {
             headers,
             perPage: 200,
           }),
-          fetch(`${LIVE_API}/settings/degrees`, { headers }),
+          fetchPaginatedApiList(`${LIVE_API}/settings/degrees`, {
+            headers,
+            perPage: 200,
+          }),
         ]);
-        const dData = await dRes.json();
 
         if (qItems.length > 0) {
           const quals = qItems.map((item) => ({
@@ -90,8 +92,8 @@ export const useLocalSettings = () => {
           save(KEYS.qualifications, quals);
         }
 
-        if (dData.success || dData.status === 200) {
-          const degs = (dData.data?.data ?? dData.data ?? []).map((item) => ({
+        if (dItems.length > 0) {
+          const degs = dItems.map((item) => ({
             id:               item.hash_id || item.id,
             name:             item.degree_name || item.name,
             qualification_id: item.degree_group || '',  // group acts as qualifier
