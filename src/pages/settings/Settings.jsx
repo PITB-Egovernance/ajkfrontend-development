@@ -22,7 +22,8 @@ import {
   Newspaper,
   Hash,
   FileText,
-  ImageIcon
+  ImageIcon,
+  Landmark
 } from 'lucide-react';
 import { hasSubModuleAccess, isAdminUser } from 'utils/permissions';
 
@@ -31,6 +32,22 @@ const Settings = () => {
   const isAdmin = isAdminUser();
 
   const settingsModules = [
+    {
+      icon: Users,
+      title: 'Commission Members',
+      description: 'Manage AJK PSC Commission Members and Chairman',
+      iconBg: 'bg-emerald-600',
+      link: '/dashboard/settings/commission-members',
+      permModule: 'settings', permSub: 'commission_members',
+    },
+    {
+      icon: Landmark,
+      title: 'Secretary and Officials',
+      description: 'Manage Secretary and Officials listings',
+      iconBg: 'bg-emerald-700',
+      link: '/dashboard/settings/secretary-officials',
+      permModule: 'settings', permSub: 'secretary_officials',
+    },
     {
       icon: MapPin,
       title: 'Districts Management',

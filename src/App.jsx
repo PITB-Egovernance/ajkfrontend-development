@@ -37,6 +37,9 @@ import DesignationsManagement from 'pages/settings/Designation/DesignationsManag
 import GradesManagement from 'pages/settings/Grades/GradesManagement';
 import CompaniesManagement from 'pages/settings/Company/CompaniesManagement';
 import ContractorsManagement from 'pages/settings/ContractorsManagement';
+import CommissionMembersManagement from 'pages/settings/CommissionMembers/CommissionMembersManagement';
+import SecretaryOfficialsManagement from 'pages/settings/SecretaryOfficials/SecretaryOfficialsManagement';
+
 import DirectorApprovals from 'pages/approvals/DirectorApprovals';
 import SecretaryApprovals from 'pages/approvals/SecretaryApprovals';
 import ChairmanApprovals from 'pages/approvals/ChairmanApprovals';
@@ -242,6 +245,9 @@ function App() {
           <Route path="settings/grades" element={<GradesManagement />} />
           <Route path="settings/companies" element={<CompaniesManagement />} />
           <Route path="settings/contractors" element={<ContractorsManagement />} />
+          <Route path="settings/commission-members" element={<CommissionMembersManagement />} />
+          <Route path="settings/secretary-officials" element={<SecretaryOfficialsManagement />} />
+
           <Route path="settings/cities" element={<ExamCitiesManagement />} />
           <Route path="settings/exam-centers" element={<ExamCentersManagement />} />
           {/* <Route path="settings/exam-halls" element={<ExamHallsManagement />} /> */}

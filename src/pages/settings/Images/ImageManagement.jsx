@@ -76,6 +76,7 @@ const ImageManagement = () => {
   const canRowActions = canEdit || canDelete;
 
   const [allRows,  setAllRows]  = useState([]);
+  const [totalRows, setTotalRows] = useState(0);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
   const [filters,  setFilters]  = useState({ title: "", category: "" });
@@ -91,19 +92,25 @@ const ImageManagement = () => {
   const [dragActive,  setDragActive]  = useState(false);
 
   /* ── FETCH ── */
-  const fetchAll = async () => {
+  const fetchAll = async ({ page = 0, pageSize = 15 } = {}) => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/images`, { headers: authHeaders() });
+      const params = new URLSearchParams({
+        page: String(page + 1),
+        per_page: String(pageSize),
+      });
+      const res    = await fetch(`${API_BASE}/settings/images?${params.toString()}`, { headers: authHeaders() });
       const result = await res.json();
 
       if (res.ok || result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
+        const pageData = result.data?.data ?? result.data ?? [];
+        const data = Array.isArray(pageData) ? pageData : [];
+        const rowOffset = Number(result.data?.from ?? (page * pageSize + 1)) - 1;
         setAllRows(
-          (Array.isArray(data) ? data : []).map((item, i) => ({
+          data.map((item, i) => ({
             id:         item.hash_id ?? item.id,
             hash_id:    item.hash_id ?? item.id,
-            sr_no:      i + 1,
+            sr_no:      rowOffset + i + 1,
             image:      resolveImage(item.url ?? item.image ?? item.image_url ?? item.path),
             title:      item.title ?? "",
             category:   item.category ?? "",
@@ -111,19 +118,22 @@ const ImageManagement = () => {
             created_at: item.created_at ?? null,
           }))
         );
+        setTotalRows(Number(result.data?.total ?? data.length));
       } else {
         toast.error(result.message || "Failed to load images");
         setAllRows([]);
+        setTotalRows(0);
       }
     } catch {
       toast.error("Failed to load images");
       setAllRows([]);
+      setTotalRows(0);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchAll(); }, []); // eslint-disable-line
+  useEffect(() => { fetchAll(paginationModel); }, [paginationModel.page, paginationModel.pageSize]); // eslint-disable-line
 
   /* ── FILE VALIDATION + PREVIEW ── */
   const applyFile = (file) => {
@@ -186,7 +196,7 @@ const ImageManagement = () => {
     return true;
   });
 
-  const total        = allRows.length;
+  const total        = totalRows;
   const galleryCount = allRows.filter((r) => r.category === "gallery").length;
   const logoCount    = allRows.filter((r) => r.category === "logo").length;
 
@@ -255,7 +265,7 @@ const ImageManagement = () => {
       if (res.ok || result.success || result.status === 200 || result.status === 201) {
         toast.success(editingRow ? "Image updated successfully" : "Image added successfully");
         setOpenModal(false);
-        fetchAll();
+        fetchAll(paginationModel);
       } else {
         toast.error(result.message || "Operation failed");
       }
@@ -280,7 +290,7 @@ const ImageManagement = () => {
 
       if (res.ok || result.success || result.status === 200) {
         toast.success("Image deleted successfully");
-        fetchAll();
+        fetchAll(paginationModel);
       } else {
         toast.error(result.message || "Delete failed");
       }
@@ -427,6 +437,8 @@ const ImageManagement = () => {
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={totalRows}
           pageSizeOptions={[15, 25, 50]}
           loading={loading}
           autoHeight
