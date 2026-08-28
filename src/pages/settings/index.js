@@ -9,3 +9,6 @@ export { default as CompaniesManagement } from './Company/CompaniesManagement';
 export { default as ContractorsManagement } from './ContractorsManagement';
 export { default as CitiesManagement } from './Cities/CitiesManagement';
 export { default as ExamCentersManagement } from './ExamCenters/ExamCentersManagement';
+export { default as CommissionMembersManagement } from './CommissionMembers/CommissionMembersManagement';
+
+

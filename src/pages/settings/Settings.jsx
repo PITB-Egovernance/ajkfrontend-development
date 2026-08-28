@@ -32,6 +32,14 @@ const Settings = () => {
 
   const settingsModules = [
     {
+      icon: Users,
+      title: 'Commission Members',
+      description: 'Manage AJK PSC Commission Members and Chairman',
+      iconBg: 'bg-emerald-600',
+      link: '/dashboard/settings/commission-members',
+      permModule: 'settings', permSub: 'commission_members',
+    },
+    {
       icon: MapPin,
       title: 'Districts Management',
       description: 'Add and manage district data',
