@@ -418,13 +418,6 @@ const Pagination = ({ page, totalPages, onChange }) => {
 };
 
 
-// Extract prefix + zero-padded length from a roll number like "OPM-000001"
-const parseRollNumber = (roll) => {
-  const match = String(roll || '').match(/^(.*?)(\d+)$/);
-  if (!match) return null;
-  return { prefix: match[1], seq: parseInt(match[2], 10), padLen: match[2].length };
-};
-
 const newWrittenSchedule = () => ({ id: Date.now() + Math.random(), date: '', startTime: '10:00', duration: 90, subjectId: '' });
 
 // Returns 24-hour "HH:MM" — same format as the <input type="time"> start time —
@@ -1862,12 +1855,16 @@ const RollNumberExamFlow = () => {
     if (isNaN(startSeq) || startSeq < 1) { toast.error('Enter a valid Roll No start sequence'); return; }
     if (!manualUpdateCenterId) { toast.error('Select an exam center'); return; }
 
-    const firstRoll = generatedCandidates.find(c => c.roll)?.roll;
-    const fmt = parseRollNumber(firstRoll);
-
+    // Governed by the SAME "Roll Number Prefix" control used for
+    // generation (above), not silently inherited from whichever existing
+    // candidate happens to be first in the batch — that previously meant
+    // clearing the prefix and reassigning still produced prefixed numbers
+    // whenever any other candidate in the batch still had one.
+    const prefix = rollPrefix.trim();
+    const padLen = Math.max(5, String(startSeq + s3SelectedList.length - 1).length);
     const newRolls = s3SelectedList.map((_, i) => {
       const seq = startSeq + i;
-      return fmt ? `${fmt.prefix}${String(seq).padStart(fmt.padLen, '0')}` : String(seq).padStart(5, '0');
+      return prefix ? `${prefix}-${String(seq).padStart(padLen, '0')}` : String(seq).padStart(padLen, '0');
     });
 
     // Use deduped candidate list for conflict check to avoid false positives
@@ -1893,24 +1890,49 @@ const RollNumberExamFlow = () => {
     setUpdating(true);
     try {
       const selectedCenter = centers.find(c => c.id === manualUpdateCenterId);
+      const updateMap = {};
+      const failures = [];
+      // One at a time, and each failure is caught individually — the
+      // backend now rejects a roll number already claimed by someone else
+      // (see claimRollNumberForReassignment), so a conflict partway through
+      // a batch must not discard the candidates that already succeeded.
       for (let i = 0; i < s3SelectedList.length; i++) {
-        await RollNumberApi.updateSlip(s3SelectedList[i].id, {
-          roll_number: newRolls[i],
-          exam_center_id: Number(manualUpdateCenterId),
+        try {
+          await RollNumberApi.updateSlip(s3SelectedList[i].id, {
+            roll_number: newRolls[i],
+            exam_center_id: Number(manualUpdateCenterId),
+          });
+          updateMap[s3SelectedList[i].id] = { roll: newRolls[i], center: selectedCenter?.center || '' };
+        } catch (err) {
+          const reason = err?.errors?.roll_number?.[0] || err?.message || 'Update failed';
+          failures.push({ name: s3SelectedList[i].name || s3SelectedList[i].id, reason });
+        }
+      }
+
+      if (Object.keys(updateMap).length > 0) {
+        setGeneratedCandidates(prev => prev.map(c => updateMap[c.id] ? { ...c, ...updateMap[c.id] } : c));
+        setS3SelectedIds(prev => {
+          const n = new Set(prev);
+          Object.keys(updateMap).forEach(id => n.delete(id));
+          return n;
         });
       }
-      const updateMap = {};
-      s3SelectedList.forEach((c, i) => { updateMap[c.id] = { roll: newRolls[i], center: selectedCenter?.center || '' }; });
-      setGeneratedCandidates(prev => prev.map(c => updateMap[c.id] ? { ...c, ...updateMap[c.id] } : c));
-      setS3SelectedIds(new Set());
-      setRollStartSeq('');
-      toast.success(`Updated ${s3SelectedList.length} candidate${s3SelectedList.length !== 1 ? 's' : ''} successfully`);
-    } catch (err) {
-      toast.error(err?.message || 'Update failed');
+      if (failures.length === 0) {
+        setRollStartSeq('');
+      }
+
+      const successCount = Object.keys(updateMap).length;
+      if (failures.length === 0) {
+        toast.success(`Updated ${successCount} candidate${successCount !== 1 ? 's' : ''} successfully`);
+      } else if (successCount > 0) {
+        toast.error(`Updated ${successCount}, but ${failures.length} failed — ${failures[0].reason}`);
+      } else {
+        toast.error(failures[0].reason);
+      }
     } finally {
       setUpdating(false);
     }
-  }, [s3SelectedList, rollStartSeq, manualUpdateCenterId, generatedCandidates, s3SelectedIds, centers]);
+  }, [s3SelectedList, rollStartSeq, manualUpdateCenterId, generatedCandidates, s3SelectedIds, centers, rollPrefix]);
 
   if (loading) {
     return (
@@ -2610,6 +2632,13 @@ const RollNumberExamFlow = () => {
                     <span className="ml-1 text-xs text-slate-400">Select candidates above to reassign their roll numbers</span>
                   )}
                 </div>
+                <p className="mb-3 text-xs text-slate-500">
+                  Uses the <span className="font-semibold text-slate-700">Roll Number Prefix</span> set above —
+                  {rollPrefix.trim()
+                    ? <> new numbers will look like <span className="font-mono font-semibold text-slate-700">{rollPrefix.trim()}-{String(parseInt(rollStartSeq, 10) || 1).padStart(5, '0')}</span></>
+                    : <> new numbers will have <span className="font-semibold text-slate-700">no prefix</span> (e.g. <span className="font-mono font-semibold text-slate-700">{String(parseInt(rollStartSeq, 10) || 1).padStart(5, '0')}</span>)</>}
+                  . Clear or set it above to change this before updating.
+                </p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
                   <TextField
                     size="small"

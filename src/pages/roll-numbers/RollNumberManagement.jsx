@@ -34,18 +34,13 @@ const PERM = 'roll_number.roll_number_generation';
 // avoids firing an API request on every keystroke.
 const FILTER_DEBOUNCE_MS = 400;
 
+// Single merged filter group — previously split across two separate filter
+// bars (free-text/dropdown filters + the Advertisement -> Department -> Post
+// cascade). Combined into one bar/state so there's one Search/Reset action
+// instead of two, without dropping any of the individual filters.
 const DEFAULT_FILTERS = {
   search: '',
-  advertisement_no: '',
-  preferred_exam_city: '',
   exam_center_id: '',
-  payment_status: '',
-};
-
-// Separate, independent filter group: Advertisement -> Department -> Post.
-// Kept entirely apart from DEFAULT_FILTERS/filters above so the existing
-// filter bar's "Clear All" / active-filter-chips behavior is untouched.
-const DEFAULT_HIERARCHY_FILTERS = {
   adv_number: '',
   department_hash_id: '',
   job_detail_hash_id: '',
@@ -104,7 +99,11 @@ const withRetry = async (fn, retries = 1, delayMs = 400) => {
   }
 };
 
-const RollNumberManagement = () => {
+// fixedTab locks the page to only ever show 'published' or 'unpublished' slips
+// and hides the in-page tab switcher — used by the two dedicated pages
+// (PublishedRollSlips / UnpublishedRollSlips) that now live at their own
+// routes instead of one combined page with a toggle.
+const RollNumberManagement = ({ fixedTab } = {}) => {
   const navigate = useNavigate();
 
   const canEdit = hasPermission(`${PERM}.edit`);
@@ -117,7 +116,7 @@ const RollNumberManagement = () => {
   const [loading,         setLoading]          = useState(true);
   const [paginationModel, setPaginationModel]  = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]   = useState([]);
-  const [activeTab,       setActiveTab]        = useState('unpublished');
+  const [activeTab,       setActiveTab]        = useState(fixedTab || 'unpublished');
   const selectedIds = useMemo(() => {
     if (!selectionModel) return [];
     if (Array.isArray(selectionModel)) return selectionModel;
@@ -136,10 +135,6 @@ const RollNumberManagement = () => {
   const [centers,          setCenters]           = useState([]);
   const [advertisements,   setAdvertisements]    = useState([]);
 
-  // Advertisement -> Department -> Post hierarchy filter (separate block, own state)
-  const [hierarchyFilters,          setHierarchyFilters]          = useState(DEFAULT_HIERARCHY_FILTERS);
-  const [debouncedHierarchyFilters, setDebouncedHierarchyFilters] = useState(DEFAULT_HIERARCHY_FILTERS);
-
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
@@ -152,15 +147,10 @@ const RollNumberManagement = () => {
     return () => clearTimeout(t);
   }, [filters]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedHierarchyFilters(hierarchyFilters), FILTER_DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [hierarchyFilters]);
-
   // Reset to page 1 whenever the applied filters or the active tab change.
   useEffect(() => {
     setPaginationModel((prev) => (prev.page === 0 ? prev : { ...prev, page: 0 }));
-  }, [debouncedFilters, debouncedHierarchyFilters, activeTab]);
+  }, [debouncedFilters, activeTab]);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -189,50 +179,18 @@ const RollNumberManagement = () => {
     })();
   }, []);
 
-  // Filter definitions built from real, complete lists (not just the current
-  // page) so Exam Center / Advertisement No only ever offer values that
-  // actually exist, and dropdown values are the raw ids the backend expects.
-  const filterConfig = useMemo(() => {
-    // adv_number already reads e.g. "Advertisement 1-26" — don't re-prefix it.
-    const advertisementOptions = Array.from(new Set(advertisements.map((a) => a.adv_number).filter(Boolean)))
-      .sort()
-      .map((value) => ({ value, label: formatAdvertisementLabel(value) }));
-
-    const centerOptions = centers
-      .filter((c) => c.id != null)
-      .map((c) => ({ value: String(c.id), label: `${c.name}${c.city ? ` (${c.city})` : ''}` }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-
-    return [
-      { name: 'search', label: 'Search (Name / CNIC / Ref ID / Roll No)', type: 'text', placeholder: 'Search by name, CNIC, Ref ID, or Roll No' },
-      { name: 'advertisement_no', label: 'Advertisement No', type: 'select', options: advertisementOptions },
-      { name: 'exam_center_id', label: 'Exam Center', type: 'select', options: centerOptions },
-      { name: 'preferred_exam_city', label: 'Preferred Exam City', type: 'text', placeholder: 'e.g. Rawalakot' },
-      {
-        name: 'payment_status',
-        label: 'Payment Status',
-        type: 'select',
-        options: [
-          { value: 'paid', label: 'Paid' },
-          { value: 'unpaid', label: 'Unpaid' },
-        ],
-      },
-    ];
-  }, [advertisements, centers]);
-
-  const hasActiveFilters = useMemo(() => Object.values(filters).some(Boolean), [filters]);
-
   // ── Advertisement -> Department -> Post cascade ─────────────────────────
   // Built entirely client-side from `advertisements` (already fetched above
   // via getAdvertisementsWithJobs, which nests job_details[].department per
   // advertisement) — no extra API calls needed. Each dropdown's options are
   // narrowed by whatever parent(s) are currently selected; an unset filter
-  // is treated as "all", per the requested hierarchy.
+  // is treated as "all", per the requested hierarchy. Computed ahead of
+  // filterConfig below since filterConfig folds these options in.
   const advertisementsScopedByAd = useMemo(
-    () => (hierarchyFilters.adv_number
-      ? advertisements.filter((a) => a.adv_number === hierarchyFilters.adv_number)
+    () => (filters.adv_number
+      ? advertisements.filter((a) => a.adv_number === filters.adv_number)
       : advertisements),
-    [advertisements, hierarchyFilters.adv_number]
+    [advertisements, filters.adv_number]
   );
 
   const cascadeAdvertisementOptions = useMemo(() => (
@@ -259,36 +217,61 @@ const RollNumberManagement = () => {
     const map = new Map();
     advertisementsScopedByAd.forEach((a) => {
       (a.job_details || []).forEach((jd) => {
-        if (hierarchyFilters.department_hash_id && getDeptKey(jd) !== hierarchyFilters.department_hash_id) return;
+        if (filters.department_hash_id && getDeptKey(jd) !== filters.department_hash_id) return;
         if (jd.hash_id && jd.designation) map.set(jd.hash_id, jd.designation);
       });
     });
     return Array.from(map.entries())
       .map(([value, label]) => ({ value, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [advertisementsScopedByAd, hierarchyFilters.department_hash_id]);
+  }, [advertisementsScopedByAd, filters.department_hash_id]);
 
-  const hierarchyFilterConfig = useMemo(() => ([
-    { name: 'adv_number', label: 'Advertisement', type: 'select', options: cascadeAdvertisementOptions },
-    { name: 'department_hash_id', label: 'Department', type: 'select', options: cascadeDepartmentOptions },
-    { name: 'job_detail_hash_id', label: 'Post', type: 'select', options: cascadePostOptions },
-  ]), [cascadeAdvertisementOptions, cascadeDepartmentOptions, cascadePostOptions]);
+  // Filter definitions built from real, complete lists (not just the current
+  // page) so Exam Center / Advertisement No only ever offer values that
+  // actually exist, and dropdown values are the raw ids the backend expects.
+  // Single combined list — previously split across two separate filter bars
+  // (base filters + the Advertisement -> Department -> Post cascade); merged
+  // into one bar/one Search-Reset action, every original filter kept as-is.
+  const filterConfig = useMemo(() => {
+    const centerOptions = centers
+      .filter((c) => c.id != null)
+      .map((c) => ({ value: String(c.id), label: `${c.name}${c.city ? ` (${c.city})` : ''}` }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    return [
+      // Advertisement -> Department -> Post cascade shown first/above the
+      // rest of the filters — these three depend on each other (picking an
+      // Advertisement narrows Department, picking a Department narrows Post).
+      { name: 'section_cascade', label: 'Advertisement → Department → Post (dependent filters)', type: 'section' },
+      { name: 'adv_number', label: 'Advertisement', type: 'select', options: cascadeAdvertisementOptions },
+      { name: 'department_hash_id', label: 'Department', type: 'select', options: cascadeDepartmentOptions },
+      { name: 'job_detail_hash_id', label: 'Post', type: 'select', options: cascadePostOptions },
+      // Other Filters — one per remaining grid column (CNIC/Applicant Name/
+      // Roll Number are covered together by the combined search box; the
+      // Advertisement Job column is already covered by the cascade above).
+      { name: 'section_independent', label: 'Other Filters', type: 'section' },
+      { name: 'search', label: 'Search (Name / CNIC / Roll No)', type: 'text', placeholder: 'Search by name, CNIC, or Roll No' },
+      { name: 'exam_center_id', label: 'Exam Center', type: 'select', options: centerOptions },
+    ];
+  }, [centers, cascadeAdvertisementOptions, cascadeDepartmentOptions, cascadePostOptions]);
+
+  const hasActiveFilters = useMemo(() => Object.values(filters).some(Boolean), [filters]);
 
   // Changing a parent clears its dependent children so a stale, no-longer-valid
   // selection can't linger (e.g. picking a new Advertisement clears any
   // previously chosen Department/Post from the old one).
-  const handleHierarchyChange = (e) => {
+  const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setHierarchyFilters((prev) => {
-      if (name === 'adv_number') return { adv_number: value, department_hash_id: '', job_detail_hash_id: '' };
+    setFilters((prev) => {
+      if (name === 'adv_number') return { ...prev, adv_number: value, department_hash_id: '', job_detail_hash_id: '' };
       if (name === 'department_hash_id') return { ...prev, department_hash_id: value, job_detail_hash_id: '' };
       return { ...prev, [name]: value };
     });
   };
 
-  const handleClearHierarchyFilters = () => {
-    setHierarchyFilters(DEFAULT_HIERARCHY_FILTERS);
-    setDebouncedHierarchyFilters(DEFAULT_HIERARCHY_FILTERS);
+  const handleClearFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setDebouncedFilters(DEFAULT_FILTERS); // apply immediately, don't wait out the debounce
   };
 
   // The live `shortlisted` endpoint only accepts `advertisement_no` — it has
@@ -297,23 +280,23 @@ const RollNumberManagement = () => {
   // against the designation(s) that belong to the selected Department/Post
   // within the selected (or, if none, every) Advertisement.
   const activeDesignations = useMemo(() => {
-    if (!debouncedHierarchyFilters.job_detail_hash_id && !debouncedHierarchyFilters.department_hash_id) return null;
-    const scoped = debouncedHierarchyFilters.adv_number
-      ? advertisements.filter((a) => a.adv_number === debouncedHierarchyFilters.adv_number)
+    if (!debouncedFilters.job_detail_hash_id && !debouncedFilters.department_hash_id) return null;
+    const scoped = debouncedFilters.adv_number
+      ? advertisements.filter((a) => a.adv_number === debouncedFilters.adv_number)
       : advertisements;
     const set = new Set();
     scoped.forEach((a) => {
       (a.job_details || []).forEach((jd) => {
         if (!jd.designation) return;
-        if (debouncedHierarchyFilters.job_detail_hash_id) {
-          if (jd.hash_id === debouncedHierarchyFilters.job_detail_hash_id) set.add(jd.designation);
-        } else if (getDeptKey(jd) === debouncedHierarchyFilters.department_hash_id) {
+        if (debouncedFilters.job_detail_hash_id) {
+          if (jd.hash_id === debouncedFilters.job_detail_hash_id) set.add(jd.designation);
+        } else if (getDeptKey(jd) === debouncedFilters.department_hash_id) {
           set.add(jd.designation);
         }
       });
     });
     return set;
-  }, [advertisements, debouncedHierarchyFilters]);
+  }, [advertisements, debouncedFilters]);
 
   // ── Data: search/filter/sort/paginate all happen server-side — this page
   // just requests the current page for the active filters and renders it. ──
@@ -324,18 +307,13 @@ const RollNumberManagement = () => {
       // when either is active, pull a larger batch and narrow+paginate
       // client-side (below) instead of relying on server pagination.
       const needsClientNarrowing = activeDesignations !== null;
-      // Old "Advertisement No" filter wins if both it and the new hierarchy
-      // filter happen to be set — the hierarchy filter fills the gap otherwise.
-      const effectiveAdvNo = debouncedFilters.advertisement_no || debouncedHierarchyFilters.adv_number;
 
       const result = await RollNumberApi.getShortlisted({
         per_page:            needsClientNarrowing ? 2000 : paginationModel.pageSize,
         page:                needsClientNarrowing ? 1 : paginationModel.page + 1,
         search:              debouncedFilters.search,
-        advertisement_no:    effectiveAdvNo,
-        payment_status:      debouncedFilters.payment_status,
+        advertisement_no:    debouncedFilters.adv_number,
         exam_center_id:      debouncedFilters.exam_center_id,
-        preferred_exam_city: debouncedFilters.preferred_exam_city,
         slip_status:         activeTab === 'published' ? 'published' : 'generated',
         has_roll_number:     1, // only candidates whose slip has been generated belong on this list
       });
@@ -409,22 +387,11 @@ const RollNumberManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel, debouncedFilters, debouncedHierarchyFilters, activeDesignations, activeTab]);
+  }, [paginationModel, debouncedFilters, activeDesignations, activeTab]);
 
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
-
-  // ── Filters ─────────────────────────────────────────────────────────────
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleClearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-    setDebouncedFilters(DEFAULT_FILTERS); // apply immediately, don't wait out the debounce
-  };
 
   // ── Slip download ───────────────────────────────────────────────────────────
   const downloadSlip = useCallback(async (applicationNumber) => {
@@ -519,15 +486,12 @@ const RollNumberManagement = () => {
     const findingTid = toast.loading(`Finding all ${tabLabel} slips…`);
     let rows;
     try {
-      const effectiveAdvNo = debouncedFilters.advertisement_no || debouncedHierarchyFilters.adv_number;
       const result = await RollNumberApi.getShortlisted({
         per_page:            5000,
         page:                1,
         search:              debouncedFilters.search,
-        advertisement_no:    effectiveAdvNo,
-        payment_status:      debouncedFilters.payment_status,
+        advertisement_no:    debouncedFilters.adv_number,
         exam_center_id:      debouncedFilters.exam_center_id,
-        preferred_exam_city: debouncedFilters.preferred_exam_city,
         slip_status:         activeTab === 'published' ? 'published' : 'generated',
         has_roll_number:     1,
       });
@@ -700,15 +664,12 @@ const RollNumberManagement = () => {
     const findingTid = toast.loading('Finding all unpublished slips…');
     let unpublished;
     try {
-      const effectiveAdvNo = debouncedFilters.advertisement_no || debouncedHierarchyFilters.adv_number;
       const result = await RollNumberApi.getShortlisted({
         per_page:            5000,
         page:                1,
         search:              debouncedFilters.search,
-        advertisement_no:    effectiveAdvNo,
-        payment_status:      debouncedFilters.payment_status,
+        advertisement_no:    debouncedFilters.adv_number,
         exam_center_id:      debouncedFilters.exam_center_id,
-        preferred_exam_city: debouncedFilters.preferred_exam_city,
         slip_status:         'generated',
         has_roll_number:     1,
       });
@@ -781,15 +742,12 @@ const RollNumberManagement = () => {
     const findingTid = toast.loading('Finding all published slips…');
     let published;
     try {
-      const effectiveAdvNo = debouncedFilters.advertisement_no || debouncedHierarchyFilters.adv_number;
       const result = await RollNumberApi.getShortlisted({
         per_page:            5000,
         page:                1,
         search:              debouncedFilters.search,
-        advertisement_no:    effectiveAdvNo,
-        payment_status:      debouncedFilters.payment_status,
+        advertisement_no:    debouncedFilters.adv_number,
         exam_center_id:      debouncedFilters.exam_center_id,
-        preferred_exam_city: debouncedFilters.preferred_exam_city,
         slip_status:         'published',
         has_roll_number:     1,
       });
@@ -917,31 +875,21 @@ const RollNumberManagement = () => {
 
   // ── Columns ─────────────────────────────
   const columns = [
-    { field: 'application_number', headerName: 'Ref ID',          minWidth: 110, flex: 0.8 },
-    { field: 'applicant_name',     headerName: 'Applicant Name',  minWidth: 160, flex: 1.1 },
-    { field: 'advertisement_no',     headerName: 'Advertisement Number',  minWidth: 170, flex: 1.1 },
-    { field: 'job_title',     headerName: 'Job Advertisement',  minWidth: 160, flex: 1.1 },
     { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
+    { field: 'applicant_name',     headerName: 'Applicant Name',  minWidth: 160, flex: 1.1 },
     {
-      field: 'preferred_exam_cities',
-      headerName: 'Exam City Preferences',
-      minWidth: 180,
-      flex: 1.0,
-      renderCell: (p) => {
-        const cities = p.value || [];
-        if (cities.length === 0) {
-          return <span className="text-slate-400 text-xs">Not specified</span>;
-        }
-        return (
-          <div className="flex flex-col gap-1">
-            {cities.map((city, idx) => (
-              <span key={idx} className="text-sm text-slate-700">
-                <span className="font-medium text-xs uppercase text-slate-500 mr-1">{idx + 1}.</span> {city}
-              </span>
-            ))}
-          </div>
-        );
-      },
+      // Advertisement Number + Job Advertisement wrapped into one column,
+      // stacked row-over-row, instead of two separate columns.
+      field: 'advertisement_job',
+      headerName: 'Advertisement Job',
+      minWidth: 190,
+      flex: 1.2,
+      renderCell: (p) => (
+        <div className="flex flex-col leading-tight py-1">
+          <span className="text-sm font-medium text-slate-800">{p.row.advertisement_no || '—'}</span>
+          <span className="text-xs text-slate-500">{p.row.job_title || '—'}</span>
+        </div>
+      ),
     },
     {
       field: 'roll_number',
@@ -960,15 +908,6 @@ const RollNumberManagement = () => {
       renderCell: (p) => p.value
         ? <span className="text-sm text-slate-700">{p.value}{p.row.exam_city ? ` (${p.row.exam_city})` : ''}</span>
         : <span className="text-slate-400 text-xs">—</span>,
-    },
-    {
-      field: 'working_state',
-      headerName: 'Slip Status',
-      minWidth: 150,
-      flex: 0.7,
-      renderCell: (p) => p.value === 'published'
-        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Published</span>
-        : <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Roll No Generated</span>,
     },
     {
       field: 'actions',
@@ -994,8 +933,16 @@ const RollNumberManagement = () => {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-100 rounded-lg"><Hash size={22} className="text-indigo-700" /></div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Roll Number Management</h1>
-              <p className="text-sm text-slate-500 mt-1">View and manage candidates with generated roll number slips.</p>
+              <h1 className="text-2xl font-bold text-slate-900">
+                {fixedTab === 'published' ? 'Published Roll Number Slips'
+                  : fixedTab === 'unpublished' ? 'Unpublished Roll Number Slips'
+                  : 'Roll Number Management'}
+              </h1>
+              <p className="text-sm text-slate-500 mt-1">
+                {fixedTab === 'published' ? 'Roll number slips already published and visible to candidates.'
+                  : fixedTab === 'unpublished' ? 'Roll number slips generated but not yet published to candidates.'
+                  : 'View and manage candidates with generated roll number slips.'}
+              </p>
             </div>
           </div>
           {/* <Button variant="outline" size="md" onClick={fetchApplications} disabled={loading}
@@ -1039,22 +986,14 @@ const RollNumberManagement = () => {
           </Card>
         </div>
 
-        {/* FILTERS */}
+        {/* FILTERS — single combined bar (base filters + the Advertisement ->
+            Department -> Post cascade used to live in two separate cards) */}
         <AdvancedFilter
           filters={filters}
           onFilterChange={handleFilterChange}
           onClearFilters={handleClearFilters}
           filterConfig={filterConfig}
           title="Filter Roll Number Slips"
-        />
-
-        {/* HIERARCHY FILTERS — Advertisement -> Department -> Post (independent of the filter bar above) */}
-        <AdvancedFilter
-          filters={hierarchyFilters}
-          onFilterChange={handleHierarchyChange}
-          onClearFilters={handleClearHierarchyFilters}
-          filterConfig={hierarchyFilterConfig}
-          title="Filter by Advertisement → Department → Post"
         />
 
         {/* ACTION BAR — always visible so "Publish/Unpublish Selected" (acts only
@@ -1130,8 +1069,11 @@ const RollNumberManagement = () => {
           </div>
         )}
 
-        {/* GRID — Published / Unpublished Slips tabs live inside the same card, same style as the All Requisitions page */}
+        {/* GRID — Published / Unpublished are now separate pages (fixedTab set),
+            so the in-page tab switcher only renders in the legacy combined mode
+            (fixedTab unset), if this component is ever mounted without a fixed tab. */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          {!fixedTab && (
           <div className="grid w-full grid-cols-2 overflow-hidden rounded-t-lg bg-white p-1">
             {TABS.map((t) => {
               const isActive = activeTab === t.id;
@@ -1159,6 +1101,7 @@ const RollNumberManagement = () => {
               );
             })}
           </div>
+          )}
 
           {loading && allRows.length === 0 ? (
             <div className="p-10 flex justify-center">

@@ -87,6 +87,20 @@ const AdvancedFilter = ({
         {extraFilters && extraFilters}
         {filterConfig.map((config) => {
           switch (config.type) {
+            // Full-width label — no input, no filter key. Used to visually
+            // separate a group of filters that depend on each other (e.g.
+            // Advertisement -> Department -> Post, where picking one narrows
+            // the next) from the independent filters around them.
+            case 'section':
+              return (
+                <p
+                  key={config.name}
+                  className="col-span-full text-xs font-semibold uppercase tracking-wide text-slate-400 mt-1 first:mt-0"
+                >
+                  {config.label}
+                </p>
+              );
+
             case 'text':
               return (
                 <TextField

@@ -78,7 +78,8 @@ import RoleForm from 'pages/settings/Roles/RoleForm';
 import DepartmentUserList from 'pages/settings/DepartmentUsers/DepartmentUserList';
 import DepartmentUserForm from 'pages/settings/DepartmentUsers/DepartmentUserForm';
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
-import RollNumberManagement from 'pages/roll-numbers/RollNumberManagement';
+import UnpublishedRollSlips from 'pages/roll-numbers/UnpublishedRollSlips';
+import PublishedRollSlips from 'pages/roll-numbers/PublishedRollSlips';
 import RollSlipEditor from 'pages/roll-numbers/RollSlipEditor';
 import RollSlipView from 'pages/roll-numbers/RollSlipView';
 import RollNumberVerify from 'pages/roll-numbers/RollNumberVerify';
@@ -279,8 +280,10 @@ function App() {
           <Route path="settings/department-users/create" element={<DepartmentUserForm />} />
           <Route path="settings/terms-conditions/" element={<AddNotes />} />
 
-          {/* Roll Number Management Routes */}
-          <Route path="roll-numbers" element={<RollNumberManagement />} />
+          {/* Roll Number Management Routes — Published/Unpublished are now
+              separate pages instead of one combined page with a tab toggle. */}
+          <Route path="roll-numbers" element={<UnpublishedRollSlips />} />
+          <Route path="roll-numbers/published" element={<PublishedRollSlips />} />
           <Route path="roll-numbers/exam/:examType" element={<RollNumberExamFlow />} />
           <Route path="roll-numbers/edit-slip/:applicationNumber" element={<RollSlipEditor />} />
           <Route path="roll-numbers/slip/:rollNumber" element={<RollSlipView />} />

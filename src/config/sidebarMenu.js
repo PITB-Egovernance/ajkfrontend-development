@@ -66,7 +66,8 @@ export const MENU_ITEMS = [
     icon: Hash,
     path: "/dashboard/roll-numbers",
     submenu: [
-      { label: "All Candidates", path: "/dashboard/roll-numbers",                    icon: ClipboardList },
+      { label: "Unpublished Slips", path: "/dashboard/roll-numbers",           icon: ClipboardList },
+      { label: "Published Slips",   path: "/dashboard/roll-numbers/published", icon: CheckCircle },
       { label: "One Paper MCQs",   path: "/dashboard/roll-numbers/exam/one-paper-mcqs", icon: FileText },
       { label: "Two Paper MCQs",   path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
       { label: "Written Exams",    path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },
