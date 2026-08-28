@@ -187,6 +187,7 @@ export const MENU_ITEMS = [
     path: "/dashboard/settings",
     submenu: [
       { label: "Commission Members", path: "/dashboard/settings/commission-members", icon: Users },
+      { label: "Secretary and Officials", path: "/dashboard/settings/secretary-officials", icon: Landmark },
       { label: "Districts",          path: "/dashboard/settings/districts",           icon: Package },
 
       { label: "Designations",       path: "/dashboard/settings/designations",        icon: Briefcase },

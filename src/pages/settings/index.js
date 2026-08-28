@@ -10,5 +10,6 @@ export { default as ContractorsManagement } from './ContractorsManagement';
 export { default as CitiesManagement } from './Cities/CitiesManagement';
 export { default as ExamCentersManagement } from './ExamCenters/ExamCentersManagement';
 export { default as CommissionMembersManagement } from './CommissionMembers/CommissionMembersManagement';
+export { default as SecretaryOfficialsManagement } from './SecretaryOfficials/SecretaryOfficialsManagement';
 
 
