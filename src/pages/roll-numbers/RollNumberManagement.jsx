@@ -89,6 +89,21 @@ const gridSx = {
   '& .MuiDataGrid-row.Mui-selected:hover': { backgroundColor: '#d1fae5' },
 };
 
+// The live backend cascades publish/unpublish/delete to sibling rows under
+// OTHER advertisements (clubbed posts), which can intermittently deadlock
+// against a concurrent action touching an overlapping advertisement and
+// return a transient 500 — retrying once covers that without the admin
+// having to notice the failure and click again themselves.
+const withRetry = async (fn, retries = 1, delayMs = 400) => {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries <= 0) throw err;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return withRetry(fn, retries - 1, delayMs);
+  }
+};
+
 const RollNumberManagement = () => {
   const navigate = useNavigate();
 
@@ -454,7 +469,7 @@ const RollNumberManagement = () => {
 
     const tid = toast.loading('Deleting slip…');
     try {
-      await RollNumberApi.deleteSlip(applicationNumber);
+      await withRetry(() => RollNumberApi.deleteSlip(applicationNumber));
       toast.dismiss(tid);
       toast.success('Roll number slip deleted successfully');
       fetchApplications();
@@ -484,9 +499,69 @@ const RollNumberManagement = () => {
 
     const tid = toast.loading(`Deleting ${rowsWithRoll.length} slip${rowsWithRoll.length === 1 ? '' : 's'}…`);
     try {
-      const result = await RollNumberApi.bulkDeleteSlips(rowsWithRoll.map(r => r.application_number));
+      const result = await withRetry(() => RollNumberApi.bulkDeleteSlips(rowsWithRoll.map(r => r.application_number)));
       toast.dismiss(tid);
       const count = result.data?.deleted ?? rowsWithRoll.length;
+      toast.success(`${count} roll number slip${count === 1 ? '' : 's'} deleted successfully`);
+      setSelectionModel([]);
+      fetchApplications();
+    } catch (err) {
+      toast.dismiss(tid);
+      toast.error(err?.message || 'Failed to delete slips');
+    }
+  };
+
+  // Mirror of publishAllUnpublished/unpublishAllPublished — deletes every
+  // slip on the ACTIVE TAB (unpublished or published) matching the current
+  // filters, across ALL pages, instead of only whatever's checked/loaded.
+  const deleteAllSlips = async () => {
+    const tabLabel = activeTab === 'published' ? 'published' : 'unpublished';
+    const findingTid = toast.loading(`Finding all ${tabLabel} slips…`);
+    let rows;
+    try {
+      const effectiveAdvNo = debouncedFilters.advertisement_no || debouncedHierarchyFilters.adv_number;
+      const result = await RollNumberApi.getShortlisted({
+        per_page:            5000,
+        page:                1,
+        search:              debouncedFilters.search,
+        advertisement_no:    effectiveAdvNo,
+        payment_status:      debouncedFilters.payment_status,
+        exam_center_id:      debouncedFilters.exam_center_id,
+        preferred_exam_city: debouncedFilters.preferred_exam_city,
+        slip_status:         activeTab === 'published' ? 'published' : 'generated',
+        has_roll_number:     1,
+      });
+      const items = Array.isArray(result?.data?.data) ? result.data.data : [];
+      rows = items.filter((item) => !!item.roll_number
+        && (activeTab === 'published' ? !!item.published_at : !item.published_at));
+      if (activeDesignations !== null) {
+        rows = rows.filter((item) => activeDesignations.has(item.job_title));
+      }
+    } catch (err) {
+      toast.dismiss(findingTid);
+      toast.error(err?.message || `Failed to load ${tabLabel} slips`);
+      return;
+    }
+    toast.dismiss(findingTid);
+
+    if (rows.length === 0) {
+      toast.error(`No ${tabLabel} slips found matching the current filters`);
+      return;
+    }
+
+    const ok = await confirmDelete({
+      title:      `Delete All ${activeTab === 'published' ? 'Published' : 'Unpublished'} Slips`,
+      message:    `Remove roll numbers and exam center allocation for all ${rows.length} ${tabLabel} candidate${rows.length === 1 ? '' : 's'} matching the current filters — not just the ones selected?`,
+      identifier: `${rows.length} slips`,
+      warning:    'Those candidates will lose their roll numbers and allocations. You can regenerate new slips afterwards.',
+    });
+    if (!ok) return;
+
+    const tid = toast.loading(`Deleting ${rows.length} slip${rows.length === 1 ? '' : 's'}…`);
+    try {
+      const result = await withRetry(() => RollNumberApi.bulkDeleteSlips(rows.map(r => r.application_number)));
+      toast.dismiss(tid);
+      const count = result.data?.deleted ?? rows.length;
       toast.success(`${count} roll number slip${count === 1 ? '' : 's'} deleted successfully`);
       setSelectionModel([]);
       fetchApplications();
@@ -500,6 +575,16 @@ const RollNumberManagement = () => {
   // Slips are grouped by advertisement (the publish/unpublish endpoint is
   // scoped per-advertisement) so a selection spanning multiple advertisements
   // still works in one action.
+  //
+  // Each advertisement is called ONE AT A TIME (not Promise.all) and with a
+  // single automatic retry on failure. The live backend cascades a
+  // publish/unpublish to sibling rows under OTHER advertisements (clubbed
+  // posts), so firing every advertisement's request in parallel can
+  // intermittently deadlock two of them against each other and return a
+  // transient 500 — which used to abort the whole action even though most
+  // advertisements had already committed. Retrying once covers the same
+  // transient failure for a single advertisement (e.g. another admin acting
+  // on it at the same moment).
   const runPublishAction = async (rows, action) => {
     const byAd = {};
     rows.forEach((r) => {
@@ -511,8 +596,29 @@ const RollNumberManagement = () => {
       throw new Error('Missing advertisement reference for the selected slip(s)');
     }
     const apiFn = action === 'publish' ? RollNumberApi.publishSlips : RollNumberApi.unpublishSlips;
-    const results = await Promise.all(adIds.map((adId) => apiFn(adId, byAd[adId])));
-    return results.reduce((sum, r) => sum + (r.data?.published ?? r.data?.unpublished ?? 0), 0);
+
+    let count = 0;
+    const failed = [];
+    for (const adId of adIds) {
+      let attempt = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        try {
+          const r = await apiFn(adId, byAd[adId]);
+          count += r.data?.published ?? r.data?.unpublished ?? 0;
+          break;
+        } catch (err) {
+          if (attempt < 1) {
+            attempt += 1;
+            await new Promise((resolve) => setTimeout(resolve, 400));
+            continue;
+          }
+          failed.push(adId);
+          break;
+        }
+      }
+    }
+    return { count, failed };
   };
 
   const bulkPublishSlips = async () => {
@@ -535,11 +641,15 @@ const RollNumberManagement = () => {
 
     const tid = toast.loading(`Publishing ${rows.length} slip${rows.length === 1 ? '' : 's'}…`);
     try {
-      const count = await runPublishAction(rows, 'publish');
+      const { count, failed } = await runPublishAction(rows, 'publish');
       toast.dismiss(tid);
-      toast.success(`${count} roll number slip${count === 1 ? '' : 's'} published successfully`);
       setSelectionModel([]);
       fetchApplications();
+      if (failed.length === 0) {
+        toast.success(`${count} roll number slip${count === 1 ? '' : 's'} published successfully`);
+      } else {
+        toast.error(`${count} slip${count === 1 ? '' : 's'} published, but ${failed.length} advertisement${failed.length === 1 ? '' : 's'} failed — try again to retry ${failed.length === 1 ? 'it' : 'them'}.`);
+      }
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to publish slips');
@@ -566,14 +676,176 @@ const RollNumberManagement = () => {
 
     const tid = toast.loading(`Unpublishing ${rows.length} slip${rows.length === 1 ? '' : 's'}…`);
     try {
-      const count = await runPublishAction(rows, 'unpublish');
+      const { count, failed } = await runPublishAction(rows, 'unpublish');
       toast.dismiss(tid);
-      toast.success(`${count} roll number slip${count === 1 ? '' : 's'} unpublished successfully`);
       setSelectionModel([]);
       fetchApplications();
+      if (failed.length === 0) {
+        toast.success(`${count} roll number slip${count === 1 ? '' : 's'} unpublished successfully`);
+      } else {
+        toast.error(`${count} slip${count === 1 ? '' : 's'} unpublished, but ${failed.length} advertisement${failed.length === 1 ? '' : 's'} failed — try again to retry ${failed.length === 1 ? 'it' : 'them'}.`);
+      }
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to unpublish slips');
+    }
+  };
+
+  // "Select all" on the grid only ever selects the currently-loaded page —
+  // the grid is server-paginated, so it has no way to know about rows on
+  // other pages. This is a dedicated action that finds every unpublished
+  // slip matching the current filters (across ALL pages) and publishes them,
+  // instead of being limited to whatever page happens to be on screen.
+  const publishAllUnpublished = async () => {
+    const findingTid = toast.loading('Finding all unpublished slips…');
+    let unpublished;
+    try {
+      const effectiveAdvNo = debouncedFilters.advertisement_no || debouncedHierarchyFilters.adv_number;
+      const result = await RollNumberApi.getShortlisted({
+        per_page:            5000,
+        page:                1,
+        search:              debouncedFilters.search,
+        advertisement_no:    effectiveAdvNo,
+        payment_status:      debouncedFilters.payment_status,
+        exam_center_id:      debouncedFilters.exam_center_id,
+        preferred_exam_city: debouncedFilters.preferred_exam_city,
+        slip_status:         'generated',
+        has_roll_number:     1,
+      });
+      const items = Array.isArray(result?.data?.data) ? result.data.data : [];
+      unpublished = items.filter((item) => !item.published_at && item.roll_number && item.advertisement_hash_id);
+      if (activeDesignations !== null) {
+        unpublished = unpublished.filter((item) => activeDesignations.has(item.job_title));
+      }
+    } catch (err) {
+      toast.dismiss(findingTid);
+      toast.error(err?.message || 'Failed to load unpublished slips');
+      return;
+    }
+    toast.dismiss(findingTid);
+
+    if (unpublished.length === 0) {
+      toast.error('No unpublished slips found matching the current filters');
+      return;
+    }
+
+    const adIds = [...new Set(unpublished.map((item) => item.advertisement_hash_id))];
+
+    const ok = await confirmDelete({
+      title:       'Publish All Unpublished Slips',
+      message:     `Publish roll number slips for all ${unpublished.length} unpublished candidate${unpublished.length === 1 ? '' : 's'} matching the current filters (across ${adIds.length} advertisement${adIds.length === 1 ? '' : 's'})? They will become visible to candidates immediately.`,
+      identifier:  `${unpublished.length} slips`,
+      warning:     'Candidates will be able to view and download these slips right away.',
+      confirmLabel: 'Publish All',
+      confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
+    });
+    if (!ok) return;
+
+    const tid = toast.loading(`Publishing ${unpublished.length} slip${unpublished.length === 1 ? '' : 's'}…`);
+    // One advertisement at a time — not Promise.all. Firing every
+    // advertisement's publish request in parallel let concurrent writes to
+    // the same tables intermittently trip a transient 500 (DB lock
+    // contention), which then aborted the whole batch even though most
+    // advertisements had already committed successfully. Awaiting each call
+    // lets its transaction fully commit before the next one starts, and a
+    // failure on one advertisement no longer discards progress on the rest.
+    let count = 0;
+    const failed = [];
+    for (const adId of adIds) {
+      try {
+        // No application_numbers passed — the backend publishes every
+        // eligible unpublished slip for the advertisement in one go, so
+        // this isn't limited by whatever page size the list above fetched.
+        const r = await RollNumberApi.publishSlips(adId);
+        count += r.data?.published ?? 0;
+      } catch (err) {
+        failed.push(adId);
+      }
+    }
+    toast.dismiss(tid);
+    setSelectionModel([]);
+    fetchApplications();
+    if (failed.length === 0) {
+      toast.success(`${count} roll number slip${count === 1 ? '' : 's'} published successfully`);
+    } else {
+      toast.error(
+        `${count} slip${count === 1 ? '' : 's'} published, but ${failed.length} advertisement${failed.length === 1 ? '' : 's'} failed — click Publish All again to retry ${failed.length === 1 ? 'it' : 'them'}.`
+      );
+    }
+  };
+
+  // Mirror of publishAllUnpublished, for the Published tab — unpublishes
+  // every currently-published slip matching the current filters, across ALL
+  // pages, instead of only whatever page the grid has loaded.
+  const unpublishAllPublished = async () => {
+    const findingTid = toast.loading('Finding all published slips…');
+    let published;
+    try {
+      const effectiveAdvNo = debouncedFilters.advertisement_no || debouncedHierarchyFilters.adv_number;
+      const result = await RollNumberApi.getShortlisted({
+        per_page:            5000,
+        page:                1,
+        search:              debouncedFilters.search,
+        advertisement_no:    effectiveAdvNo,
+        payment_status:      debouncedFilters.payment_status,
+        exam_center_id:      debouncedFilters.exam_center_id,
+        preferred_exam_city: debouncedFilters.preferred_exam_city,
+        slip_status:         'published',
+        has_roll_number:     1,
+      });
+      const items = Array.isArray(result?.data?.data) ? result.data.data : [];
+      published = items.filter((item) => !!item.published_at && item.roll_number && item.advertisement_hash_id);
+      if (activeDesignations !== null) {
+        published = published.filter((item) => activeDesignations.has(item.job_title));
+      }
+    } catch (err) {
+      toast.dismiss(findingTid);
+      toast.error(err?.message || 'Failed to load published slips');
+      return;
+    }
+    toast.dismiss(findingTid);
+
+    if (published.length === 0) {
+      toast.error('No published slips found matching the current filters');
+      return;
+    }
+
+    const adIds = [...new Set(published.map((item) => item.advertisement_hash_id))];
+
+    const ok = await confirmDelete({
+      title:       'Unpublish All Published Slips',
+      message:     `Unpublish roll number slips for all ${published.length} published candidate${published.length === 1 ? '' : 's'} matching the current filters (across ${adIds.length} advertisement${adIds.length === 1 ? '' : 's'})? They will no longer be visible to candidates.`,
+      identifier:  `${published.length} slips`,
+      warning:     'Candidates will immediately lose access to view/download these slips.',
+      confirmLabel: 'Unpublish All',
+      confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!ok) return;
+
+    const tid = toast.loading(`Unpublishing ${published.length} slip${published.length === 1 ? '' : 's'}…`);
+    // One advertisement at a time — see publishAllUnpublished for why.
+    let count = 0;
+    const failed = [];
+    for (const adId of adIds) {
+      try {
+        // No application_numbers passed — the backend unpublishes every
+        // published slip for the advertisement in one go, so this isn't
+        // limited by whatever page size the list above happened to fetch.
+        const r = await RollNumberApi.unpublishSlips(adId);
+        count += r.data?.unpublished ?? 0;
+      } catch (err) {
+        failed.push(adId);
+      }
+    }
+    toast.dismiss(tid);
+    setSelectionModel([]);
+    fetchApplications();
+    if (failed.length === 0) {
+      toast.success(`${count} roll number slip${count === 1 ? '' : 's'} unpublished successfully`);
+    } else {
+      toast.error(
+        `${count} slip${count === 1 ? '' : 's'} unpublished, but ${failed.length} advertisement${failed.length === 1 ? '' : 's'} failed — click Unpublish All again to retry ${failed.length === 1 ? 'it' : 'them'}.`
+      );
     }
   };
 
@@ -591,10 +863,14 @@ const RollNumberManagement = () => {
 
     const tid = toast.loading('Publishing slip…');
     try {
-      await runPublishAction([row], 'publish');
+      const { count, failed } = await runPublishAction([row], 'publish');
       toast.dismiss(tid);
-      toast.success('Roll number slip published successfully');
       fetchApplications();
+      if (failed.length === 0 && count > 0) {
+        toast.success('Roll number slip published successfully');
+      } else {
+        toast.error('Failed to publish slip — please try again.');
+      }
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to publish slip');
@@ -615,10 +891,14 @@ const RollNumberManagement = () => {
 
     const tid = toast.loading('Unpublishing slip…');
     try {
-      await runPublishAction([row], 'unpublish');
+      const { count, failed } = await runPublishAction([row], 'unpublish');
       toast.dismiss(tid);
-      toast.success('Roll number slip unpublished successfully');
       fetchApplications();
+      if (failed.length === 0 && count > 0) {
+        toast.success('Roll number slip unpublished successfully');
+      } else {
+        toast.error('Failed to unpublish slip — please try again.');
+      }
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to unpublish slip');
@@ -777,33 +1057,72 @@ const RollNumberManagement = () => {
           title="Filter by Advertisement → Department → Post"
         />
 
-        {/* BULK BAR */}
-        {selectedIds.length > 0 && (
+        {/* ACTION BAR — always visible so "Publish/Unpublish Selected" (acts only
+            on the checked rows) and "Publish/Unpublish ALL" (acts on every
+            matching slip across every page) are never mistaken for each other. */}
+        {canEdit && (
           <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-emerald-800 font-medium">
-                {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
+                {selectedIds.length > 0
+                  ? `${selectedIds.length} candidate${selectedIds.length === 1 ? '' : 's'} selected on this page`
+                  : 'No candidates selected on this page'}
               </span>
-              <div className="flex gap-2">
-                {canEdit && (
-                  <Button onClick={bulkPublishSlips} variant="outline" size="sm"
-                    className="flex items-center gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                    disabled={selectedRows.filter(r => r.roll_number && !r.published_at).length === 0}>
-                    <Send size={14} /> Publish Selected
-                  </Button>
-                )}
-                {canEdit && (
-                  <Button onClick={bulkUnpublishSlips} variant="outline" size="sm"
-                    className="flex items-center gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
-                    disabled={selectedRows.filter(r => r.published_at).length === 0}>
-                    <EyeOff size={14} /> Unpublish Selected
-                  </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedIds.length > 0 && (
+                  <>
+                    <Button onClick={bulkUnpublishSlips} variant="outline" size="sm"
+                      className="flex items-center gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+                      disabled={selectedRows.filter(r => r.published_at).length === 0}>
+                      <EyeOff size={14} /> Unpublish Selected ({selectedIds.length})
+                    </Button>
+                    {canDelete && (
+                      <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
+                        className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
+                        disabled={selectedRows.filter(r => r.roll_number).length === 0}>
+                        <Trash2 size={14} /> Delete Roll No Slip ({selectedIds.length})
+                      </Button>
+                    )}
+                    <Button onClick={bulkPublishSlips} variant="outline" size="sm"
+                      className="flex items-center gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                      disabled={selectedRows.filter(r => r.roll_number && !r.published_at).length === 0}>
+                      <Send size={14} /> Publish Selected ({selectedIds.length})
+                    </Button>
+                    <span className="mx-1 h-6 w-px bg-emerald-200" aria-hidden="true" />
+                  </>
                 )}
                 {canDelete && (
-                  <Button onClick={bulkDeleteSlips} variant="outline" size="sm"
-                    className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-50"
-                    disabled={selectedRows.filter(r => r.roll_number).length === 0}>
-                    <Trash2 size={14} /> Delete Roll No Slip
+                  <button
+                    type="button"
+                    onClick={deleteAllSlips}
+                    disabled={(activeTab === 'published' ? stats.published : stats.generated) === 0}
+                    title={`Deletes every ${activeTab === 'published' ? 'published' : 'unpublished'} slip across all pages, not just what's selected`}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-red-700 via-red-600 to-red-700 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 text-sm"
+                  >
+                    <Trash2 size={14} /> Delete ALL {activeTab === 'published' ? 'Published' : 'Unpublished'} ({activeTab === 'published' ? stats.published : stats.generated})
+                  </button>
+                )}
+                {activeTab === 'published' && (
+                  <button
+                    type="button"
+                    onClick={unpublishAllPublished}
+                    disabled={stats.published === 0}
+                    title="Unpublishes every published slip across all pages, not just what's selected"
+                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-amber-700 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-700 text-white shadow-md hover:shadow-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 text-sm"
+                  >
+                    <EyeOff size={14} /> Unpublish ALL Published ({stats.published})
+                  </button>
+                )}
+                {activeTab === 'unpublished' && (
+                  <Button
+                    onClick={publishAllUnpublished}
+                    variant="primary"
+                    size="sm"
+                    disabled={stats.generated === 0}
+                    className="gap-2"
+                    title="Publishes every unpublished slip across all pages, not just what's selected"
+                  >
+                    <Send size={14} /> Publish ALL Unpublished ({stats.generated})
                   </Button>
                 )}
               </div>

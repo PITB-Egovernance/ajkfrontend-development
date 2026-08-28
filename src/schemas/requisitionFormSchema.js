@@ -99,6 +99,18 @@ export const requisitionFormSchema = {
       type: 'required',
       message: 'Age relaxation is required'
     },
+    relaxation_years: {
+      type: 'custom',
+      message: 'Years of age relaxation is required when Age Relaxation is Yes',
+      validate: (value, formData) => {
+        if (formData.age_relaxation === 'Yes') {
+          return value !== '' && value !== null && value !== undefined
+            ? null
+            : 'Years of age relaxation is required when Age Relaxation is Yes';
+        }
+        return null; // Not required when No
+      }
+    },
     nationality: {
       type: 'required',
       message: 'Nationality is required'

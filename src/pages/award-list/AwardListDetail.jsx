@@ -223,8 +223,7 @@ export default function AwardListDetail() {
                 {errorsList.slice(0, 5).map((err, idx) => <li key={idx}>{err}</li>)}
                 {errorsList.length > 5 && <li>...and {errorsList.length - 5} more</li>}
               </ul>
-            </div>,
-            { duration: 6000 }
+            </div>
           );
         } else {
           toast.success(data?.message || 'CSV imported successfully!');

@@ -121,7 +121,7 @@ const CceScreeningResults = () => {
     } catch (err) {
       if (err.errors && Array.isArray(err.errors.file)) {
         err.errors.file.forEach((errMsg) => {
-          toast.error(errMsg, { duration: 6000 });
+          toast.error(errMsg);
         });
       } else {
         toast.error(err?.message || 'Failed to import marks');
@@ -348,6 +348,116 @@ const CceScreeningResults = () => {
     }
   };
 
+  // "Select all" on the grid only ever selects the currently-loaded page —
+  // the grid is server-paginated, so it has no way to know about rows on
+  // other pages. These are dedicated actions that find every matching
+  // result across ALL pages (respecting the active advertisement + filters)
+  // and publish/unpublish them in one go, instead of being limited to
+  // whatever page happens to be on screen.
+  const publishAllResults = async () => {
+    if (advertisementIds.length === 0) return;
+    const findingTid = toast.loading('Finding all publishable results…');
+    let publishable;
+    try {
+      const res = await CceScreeningApi.list(advertisementIds, {
+        status:   filters.status || undefined,
+        search:   filters.search || undefined,
+        per_page: 5000,
+        page:     1,
+      });
+      const list = res?.data?.data ?? [];
+      publishable = (Array.isArray(list) ? list : [])
+        .filter((r) => r.status !== 'pending' && !r.published_at)
+        .map((r) => r.hash_id);
+    } catch (err) {
+      toast.dismiss(findingTid);
+      toast.error(err?.message || 'Failed to load screening results');
+      return;
+    }
+    toast.dismiss(findingTid);
+
+    if (publishable.length === 0) {
+      toast.error('No publishable (pass/fail, not yet published) results found matching the current filters');
+      return;
+    }
+
+    const confirmed = await confirmDelete({
+      title: 'Publish All Screening Results',
+      message: `Publish results for all ${publishable.length} publishable candidate${publishable.length === 1 ? '' : 's'} matching the current filters — not just the ones selected? This locks their status and notifies them immediately.`,
+      warning: 'This action cannot be undone.',
+      confirmLabel: 'Publish All',
+      confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
+    });
+    if (!confirmed) return;
+
+    setBusy(true);
+    const tid = toast.loading(`Publishing ${publishable.length} result${publishable.length === 1 ? '' : 's'}…`);
+    try {
+      const res = await CceScreeningApi.publish(publishable);
+      toast.dismiss(tid);
+      toast.success(res?.message || 'Screening results published');
+      setSelectionModel([]);
+      await loadResults();
+    } catch (err) {
+      toast.dismiss(tid);
+      toast.error(err?.message || 'Failed to publish screening results');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unpublishAllResults = async () => {
+    if (advertisementIds.length === 0) return;
+    const findingTid = toast.loading('Finding all published results…');
+    let published;
+    try {
+      const res = await CceScreeningApi.list(advertisementIds, {
+        status:   filters.status || undefined,
+        search:   filters.search || undefined,
+        per_page: 5000,
+        page:     1,
+      });
+      const list = res?.data?.data ?? [];
+      published = (Array.isArray(list) ? list : [])
+        .filter((r) => !!r.published_at)
+        .map((r) => r.hash_id);
+    } catch (err) {
+      toast.dismiss(findingTid);
+      toast.error(err?.message || 'Failed to load screening results');
+      return;
+    }
+    toast.dismiss(findingTid);
+
+    if (published.length === 0) {
+      toast.error('No published results found matching the current filters');
+      return;
+    }
+
+    const confirmed = await confirmDelete({
+      title: 'Unpublish All Screening Results',
+      message: `Unpublish results for all ${published.length} published candidate${published.length === 1 ? '' : 's'} matching the current filters — not just the ones selected? They will no longer be able to see this result until it's republished.`,
+      warning: 'Those candidates immediately lose access to this result.',
+      confirmLabel: 'Unpublish All',
+      confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!confirmed) return;
+
+    setBusy(true);
+    const tid = toast.loading(`Unpublishing ${published.length} result${published.length === 1 ? '' : 's'}…`);
+    try {
+      const res = await CceScreeningApi.unpublish(published);
+      toast.dismiss(tid);
+      toast.success(res?.message || 'Screening results unpublished');
+      setSelectionModel([]);
+      await loadResults();
+    } catch (err) {
+      toast.dismiss(tid);
+      toast.error(err?.message || 'Failed to unpublish screening results');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const unpublishRow = async (row) => {
     if (!row.published_at) return;
     const confirmed = await confirmDelete({
@@ -568,27 +678,54 @@ const CceScreeningResults = () => {
               title="Filter Screening Candidates"
             />
 
-            {/* BULK BAR */}
-            {selectedIds.length > 0 && (
-              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-emerald-800 font-medium">
-                    {selectedIds.length} candidate{selectedIds.length === 1 ? '' : 's'} selected
-                  </span>
-                  <div className="flex gap-2">
-                    <Button onClick={handlePublish} size="sm" disabled={busy} className="flex items-center gap-2">
-                      <Send size={14} /> Publish Selected
-                    </Button>
-                    {selectedPublishedCount > 0 && (
-                      <Button onClick={handleBulkUnpublish} variant="outline" size="sm" disabled={busy}
-                        className="flex items-center gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
-                        <EyeOff size={14} /> Unpublish Selected
+            {/* ACTION BAR — always visible so "Publish/Unpublish Selected" (acts only
+                on the checked rows) and "Publish/Unpublish ALL" (acts on every
+                matching result across every page) are never mistaken for each other. */}
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-emerald-800 font-medium">
+                  {selectedIds.length > 0
+                    ? `${selectedIds.length} candidate${selectedIds.length === 1 ? '' : 's'} selected on this page`
+                    : 'No candidates selected on this page'}
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedIds.length > 0 && (
+                    <>
+                      <Button onClick={handlePublish} variant="outline" size="sm" disabled={busy}
+                        className="flex items-center gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+                        <Send size={14} /> Publish Selected ({selectedIds.length})
                       </Button>
-                    )}
-                  </div>
+                      {selectedPublishedCount > 0 && (
+                        <Button onClick={handleBulkUnpublish} variant="outline" size="sm" disabled={busy}
+                          className="flex items-center gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
+                          <EyeOff size={14} /> Unpublish Selected ({selectedPublishedCount})
+                        </Button>
+                      )}
+                      <span className="mx-1 h-6 w-px bg-emerald-200" aria-hidden="true" />
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={unpublishAllResults}
+                    disabled={busy || advertisementIds.length === 0}
+                    title="Unpublishes every published result across all pages, not just what's selected"
+                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-amber-700 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-700 text-white shadow-md hover:shadow-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 text-sm"
+                  >
+                    <EyeOff size={14} /> Unpublish ALL Published
+                  </button>
+                  <Button
+                    onClick={publishAllResults}
+                    variant="primary"
+                    size="sm"
+                    disabled={busy || advertisementIds.length === 0}
+                    className="gap-2"
+                    title="Publishes every publishable (pass/fail) result across all pages, not just what's selected"
+                  >
+                    <Send size={14} /> Publish ALL
+                  </Button>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* GRID */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">

@@ -8,6 +8,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
+import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 
 const ApprovedRequisitions = () => {
   // Creating an advertisement from the job pool requires advertisement add rights.
@@ -61,110 +62,78 @@ const ApprovedRequisitions = () => {
   const TOKEN = AuthService.getToken();
   const API_KEY = Config.apiKey;
 
-  const fetchApproved = async (pageNum = 0) => {
+  const fetchApproved = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch from advertisements endpoint
-      const adsRes = await fetch(`${API_BASE}/advertisements/approved-requisitions?per_page=500`, {
-        headers: {
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-          'Authorization': `Bearer ${TOKEN}`,
-        },
-      });
+      const headers = {
+        Accept: 'application/json',
+        'X-API-KEY': API_KEY,
+        Authorization: `Bearer ${TOKEN}`,
+      };
 
-      // Fetch from psc/requisitions endpoint
-      const pscRes = await fetch(`${API_BASE}/psc/requisitions`, {
-        headers: {
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-          'Authorization': `Bearer ${TOKEN}`,
-        },
-      });
-      
-      // Fetch existing advertisements to exclude already advertised jobs
-      const adsListRes = await fetch(`${API_BASE}/advertisements`, {
-        headers: {
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-          'Authorization': `Bearer ${TOKEN}`,
-        },
-      });
-
-      let allJobs = [];
-      let totalCount = 0;
-
-      if (adsRes.ok) {
-        const adsResult = await adsRes.json();
-        if (adsResult.success && adsResult.data && adsResult.data.jobs && Array.isArray(adsResult.data.jobs.data)) {
-          allJobs = adsResult.data.jobs.data.map((item, index) => ({
-            id: item.hash_id || item.id || `approved-req-${pageNum}-${index}`,
-            hash_id: item.hash_id,
-            designation: item.designation,
-            department: typeof item.department === 'object' ? (item.department?.name || item.department?.department_name || '') : (item.department || ''),
-            scale: item.scale,
-            quota_percentage: item.quota_percentage,
-            num_posts: item.num_posts,
-            vacancy_date: item.vacancy_date,
-            status: item.status || 'Approved',
-            created_at: item.created_at,
-            updated_at: item.updated_at,
-          }));
-          totalCount = adsResult.data.jobs.total ?? allJobs.length;
+      // Each source is walked page-by-page (not a single big per_page=N
+      // request) — the backend doesn't always honor an overridden per_page,
+      // so a one-shot request can silently return only its default page.
+      const safeFetchList = async (url, opts) => {
+        try {
+          return await fetchPaginatedApiList(url, opts);
+        } catch {
+          return [];
         }
-      }
+      };
 
-      if (pscRes.ok) {
-        const pscResult = await pscRes.json();
-        if (pscResult.success && pscResult.data && Array.isArray(pscResult.data.data)) {
-          const pscApproved = pscResult.data.data
-            .filter(item => item.status?.toLowerCase() === 'approved')
-            .map((item, index) => ({
-              id: item.hash_id || item.id || `psc-approved-${index}`,
-              hash_id: item.hash_id,
-              designation: item.designation,
-              department: typeof item.department === 'object' ? (item.department?.name || item.department?.department_name || '') : (item.department || ''),
-              scale: item.scale,
-              quota_percentage: item.quota_percentage,
-              num_posts: item.num_posts,
-              vacancy_date: item.vacancy_date || '-',
-              status: item.status || 'Approved',
-              created_at: item.created_at,
-              updated_at: item.updated_at,
-            }));
+      const [adsJobs, pscItems, advertisedList] = await Promise.all([
+        safeFetchList(`${API_BASE}/advertisements/approved-requisitions`, {
+          headers,
+          // This endpoint's paginator is nested under data.jobs, not data directly.
+          getPaginator: (result) => result?.data?.jobs,
+        }),
+        safeFetchList(`${API_BASE}/psc/requisitions`, { headers }),
+        safeFetchList(`${API_BASE}/advertisements`, { headers }),
+      ]);
 
-          // Merge and avoid duplicates by hash_id
-          const existingIds = new Set(allJobs.map(j => j.hash_id).filter(id => id));
-          const uniquePscApproved = pscApproved.filter(j => !j.hash_id || !existingIds.has(j.hash_id));
+      const mapJob = (item, prefix, index) => ({
+        id: item.hash_id || item.id || `${prefix}-${index}`,
+        hash_id: item.hash_id,
+        designation: item.designation,
+        department: typeof item.department === 'object' ? (item.department?.name || item.department?.department_name || '') : (item.department || ''),
+        scale: item.scale,
+        quota_percentage: item.quota_percentage,
+        num_posts: item.num_posts,
+        vacancy_date: item.vacancy_date || '-',
+        status: item.status || 'Approved',
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+      });
 
-          allJobs = [...allJobs, ...uniquePscApproved];
-          totalCount += uniquePscApproved.length;
-        }
-      }
-      
+      let allJobs = adsJobs.map((item, index) => mapJob(item, 'approved-req', index));
+
+      const pscApproved = pscItems
+        .filter(item => item.status?.toLowerCase() === 'approved')
+        .map((item, index) => mapJob(item, 'psc-approved', index));
+
+      // Merge and avoid duplicates by hash_id
+      const existingIds = new Set(allJobs.map(j => j.hash_id).filter(Boolean));
+      const uniquePscApproved = pscApproved.filter(j => !j.hash_id || !existingIds.has(j.hash_id));
+      allJobs = [...allJobs, ...uniquePscApproved];
+
       // Exclude jobs already included in advertisements
-      if (adsListRes.ok) {
-        const listResult = await adsListRes.json();
-        if (listResult?.data?.data && Array.isArray(listResult.data.data)) {
-          const included = new Set();
-          listResult.data.data.forEach(ad => {
-            if (Array.isArray(ad.job_details)) {
-              ad.job_details.forEach(j => {
-                if (j?.hash_id) included.add(j.hash_id);
-                else if (j?.id) included.add(j.id);
-                else if (j?.job_id) included.add(j.job_id);
-              });
-            }
+      const included = new Set();
+      advertisedList.forEach(ad => {
+        if (Array.isArray(ad.job_details)) {
+          ad.job_details.forEach(j => {
+            if (j?.hash_id) included.add(j.hash_id);
+            else if (j?.id) included.add(j.id);
+            else if (j?.job_id) included.add(j.job_id);
           });
-          allJobs = allJobs.filter(j => {
-            const key = j.hash_id || j.id;
-            return key ? !included.has(key) : true;
-          });
-          totalCount = allJobs.length;
         }
-      }
-      
+      });
+      allJobs = allJobs.filter(j => {
+        const key = j.hash_id || j.id;
+        return key ? !included.has(key) : true;
+      });
+
       try {
         const localAdvertisedRaw = localStorage.getItem('advertised_job_ids');
         const localAdvertised = localAdvertisedRaw ? new Set(JSON.parse(localAdvertisedRaw)) : new Set();
@@ -173,12 +142,20 @@ const ApprovedRequisitions = () => {
             const key = j.hash_id || j.id;
             return key ? !localAdvertised.has(key) : true;
           });
-          totalCount = allJobs.length;
         }
       } catch {}
 
+      // Newest approval first — the two source endpoints don't return a
+      // consistent order once merged, so sort explicitly by approval date
+      // (falling back to update/vacancy date for rows missing it).
+      allJobs.sort((a, b) => {
+        const dateA = new Date(a.created_at || a.updated_at || a.vacancy_date || 0).getTime();
+        const dateB = new Date(b.created_at || b.updated_at || b.vacancy_date || 0).getTime();
+        return dateB - dateA;
+      });
+
       setRows(allJobs);
-      setTotal(totalCount);
+      setTotal(allJobs.length);
     } catch (err) {
       setError(err.message);
     } finally {

@@ -402,6 +402,8 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
     formData.min_age !== '' && formData.min_age !== null && formData.min_age !== undefined &&
     formData.max_age !== '' && formData.max_age !== null && formData.max_age !== undefined &&
     !!formData.age_relaxation &&
+    (formData.age_relaxation !== 'Yes' ||
+      (formData.relaxation_years !== '' && formData.relaxation_years !== null && formData.relaxation_years !== undefined)) &&
     !!formData.nationality &&
     (formData.selection_mode !== 'quota_based' || (formData.district || []).some(Boolean));
 
@@ -436,6 +438,12 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
     if (Object.keys(errs).length > 0) {
       setAgeErrors(errs);
       toast.error(errs.min_age || errs.max_age || 'Fix the age limits');
+      return;
+    }
+
+    if (formData.age_relaxation === 'Yes' &&
+      (formData.relaxation_years === '' || formData.relaxation_years === null || formData.relaxation_years === undefined)) {
+      toast.error('Years of age relaxation is required when Age Relaxation is Yes');
       return;
     }
 
@@ -676,12 +684,15 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
             <div className="col-md-6 form-group">
               <TextField
                 fullWidth
+                required
                 type="number"
                 label="Years of Relaxation"
                 name="relaxation_years"
                 value={formData.relaxation_years}
                 onChange={handleChange}
                 inputProps={{ min: 0 }}
+                error={!formData.relaxation_years}
+                helperText={!formData.relaxation_years ? 'Required when Age Relaxation is Yes' : ''}
               />
             </div>
           </>
