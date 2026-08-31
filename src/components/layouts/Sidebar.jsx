@@ -69,13 +69,17 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     }
   };
 
-  const [localOpenMenu, setLocalOpenMenu] = useState("");
+  // null = "auto" (nothing explicitly toggled yet, so the active route's menu
+  // auto-expands); once toggled it becomes a real string ('' = explicitly
+  // closed, or the id/path = explicitly open) and stops auto-expanding — see
+  // the matching comment in SidebarContext.jsx for why this can't just be ''.
+  const [localOpenMenu, setLocalOpenMenu] = useState(null);
   // Which nested SubGroup (by its path) is expanded. Lifted up here — rather than
   // local state inside SubGroup — because SubGroup is defined inline inside this
   // component and gets a new type identity (and therefore remounts, resetting any
   // local state) every time Sidebar re-renders, which happens immediately after
   // the group header's own navigate() call fires.
-  const [openSubMenu, setOpenSubMenu] = useState("");
+  const [openSubMenu, setOpenSubMenu] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -139,8 +143,10 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
   // Collapsed by default; auto-expands when one of its children is the active route.
   const SubGroup = ({ subItem }) => {
     const hasActiveChild = subItem.children.some((c) => isSubActive(c.path));
-    // Explicit toggle wins; otherwise auto-expand when a child route is active.
-    const expanded = openSubMenu ? openSubMenu === subItem.path : hasActiveChild;
+    // Explicit toggle wins (including an explicit close, '' !== null); only
+    // fall back to auto-expanding on the active child route before anything
+    // has been explicitly toggled yet.
+    const expanded = openSubMenu === null ? hasActiveChild : openSubMenu === subItem.path;
 
     return (
       <div>
@@ -215,9 +221,11 @@ const Sidebar = ({ isOpen: propIsOpen, setIsOpen: propSetIsOpen }) => {
     const hasActiveChild = hasSubmenu && submenu.some((s) =>
       isActive(s.path) || (Array.isArray(s.children) && s.children.some((c) => isActive(c.path)))
     );
-    // Accordion: an explicit selection wins (only that menu is open). Fall back
-    // to auto-expanding the active route's parent only when nothing is explicitly open.
-    const isMenuOpen = currentOpenMenu ? currentOpenMenu === item.id : hasActiveChild;
+    // Accordion: an explicit selection wins (only that menu is open), including
+    // an explicit close ('' !== null) — so re-clicking an open tab collapses it
+    // even while you're on a page inside it. Fall back to auto-expanding the
+    // active route's parent only when nothing has been explicitly toggled yet.
+    const isMenuOpen = currentOpenMenu === null ? hasActiveChild : currentOpenMenu === item.id;
     const active = isActive(item.path);
     const [showHoverMenu, setShowHoverMenu] = useState(false);
 

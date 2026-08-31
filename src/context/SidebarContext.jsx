@@ -13,7 +13,12 @@ export const SidebarContext = createContext(null);
  */
 export const SidebarProvider = ({ children }) => {
   const [isOpen, setIsOpen] = useState(true);
-  const [openMenu, setOpenMenu] = useState('');
+  // null = "auto" (no explicit choice yet — Sidebar falls back to expanding
+  // whichever menu contains the active route). Once toggleMenu is called,
+  // this becomes a real string ('' for "explicitly closed", or a menuId for
+  // "explicitly open") and auto-expand no longer overrides it — otherwise
+  // closing a menu you're currently inside would immediately reopen itself.
+  const [openMenu, setOpenMenu] = useState(null);
 
   // Toggle sidebar
   const toggleSidebar = useCallback(() => {

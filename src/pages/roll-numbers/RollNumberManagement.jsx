@@ -366,15 +366,9 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
 
       setAllRows(pageRows);
       setTotalCount(needsClientNarrowing ? mapped.length : (payload.total ?? mapped.length));
-      if (payload.stats) {
-        setStats({
-          total:     payload.stats.total ?? 0,
-          unique:    payload.stats.unique_candidates ?? 0,
-          generated: payload.stats.generated ?? 0,
-          published: payload.stats.published ?? 0,
-          centers:   payload.stats.centers ?? 0,
-        });
-      }
+      // Stat cards are populated separately by fetchStats() below — the
+      // backend's own `payload.stats` here is dataset-wide, not scoped to
+      // whatever filters are active, so it's intentionally not used.
       setRowsCache((prev) => {
         const next = { ...prev };
         mapped.forEach((r) => { next[r.id] = r; });
@@ -392,6 +386,53 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
+
+  // ── Stat cards, computed client-side and scoped to the current filters ──
+  // The live backend's stat counts on this endpoint are dataset-wide (not
+  // scoped to search/advertisement/exam-center filters) — fixing that
+  // requires redeploying the live API, which isn't available right now — so
+  // totals are computed here instead: pull every row matching the current
+  // filters in one batch (both published AND unpublished together, so both
+  // counts are available at once, independent of which tab is active) and
+  // count client-side. Mirrors the per_page:5000 pattern the "...All"
+  // bulk actions already use below.
+  const fetchStats = useCallback(async () => {
+    try {
+      const result = await RollNumberApi.getShortlisted({
+        per_page:            5000,
+        page:                1,
+        search:              debouncedFilters.search,
+        advertisement_no:    debouncedFilters.adv_number,
+        exam_center_id:      debouncedFilters.exam_center_id,
+        has_roll_number:     1,
+        // No slip_status — this needs published AND unpublished counts together.
+      });
+      const payload = result?.data ?? {};
+      let items = Array.isArray(payload.data) ? payload.data : [];
+      items = items.filter((item) => !!item.roll_number);
+      if (activeDesignations !== null) {
+        items = items.filter((item) => activeDesignations.has(item.job_title));
+      }
+
+      const publishedCount = items.filter((item) => !!item.published_at).length;
+      const centerIds = new Set(items.filter((item) => item.exam_center_id != null).map((item) => item.exam_center_id));
+      const cnics = new Set(items.filter((item) => item.candidate_cnic).map((item) => item.candidate_cnic));
+
+      setStats({
+        total:     items.length,
+        unique:    cnics.size,
+        generated: items.length - publishedCount,
+        published: publishedCount,
+        centers:   centerIds.size,
+      });
+    } catch {
+      // silent — stat cards simply won't refresh for this filter combination
+    }
+  }, [debouncedFilters, activeDesignations]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   // ── Slip download ───────────────────────────────────────────────────────────
   const downloadSlip = useCallback(async (applicationNumber) => {
@@ -440,6 +481,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       toast.dismiss(tid);
       toast.success('Roll number slip deleted successfully');
       fetchApplications();
+      fetchStats();
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to delete slip');
@@ -472,6 +514,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       toast.success(`${count} roll number slip${count === 1 ? '' : 's'} deleted successfully`);
       setSelectionModel([]);
       fetchApplications();
+      fetchStats();
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to delete slips');
@@ -529,6 +572,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       toast.success(`${count} roll number slip${count === 1 ? '' : 's'} deleted successfully`);
       setSelectionModel([]);
       fetchApplications();
+      fetchStats();
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to delete slips');
@@ -609,6 +653,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       toast.dismiss(tid);
       setSelectionModel([]);
       fetchApplications();
+      fetchStats();
       if (failed.length === 0) {
         toast.success(`${count} roll number slip${count === 1 ? '' : 's'} published successfully`);
       } else {
@@ -644,6 +689,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       toast.dismiss(tid);
       setSelectionModel([]);
       fetchApplications();
+      fetchStats();
       if (failed.length === 0) {
         toast.success(`${count} roll number slip${count === 1 ? '' : 's'} unpublished successfully`);
       } else {
@@ -726,6 +772,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
     toast.dismiss(tid);
     setSelectionModel([]);
     fetchApplications();
+    fetchStats();
     if (failed.length === 0) {
       toast.success(`${count} roll number slip${count === 1 ? '' : 's'} published successfully`);
     } else {
@@ -798,6 +845,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
     toast.dismiss(tid);
     setSelectionModel([]);
     fetchApplications();
+    fetchStats();
     if (failed.length === 0) {
       toast.success(`${count} roll number slip${count === 1 ? '' : 's'} unpublished successfully`);
     } else {
@@ -824,6 +872,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       const { count, failed } = await runPublishAction([row], 'publish');
       toast.dismiss(tid);
       fetchApplications();
+      fetchStats();
       if (failed.length === 0 && count > 0) {
         toast.success('Roll number slip published successfully');
       } else {
@@ -852,6 +901,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       const { count, failed } = await runPublishAction([row], 'unpublish');
       toast.dismiss(tid);
       fetchApplications();
+      fetchStats();
       if (failed.length === 0 && count > 0) {
         toast.success('Roll number slip unpublished successfully');
       } else {
@@ -1038,7 +1088,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
                     title={`Deletes every ${activeTab === 'published' ? 'published' : 'unpublished'} slip across all pages, not just what's selected`}
                     className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-red-700 via-red-600 to-red-700 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 text-sm"
                   >
-                    <Trash2 size={14} /> Delete ALL {activeTab === 'published' ? 'Published' : 'Unpublished'} ({activeTab === 'published' ? stats.published : stats.generated})
+                    <Trash2 size={14} /> Delete All ({activeTab === 'published' ? stats.published : stats.generated})
                   </button>
                 )}
                 {activeTab === 'published' && (
@@ -1049,7 +1099,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
                     title="Unpublishes every published slip across all pages, not just what's selected"
                     className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-amber-700 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-700 text-white shadow-md hover:shadow-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 text-sm"
                   >
-                    <EyeOff size={14} /> Unpublish ALL Published ({stats.published})
+                    <EyeOff size={14} /> Unpublish All ({stats.published})
                   </button>
                 )}
                 {activeTab === 'unpublished' && (
@@ -1061,7 +1111,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
                     className="gap-2"
                     title="Publishes every unpublished slip across all pages, not just what's selected"
                   >
-                    <Send size={14} /> Publish ALL Unpublished ({stats.generated})
+                    <Send size={14} /> Publish All ({stats.generated})
                   </Button>
                 )}
               </div>
