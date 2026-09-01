@@ -42,16 +42,70 @@ const NEWS_CATEGORIES = [
   "Written Test Schedule",
 ];
 
+// const NEWS_TYPES = [
+//   { value: "general",       label: "General" },
+//   { value: "notice",        label: "Notice" },
+//   { value: "press_release", label: "Press Release" },
+//   { value: "advertisement", label: "Advertisement" },
+//   { value: "result",        label: "Result" },
+//   { value: "schedule",      label: "Schedule" },
+//   { value: "corrigendum",   label: "Corrigendum" },
+//   { value: "announcement",   label: "Announcement" },
+//   { value: "public_notice", label: "Public Notice" },
+// ];
+
 const NEWS_TYPES = [
-  { value: "general",       label: "General" },
-  { value: "notice",        label: "Notice" },
+  { value: "general", label: "General" },
+  { value: "notice", label: "Notice" },
   { value: "press_release", label: "Press Release" },
   { value: "advertisement", label: "Advertisement" },
-  { value: "result",        label: "Result" },
-  { value: "schedule",      label: "Schedule" },
-  { value: "corrigendum",   label: "Corrigendum" },
-  { value: "announcement",   label: "Announcement" },
+  { value: "result", label: "Result" },
+  { value: "schedule", label: "Schedule" },
+  { value: "corrigendum", label: "Corrigendum" },
+  { value: "announcement", label: "Announcement" },
   { value: "public_notice", label: "Public Notice" },
+
+  // New News Types
+  {
+    value: "written_mcqs_test_schedule",
+    label: "Written/MCQS Test Schedule",
+  },
+  {
+    value: "short_list_candidate",
+    label: "List of Short List Candidate",
+  },
+  {
+    value: "rejected_candidates",
+    label: "List of Rejected Candidates",
+  },
+  {
+    value: "final_rejection",
+    label: "List of Final Rejection",
+  },
+  {
+    value: "candidate_for_interview",
+    label: "List of Candidate for Interview",
+  },
+  {
+    value: "interview_schedule",
+    label: "Interview Schedule",
+  },
+  {
+    value: "advertisements",
+    label: "Advertisements",
+  },
+  {
+    value: "annual_reports",
+    label: "Annual Reports",
+  },
+  {
+    value: "advertised_posts_status",
+    label: "Advertised Posts Status",
+  },
+  {
+    value: "tender_notices",
+    label: "Tender Notices",
+  },
 ];
 
 const DISPLAY_TYPES = [
