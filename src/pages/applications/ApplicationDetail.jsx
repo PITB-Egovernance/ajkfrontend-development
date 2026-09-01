@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin } from 'lucide-react';
+import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin, History } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
 import Button from 'components/ui/Button';
 import ApplicationApi from 'api/applicationApi';
+import AttemptApi from 'api/attemptApi';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import { formatApplicationDocumentType } from 'utils/applicationOcrUtils';
@@ -15,6 +17,14 @@ const ApplicationDetail = () => {
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+
+  // ── Attempt history / interview-shortlist correction ────────────────────
+  const [attemptData, setAttemptData] = useState(null);
+  const [attemptLoading, setAttemptLoading] = useState(false);
+  const [attemptError, setAttemptError] = useState(null);
+  const [shortlistedDraft, setShortlistedDraft] = useState(null);
+  const [reasonDraft, setReasonDraft] = useState('');
+  const [correctionBusy, setCorrectionBusy] = useState(false);
 
   useEffect(() => {
     fetchApplication();
@@ -130,6 +140,62 @@ const ApplicationDetail = () => {
     }
   };
 
+  // ── Attempt history — lazy-loaded when the tab is first opened ──────────
+  const loadAttemptHistory = async (applicationId, { force = false } = {}) => {
+    if (!applicationId) return;
+    if (attemptData && !force) return;
+    setAttemptLoading(true);
+    setAttemptError(null);
+    try {
+      const res = await AttemptApi.getHistory(applicationId);
+      const data = res?.data || null;
+      setAttemptData(data);
+      // Pre-select the toggle to the CURRENT application's own status, so the
+      // admin only has to click something when they actually want to change it.
+      const currentRow = data?.history?.find((h) => h.hash_id === applicationId);
+      setShortlistedDraft(currentRow ? !!currentRow.interview_shortlisted : null);
+    } catch (err) {
+      setAttemptError(err?.message || 'Failed to load attempt history');
+    } finally {
+      setAttemptLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'attempts' && application?.id) {
+      loadAttemptHistory(application.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, application?.id]);
+
+  const handleCorrectShortlist = async () => {
+    if (shortlistedDraft === null || !application?.id) return;
+
+    const confirmed = await confirmDelete({
+      title: 'Correct Interview-Shortlist Status',
+      message: `Mark application ${application.application_number} as "${shortlistedDraft ? 'Shortlisted for Interview' : 'Not Shortlisted'}"? This recalculates the attempt number for every application this candidate made to this same post.`,
+      warning: 'This directly changes the candidate\'s attempt count.',
+      confirmLabel: 'Confirm Correction',
+      confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
+    });
+    if (!confirmed) return;
+
+    setCorrectionBusy(true);
+    try {
+      await AttemptApi.correctShortlistStatus(application.id, {
+        shortlisted: shortlistedDraft,
+        reason: reasonDraft,
+      });
+      toast.success('Interview-shortlist status corrected.');
+      setReasonDraft('');
+      await loadAttemptHistory(application.id, { force: true });
+    } catch (err) {
+      toast.error(err?.message || 'Failed to correct interview-shortlist status');
+    } finally {
+      setCorrectionBusy(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const lowerStatus = status?.toLowerCase() || '';
     if (!lowerStatus) return <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-sm font-semibold">Unreviewed</span>;
@@ -182,6 +248,7 @@ const ApplicationDetail = () => {
     { id: 'disability',   label: 'Disability',       icon: HeartPulse },
     { id: 'gov_service',  label: 'Gov. Service',     icon: Shield },
     { id: 'documents',    label: 'Documents',        icon: FileText },
+    { id: 'attempts',     label: 'Attempt History',  icon: History },
   ];
 
   const renderTabContent = () => {
@@ -528,6 +595,142 @@ const ApplicationDetail = () => {
                 ))}
               </div>
             ) : <p className="text-slate-500 text-sm">No documents uploaded.</p>}
+          </div>
+        );
+
+      case 'attempts':
+        return (
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-800 border-b pb-3 mb-4">Attempt History</h3>
+            <p className="text-sm text-slate-500 mb-5">
+              An attempt is only consumed when the candidate is selected for interview — tracked across every
+              advertisement that re-posts this same post (same title, department and BPS grade), capped at{' '}
+              {attemptData?.max_attempts ?? 3}.
+            </p>
+
+            {attemptLoading ? (
+              <div className="flex justify-center py-10">
+                <InlineLoader text="Loading attempt history..." variant="ring" size="md" />
+              </div>
+            ) : attemptError ? (
+              <div className="p-6 text-center bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 font-medium text-sm">{attemptError}</p>
+              </div>
+            ) : attemptData ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-xs uppercase text-slate-500 font-semibold">Logical Post</p>
+                    <p className="text-sm font-bold text-slate-800 mt-1">{attemptData.logical_post?.post_title || 'N/A'}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {attemptData.logical_post?.department || 'N/A'}
+                      {attemptData.logical_post?.bps_grade ? ` · BPS-${attemptData.logical_post.bps_grade}` : ''}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-xs uppercase text-slate-500 font-semibold">Attempts Used</p>
+                    <p className="text-2xl font-bold text-slate-800 mt-1">
+                      {attemptData.attempts_used}
+                      <span className="text-sm font-medium text-slate-400"> / {attemptData.max_attempts}</span>
+                    </p>
+                  </div>
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-xs uppercase text-slate-500 font-semibold">Applications on Record</p>
+                    <p className="text-2xl font-bold text-slate-800 mt-1">{attemptData.history?.length || 0}</p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-lg mb-6">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Application #</th>
+                        <th className="px-4 py-2 text-left">Advertisement</th>
+                        <th className="px-4 py-2 text-left">Applied At</th>
+                        <th className="px-4 py-2 text-left">Interview Shortlisted</th>
+                        <th className="px-4 py-2 text-left">Attempt #</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(attemptData.history || []).map((row) => (
+                        <tr key={row.application_id} className={row.hash_id === application.id ? 'bg-emerald-50/50' : ''}>
+                          <td className="px-4 py-2 font-medium text-slate-800">
+                            {row.application_number}
+                            {row.hash_id === application.id && (
+                              <span className="ml-2 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-100 border border-emerald-200 rounded-full px-2 py-0.5">
+                                This application
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-slate-600">{row.advertisement_number || 'N/A'}</td>
+                          <td className="px-4 py-2 text-slate-600">{row.applied_at ? formatDate(row.applied_at) : 'N/A'}</td>
+                          <td className="px-4 py-2">
+                            {row.interview_shortlisted ? (
+                              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs font-semibold">Yes</span>
+                            ) : (
+                              <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-xs font-semibold">No</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 font-semibold text-slate-800">{row.attempt_number ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-5 border border-amber-200 bg-amber-50 rounded-lg">
+                  <h4 className="font-semibold text-slate-800 mb-1">Correct Interview-Shortlist Status</h4>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Corrects whether THIS application ({application.application_number}) counted as selected for
+                    interview. Recalculates the attempt number for every application to this same post afterward.
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-3 mb-3">
+                    <span className="text-sm font-medium text-slate-700">Mark as:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShortlistedDraft(true)}
+                      className={`px-4 py-1.5 rounded-md text-sm font-semibold border transition-colors ${
+                        shortlistedDraft === true
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      Shortlisted for Interview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShortlistedDraft(false)}
+                      className={`px-4 py-1.5 rounded-md text-sm font-semibold border transition-colors ${
+                        shortlistedDraft === false
+                          ? 'bg-slate-700 text-white border-slate-700'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      Not Shortlisted
+                    </button>
+                  </div>
+
+                  <textarea
+                    value={reasonDraft}
+                    onChange={(e) => setReasonDraft(e.target.value)}
+                    placeholder="Reason for this correction (optional, max 500 characters)"
+                    maxLength={500}
+                    rows={2}
+                    className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+
+                  <Button
+                    onClick={handleCorrectShortlist}
+                    disabled={shortlistedDraft === null || correctionBusy}
+                    variant="primary"
+                    size="sm"
+                  >
+                    {correctionBusy ? 'Saving...' : 'Save Correction'}
+                  </Button>
+                </div>
+              </>
+            ) : null}
           </div>
         );
 
