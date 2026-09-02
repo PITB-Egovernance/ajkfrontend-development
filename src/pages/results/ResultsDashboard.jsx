@@ -24,7 +24,7 @@ import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
 import toast from 'react-hot-toast';
 import { getJobRouteId } from 'utils/jobMapper';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, EyeOff } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -33,11 +33,26 @@ import {
   DropdownMenuSeparator,
 } from 'components/ui/DropdownMenu';
 import OfficialPublicationModal from 'components/results/OfficialPublicationModal';
+import BulkPublishModal from 'components/results/BulkPublishModal';
+import BulkWithdrawModal from 'components/results/BulkWithdrawModal';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 import { fetchAndApplyClubbedGroups } from 'utils/resultsClubbing';
 
 const PERM = 'result.result_publishing'; // permission scope for publishing actions
+
+// Same publishable/unpublishable split used on the Post-Result landing page.
+const PUBLISHABLE_STATUSES = ['Approved', 'APPROVED', 'WITHDRAWN'];
+const UNPUBLISHABLE_STATUSES = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'];
+
+// Same emerald-900 checkbox theme used across the Post-Result Processing
+// tables — native MUI checkboxes need an explicit sx override.
+const checkboxThemeSx = {
+  '& .MuiDataGrid-checkboxInput svg':              { color: '#064e3b' },
+  '& .MuiDataGrid-checkboxInput.Mui-checked svg':  { color: '#064e3b' },
+  '& .MuiCheckbox-root .MuiSvgIcon-root':          { color: '#064e3b' },
+  '& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root': { color: '#064e3b' },
+};
 
 const confirmWithdraw = () => {
   return new Promise((resolve) => {
@@ -279,6 +294,14 @@ const ResultsDashboard = () => {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [activeDropdownJobId, setActiveDropdownJobId] = useState(null);
 
+  // Bulk publish/unpublish — DataGrid's checkboxSelection model holds row
+  // ids, set to job.hash_id below (job.id is hidden from every API response
+  // by JobDetail::$hidden), so these are already the right identifiers to
+  // send straight to the backend.
+  const [selectionModel, setSelectionModel] = useState([]);
+  const [publishJobIds, setPublishJobIds] = useState(null);
+  const [withdrawJobIds, setWithdrawJobIds] = useState(null);
+
   const fetchActiveJobs = async () => {
     setFetchingJobs(true);
     try {
@@ -418,6 +441,42 @@ const ResultsDashboard = () => {
     // }
   ];
 
+  const filteredRows = useMemo(() => {
+    const q = searchTerm.toLowerCase();
+    return allJobRows
+      .filter((job) =>
+        (job.designation || '').toLowerCase().includes(q) ||
+        (job.adv?.adv_number || '').toLowerCase().includes(q)
+      )
+      .map((job, idx) => ({ ...job, id: job.hash_id || job.id || `${job.adv?.adv_number}-${idx}` }));
+  }, [allJobRows, searchTerm]);
+
+  const publishableInView = useMemo(() => filteredRows.filter((j) => PUBLISHABLE_STATUSES.includes(j.result_status)), [filteredRows]);
+  const unpublishableInView = useMemo(() => filteredRows.filter((j) => UNPUBLISHABLE_STATUSES.includes(j.result_status)), [filteredRows]);
+  const selectedPublishable = useMemo(
+    () => filteredRows.filter((j) => selectionModel.includes(getJobRouteId(j)) && PUBLISHABLE_STATUSES.includes(j.result_status)),
+    [filteredRows, selectionModel]
+  );
+  const selectedUnpublishable = useMemo(
+    () => filteredRows.filter((j) => selectionModel.includes(getJobRouteId(j)) && UNPUBLISHABLE_STATUSES.includes(j.result_status)),
+    [filteredRows, selectionModel]
+  );
+
+  const openPublishModal = (jobIds) => {
+    if (jobIds.length === 0) { toast.error('No publishable posts in this selection'); return; }
+    setPublishJobIds(jobIds);
+  };
+  const openWithdrawModal = (jobIds) => {
+    if (jobIds.length === 0) { toast.error('No published posts in this selection'); return; }
+    setWithdrawJobIds(jobIds);
+  };
+  const handleBulkSuccess = () => {
+    setPublishJobIds(null);
+    setWithdrawJobIds(null);
+    setSelectionModel([]);
+    fetchActiveJobs();
+  };
+
   const columns = useMemo(() => [
     {
       field: 'advertisement',
@@ -514,10 +573,20 @@ const ResultsDashboard = () => {
       <div className="max-w-8xl mx-auto space-y-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Results Module</h1>
             <p className="text-sm text-slate-500 mt-1">AJK Public Service Commission</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" variant="outline" onClick={() => openPublishModal(publishableInView.map(getJobRouteId))}
+              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+              <Send size={14} className="mr-1.5" /> Publish All ({publishableInView.length})
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => openWithdrawModal(unpublishableInView.map(getJobRouteId))}
+              className="border-amber-300 text-amber-700 hover:bg-amber-50">
+              <EyeOff size={14} className="mr-1.5" /> Unpublish All ({unpublishableInView.length})
+            </Button>
           </div>
         </div>
 
@@ -602,32 +671,37 @@ const ResultsDashboard = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            {(() => {
-              const q = searchTerm.toLowerCase();
-              const filteredRows = allJobRows
-                .filter((job) =>
-                  (job.designation || '').toLowerCase().includes(q) ||
-                  (job.adv?.adv_number || '').toLowerCase().includes(q)
-                )
-                .map((job, idx) => ({ ...job, id: job.hash_id || job.id || `${job.adv?.adv_number}-${idx}` }));
+          {selectionModel.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+              <span className="text-sm font-semibold text-emerald-800 mr-2">{selectionModel.length} selected</span>
+              <Button size="sm" onClick={() => openPublishModal(selectedPublishable.map(getJobRouteId))} disabled={selectedPublishable.length === 0}>
+                <Send size={14} className="mr-1.5" /> Publish Selected ({selectedPublishable.length})
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => openWithdrawModal(selectedUnpublishable.map(getJobRouteId))} disabled={selectedUnpublishable.length === 0}>
+                <EyeOff size={14} className="mr-1.5" /> Unpublish Selected ({selectedUnpublishable.length})
+              </Button>
+              <button onClick={() => setSelectionModel([])} className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 ml-1">Clear</button>
+            </div>
+          )}
 
-              return (
-                <TooltipDataGrid
-                  rows={filteredRows}
-                  columns={columns}
-                  autoHeight
-                  pageSizeOptions={[10, 25, 50]}
-                  initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
-                  loading={fetchingJobs}
-                  disableRowSelectionOnClick
-                  sx={{
-                    '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
-                    '& .MuiDataGrid-row': { minHeight: '52px !important' }
-                  }}
-                />
-              );
-            })()}
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <TooltipDataGrid
+              rows={filteredRows}
+              columns={columns}
+              autoHeight
+              pageSizeOptions={[10, 25, 50]}
+              initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
+              loading={fetchingJobs}
+              checkboxSelection
+              rowSelectionModel={selectionModel}
+              onRowSelectionModelChange={setSelectionModel}
+              disableRowSelectionOnClick
+              sx={{
+                '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
+                '& .MuiDataGrid-row': { minHeight: '52px !important' },
+                ...checkboxThemeSx,
+              }}
+            />
           </div>
         </div>
 
@@ -690,6 +764,8 @@ const ResultsDashboard = () => {
         job={selectedJob}
         onSuccess={handlePublishSuccess}
       />
+      <BulkPublishModal isOpen={Boolean(publishJobIds)} onClose={() => setPublishJobIds(null)} jobIds={publishJobIds || []} onSuccess={handleBulkSuccess} />
+      <BulkWithdrawModal isOpen={Boolean(withdrawJobIds)} onClose={() => setWithdrawJobIds(null)} jobIds={withdrawJobIds || []} onSuccess={handleBulkSuccess} />
     </div>
   );
 };

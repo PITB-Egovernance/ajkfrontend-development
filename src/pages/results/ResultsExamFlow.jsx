@@ -2,11 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  Award, ArrowLeft, Search, ChevronDown, Filter,
-  FileSpreadsheet, ArrowRight, Send, FileText,
+  Award, ArrowLeft, ChevronDown,
+  FileSpreadsheet, ArrowRight, Send, FileText, EyeOff,
   LayoutDashboard, ShieldAlert, ClipboardCheck,
 } from 'lucide-react';
-import { TextField } from '@mui/material';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
@@ -20,8 +19,26 @@ import AuthService from 'services/authService';
 import { getJobRouteId } from 'utils/jobMapper';
 import { useAuth } from 'context/AuthContext';
 import { getUserRole } from 'utils/roleUtils';
-import SearchableSelect from 'components/ui/SearchableSelect';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { examTypeToCategory, applyClubbedGroups } from 'utils/resultsClubbing';
+import BulkPublishModal from 'components/results/BulkPublishModal';
+import BulkWithdrawModal from 'components/results/BulkWithdrawModal';
+
+// Same publishable/unpublishable split used on the Post-Result landing page.
+const PUBLISHABLE_STATUSES = ['Approved', 'APPROVED', 'WITHDRAWN'];
+const UNPUBLISHABLE_STATUSES = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'];
+
+const DEFAULT_FILTERS = { search: '', adv_number: '', department: '', post: '' };
+
+// Same emerald-900 checkbox theme used by the Post-Result Processing tables
+// (PostResultWorkflow.jsx gridSx) — native MUI checkboxes need an explicit
+// sx override, a plain text-* Tailwind class doesn't tint them.
+const checkboxThemeSx = {
+  '& .MuiDataGrid-checkboxInput svg':              { color: '#064e3b' },
+  '& .MuiDataGrid-checkboxInput.Mui-checked svg':  { color: '#064e3b' },
+  '& .MuiCheckbox-root .MuiSvgIcon-root':          { color: '#064e3b' },
+  '& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root': { color: '#064e3b' },
+};
 
 const examTypeMeta = {
   'one-paper-mcqs': { title: 'One Paper MCQs — Results', badge: 'One Paper MCQs', testTypeFilter: (tt) => /mcq/i.test(tt) && !/two/i.test(tt) },
@@ -208,11 +225,16 @@ const ResultsExamFlow = () => {
 
   const [loading, setLoading]           = useState(true);
   const [allJobRows, setAllJobRows]     = useState([]);
-  const [searchTerm, setSearchTerm]     = useState('');
-  const [filterAdv, setFilterAdv]       = useState('all');
-  const [filterDept, setFilterDept]     = useState('all');
-  const [filterPost, setFilterPost]     = useState('all');
+  const [filters, setFilters]           = useState(DEFAULT_FILTERS);
   const [activeDropdownJobId, setActiveDropdownJobId] = useState(null);
+
+  // Bulk publish/unpublish — DataGrid's checkboxSelection model holds row
+  // ids, which are set to job.hash_id below (job.id is hidden from every
+  // API response by JobDetail::$hidden), so these are already the right
+  // identifiers to send straight to the backend.
+  const [selectionModel, setSelectionModel] = useState([]);
+  const [publishJobIds, setPublishJobIds] = useState(null);
+  const [withdrawJobIds, setWithdrawJobIds] = useState(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -337,19 +359,59 @@ const ResultsExamFlow = () => {
       .map(([id, label]) => ({ value: id, label })),
     [allJobRows]);
 
+  const filterConfig = useMemo(() => [
+    { name: 'search', label: 'Search', type: 'text', placeholder: 'Post, advertisement...' },
+    { name: 'adv_number', label: 'Advertisement', type: 'select', options: advOptions },
+    { name: 'department', label: 'Department', type: 'select', options: deptOptions },
+    { name: 'post', label: 'Post', type: 'select', options: postOptions },
+  ], [advOptions, deptOptions, postOptions]);
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleClearFilters = () => setFilters(DEFAULT_FILTERS);
+
   const filteredRows = useMemo(() => {
-    const q = searchTerm.toLowerCase().trim();
+    const q = filters.search.toLowerCase().trim();
     return allJobRows.filter((job) => {
       const advId = job.adv?.hash_id || String(job.adv?.id || '');
-      if (filterAdv  !== 'all' && advId !== filterAdv) return false;
+      if (filters.adv_number && advId !== filters.adv_number) return false;
       const dept = job.department_label || job.department || '';
-      if (filterDept !== 'all' && dept !== filterDept) return false;
+      if (filters.department && dept !== filters.department) return false;
       const postId = job.hash_id || String(job.id || '');
-      if (filterPost !== 'all' && postId !== filterPost) return false;
+      if (filters.post && postId !== filters.post) return false;
       if (q) return (job.designation || '').toLowerCase().includes(q) || (job.adv?.adv_number || '').toLowerCase().includes(q);
       return true;
     });
-  }, [allJobRows, searchTerm, filterAdv, filterDept, filterPost]);
+  }, [allJobRows, filters]);
+
+  const publishableInView = useMemo(() => filteredRows.filter((j) => PUBLISHABLE_STATUSES.includes(j.result_status)), [filteredRows]);
+  const unpublishableInView = useMemo(() => filteredRows.filter((j) => UNPUBLISHABLE_STATUSES.includes(j.result_status)), [filteredRows]);
+  const selectedPublishable = useMemo(
+    () => filteredRows.filter((j) => selectionModel.includes(getJobRouteId(j)) && PUBLISHABLE_STATUSES.includes(j.result_status)),
+    [filteredRows, selectionModel]
+  );
+  const selectedUnpublishable = useMemo(
+    () => filteredRows.filter((j) => selectionModel.includes(getJobRouteId(j)) && UNPUBLISHABLE_STATUSES.includes(j.result_status)),
+    [filteredRows, selectionModel]
+  );
+
+  const openPublishModal = (jobIds) => {
+    if (jobIds.length === 0) { toast.error('No publishable posts in this selection'); return; }
+    setPublishJobIds(jobIds);
+  };
+  const openWithdrawModal = (jobIds) => {
+    if (jobIds.length === 0) { toast.error('No published posts in this selection'); return; }
+    setWithdrawJobIds(jobIds);
+  };
+  const handleBulkSuccess = () => {
+    setPublishJobIds(null);
+    setWithdrawJobIds(null);
+    setSelectionModel([]);
+    fetchData();
+  };
 
   const columns = useMemo(() => [
     {
@@ -440,13 +502,23 @@ const ResultsExamFlow = () => {
             className="text-sm text-slate-500 flex items-center gap-1 mb-3 hover:text-slate-700">
             <ArrowLeft size={14} /> Back to Results
           </button>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg"><Award size={22} className="text-emerald-700" /></div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">{meta.title}</h1>
                 <p className="text-sm text-slate-500 mt-0.5">AJK Public Service Commission</p>
               </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button size="sm" variant="outline" onClick={() => openPublishModal(publishableInView.map(getJobRouteId))}
+                className="border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+                <Send size={14} className="mr-1.5" /> Publish All ({publishableInView.length})
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openWithdrawModal(unpublishableInView.map(getJobRouteId))}
+                className="border-amber-300 text-amber-700 hover:bg-amber-50">
+                <EyeOff size={14} className="mr-1.5" /> Unpublish All ({unpublishableInView.length})
+              </Button>
             </div>
           </div>
         </div>
@@ -455,32 +527,27 @@ const ResultsExamFlow = () => {
         <div className="space-y-4">
           <h2 className="text-base font-semibold text-slate-900">Job Listings</h2>
 
-          {/* Filters — same layout as Roll Number Exam Flow */}
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-            <TextField size="small" label="Search" value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="lg:col-span-3"
-              InputProps={{ startAdornment: <Search size={16} className="mr-2 text-slate-400" /> }} />
-            <div className="lg:col-span-3">
-              <SearchableSelect label="Advertisement" value={filterAdv}
-                onChange={(e) => setFilterAdv(e.target.value)} placeholder="All Advertisements"
-                options={[{ value: 'all', label: 'All Advertisements' }, ...advOptions]} />
+          {selectionModel.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+              <span className="text-sm font-semibold text-emerald-800 mr-2">{selectionModel.length} selected</span>
+              <Button size="sm" onClick={() => openPublishModal(selectedPublishable.map(getJobRouteId))} disabled={selectedPublishable.length === 0}>
+                <Send size={14} className="mr-1.5" /> Publish Selected ({selectedPublishable.length})
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => openWithdrawModal(selectedUnpublishable.map(getJobRouteId))} disabled={selectedUnpublishable.length === 0}>
+                <EyeOff size={14} className="mr-1.5" /> Unpublish Selected ({selectedUnpublishable.length})
+              </Button>
+              <button onClick={() => setSelectionModel([])} className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 ml-1">Clear</button>
             </div>
-            <div className="lg:col-span-3">
-              <SearchableSelect label="Department" value={filterDept}
-                onChange={(e) => setFilterDept(e.target.value)} placeholder="All Departments"
-                options={[{ value: 'all', label: 'All Departments' }, ...deptOptions]} />
-            </div>
-            <div className="lg:col-span-2">
-              <SearchableSelect label="Post" value={filterPost}
-                onChange={(e) => setFilterPost(e.target.value)} placeholder="All Posts"
-                options={[{ value: 'all', label: 'All Posts' }, ...postOptions]} />
-            </div>
-            <Button variant="outline" className="h-10 gap-2 bg-white lg:col-span-1"
-              onClick={() => { setSearchTerm(''); setFilterAdv('all'); setFilterDept('all'); setFilterPost('all'); }}>
-              <Filter size={15} /> Reset
-            </Button>
-          </div>
+          )}
+
+          {/* Filters — same AdvancedFilter (Search/Reset) pattern as Post-Result Processing */}
+          <AdvancedFilter
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onClearFilters={handleClearFilters}
+            filterConfig={filterConfig}
+            title="Filter Posts"
+          />
 
           <div className="bg-white rounded-lg shadow-sm p-4">
             <TooltipDataGrid
@@ -493,16 +560,23 @@ const ResultsExamFlow = () => {
               pageSizeOptions={[10, 25, 50]}
               initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
               loading={loading}
+              checkboxSelection
+              rowSelectionModel={selectionModel}
+              onRowSelectionModelChange={setSelectionModel}
               disableRowSelectionOnClick
               sx={{
                 '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
-                '& .MuiDataGrid-row': { minHeight: '52px !important' }
+                '& .MuiDataGrid-row': { minHeight: '52px !important' },
+                ...checkboxThemeSx,
               }}
             />
           </div>
         </div>
 
       </div>
+
+      <BulkPublishModal isOpen={Boolean(publishJobIds)} onClose={() => setPublishJobIds(null)} jobIds={publishJobIds || []} onSuccess={handleBulkSuccess} />
+      <BulkWithdrawModal isOpen={Boolean(withdrawJobIds)} onClose={() => setWithdrawJobIds(null)} jobIds={withdrawJobIds || []} onSuccess={handleBulkSuccess} />
     </div>
   );
 };

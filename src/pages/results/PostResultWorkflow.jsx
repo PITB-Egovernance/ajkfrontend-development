@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { IconButton, Menu, MenuItem } from '@mui/material';
-import { ArrowLeft, ClipboardCheck, Download, FileSpreadsheet, RefreshCw, Plus, EyeOff, ShieldCheck, MapPin, Calendar, Users, CheckCircle2, MoreVertical, Pencil, Send, Trash2, X, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Download, FileSpreadsheet, RefreshCw, Plus, EyeOff, ShieldCheck, MapPin, Calendar, Users, CheckCircle2, MoreVertical, Pencil, Send, Trash2, X, AlertTriangle, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Card, CardContent } from 'components/ui/Card';
@@ -13,6 +13,7 @@ import SearchableSelect from 'components/ui/SearchableSelect';
 import PostResultApi from 'api/postResultApi';
 import AdvertisementApi from 'api/advertisementApi';
 import { getJobRouteId } from 'utils/jobMapper';
+import CandidateProfileModal from './components/CandidateProfileModal';
 
 const FILTER_DEBOUNCE_MS = 400;
 const DEFAULT_FILTERS = { search: '', adv_number: '' };
@@ -106,6 +107,16 @@ const StatusPill = ({ value }) => {
     </span>
   );
 };
+
+const profileCol = (onOpen) => ({
+  field: 'profile_action', headerName: 'Profile', width: 90, sortable: false,
+  align: 'center', headerAlign: 'center', resizable: false,
+  renderCell: (params) => (
+    <IconButton size="small" onClick={() => onOpen(params.row)} title="View full profile & download documents">
+      <User size={16} className="text-emerald-700" />
+    </IconButton>
+  ),
+});
 
 const statusCol = (field, headerName, flex = 1) => ({
   field, headerName, flex, minWidth: 160, sortable: false,
@@ -238,6 +249,19 @@ const PostResultWorkflow = () => {
   // Number Slip / Edit Interview Phase) rather than a modal.
   const [actionAnchorEl, setActionAnchorEl] = useState(null);
   const [actionRow, setActionRow] = useState(null);
+
+  // Candidate Profile modal — full profile + document/application-form
+  // download, reachable from every tab (Passed, Shortlisted, Rejections,
+  // Interview, Award List, Onboarding) since every row now carries an
+  // application_number.
+  const [profileModal, setProfileModal] = useState(null); // { identifier, name } | null
+  const openProfile = (row) => {
+    if (!row?.application_number) {
+      toast.error('No application reference available for this candidate');
+      return;
+    }
+    setProfileModal({ identifier: row.application_number, name: row.candidate_name });
+  };
 
   // Interview Phase Allocation table row menu (three-dot menu, same pattern
   // as the Interview Candidates row menu above) — Publish/Unpublish + Edit
@@ -636,6 +660,8 @@ const PostResultWorkflow = () => {
         numberCol('total_marks', 'Total Marks'),
         numberCol('obtained_marks', 'Obtained Marks'),
         numberCol('percentage', 'Percentage'),
+        statusCol('current_status', 'Status', 0.8),
+        profileCol(openProfile),
       ];
     }
     if (activeTab === 'shortlisted') {
@@ -645,6 +671,7 @@ const PostResultWorkflow = () => {
         numberCol('obtained_marks', 'Obtained Marks'),
         numberCol('percentage', 'Percentage'),
         statusCol('current_status', 'Status', 0.8),
+        profileCol(openProfile),
       ];
     }
     if (activeTab === 'interview') {
@@ -676,6 +703,7 @@ const PostResultWorkflow = () => {
         textCol('rejection_reason', 'Rejection Reason', 1.6),
         textCol(activeTab === 'initial-rejection' ? 'rejection_date' : 'final_rejection_date', activeTab === 'initial-rejection' ? 'Rejection Date' : 'Final Rejection Date', 0.8),
         statusCol('current_status', 'Status', 0.8),
+        profileCol(openProfile),
       ];
     }
     if (activeTab === 'award-list') {
@@ -704,10 +732,11 @@ const PostResultWorkflow = () => {
         timeCol('interview_time', 'Interview Time'),
         statusCol('call_letter_status', 'Call Letter Status', 0.9),
         statusCol('interview_award_status', 'Interview/Award Status', 1),
+        profileCol(openProfile),
       ];
     }
     if (activeTab === 'onboarding') {
-      return [...base, statusCol('post_result_status', 'Status', 0.9), statusCol('onboarding_status', 'Onboarding Status', 0.9)];
+      return [...base, statusCol('post_result_status', 'Status', 0.9), statusCol('onboarding_status', 'Onboarding Status', 0.9), profileCol(openProfile)];
     }
     return base;
   }, [activeTab, maxVivaMarks]);
@@ -990,9 +1019,8 @@ const PostResultWorkflow = () => {
             Management's Published/Unpublished Slips tabs. */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {activeTab === 'onboarding' && (
-            <div className="grid w-full grid-cols-1 overflow-hidden rounded-t-lg bg-white p-1">
-              {/* { id: 'eligible', label: 'Eligible to Start' } */}
-              {[{ id: 'all', label: 'In Progress / Onboarded Candidates' }, ].map((v) => {
+            <div className="grid w-full grid-cols-2 overflow-hidden rounded-t-lg bg-white p-1">
+              {[{ id: 'eligible', label: 'Eligible to Start' }, { id: 'all', label: 'In Progress / Onboarded Candidates' }].map((v) => {
                 const isActive = onboardingView === v.id;
                 return (
                   <button
@@ -1075,6 +1103,9 @@ const PostResultWorkflow = () => {
       <Menu anchorEl={actionAnchorEl} open={Boolean(actionAnchorEl)} onClose={handleActionMenuClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <MenuItem key="profile" onClick={() => { const row = actionRow; handleActionMenuClose(); if (row) openProfile(row); }}>
+          <User size={16} style={{ marginRight: '8px' }} className="text-emerald-700" /> View Profile & Documents
+        </MenuItem>
         <MenuItem key="download" onClick={() => { handleDownloadCallLetter(actionRow); handleActionMenuClose(); }}
           disabled={!actionRow?.call_letter_id}>
           <Download size={16} style={{ marginRight: '8px' }} className="text-violet-600" /> Download Call Letter
@@ -1165,6 +1196,13 @@ const PostResultWorkflow = () => {
           </div>
         </div>
       )}
+
+      <CandidateProfileModal
+        isOpen={Boolean(profileModal)}
+        onClose={() => setProfileModal(null)}
+        identifier={profileModal?.identifier}
+        candidateName={profileModal?.name}
+      />
 
     </div>
   );

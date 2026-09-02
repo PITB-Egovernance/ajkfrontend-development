@@ -220,6 +220,42 @@ const PostResultApi = {
     return handleResponse(res);
   },
 
+  // ── Candidate Profile / Documents (admin) ──
+  getCandidateProfile: async (identifier) => {
+    const res = await fetch(`${API_BASE}/results/candidates/${identifier}`, { headers: getHeaders(false) });
+    return handleResponse(res);
+  },
+  updateCandidateProfile: async (identifier, data, section = 'profile') => {
+    const res = await fetch(`${API_BASE}/results/candidates/${identifier}/${section}`, {
+      method: 'PUT', headers: getHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(res);
+  },
+  downloadCandidateDocument: async (identifier, docHash, filename) => {
+    const res = await fetch(`${API_BASE}/results/candidates/${identifier}/documents/${docHash}/download`, { headers: getHeaders(false) });
+    const blob = await handleBlobResponse(res);
+    await downloadBlob(blob, filename || `document-${docHash}`);
+  },
+  downloadApplicationForm: async (identifier, filename) => {
+    const res = await fetch(`${API_BASE}/results/candidates/${identifier}/application-form/download`, { headers: getHeaders(false) });
+    const blob = await handleBlobResponse(res);
+    await downloadBlob(blob, filename || `application-form-${identifier}.pdf`);
+  },
+  downloadApplicationFormsBulk: async (identifiers, filename = 'application_forms.zip') => {
+    const res = await fetch(`${API_BASE}/results/candidates/application-forms/download-bulk`, {
+      method: 'POST', headers: getHeaders(), body: JSON.stringify({ identifiers }),
+    });
+    const blob = await handleBlobResponse(res);
+    await downloadBlob(blob, filename);
+  },
+  downloadDocumentsBulk: async (items, filename = 'documents.zip') => {
+    const res = await fetch(`${API_BASE}/results/candidates/documents/download-bulk`, {
+      method: 'POST', headers: getHeaders(), body: JSON.stringify({ items }),
+    });
+    const blob = await handleBlobResponse(res);
+    await downloadBlob(blob, filename);
+  },
+
   // ── Onboarding ──
   getOnboardingEligible: async (jobId, params = {}) => {
     const res = await fetch(`${API_BASE}/post-result/${jobId}/onboarding/eligible${qs(params)}`, { headers: getHeaders(false) });

@@ -362,6 +362,35 @@ const ResultsApi = {
   },
 
   /**
+   * Publish results for several posts in one all-or-nothing batch. Pass
+   * either `job_post_ids` (explicit selection) or `all: true` (every
+   * eligible-but-unpublished post). If any post in the batch fails, none of
+   * them are published — the thrown error's message names which post
+   * stopped it, straight from the backend's rollback message.
+   */
+  bulkPublish: async (data) => {
+    const response = await fetch(`${API_BASE}/results/publish/bulk`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Withdraw (unpublish) results for several posts in one all-or-nothing
+   * batch — same rollback-and-clear-error contract as bulkPublish().
+   */
+  bulkWithdraw: async (data) => {
+    const response = await fetch(`${API_BASE}/results/publish/bulk/withdraw`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Get current publication status
    */
   getPublishStatus: async (jobPostId) => {
