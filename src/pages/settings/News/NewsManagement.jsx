@@ -58,9 +58,9 @@ const NEWS_TYPES = [
   { value: "general", label: "General" },
   { value: "notice", label: "Notice" },
   { value: "press_release", label: "Press Release" },
-  { value: "advertisement", label: "Advertisement" },
-  { value: "result", label: "Result" },
-  { value: "schedule", label: "Schedule" },
+//  { value: "advertisement", label: "Advertisement" },
+ // { value: "result", label: "Result" },
+  // { value: "schedule", label: "Schedule" },
   { value: "corrigendum", label: "Corrigendum" },
   { value: "announcement", label: "Announcement" },
   { value: "public_notice", label: "Public Notice" },
@@ -105,6 +105,24 @@ const NEWS_TYPES = [
   {
     value: "tender_notices",
     label: "Tender Notices",
+  },
+
+   // Additional News Types
+  {
+    value: "syllabus",
+    label: "Syllabus",
+  },
+  {
+    value: "recruitment_management_policy",
+    label: "Recruitment Management Policy",
+  },
+  {
+    value: "sample_paper",
+    label: "Sample Paper",
+  },
+  {
+    value: "gallery",
+    label: "Gallery",
   },
 ];
 
