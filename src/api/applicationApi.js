@@ -32,6 +32,9 @@ const handleResponse = async (response) => {
 
 // The candidate portal application list always reports status='submitted' (its own column).
 // The real admin status (Shortlisted / Rejected / Interview) is overlaid from the admin DB.
+// This same batch call also returns job_designation — the candidate portal's
+// own list endpoint never returns a job title (only a numeric job_post_id
+// nothing on this side can resolve), so this is the only source for one.
 const fetchAdminStatuses = async (numbers) => {
   try {
     const res  = await fetch(
@@ -52,10 +55,18 @@ const overlayAdminStatuses = async (result) => {
 
   const map = await fetchAdminStatuses(numbers);
   if (result.data?.data) {
-    result.data.data = result.data.data.map((app) => ({
-      ...app,
-      _admin_status: map[app.application_number] ?? null,
-    }));
+    result.data.data = result.data.data.map((app) => {
+      const entry = map[app.application_number];
+      // entry is { status, job_designation } on the current backend contract;
+      // tolerate the older plain-string shape too in case of a rollback.
+      const adminStatus = entry && typeof entry === 'object' ? entry.status : entry;
+      const jobDesignation = entry && typeof entry === 'object' ? entry.job_designation : null;
+      return {
+        ...app,
+        _admin_status: adminStatus ?? null,
+        _job_designation: jobDesignation ?? null,
+      };
+    });
   }
   return result;
 };
@@ -183,7 +194,11 @@ const ApplicationApi = {
     const appNum  = appData?.application_number;
     if (appNum) {
       const map = await fetchAdminStatuses([appNum]);
-      appData._admin_status = map[appNum] ?? null;
+      const entry = map[appNum];
+      const adminStatus = entry && typeof entry === 'object' ? entry.status : entry;
+      const jobDesignation = entry && typeof entry === 'object' ? entry.job_designation : null;
+      appData._admin_status = adminStatus ?? null;
+      appData._job_designation = jobDesignation ?? null;
     }
     return result;
   },
