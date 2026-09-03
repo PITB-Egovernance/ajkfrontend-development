@@ -917,12 +917,6 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
 
-  const handleView = () => {
-    if (selectedRow) navigate(`/dashboard/applications/${selectedRow.application_number}`);
-    handleMenuClose();
-  };
-
-
   // ── Columns ─────────────────────────────
   const columns = [
     { field: 'cnic',               headerName: 'CNIC',            minWidth: 150, flex: 0.9 },
@@ -1217,9 +1211,6 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
           }}
           disabled={!selectedRow?.roll_number}>
           <FileText size={16} style={{ marginRight: '8px' }} className="text-emerald-600" /> View Slip
-        </MenuItem>
-        <MenuItem key="view" onClick={handleView}>
-          <Eye size={16} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
         </MenuItem>
         {canEdit && (
           <MenuItem key="edit"

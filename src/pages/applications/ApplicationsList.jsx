@@ -1,25 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useGridApiRef } from '@mui/x-data-grid';
+import * as XLSX from 'xlsx';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
-import SearchableSelect from 'components/ui/SearchableSelect';
-import { IconButton, Menu, MenuItem, TextField } from '@mui/material';
-import { Eye, CheckCircle, XCircle, MoreVertical, RefreshCw, FilterX } from 'lucide-react';
+import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { IconButton, Menu, MenuItem } from '@mui/material';
+import { Eye, XCircle, MoreVertical, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from 'components/ui/Loader';
-import Button from 'components/ui/Button';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import ApplicationApi from 'api/applicationApi';
 import toast from 'react-hot-toast';
-import {
-  getApplicationOcrBatch,
-  getApplicationOcrBatchLabel,
-  getApplicationOcrBatchPillClass,
-} from 'utils/applicationOcrUtils';
+import { getApplicationOcrBatch } from 'utils/applicationOcrUtils';
 import { formatDate } from 'utils/dateUtils';
-import { hasPermission } from 'utils/permissions';
-
-const PERM = 'candidates.job_applications'; // permission scope for this module
 
 // ── Module-level constants ────────────────────────────────────────────────────
 
@@ -31,18 +23,8 @@ const DEFAULT_FILTERS = {
   search: '', ocr_batch: '', disability: '',
 };
 
-const STATUS_COLORS = {
-  shortlisted: 'bg-green-100 text-green-700',
-  rejected:    'bg-red-100 text-red-700',
-  interview:   'bg-blue-100 text-blue-700',
-};
-
 const ApplicationsList = () => {
-  // Action-level permissions for the current role (status changes = edit).
-  const canEdit = hasPermission(`${PERM}.edit`);
-
   const navigate = useNavigate();
-  const apiRef = useGridApiRef();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -51,7 +33,6 @@ const ApplicationsList = () => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
-  const [selectionModel, setSelectionModel] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [advertisementMap, setAdvertisementMap] = useState({});
@@ -107,19 +88,70 @@ const ApplicationsList = () => {
     fetchAdvertisements();
   }, [fetchAdvertisements]);
 
-  // Derive unique jobs from loaded rows — useMemo avoids extra state + double-render.
+  // Derive unique jobs from loaded rows — keyed on advertisement_no (now
+  // sourced straight from the candidate portal's own top-level field, so
+  // it's reliably present on every application regardless of admin sync
+  // status), labeled with the post title when available for readability.
   const jobs = useMemo(() => {
     const seen   = new Set();
     const unique = [];
     rows.forEach((row) => {
-      const key = row.advertisement_no || row.job_title;
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        unique.push({ id: row.advertisement_no, title: row.job_title, advertisement_no: row.advertisement_no });
+      const adNo = row.advertisement_no;
+      if (adNo && adNo !== 'N/A' && !seen.has(adNo)) {
+        seen.add(adNo);
+        const label = row.job_title && row.job_title !== 'N/A' ? `${row.job_title} (${adNo})` : adNo;
+        unique.push({ id: adNo, advertisement_no: adNo, label });
       }
     });
     return unique;
   }, [rows]);
+
+  const filterConfig = useMemo(() => [
+    { name: 'search', label: 'Search (Name/CNIC)', type: 'text', placeholder: 'Candidate name or CNIC...' },
+    { name: 'ref_id', label: 'Ref ID', type: 'text' },
+    {
+      name: 'job_id', label: 'Job Advertisement', type: 'select',
+      options: jobs.map((job) => ({ value: job.advertisement_no, label: job.label })),
+    },
+    {
+      name: 'advertisement_no', label: 'Advertisement No', type: 'select',
+      options: jobs.map((job) => ({ value: job.advertisement_no, label: job.advertisement_no })),
+    },
+    {
+      name: 'status', label: 'Status', type: 'select',
+      options: [
+        { value: UNREVIEWED_SENTINEL, label: 'Unreviewed' },
+        { value: 'Shortlisted', label: 'Shortlisted' },
+        { value: 'Interview', label: 'Interview' },
+        { value: 'Rejected', label: 'Rejected' },
+      ],
+    },
+    {
+      name: 'payment_status', label: 'Payment Status', type: 'select',
+      options: [
+        { value: 'paid', label: 'Paid' },
+        { value: 'unpaid', label: 'Unpaid' },
+        { value: 'pending', label: 'Pending' },
+      ],
+    },
+    {
+      name: 'ocr_batch', label: 'OCR Verification', type: 'select',
+      options: [
+        { value: 'green', label: 'OCR Verified' },
+        { value: 'yellow', label: 'Partially Verified' },
+        { value: 'red', label: 'Not Verified' },
+      ],
+    },
+    {
+      name: 'disability', label: 'Disability', type: 'select',
+      options: [
+        { value: 'yes', label: 'Disabled' },
+        { value: 'no', label: 'Not Disabled' },
+      ],
+    },
+    { name: 'start_date', label: 'Applied At (From)', type: 'date' },
+    { name: 'end_date', label: 'Applied At (To)', type: 'date' },
+  ], [jobs]);
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
@@ -127,10 +159,12 @@ const ApplicationsList = () => {
     try {
       // UNREVIEWED_SENTINEL is a frontend-only token (no admin row with that status exists);
       // skip sending it to the server so the local filter can pick up rows whose status is empty.
+      // job_id is filtered locally below (its value is now the job title
+      // text, not an id the candidate portal's own /applications endpoint
+      // would understand), so it's deliberately not sent as a server param.
       const params = {
         per_page: 1000,
         search: filters.search,
-        job_id: filters.job_id,
         status: filters.status === UNREVIEWED_SENTINEL ? '' : filters.status,
         start_date: filters.start_date,
         end_date: filters.end_date,
@@ -191,11 +225,22 @@ const ApplicationsList = () => {
         return {
           id:      item.application_number || item.id,
           hash_id: item.hash_id || item.id,
-          applicant_name:  snapshot?.name || item.candidate?.name || item.profile?.full_name || 'N/A',
-          cnic:            snapshot?.cnic || item.candidate?.cnic || item.profile?.cnic || 'N/A',
-          job_title:       item.job_post?.post_title || item.job_post?.title || item.job?.title || 'N/A',
+          // Live candidate record preferred over snapshot_data (frozen at
+          // submission time) — admin profile edits only ever update the live
+          // record, so snapshot-first would make edits (e.g. CNIC changes)
+          // never show up here even though they saved correctly.
+          applicant_name:  item.candidate?.name || snapshot?.name || item.profile?.full_name || 'N/A',
+          cnic:            item.candidate?.cnic || snapshot?.cnic || item.profile?.cnic || 'N/A',
+          // item.job.post_title and the top-level item.advertisement_no are
+          // the real fields the candidate portal's /applications list
+          // actually returns (confirmed live) — always present, regardless
+          // of whether this application has ever been synced to the admin
+          // DB. item.job_post (wrong field name) never existed, which is
+          // why job_title/advertisement_no used to silently fall through to
+          // 'N/A' for any application the admin hadn't already touched.
+          job_title:       item.job?.post_title || item._job_designation || item.job_post?.post_title || 'N/A',
           job_post_id:     item.job_post_id || null,
-          advertisement_no: resolveAdvertisementNo(item.job_post?.ext_adv_id || item.advertisement_no || item.job_post?.adv_number || 'N/A'),
+          advertisement_no: resolveAdvertisementNo(item.advertisement_no || item.job?.adv_number || item.job_post?.ext_adv_id || 'N/A'),
           status:          effectiveStatus,
           applied_at_raw:  item.submitted_at || item.created_at || null,
           applied_at: (item.submitted_at || item.created_at)
@@ -237,7 +282,7 @@ const ApplicationsList = () => {
         const endMatch   = !filters.end_date   || (rowDate && rowDate <= new Date(`${filters.end_date}T23:59:59`));
 
         const refMatch       = !filters.ref_id          || (row.id || '').toString().toLowerCase().includes(filters.ref_id.toLowerCase());
-        const adNoMatch      = !filters.advertisement_no || (row.advertisement_no || '').toString().toLowerCase().includes(filters.advertisement_no.toLowerCase());
+        const adNoMatch      = !filters.advertisement_no || (row.advertisement_no || '') === filters.advertisement_no;
         const paymentMatch   = !filters.payment_status  || (row.payment_status || '').toString().toLowerCase() === filters.payment_status.toLowerCase();
         const batchMatch     = !filters.ocr_batch       || (row.ocr_batch || '').toString().toLowerCase() === filters.ocr_batch.toLowerCase();
         const disabilityMatch = !filters.disability
@@ -249,7 +294,7 @@ const ApplicationsList = () => {
 
       setRows(locallyFilteredRows);
       setTotal(
-        (filters.ref_id || filters.advertisement_no || filters.payment_status || filters.ocr_batch || filters.disability)
+        (filters.ref_id || filters.job_id || filters.advertisement_no || filters.payment_status || filters.ocr_batch || filters.disability)
           ? locallyFilteredRows.length
           : totalCount
       );
@@ -266,17 +311,6 @@ const ApplicationsList = () => {
     return () => clearTimeout(timer);
   }, [fetchApplications]);
 
-  useEffect(() => {
-    if (!loading && rows.length > 0) {
-      setTimeout(() => {
-        apiRef.current?.autosizeColumns?.({
-          includeOutliers: true,
-          includeHeaders: true,
-          expand: true,
-        });
-      }, 0);
-    }
-  }, [rows, loading, apiRef]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -297,155 +331,43 @@ const ApplicationsList = () => {
     handleMenuClose();
   };
 
-  const updateStatus = async (id, status) => {
-    try {
-      const row = rows.find((r) => r.id === id);
-      const payloadRow = {
-      ...row,
-      candidate_cnic: row?.cnic,
-      cnic_front_path: row?.cnic_front_path,
-      cnic_back_path: row?.cnic_back_path,
-      photo_path: row?.photo_path,
-      profile_photo_path: row?.profile_photo_path,
-      profile_photo_url: row?.profile_photo_url,
-    };
-
-    console.log("Payload", payloadRow)
-      // Optimistic update — set both `status` (display) and `_admin_status` (source of truth
-      // for the effectiveStatus mapping). Without this, a later re-render (re-fetch or filter
-      // change) maps the row back to '' because the candidate portal always returns 'submitted'.
-      // setRows(prev => prev.map(r => r.id === id ? { ...r, status, _admin_status: status } : r));
-      setRows(prev =>
-      prev.map(r =>
-        r.id === id ? { ...r, status, _admin_status: status } : r
-      )
-    );
-      // await ApplicationApi.updateStatus(id, status, row);
-      // toast.success(`Application marked as ${status}`);
-      await ApplicationApi.updateStatus(id, status, payloadRow);
-
-      toast.success(`Application marked as ${status}`);
-    } catch (err) {
-      // Surface backend message when available — the live API's updateStatus path can
-      // return 404 "No query results for model [App\Models\ReceivedApplication]" when
-      // the admin row hasn't been synced yet. applicationApi.updateStatus already
-      // retries via /applications/bulk-status in that case, so this catch only fires
-      // if both endpoints fail.
-      const msg = err?.status === 404
-        ? 'Status update failed: admin DB has no record for this application. Both single and bulk endpoints returned 404. The backend team needs to sync the application to admin DB, or relax the route-model binding on PUT /applications/{id}/status.'
-        : (err?.message || 'Failed to update status');
-      toast.error(msg);
-      fetchApplications();
+  // Exports whatever is currently loaded/filtered in `rows` (the list is
+  // already fetched in full — up to 1000 records — and filtered client-side,
+  // so no separate backend export endpoint is needed here).
+  const handleExportExcel = () => {
+    if (rows.length === 0) {
+      toast.error('No applications to export');
+      return;
     }
-    handleMenuClose();
+    const data = rows.map((row) => ({
+      'Ref ID': row.id,
+      'Applicant Name': row.applicant_name,
+      'CNIC': row.cnic,
+      'Job Advertisement': row.job_title,
+      'Advertisement No': row.advertisement_no,
+      'Applied At': row.applied_at,
+      'Status': row.status || 'Unreviewed',
+      'Domicile District': row.domicile_district || 'N/A',
+      'Disability': row.has_disability ? (row.disability_type || 'Yes') : 'None',
+      'Payment Status': row.payment_status,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Applications');
+    XLSX.writeFile(workbook, `applications_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
-
-  const handleBulkStatusUpdate = async (status) => {
-    if (!selectionModel.length) return;
-    try {
-      // const selectedRows = rows.filter((r) => selectionModel.includes(r.id));
-      const selectedRows = rows
-      .filter((r) => selectionModel.includes(r.id))
-      .map(row => ({
-        ...row,
-        candidate_cnic: row?.cnic,
-        cnic_front_path: row?.cnic_front_path,
-        cnic_back_path: row?.cnic_back_path,
-        photo_path: row?.photo_path,
-        profile_photo_path: row?.profile_photo_path,
-        profile_photo_url: row?.profile_photo_url,
-      }));
-      // Same optimistic patch as updateStatus — also write _admin_status so the row keeps its
-      // new status across re-fetches and filter changes.
-      setRows(prev => prev.map(r => selectionModel.includes(r.id) ? { ...r, status, _admin_status: status } : r));
-      // await ApplicationApi.bulkUpdateStatus(selectionModel, status, selectedRows);
-      await ApplicationApi.bulkUpdateStatus(selectionModel, status, selectedRows);
-      toast.success(`${selectionModel.length} applications marked as ${status}`);
-      setSelectionModel([]);
-    } catch {
-      toast.error('Failed to update bulk status');
-      fetchApplications();
-    }
-  };
-
-  const getStatusColor = (status) => {
-    const key = status?.toLowerCase() || '';
-    if (!key) return 'bg-slate-100 text-slate-400';
-    return STATUS_COLORS[key] ?? 'bg-gray-100 text-gray-700';
-  };
-
-  // ── Selection-aware shortlist state (for bulk action bar) ───────────────
-  const selectedRows = useMemo(
-    () => rows.filter((r) => selectionModel.includes(r.id)),
-    [rows, selectionModel]
-  );
-  const anyShortlisted = selectedRows.some((r) => (r.status || '').toLowerCase() === 'shortlisted');
-  const allShortlisted = selectedRows.length > 0 && selectedRows.every((r) => (r.status || '').toLowerCase() === 'shortlisted');
 
   const columns = [
-    { field: 'id',               headerName: 'Ref ID',           minWidth: 100 },
-    // {
-    //   field: 'photo_url',
-    //   headerName: 'Photo',
-    //   minWidth: 70,
-    //   sortable: false,
-    //   renderCell: (params) => params.value ? (
-    //     <a href={params.value} target="_blank" rel="noopener noreferrer">
-    //       <img src={params.value} alt="Candidate" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
-    //     </a>
-    //   ) : <span className="text-slate-400 text-xs">—</span>,
-    // },
-    // {
-    //   field: 'cnic_front_url',
-    //   headerName: 'CNIC Front',
-    //   minWidth: 90,
-    //   sortable: false,
-    //   renderCell: (params) => params.value ? (
-    //     <a href={params.value} target="_blank" rel="noopener noreferrer">
-    //       <img src={params.value} alt="CNIC Front" className="w-14 h-10 rounded object-cover border border-slate-200" />
-    //     </a>
-    //   ) : <span className="text-slate-400 text-xs">—</span>,
-    // },
-    { field: 'applicant_name',   headerName: 'Applicant Name',   minWidth: 150 },
-    { field: 'cnic',             headerName: 'CNIC',             minWidth: 150 },
-    { field: 'job_title',        headerName: 'Job Advertisement', minWidth: 170 },
-    { field: 'advertisement_no', headerName: 'Advertisement No', minWidth: 155 },
-    { field: 'applied_at',       headerName: 'Applied At',       minWidth: 105 },
-    {
-      field: 'status',
-      headerName: 'Status',
-      minWidth: 115,
-      renderCell: (params) => params.value ? (
-        <span className={`px-2.5 py-1 rounded-full text-xs font-medium uppercase ${getStatusColor(params.value)}`}>
-          {params.value}
-        </span>
-      ) : <span className="text-slate-400 text-xs">—</span>,
-    },
-    {
-      field: 'ocr_batch',
-      headerName: 'Batch',
-      minWidth: 130,
-      sortable: false,
-      renderCell: (params) => (
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase border ${getApplicationOcrBatchPillClass(params.value)}`}>
-          {getApplicationOcrBatchLabel(params.value)}
-        </span>
-      ),
-    },
-    {
-      field: 'payment_status',
-      headerName: 'Payment Status',
-      minWidth: 130,
-      sortable: false,
-      renderCell: (params) => (
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase border ${params.value?.toLowerCase() === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200'}`}>
-          {params.value || 'N/A'}
-        </span>
-      ),
-    },
+    { field: 'id',               headerName: 'Ref ID',           flex: 0.7, minWidth: 100 },
+    { field: 'applicant_name',   headerName: 'Applicant Name',   flex: 1.1, minWidth: 150 },
+    { field: 'cnic',             headerName: 'CNIC',             flex: 1,   minWidth: 150 },
+    { field: 'job_title',        headerName: 'Job Advertisement', flex: 1.3, minWidth: 200 },
+    { field: 'advertisement_no', headerName: 'Advertisement No', flex: 1,   minWidth: 155 },
+    { field: 'applied_at',       headerName: 'Applied At',       flex: 0.8, minWidth: 105 },
     {
       field: 'has_disability',
       headerName: 'Disability',
+      flex: 0.8,
       minWidth: 110,
       sortable: false,
       renderCell: (params) => params.value ? (
@@ -461,7 +383,7 @@ const ApplicationsList = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      minWidth: 70,
+      width: 70,
       sortable: false,
       resizable: false,
       renderCell: (params) => (
@@ -475,142 +397,39 @@ const ApplicationsList = () => {
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="max-w-8xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Applications Management</h1>
             <p className="text-sm text-slate-500 mt-1">Manage and review all incoming job applications.</p>
           </div>
-        </div>
-
-        {/* Filter Section — single flex-wrap container so each row is fully packed */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-          <div className="flex gap-3 items-end flex-wrap">
-            <TextField label="Search (Name/CNIC)" variant="outlined" size="small" name="search"
-              value={filters.search} onChange={handleFilterChange} sx={{ flex: '1 1 160px', minWidth: 140 }} />
-            <TextField label="Ref ID" variant="outlined" size="small" name="ref_id"
-              value={filters.ref_id} onChange={handleFilterChange} sx={{ width: 110 }} />
-            <div style={{ flex: '1 1 140px', minWidth: 130 }}>
-              <SearchableSelect
-                name="job_id"
-                label="Job Advertisement"
-                value={filters.job_id}
-                onChange={handleFilterChange}
-                options={[
-                  { value: '', label: 'All Jobs' },
-                  ...jobs.map(job => ({ value: job.advertisement_no, label: job.title })),
-                ]}
-                placeholder="All Jobs"
-              />
-            </div>
-            <TextField label="Advertisement No" variant="outlined" size="small" name="advertisement_no"
-              value={filters.advertisement_no} onChange={handleFilterChange} sx={{ width: 140 }} />
-            <div style={{ width: 130 }}>
-              <SearchableSelect
-                name="status"
-                label="Status"
-                value={filters.status}
-                onChange={handleFilterChange}
-                options={[
-                  { value: '', label: 'All Statuses' },
-                  { value: UNREVIEWED_SENTINEL, label: 'Unreviewed' },
-                  { value: 'Shortlisted', label: 'Shortlisted' },
-                  { value: 'Interview', label: 'Interview' },
-                  { value: 'Rejected', label: 'Rejected' },
-                ]}
-                placeholder="All Statuses"
-              />
-            </div>
-            <div style={{ width: 135 }}>
-              <SearchableSelect
-                name="payment_status"
-                label="Payment Status"
-                value={filters.payment_status}
-                onChange={handleFilterChange}
-                options={[
-                  { value: '', label: 'All Payments' },
-                  { value: 'paid', label: 'Paid' },
-                  { value: 'unpaid', label: 'Unpaid' },
-                  { value: 'pending', label: 'Pending' },
-                ]}
-                placeholder="All Payments"
-              />
-            </div>
-            <div style={{ width: 145 }}>
-              <SearchableSelect
-                name="ocr_batch"
-                label="OCR Verification"
-                value={filters.ocr_batch}
-                onChange={handleFilterChange}
-                options={[
-                  { value: '', label: 'All Batches' },
-                  { value: 'green', label: 'OCR Verified' },
-                  { value: 'yellow', label: 'Partially Verified' },
-                  { value: 'red', label: 'Not Verified' },
-                ]}
-                placeholder="All Batches"
-              />
-            </div>
-            <div style={{ width: 125 }}>
-              <SearchableSelect
-                name="disability"
-                label="Disability"
-                value={filters.disability}
-                onChange={handleFilterChange}
-                options={[
-                  { value: '', label: 'All' },
-                  { value: 'yes', label: 'Disabled' },
-                  { value: 'no', label: 'Not Disabled' },
-                ]}
-                placeholder="All"
-              />
-            </div>
-            <TextField type="date" label="Applied At (From)" InputLabelProps={{ shrink: true }}
-              variant="outlined" size="small" name="start_date"
-              value={filters.start_date} onChange={handleFilterChange} sx={{ width: 170 }} />
-            <TextField type="date" label="Applied At (To)" InputLabelProps={{ shrink: true }}
-              variant="outlined" size="small" name="end_date"
-              value={filters.end_date} onChange={handleFilterChange} sx={{ width: 170 }} />
-            <Button variant="outline" size="md" onClick={handleClearFilters}
-              className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              title="Clear Filters" aria-label="Clear Filters">
-              <FilterX size={16} />
-            </Button>
-            <Button variant="outline" size="md" onClick={fetchApplications} disabled={loading}
-              className="h-[33.07px] w-[33.07px] min-w-[33.07px] p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              title="Refresh List" aria-label="Refresh List">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              disabled={loading || rows.length === 0}
+              className="h-10 flex-shrink-0 flex items-center gap-1.5 px-3 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-semibold"
+            >
+              <FileSpreadsheet size={16} /> Export Excel
+            </button>
+            <button
+              onClick={fetchApplications}
+              disabled={loading}
+              title="Refresh"
+              aria-label="Refresh"
+              className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            </Button>
+            </button>
           </div>
         </div>
 
-        {/* Bulk Actions */}
-        {canEdit && selectionModel.length > 0 && (
-          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg mb-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-emerald-800 font-medium">{selectionModel.length} applications selected</span>
-              <div className="flex gap-2">
-                {!anyShortlisted && (
-                  <Button onClick={() => handleBulkStatusUpdate('Shortlisted')} variant="primary" size="sm">
-                    Shortlist Selected
-                  </Button>
-                )}
-                {anyShortlisted && (
-                  <Button onClick={() => handleBulkStatusUpdate('submitted')} variant="outline" size="sm">
-                    Unshortlist Selected
-                  </Button>
-                )}
-                <Button onClick={() => handleBulkStatusUpdate('Rejected')} variant="destructive" size="sm">
-                  Reject Selected
-                </Button>
-              </div>
-            </div>
-            {anyShortlisted && !allShortlisted && (
-              <p className="text-amber-700 text-xs font-medium mt-2">
-                You have selected an already shortlisted application. Please unshortlist it before shortlisting the rest.
-              </p>
-            )}
-          </div>
-        )}
+        {/* Filters — same AdvancedFilter (Search/Reset) pattern used across the admin portal */}
+        <AdvancedFilter
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          filterConfig={filterConfig}
+          title="Filter Applications"
+        />
 
         {/* API Error Banner */}
         {apiError && !loading && (
@@ -642,18 +461,12 @@ const ApplicationsList = () => {
             </div>
           ) : (
             <TooltipDataGrid
-              apiRef={apiRef}
               rows={rows}
               columns={columns}
               paginationModel={paginationModel}
               onPaginationModelChange={setPaginationModel}
               pageSizeOptions={[10, 25, 50]}
-              checkboxSelection
-              onRowSelectionModelChange={(s) => setSelectionModel(s)}
-              rowSelectionModel={selectionModel}
               disableRowSelectionOnClick
-              autosizeOnMount
-              autosizeOptions={{ includeOutliers: true, includeHeaders: true, expand: true }}
               autoHeight
               loading={loading}
               sx={{
@@ -676,22 +489,8 @@ const ApplicationsList = () => {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
         <MenuItem onClick={handleView}>
-          <Eye size={18} style={{ marginRight: '8px' }} className="text-blue-600" /> View Details
+          <Eye size={18} style={{ marginRight: '8px' }} className="text-blue-600" /> View Application
         </MenuItem>
-        {canEdit && (selectedRow?.status?.toLowerCase() === 'shortlisted' ? (
-          <MenuItem onClick={() => updateStatus(selectedRow?.id, 'submitted')}>
-            <RefreshCw size={18} style={{ marginRight: '8px' }} className="text-yellow-600" /> Unshortlist
-          </MenuItem>
-        ) : (
-          <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Shortlisted')}>
-            <CheckCircle size={18} style={{ marginRight: '8px' }} className="text-green-600" /> Mark Shortlisted
-          </MenuItem>
-        ))}
-        {canEdit && (
-          <MenuItem onClick={() => updateStatus(selectedRow?.id, 'Rejected')}>
-            <XCircle size={18} style={{ marginRight: '8px' }} className="text-red-600" /> Mark Rejected
-          </MenuItem>
-        )}
       </Menu>
     </div>
   );

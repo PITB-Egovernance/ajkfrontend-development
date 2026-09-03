@@ -9,7 +9,7 @@ import {
   Mic, CalendarClock, FileSignature, GitMerge,
   Landmark, MessageSquareWarning, Funnel,
   History, Layers,
-  Gavel
+  Gavel, UserCheck
 } from "lucide-react";
 
 export const MENU_ITEMS = [
@@ -83,6 +83,12 @@ export const MENU_ITEMS = [
         ],
       },
     ],
+  },
+  {
+    id: "candidate-applications",
+    label: "Candidate Applications",
+    icon: UserCheck,
+    path: "/dashboard/applications",
   },
   {
     id: "results",
