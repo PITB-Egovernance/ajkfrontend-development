@@ -4,13 +4,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Award, ArrowLeft, ChevronDown,
   FileSpreadsheet, ArrowRight, Send, FileText, EyeOff,
-  LayoutDashboard, ShieldAlert, ClipboardCheck,
+  LayoutDashboard, ShieldAlert, ClipboardCheck, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import RollNumberApi from 'api/rollNumberApi';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
@@ -129,7 +130,7 @@ const PortalDropdown = ({ anchorRef, open, onClose, children }) => {
   );
 };
 
-const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShortlistable, isInterviewAllowed, isWithdrawable, onWithdraw, onGazette, activeId, setActiveId }) => {
+const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShortlistable, isInterviewAllowed, isWithdrawable, isDeletable, onWithdraw, onGazette, onDelete, activeId, setActiveId }) => {
   const btnRef = useRef(null);
   const open   = activeId === rId;
   return (
@@ -177,6 +178,15 @@ const ActionCell = ({ job, rId, examType, isPublishedState, isImportable, isShor
           <div className="flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50">
             <ClipboardCheck size={14} /> Post-Result Processing
           </div>
+        )}
+        {isDeletable && (
+          <>
+            <div className="my-1 border-t border-slate-100" />
+            <button onClick={() => { setActiveId(null); onDelete(job, rId); }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded transition-colors text-left">
+              <Trash2 size={14} className="text-rose-500" /> Delete Results
+            </button>
+          </>
         )}
         {/* <div className="my-1 border-t border-slate-100" />
         {isPublishedState ? (
@@ -326,6 +336,52 @@ const ResultsExamFlow = () => {
     } catch { toast.error('Withdrawal failed', { id: 'withdraw' }); }
   };
 
+  // Two-step: a normal confirm first; if the backend reports candidates
+  // already moved into the post-result workflow off these results, escalate
+  // to a second, more explicit confirm before retrying with force — never
+  // silently cascades into deleting shortlisting/interview/award/onboarding
+  // records without the admin seeing exactly what that means first.
+  const handleDeleteResults = async (job, rId) => {
+    const ok = await confirmDelete({
+      title: 'Delete Exam Results',
+      message: `Permanently delete all exam results for "${job.designation}"? Marks and subject-wise breakdowns would need to be re-imported from scratch.`,
+      warning: 'This cannot be undone.',
+      confirmLabel: 'Delete Results',
+    });
+    if (!ok) return;
+
+    try {
+      toast.loading('Deleting results...', { id: 'delete-results' });
+      const res = await ResultsApi.deleteResults(rId);
+      toast.success(res?.message || 'Results deleted', { id: 'delete-results' });
+      fetchData();
+    } catch (err) {
+      toast.dismiss('delete-results');
+      const alreadyInWorkflow = err?.status === 422 && /post-result workflow/i.test(err?.message || '');
+      if (!alreadyInWorkflow) {
+        toast.error(err?.message || 'Failed to delete results');
+        return;
+      }
+
+      const forceOk = await confirmDelete({
+        title: 'Candidates Already In Post-Result Workflow',
+        message: err.message,
+        warning: 'Proceeding also permanently deletes those shortlisting/interview/award/onboarding records for this post.',
+        confirmLabel: 'Delete Everything',
+      });
+      if (!forceOk) return;
+
+      try {
+        toast.loading('Deleting results and workflow entries...', { id: 'delete-results-force' });
+        const res2 = await ResultsApi.deleteResults(rId, true);
+        toast.success(res2?.message || 'Results deleted', { id: 'delete-results-force' });
+        fetchData();
+      } catch (err2) {
+        toast.error(err2?.message || 'Failed to delete results', { id: 'delete-results-force' });
+      }
+    }
+  };
+
   const handleDownloadGazette = async (job) => {
     try {
       toast.loading('Generating Official Gazette...', { id: 'gazette-task' });
@@ -464,14 +520,18 @@ const ResultsExamFlow = () => {
         const isShortlistable    = ['Approved', 'APPROVED', 'WITHDRAWN'].includes(job.result_status);
         const isInterviewAllowed = isPublishedState && (isAdmin || isDirector || ['data_entry', 'dataentry', 'senior_admin'].includes(userRole));
         const isWithdrawable     = isPublishedState && (isAdmin || isDirector);
+        // Never offered while published — the backend refuses that outright
+        // and there's no scenario where deleting a live published result is
+        // the right first move (withdraw it, then delete).
+        const isDeletable        = !isPublishedState && (isAdmin || isDirector);
 
         return (
           <div className="flex items-center h-full">
             <ActionCell job={job} rId={rId} examType={examType}
               isPublishedState={isPublishedState} isImportable={isImportable}
               isShortlistable={isShortlistable} isInterviewAllowed={isInterviewAllowed}
-              isWithdrawable={isWithdrawable}
-              onGazette={handleDownloadGazette} onWithdraw={handleWithdraw}
+              isWithdrawable={isWithdrawable} isDeletable={isDeletable}
+              onGazette={handleDownloadGazette} onWithdraw={handleWithdraw} onDelete={handleDeleteResults}
               activeId={activeDropdownJobId} setActiveId={setActiveDropdownJobId} />
           </div>
         );

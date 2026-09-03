@@ -362,6 +362,21 @@ const ResultsApi = {
   },
 
   /**
+   * Permanently deletes every exam result (one-paper-mcqs / two-paper-mcqs /
+   * written-exams) for a post, so marks can be re-imported from scratch.
+   * Blocked server-side if currently published, or if candidates already
+   * moved into the post-result workflow off these results — pass
+   * force: true to override the latter (never the published check).
+   */
+  deleteResults: async (jobPostId, force = false) => {
+    const response = await fetch(`${API_BASE}/results/${jobPostId}${force ? '?force=1' : ''}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Publish results for several posts in one all-or-nothing batch. Pass
    * either `job_post_ids` (explicit selection) or `all: true` (every
    * eligible-but-unpublished post). If any post in the batch fails, none of

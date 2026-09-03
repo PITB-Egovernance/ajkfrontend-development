@@ -10,6 +10,7 @@ import {
   Send,
   EyeOff,
   Download,
+  Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
@@ -129,6 +130,57 @@ const CceScreeningResults = () => {
     } finally {
       setBusy(false);
       e.target.value = '';
+    }
+  };
+
+  // Two-step: a normal confirm first; if the backend reports candidates
+  // already submitted a subject selection off these results, escalate to a
+  // second, more explicit confirm before retrying with force — never
+  // silently cascades into deleting subject selections/date sheets without
+  // the admin seeing exactly what that means first.
+  const handleDeleteResults = async () => {
+    if (advertisementIds.length === 0) {
+      toast.error('Select at least one advertisement');
+      return;
+    }
+    const ok = await confirmDelete({
+      title: 'Delete Screening Results',
+      message: `Permanently delete all CCE screening results for "${selectedEntry?.designation || 'this advertisement'}"? Marks would need to be re-imported from scratch.`,
+      warning: 'This cannot be undone.',
+      confirmLabel: 'Delete Results',
+    });
+    if (!ok) return;
+
+    setBusy(true);
+    try {
+      const res = await CceScreeningApi.deleteResults(advertisementIds);
+      toast.success(res?.message || 'Screening results deleted');
+      await loadResults();
+    } catch (err) {
+      const alreadySelected = err?.status === 422 && /subject selection/i.test(err?.message || '');
+      if (!alreadySelected) {
+        toast.error(err?.message || 'Failed to delete screening results');
+        setBusy(false);
+        return;
+      }
+
+      const forceOk = await confirmDelete({
+        title: 'Candidates Already Submitted Subject Selection',
+        message: err.message,
+        warning: 'Proceeding also permanently deletes those subject selections and any scheduled written-exam date sheets.',
+        confirmLabel: 'Delete Everything',
+      });
+      if (!forceOk) { setBusy(false); return; }
+
+      try {
+        const res2 = await CceScreeningApi.deleteResults(advertisementIds, true);
+        toast.success(res2?.message || 'Screening results deleted');
+        await loadResults();
+      } catch (err2) {
+        toast.error(err2?.message || 'Failed to delete screening results');
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -601,6 +653,9 @@ const CceScreeningResults = () => {
                 </Button>
                 <Button onClick={handleImportClick} variant="outline" className="flex items-center gap-2" disabled={busy}>
                   <Download size={16} className="rotate-180" /> Import Marks
+                </Button>
+                <Button onClick={handleDeleteResults} variant="outline" className="flex items-center gap-2 border-rose-300 text-rose-600 hover:bg-rose-50" disabled={busy}>
+                  <Trash2 size={16} /> Delete Results
                 </Button>
                 <input
                   type="file"

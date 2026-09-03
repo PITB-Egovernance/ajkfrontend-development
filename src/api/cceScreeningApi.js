@@ -86,6 +86,22 @@ const CceScreeningApi = {
     return handleResponse(res);
   },
 
+  // Permanently deletes screening results for the given advertisement(s), so
+  // marks can be re-imported from scratch. Blocked server-side if currently
+  // published, or if candidates already submitted their subject selection
+  // off these results — pass force: true to override the latter (never the
+  // published check).
+  deleteResults: async (advertisementIds, force = false) => {
+    const ids = Array.isArray(advertisementIds) ? advertisementIds : [advertisementIds];
+    const params = new URLSearchParams({ advertisement_id: ids.join(',') });
+    if (force) params.set('force', '1');
+    const res = await fetch(`${ADMIN_API_BASE}/cce/screening?${params}`, {
+      method: 'DELETE',
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
   downloadTemplate: async (advertisementIds) => {
     const ids = Array.isArray(advertisementIds) ? advertisementIds : [advertisementIds];
     const res = await fetch(`${ADMIN_API_BASE}/cce/screening/template?advertisement_id=${ids.join(',')}`, {
