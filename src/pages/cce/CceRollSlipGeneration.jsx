@@ -478,6 +478,10 @@ const CceRollSlipGeneration = () => {
             label:             paper.subject_name + (paper.paper_label ? ` — ${paper.paper_label}` : ''),
             date:              paper.paper_date,
             time:              paper.paper_time,
+            // Recomputed server-side from time + duration_minutes anyway
+            // (GenerateRollNumberSlipsJob::computeCcePaperEndTime) — sent
+            // here too just to keep this call's shape self-explanatory.
+            end_time:          paper.paper_end_time || null,
             duration_minutes:  paper.duration_minutes,
           }));
 

@@ -372,13 +372,14 @@ const CceCandidateDateSheet = () => {
                             <th className="py-2 px-4">Paper Day</th>
                             <th className="py-2 px-4">Paper Time</th>
                             <th className="py-2 px-4">Duration (min)</th>
+                            <th className="py-2 px-4">Closing Time</th>
                           </tr>
                         </thead>
                         <tbody>
                           {candidateDateSheetGroups.map(({ group, items }) => (
                             <React.Fragment key={group}>
                               <tr className="bg-indigo-50/60">
-                                <td colSpan={6} className="py-1.5 px-4 text-xs font-bold uppercase text-indigo-800">{group}</td>
+                                <td colSpan={7} className="py-1.5 px-4 text-xs font-bold uppercase text-indigo-800">{group}</td>
                               </tr>
                               {items.map((row) => (
                                 <tr key={`${row.subject_id}-${row.paper_label || ''}`} className="border-b border-slate-100">
@@ -390,6 +391,7 @@ const CceCandidateDateSheet = () => {
                                   <td className="py-2 px-4 text-slate-500">{formatPaperDay(row.paper_date)}</td>
                                   <td className="py-2 px-4 text-slate-600">{formatPaperTime(row.paper_time)}</td>
                                   <td className="py-2 px-4 text-slate-600">{row.duration_minutes || '—'}</td>
+                                  <td className="py-2 px-4 text-slate-600">{formatPaperTime(row.paper_end_time)}</td>
                                 </tr>
                               ))}
                             </React.Fragment>

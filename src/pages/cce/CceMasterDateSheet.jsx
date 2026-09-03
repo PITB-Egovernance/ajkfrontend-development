@@ -15,7 +15,42 @@ const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', '
 // subjects are scheduled as a single paper, one shared schedule per group.
 const TWO_PAPER_GROUPS = ['Group A', 'Group B'];
 
+// Settings → Subjects actually stores subject_group as e.g. GROUP “A” —
+// uppercase "GROUP", curly quotes (U+201C/U+201D) around the letter — not
+// the plain "Group A" this page's GROUP_ORDER/TWO_PAPER_GROUPS assumed.
+// That mismatch silently failed the Group A/B two-paper check (it always
+// fell through to the generic single-schedule branch) and left every group
+// unmatched by GROUP_ORDER too (all bucketed into "unknown", unordered).
+// Normalizing (strip every quote style, uppercase) makes the comparison
+// resilient to curly vs straight quotes and casing, without needing the
+// raw display text — shown to the admin exactly as stored — to change.
+const normalizeGroupKey = (group) => String(group || '').replace(/[“”"'']/g, '').trim().toUpperCase();
+const TWO_PAPER_GROUP_KEYS = TWO_PAPER_GROUPS.map(normalizeGroupKey);
+const GROUP_ORDER_KEYS = GROUP_ORDER.map(normalizeGroupKey);
+
 const dayFromDate = (date) => (date ? new Date(date).toLocaleDateString(undefined, { weekday: 'long' }) : '—');
+
+// Same formula as RollNumberExamFlow.jsx's computeEndTime() (Written Exams'
+// own schedule picker) — 24-hour "HH:MM" so it stays parseable downstream,
+// wrapping past midnight if a paper's duration runs it over.
+const computeEndTime = (startTime, durationMinutes) => {
+  if (!startTime || !durationMinutes) return '';
+  const [h, m] = startTime.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return '';
+  const totalMinutes = h * 60 + m + Number(durationMinutes);
+  const endH = Math.floor((totalMinutes / 60) % 24);
+  const endM = totalMinutes % 60;
+  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+};
+
+const to12Hour = (time24) => {
+  if (!time24) return '';
+  const [h, m] = time24.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return time24;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+};
 
 const CceMasterDateSheet = () => {
   const [advertisements, setAdvertisements] = useState([]);
@@ -85,14 +120,19 @@ const CceMasterDateSheet = () => {
 
   // Group rows by subject_group, in the standard CCE syllabus order —
   // ungrouped/unknown groups are appended at the end rather than dropped.
+  // Grouped and displayed under the RAW subject_group text exactly as
+  // stored (e.g. GROUP “A”) — only the ORDERING comparison is normalized.
   const groupedRows = useMemo(() => {
     const byGroup = {};
     rows.forEach((row) => {
       const group = row.subject_group || 'Compulsory';
       (byGroup[group] ||= []).push(row);
     });
-    const known = GROUP_ORDER.filter((g) => byGroup[g]);
-    const unknown = Object.keys(byGroup).filter((g) => !GROUP_ORDER.includes(g));
+    const rawGroups = Object.keys(byGroup);
+    const known = rawGroups
+      .filter((g) => GROUP_ORDER_KEYS.includes(normalizeGroupKey(g)))
+      .sort((a, b) => GROUP_ORDER_KEYS.indexOf(normalizeGroupKey(a)) - GROUP_ORDER_KEYS.indexOf(normalizeGroupKey(b)));
+    const unknown = rawGroups.filter((g) => !GROUP_ORDER_KEYS.includes(normalizeGroupKey(g)));
     return [...known, ...unknown].map((group) => ({ group, items: byGroup[group] }));
   }, [rows]);
 
@@ -110,8 +150,8 @@ const CceMasterDateSheet = () => {
     () => groupedRows.find((g) => g.group === activeTab)?.items ?? [],
     [groupedRows, activeTab]
   );
-  const isTwoPaperGroup = TWO_PAPER_GROUPS.includes(activeTab);
-  const isCompulsory = activeTab === 'Compulsory';
+  const isTwoPaperGroup = TWO_PAPER_GROUP_KEYS.includes(normalizeGroupKey(activeTab));
+  const isCompulsory = normalizeGroupKey(activeTab) === normalizeGroupKey('Compulsory');
 
   const updateRow = (index, field, value) => {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
@@ -151,6 +191,7 @@ const CceMasterDateSheet = () => {
           paper_label:       r.paper_label,
           paper_date:        r.paper_date,
           paper_time:        r.paper_time,
+          paper_end_time:    computeEndTime(r.paper_time, r.duration_minutes) || null,
           duration_minutes:  Number(r.duration_minutes),
         }))
       );
@@ -172,10 +213,11 @@ const CceMasterDateSheet = () => {
     const dateVal     = groupScheduleValue(group, paperLabel, 'paper_date');
     const timeVal     = groupScheduleValue(group, paperLabel, 'paper_time');
     const durationVal = groupScheduleValue(group, paperLabel, 'duration_minutes');
+    const endTimeVal  = computeEndTime(timeVal, durationVal);
     return (
       <div key={`${group}-${paperLabel || ''}`} className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-4">
         {title && <p className="text-sm font-bold text-indigo-900 mb-3">{title}</p>}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
           <TextField type="date" size="small" label="Paper Date *" required InputLabelProps={{ shrink: true }}
             error={!dateVal} value={dateVal}
             onChange={(e) => updateGroupSchedule(group, paperLabel, 'paper_date', e.target.value)}
@@ -190,6 +232,8 @@ const CceMasterDateSheet = () => {
             error={!durationVal} value={durationVal}
             onChange={(e) => updateGroupSchedule(group, paperLabel, 'duration_minutes', e.target.value)}
             sx={{ backgroundColor: 'white' }} />
+          <TextField size="small" label="Closing Time" InputProps={{ readOnly: true }} disabled
+            value={endTimeVal ? to12Hour(endTimeVal) : '—'} sx={{ backgroundColor: 'white' }} />
         </div>
       </div>
     );
@@ -344,6 +388,7 @@ const CceMasterDateSheet = () => {
                             <th className="py-2 px-4">Paper Day</th>
                             <th className="py-2 px-4">Paper Time</th>
                             <th className="py-2 px-4">Duration (min)</th>
+                            <th className="py-2 px-4">Closing Time</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -368,6 +413,9 @@ const CceMasterDateSheet = () => {
                                   <TextField type="number" size="small" sx={{ width: 100 }} inputProps={{ min: 1 }}
                                     value={row.duration_minutes || ''} onChange={(e) => updateRow(index, 'duration_minutes', e.target.value)} />
                                 </td>
+                                <td className="py-2 px-4 text-slate-500">
+                                  {to12Hour(computeEndTime(row.paper_time, row.duration_minutes)) || '—'}
+                                </td>
                               </tr>
                             );
                           })}
@@ -376,8 +424,8 @@ const CceMasterDateSheet = () => {
                     </div>
                   ) : isTwoPaperGroup ? (
                     <>
-                      {renderGroupScheduleFields(activeTab, 'Paper I', 'Paper I Schedule')}
-                      {renderGroupScheduleFields(activeTab, 'Paper II', 'Paper II Schedule')}
+                      {renderGroupScheduleFields(activeTab, 'Paper I', `${activeTab} Schedule PAPER 1`)}
+                      {renderGroupScheduleFields(activeTab, 'Paper II', `${activeTab} Schedule PAPER 2`)}
                       {renderGroupSubjectList(activeGroupRows)}
                     </>
                   ) : (

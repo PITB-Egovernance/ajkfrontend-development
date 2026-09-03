@@ -5,6 +5,14 @@
 // Same group ordering used across the CCE pages (master date sheet, public syllabus).
 export const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G'];
 
+// Settings → Subjects actually stores subject_group as e.g. GROUP “A” —
+// uppercase, curly quotes (U+201C/U+201D) around the letter — not the plain
+// "Group A" GROUP_ORDER lists. Normalize (strip every quote style,
+// uppercase) for ORDERING comparisons only; grouping itself stays keyed on
+// the raw subject_group string so the admin still sees it exactly as stored.
+const normalizeGroupKey = (group) => String(group || '').replace(/[“”"'']/g, '').trim().toUpperCase();
+const GROUP_ORDER_KEYS = GROUP_ORDER.map(normalizeGroupKey);
+
 const normalize = (v) => String(v || '').trim().toLowerCase();
 
 export const formatPaperDate = (isoDate) => {
@@ -41,8 +49,11 @@ export const buildCandidateDateSheetGroups = (masterRows, selections) => {
     (byGroup[group] ||= []).push(row);
   });
 
-  const known = GROUP_ORDER.filter((g) => byGroup[g]);
-  const unknown = Object.keys(byGroup).filter((g) => !GROUP_ORDER.includes(g));
+  const rawGroups = Object.keys(byGroup);
+  const known = rawGroups
+    .filter((g) => GROUP_ORDER_KEYS.includes(normalizeGroupKey(g)))
+    .sort((a, b) => GROUP_ORDER_KEYS.indexOf(normalizeGroupKey(a)) - GROUP_ORDER_KEYS.indexOf(normalizeGroupKey(b)));
+  const unknown = rawGroups.filter((g) => !GROUP_ORDER_KEYS.includes(normalizeGroupKey(g)));
 
   return [...known, ...unknown]
     .map((group) => {
