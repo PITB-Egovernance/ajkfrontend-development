@@ -50,28 +50,6 @@ export default function BulkPublishModal({ isOpen, onClose, jobIds = [], onSucce
         </div>
 
         <div className="px-6 pb-2 space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Publication Type</label>
-            <select
-              value={form.pub_type}
-              onChange={(e) => setForm((p) => ({ ...p, pub_type: e.target.value }))}
-              className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            >
-              <option value="written_test">Provisional (Written Test)</option>
-              <option value="final">Final (Official Release)</option>
-              <option value="interview">Interview</option>
-              <option value="supplementary">Supplementary (Addendum)</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Gazette Reference (optional)</label>
-            <input
-              value={form.gazette_ref}
-              onChange={(e) => setForm((p) => ({ ...p, gazette_ref: e.target.value }))}
-              placeholder="Ex: PSC/RE/2026/782"
-              className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-          </div>
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"

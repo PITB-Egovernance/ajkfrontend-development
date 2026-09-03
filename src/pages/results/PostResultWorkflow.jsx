@@ -257,7 +257,12 @@ const PostResultWorkflow = () => {
   const [profileModal, setProfileModal] = useState(null); // { identifier, name } | null
   const openProfile = (row) => {
     if (!row?.application_number) {
-      toast.error('No application reference available for this candidate');
+      // Deferred: a toast fired synchronously inside a click handler races
+      // ToastProvider's document-level "click anywhere dismisses the visible
+      // toast" listener — the same click event that creates this toast also
+      // bubbles up and immediately dismisses it. Escaping to the next tick
+      // lets it survive past that click.
+      setTimeout(() => toast.error('No application reference available for this candidate'), 0);
       return;
     }
     setProfileModal({ identifier: row.application_number, name: row.candidate_name });
@@ -441,6 +446,19 @@ const PostResultWorkflow = () => {
     await runAction(() => PostResultApi.generateFinalRejectionFromInitial(jobId, selectedIds, reason), 'Candidates finally rejected');
   };
 
+  // ── Final Rejection actions ──
+  const handleRevertFinalRejection = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = await confirmDelete({
+      title: 'Revert Final Rejection',
+      message: `Move ${selectedIds.length} candidate(s) back to Selected/Shortlisted for Documents? This undoes the final rejection.`,
+      confirmLabel: 'Revert',
+      confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!ok) return;
+    await runAction(() => PostResultApi.revertFinalRejection(jobId, selectedIds), 'Final rejection reverted');
+  };
+
   // ── Award List actions ──
   const handleMarkCompleted = async () => {
     if (selectedIds.length === 0) return;
@@ -472,6 +490,64 @@ const PostResultWorkflow = () => {
     });
     if (!ok) return;
     await runAction(() => PostResultApi.completeOnboarding(jobId, selectedIds), 'Candidates onboarded');
+  };
+
+  // ── Revert actions — undo a step without needing to redo the whole
+  // downstream flow. Each backend call only actually reverts entries
+  // currently in the exact expected state, so selecting a mix of
+  // stages is safe — anything not eligible is silently left alone. ──
+  const handleRevertSelection = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = await confirmDelete({
+      title: 'Revert to Award List',
+      message: `Move ${selectedIds.length} candidate(s) back to "Interview Completed" on the Award List? This undoes "Select Successful Candidates".`,
+      confirmLabel: 'Revert', confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!ok) return;
+    await runAction(() => PostResultApi.revertSelectionAfterInterview(jobId, selectedIds), 'Candidates reverted to Award List');
+  };
+  const handleRevertOnboardingStart = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = await confirmDelete({
+      title: 'Revert to Eligible to Start',
+      message: `Undo "Start Onboarding" for ${selectedIds.length} candidate(s)? They will move back to Eligible to Start.`,
+      confirmLabel: 'Revert', confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!ok) return;
+    await runAction(() => PostResultApi.revertOnboardingStart(jobId, selectedIds), 'Onboarding start reverted');
+  };
+  const handleRevertOnboardingComplete = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = await confirmDelete({
+      title: 'Revert to In Progress',
+      message: `Undo "Candidate Onboarded" for ${selectedIds.length} candidate(s)? They will move back to In Progress.`,
+      confirmLabel: 'Revert', confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!ok) return;
+    await runAction(() => PostResultApi.revertOnboardingComplete(jobId, selectedIds), 'Onboarding completion reverted');
+  };
+
+  // ── Onboarding publish/unpublish — gates candidate visibility + fires
+  // the notification, separate from the workflow status itself. ──
+  const handlePublishOnboarding = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = await confirmDelete({
+      title: 'Publish Onboarding Status',
+      message: `Publish onboarding status for ${selectedIds.length} candidate(s)? They will be notified and can see it on their portal.`,
+      confirmLabel: 'Publish', confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
+    });
+    if (!ok) return;
+    await runAction(() => PostResultApi.publishOnboarding(jobId, selectedIds), 'Onboarding status published');
+  };
+  const handleUnpublishOnboarding = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = await confirmDelete({
+      title: 'Unpublish Onboarding Status',
+      message: `Unpublish onboarding status for ${selectedIds.length} candidate(s)? It will no longer be visible to them.`,
+      confirmLabel: 'Unpublish', confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!ok) return;
+    await runAction(() => PostResultApi.unpublishOnboarding(jobId, selectedIds), 'Onboarding status unpublished');
   };
 
   // ── Interview phase quick actions ──
@@ -594,6 +670,44 @@ const PostResultWorkflow = () => {
       fetchList();
     } catch (err) { toast.error(err.message || 'Failed to unpublish call letter'); }
   };
+
+  // Bulk publish/unpublish call letters — "selected" uses the checked rows,
+  // "all" applies to every candidate currently loaded in this view (current
+  // page/filter, not every page across the whole list).
+  const handlePublishCallLetters = async (targetRows, labelForEmpty) => {
+    const ids = targetRows.map((r) => r.call_letter_id).filter(Boolean);
+    if (ids.length === 0) { toast.error(labelForEmpty); return; }
+    const ok = await confirmDelete({
+      title: 'Publish Call Letters',
+      message: `Publish interview call letters for ${ids.length} candidate(s)? They will become visible to the candidates immediately.`,
+      confirmLabel: 'Publish', confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
+    });
+    if (!ok) return;
+    try {
+      await PostResultApi.bulkPublishCallLetters(ids);
+      toast.success(`${ids.length} call letter(s) published`);
+      fetchList();
+    } catch (err) { toast.error(err.message || 'Failed to publish call letters'); }
+  };
+  const handleUnpublishCallLetters = async (targetRows, labelForEmpty) => {
+    const ids = targetRows.map((r) => r.call_letter_id).filter(Boolean);
+    if (ids.length === 0) { toast.error(labelForEmpty); return; }
+    const ok = await confirmDelete({
+      title: 'Unpublish Call Letters',
+      message: `Unpublish interview call letters for ${ids.length} candidate(s)? They will no longer be visible to the candidates.`,
+      confirmLabel: 'Unpublish', confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!ok) return;
+    try {
+      await PostResultApi.bulkUnpublishCallLetters(ids);
+      toast.success(`${ids.length} call letter(s) unpublished`);
+      fetchList();
+    } catch (err) { toast.error(err.message || 'Failed to unpublish call letters'); }
+  };
+  const handlePublishSelected = () => handlePublishCallLetters(rows.filter((r) => selectedIds.includes(r.id)), 'No selected candidates to publish');
+  const handleUnpublishSelected = () => handleUnpublishCallLetters(rows.filter((r) => selectedIds.includes(r.id)), 'No selected candidates to unpublish');
+  const handlePublishAll = () => handlePublishCallLetters(rows, 'No candidates in this view to publish');
+  const handleUnpublishAll = () => handleUnpublishCallLetters(rows, 'No candidates in this view to unpublish');
 
   const handleEditCandidateInterview = (row) => {
     navigate(`/dashboard/results/post-result/${jobId}/interview-candidate/${row.call_letter_id}/edit`, { state: { row } });
@@ -736,10 +850,52 @@ const PostResultWorkflow = () => {
       ];
     }
     if (activeTab === 'onboarding') {
-      return [...base, statusCol('post_result_status', 'Status', 0.9), statusCol('onboarding_status', 'Onboarding Status', 0.9), profileCol(openProfile)];
+      return [
+        ...base,
+        statusCol('post_result_status', 'Status', 0.9),
+        statusCol('onboarding_status', 'Onboarding Status', 0.9),
+        {
+          field: 'is_onboarding_published', headerName: 'Publish Status', flex: 0.9, minWidth: 140, sortable: false,
+          align: 'center', headerAlign: 'center',
+          renderCell: (params) => (
+            params.value
+              ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold border bg-emerald-50 border-emerald-200 text-emerald-700">Published</span>
+              : <span className="px-2 py-0.5 rounded-full text-xs font-semibold border bg-slate-50 border-slate-200 text-slate-500">Unpublished</span>
+          ),
+        },
+        profileCol(openProfile),
+      ];
     }
     return base;
   }, [activeTab, maxVivaMarks]);
+
+  // Application-form downloads (single-per-candidate zipped together) —
+  // available for whatever candidates are currently loaded ("All") or just
+  // the checked rows ("Selected"), on every tab, independent of whatever
+  // stage-specific bulk action that tab otherwise offers.
+  const handleDownloadApplicationForms = async (targetRows, labelForEmpty) => {
+    const identifiers = targetRows.map((r) => r.application_number).filter(Boolean);
+    if (identifiers.length === 0) {
+      setTimeout(() => toast.error(labelForEmpty), 0);
+      return;
+    }
+    try {
+      const res = await PostResultApi.downloadApplicationFormsBulk(identifiers, `application_forms_${activeTab}_${jobId}.zip`);
+      toast.success(res?.message || 'Application forms download started');
+    } catch (err) {
+      toast.error(err.message || 'Failed to download application forms');
+    }
+  };
+
+  // Selected candidates only when something's checked, otherwise every
+  // candidate currently loaded in this view — one button covers both.
+  const handleDownloadApplicationFormsSmart = () => {
+    const targetRows = selectedIds.length > 0 ? rows.filter((r) => selectedIds.includes(r.id)) : rows;
+    const labelForEmpty = selectedIds.length > 0
+      ? 'No selected candidates have an application reference'
+      : 'No candidates with an application reference in this view';
+    return handleDownloadApplicationForms(targetRows, labelForEmpty);
+  };
 
   const renderBulkActions = () => {
     if (selectedIds.length === 0) return null;
@@ -768,23 +924,54 @@ const PostResultWorkflow = () => {
       <Button size="sm" variant="destructive" onClick={handleFinalRejectionFromInitial} disabled={busy}>Generate Final Rejection</Button>
     </>);
 
-    if (activeTab === 'interview') return wrap(
+    if (activeTab === 'final-rejection') return wrap(
+      <Button size="sm" variant="outline" onClick={handleRevertFinalRejection} disabled={busy} className="border-amber-300 text-amber-700 hover:bg-amber-50">
+        Revert Back
+      </Button>
+    );
+
+    if (activeTab === 'interview') return wrap(<>
       <select onChange={(e) => e.target.value && handleAssignToPhase(e.target.value)} defaultValue="" disabled={busy}
         className="text-xs border border-emerald-300 rounded-md px-2 py-1.5 bg-white disabled:opacity-50 disabled:cursor-not-allowed">
         <option value="" disabled>Assign to phase…</option>
         {phases.map((p) => <option key={p.id} value={p.id}>{p.phase_name} — {p.interview_date}</option>)}
       </select>
-    );
+      {interviewView === 'published'
+        ? <Button size="sm" variant="outline" onClick={handleUnpublishSelected} disabled={busy} className="border-amber-300 text-amber-700 hover:bg-amber-50">Unpublish Selected</Button>
+        : <Button size="sm" onClick={handlePublishSelected} disabled={busy} className="bg-emerald-700 hover:bg-emerald-800">Publish Selected</Button>}
+    </>);
 
     if (activeTab === 'award-list') return wrap(<>
       <Button size="sm" variant="secondary" onClick={handleMarkCompleted} disabled={busy}>Mark Interview Completed</Button>
       <Button size="sm" onClick={handleSelectAfterInterview} disabled={busy}>Select Successful Candidates</Button>
+      <Button size="sm" variant="outline" onClick={handleRevertSelection} disabled={busy} className="border-amber-300 text-amber-700 hover:bg-amber-50">
+        Revert Selection
+      </Button>
     </>);
 
     if (activeTab === 'onboarding') return wrap(
       onboardingView === 'eligible'
-        ? <Button size="sm" onClick={handleStartOnboarding} disabled={busy}>Start Onboarding</Button>
-        : <Button size="sm" onClick={handleCompleteOnboarding} disabled={busy}>Candidate Onboarded</Button>
+        ? <>
+            <Button size="sm" onClick={handleStartOnboarding} disabled={busy}>Start Onboarding</Button>
+            <Button size="sm" variant="outline" onClick={handleRevertSelection} disabled={busy} className="border-amber-300 text-amber-700 hover:bg-amber-50">
+              Revert to Award List
+            </Button>
+          </>
+        : <>
+            <Button size="sm" onClick={handleCompleteOnboarding} disabled={busy}>Candidate Onboarded</Button>
+            <Button size="sm" variant="outline" onClick={handleRevertOnboardingStart} disabled={busy} className="border-amber-300 text-amber-700 hover:bg-amber-50">
+              Revert to Eligible to Start
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleRevertOnboardingComplete} disabled={busy} className="border-amber-300 text-amber-700 hover:bg-amber-50">
+              Revert to In Progress
+            </Button>
+            <Button size="sm" onClick={handlePublishOnboarding} disabled={busy} className="bg-emerald-700 hover:bg-emerald-800">
+              Publish
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleUnpublishOnboarding} disabled={busy} className="border-slate-300 text-slate-700 hover:bg-slate-50">
+              Unpublish
+            </Button>
+          </>
     );
 
     return null;
@@ -818,6 +1005,15 @@ const PostResultWorkflow = () => {
             </Button> */}
             <Button size="sm" variant="outline" onClick={() => handleExport('pdf')}><FileSpreadsheet size={14} className="mr-1" /> Export PDF</Button>
             <Button size="sm" variant="outline" onClick={() => handleExport('excel')}><FileSpreadsheet size={14} className="mr-1" /> Export Excel</Button>
+            <Button size="sm" variant="outline" onClick={handleDownloadApplicationFormsSmart}>
+              <Download size={14} className="mr-1" />
+              {selectedIds.length > 0 ? `Download Selected (${selectedIds.length})` : 'Download All Application Forms'}
+            </Button>
+            {activeTab === 'interview' && (
+              interviewView === 'published'
+                ? <Button size="sm" variant="outline" onClick={handleUnpublishAll} className="border-amber-300 text-amber-700 hover:bg-amber-50">Unpublish All</Button>
+                : <Button size="sm" onClick={handlePublishAll} className="bg-emerald-700 hover:bg-emerald-800">Publish All</Button>
+            )}
           </div>
         </div>
 

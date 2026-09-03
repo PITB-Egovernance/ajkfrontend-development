@@ -116,6 +116,13 @@ const PostResultApi = {
     const res = await fetch(`${API_BASE}/post-result/${jobId}/final-rejections${qs(params)}`, { headers: getHeaders(false) });
     return handleResponse(res);
   },
+  // Undo a final rejection (either path) — lands back on Shortlisted for Documents.
+  revertFinalRejection: async (jobId, entryIds) => {
+    const res = await fetch(`${API_BASE}/post-result/${jobId}/final-rejections/revert`, {
+      method: 'POST', headers: getHeaders(), body: JSON.stringify({ award_list_entry_ids: entryIds }),
+    });
+    return handleResponse(res);
+  },
 
   // ── Exports (shortlisted | initial-rejections | final-rejections) ──
   exportList: async (jobId, tab, format, filenamePrefix) => {
@@ -274,6 +281,42 @@ const PostResultApi = {
   completeOnboarding: async (jobId, entryIds, notes) => {
     const res = await fetch(`${API_BASE}/post-result/${jobId}/onboarding/complete`, {
       method: 'POST', headers: getHeaders(), body: JSON.stringify({ award_list_entry_ids: entryIds, notes }),
+    });
+    return handleResponse(res);
+  },
+  // Undo "Select Successful Candidates" on the Award List — back to interview_completed.
+  revertSelectionAfterInterview: async (jobId, entryIds) => {
+    const res = await fetch(`${API_BASE}/post-result/${jobId}/onboarding/revert-selection`, {
+      method: 'POST', headers: getHeaders(), body: JSON.stringify({ award_list_entry_ids: entryIds }),
+    });
+    return handleResponse(res);
+  },
+  // Undo "Start Onboarding" — back to Eligible to Start.
+  revertOnboardingStart: async (jobId, entryIds) => {
+    const res = await fetch(`${API_BASE}/post-result/${jobId}/onboarding/revert-start`, {
+      method: 'POST', headers: getHeaders(), body: JSON.stringify({ award_list_entry_ids: entryIds }),
+    });
+    return handleResponse(res);
+  },
+  // Undo "Candidate Onboarded" — back to In Progress.
+  revertOnboardingComplete: async (jobId, entryIds) => {
+    const res = await fetch(`${API_BASE}/post-result/${jobId}/onboarding/revert-complete`, {
+      method: 'POST', headers: getHeaders(), body: JSON.stringify({ award_list_entry_ids: entryIds }),
+    });
+    return handleResponse(res);
+  },
+  // Makes the candidate's current onboarding status visible to them + sends
+  // the SMS/portal-push notification.
+  publishOnboarding: async (jobId, entryIds) => {
+    const res = await fetch(`${API_BASE}/post-result/${jobId}/onboarding/publish`, {
+      method: 'POST', headers: getHeaders(), body: JSON.stringify({ award_list_entry_ids: entryIds }),
+    });
+    return handleResponse(res);
+  },
+  // Hides the onboarding status from the candidate again. No notification sent.
+  unpublishOnboarding: async (jobId, entryIds) => {
+    const res = await fetch(`${API_BASE}/post-result/${jobId}/onboarding/unpublish`, {
+      method: 'POST', headers: getHeaders(), body: JSON.stringify({ award_list_entry_ids: entryIds }),
     });
     return handleResponse(res);
   },

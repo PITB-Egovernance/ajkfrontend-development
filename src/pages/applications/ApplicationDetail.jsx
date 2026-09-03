@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin, History } from 'lucide-react';
+import { ArrowLeft, User, GraduationCap, FileText, CheckCircle, XCircle, Clock, Briefcase, Award, Zap, HeartPulse, Shield, MapPin, History, Pencil, Save, X } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
 import Button from 'components/ui/Button';
 import ApplicationApi from 'api/applicationApi';
 import AttemptApi from 'api/attemptApi';
+import PostResultApi from 'api/postResultApi';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 import { formatApplicationDocumentType } from 'utils/applicationOcrUtils';
 import { formatDate } from 'utils/dateUtils';
+import { hasPermission } from 'utils/permissions';
 
 const ApplicationDetail = () => {
   const { id } = useParams();
@@ -25,6 +28,107 @@ const ApplicationDetail = () => {
   const [shortlistedDraft, setShortlistedDraft] = useState(null);
   const [reasonDraft, setReasonDraft] = useState('');
   const [correctionBusy, setCorrectionBusy] = useState(false);
+
+  // ── Personal Info editing — saves back to the candidate portal via the
+  // admin backend's proxy PUT /results/candidates/{application_number}/profile,
+  // so a change here is reflected on the candidate's own side too. ──────────
+  const canEditProfile = hasPermission('candidates.job_applications.edit');
+  const [editingPersonal, setEditingPersonal] = useState(false);
+  const [personalDraft, setPersonalDraft] = useState({});
+  const [savingPersonal, setSavingPersonal] = useState(false);
+
+  // Domicile District options — same /settings/districts list the Districts
+  // settings page manages, so the dropdown here always matches what's
+  // actually configured rather than drifting out of sync with free text.
+  const [districts, setDistricts] = useState([]);
+  useEffect(() => {
+    const fetchDistricts = async () => {
+      try {
+        const res = await fetch(`${Config.apiUrl}/settings/districts?per_page=500`, {
+          headers: {
+            Authorization: `Bearer ${AuthService.getToken()}`,
+            Accept: 'application/json',
+            'X-API-KEY': Config.apiKey,
+          },
+        });
+        const result = await res.json();
+        const payload = result?.data ?? {};
+        const list = payload.data ?? result.data ?? [];
+        setDistricts(
+          (Array.isArray(list) ? list : [])
+            .filter((d) => (d.status ?? 'active') === 'active')
+            .map((d) => d.name)
+            .filter(Boolean)
+        );
+      } catch {
+        // Non-fatal — the field just falls back to free text below.
+      }
+    };
+    fetchDistricts();
+  }, []);
+
+  const startEditPersonal = () => {
+    setPersonalDraft({
+      name: application?.profile?.full_name || '',
+      father_name: application?.profile?.father_name || '',
+      cnic: application?.profile?.cnic || '',
+      date_of_birth: application?.profile?.dob ? String(application.profile.dob).slice(0, 10) : '',
+      gender: application?.profile?.gender || '',
+      religion: application?.profile?.religion || '',
+      domicile_district: application?.profile?.domicile || '',
+      permanent_address: application?.profile?.permanent_address || '',
+      current_address: application?.profile?.current_address || '',
+      mobile_number: application?.profile?.phone || '',
+      email: application?.profile?.email || '',
+    });
+    setEditingPersonal(true);
+  };
+
+  const cancelEditPersonal = () => {
+    setEditingPersonal(false);
+    setPersonalDraft({});
+  };
+
+  const handleSavePersonal = async () => {
+    if (!application?.application_number) {
+      toast.error('No application reference available to save against');
+      return;
+    }
+    setSavingPersonal(true);
+    try {
+      await PostResultApi.updateCandidateProfile(application.application_number, personalDraft, 'profile');
+      toast.success('Profile updated');
+      setEditingPersonal(false);
+      // Deliberately not re-fetching here: fetchApplication() prioritizes
+      // snapshot_data (a copy of the candidate's info frozen at the moment
+      // THIS application was submitted) over the live candidate record —
+      // e.g. `snapshot.date_of_birth || rawData.candidate?.date_of_birth`.
+      // The snapshot always has a value, so it always wins, meaning any edit
+      // to the live profile would appear to silently revert on refresh even
+      // though it saved correctly. Just reflect what was actually saved.
+      setApplication((prev) => prev && ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          full_name: personalDraft.name,
+          father_name: personalDraft.father_name,
+          cnic: personalDraft.cnic,
+          dob: personalDraft.date_of_birth,
+          gender: personalDraft.gender,
+          religion: personalDraft.religion,
+          domicile: personalDraft.domicile_district,
+          permanent_address: personalDraft.permanent_address,
+          current_address: personalDraft.current_address,
+          phone: personalDraft.mobile_number,
+          email: personalDraft.email,
+        },
+      }));
+    } catch (err) {
+      toast.error(err.message || 'Failed to update profile');
+    } finally {
+      setSavingPersonal(false);
+    }
+  };
 
   useEffect(() => {
     fetchApplication();
@@ -55,20 +159,27 @@ const ApplicationDetail = () => {
         status: effectiveStatus,
         created_at: rawData.submitted_at || rawData.created_at,
         job: {
-          title: rawData.job_post?.post_title || rawData.job?.title || 'N/A',
+          title: rawData._job_designation || rawData.job_post?.post_title || rawData.job?.title || 'N/A',
         },
+        // Personal fields prefer the LIVE candidate record over snapshot_data
+        // (a copy frozen at the moment this application was submitted) —
+        // editing via the admin form (updateCandidateProfile) only ever
+        // updates the live candidate record, never the historical snapshot,
+        // so snapshot-first would make admin edits appear to never take
+        // effect on reload. Non-editable sections below (education,
+        // experience, certifications) are left snapshot-first as before.
         profile: {
-          full_name: snapshot.name || rawData.candidate?.name || rawData.snapshot_data?.name,
-          father_name: snapshot.father_name || rawData.candidate?.father_name || rawData.snapshot_data?.father_name,
-          cnic: snapshot.cnic || rawData.candidate?.cnic || rawData.snapshot_data?.cnic,
-          email: snapshot.email || rawData.candidate?.email || rawData.snapshot_data?.email,
-          phone: snapshot.mobile_number || rawData.candidate?.mobile_number || rawData.snapshot_data?.mobile_number,
-          domicile: snapshot.domicile_district || rawData.candidate?.domicile_district || rawData.snapshot_data?.domicile_district,
-          dob: snapshot.date_of_birth || rawData.candidate?.date_of_birth || rawData.snapshot_data?.date_of_birth,
-          gender: snapshot.gender || rawData.candidate?.gender || rawData.snapshot_data?.gender,
-          religion: snapshot.religion || rawData.candidate?.religion || rawData.snapshot_data?.religion,
-          permanent_address: snapshot.permanent_address || rawData.candidate?.permanent_address || rawData.snapshot_data?.permanent_address,
-          current_address: snapshot.current_address || rawData.candidate?.current_address || rawData.snapshot_data?.current_address,
+          full_name: rawData.candidate?.name || snapshot.name,
+          father_name: rawData.candidate?.father_name || snapshot.father_name,
+          cnic: rawData.candidate?.cnic || snapshot.cnic,
+          email: rawData.candidate?.email || snapshot.email,
+          phone: rawData.candidate?.mobile_number || snapshot.mobile_number,
+          domicile: rawData.candidate?.domicile_district || snapshot.domicile_district,
+          dob: rawData.candidate?.date_of_birth || snapshot.date_of_birth,
+          gender: rawData.candidate?.gender || snapshot.gender,
+          religion: rawData.candidate?.religion || snapshot.religion,
+          permanent_address: rawData.candidate?.permanent_address || snapshot.permanent_address,
+          current_address: rawData.candidate?.current_address || snapshot.current_address,
           mobile_verified: rawData.candidate?.mobile_verified,
           email_verified: rawData.candidate?.email_verified,
           is_blacklisted: rawData.candidate?.is_blacklisted,
@@ -134,7 +245,7 @@ const ApplicationDetail = () => {
       setApplication(mappedApp);
     } catch (err) {
       toast.error(err.message || 'Error loading application details');
-      navigate('/dashboard/roll-numbers');
+      navigate('/dashboard/applications');
     } finally {
       setLoading(false);
     }
@@ -253,33 +364,102 @@ const ApplicationDetail = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'overview':
+      case 'overview': {
+        const inputCls = "w-full text-sm border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500";
+        const labelCls = "text-sm text-slate-500 mb-1 block";
         return (
           <div className="bg-white p-6 rounded-lg shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-800 border-b pb-3 mb-4">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div><p className="text-sm text-slate-500">Full Name</p><p className="font-medium text-slate-800">{profile?.full_name || 'N/A'}</p></div>
-              <div><p className="text-sm text-slate-500">Father's Name</p><p className="font-medium text-slate-800">{profile?.father_name || 'N/A'}</p></div>
-              <div><p className="text-sm text-slate-500">CNIC</p><p className="font-medium text-slate-800">{profile?.cnic || 'N/A'}</p></div>
-              <div><p className="text-sm text-slate-500">Date of Birth</p><p className="font-medium text-slate-800">{profile?.dob ? formatDate(profile.dob) : 'N/A'}</p></div>
-              <div><p className="text-sm text-slate-500">Gender</p><p className="font-medium text-slate-800 capitalize">{profile?.gender || 'N/A'}</p></div>
-              <div><p className="text-sm text-slate-500">Religion</p><p className="font-medium text-slate-800 capitalize">{profile?.religion || 'N/A'}</p></div>
-              <div><p className="text-sm text-slate-500">Domicile District</p><p className="font-medium text-slate-800">{profile?.domicile || 'N/A'}</p></div>
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <h3 className="text-lg font-semibold text-slate-800">Personal Information</h3>
+              {canEditProfile && (editingPersonal ? (
+                <div className="flex items-center gap-2">
+                  <Button onClick={cancelEditPersonal} variant="secondary" size="sm" disabled={savingPersonal} className="gap-1.5">
+                    <X size={14} /> Cancel
+                  </Button>
+                  <Button onClick={handleSavePersonal} variant="primary" size="sm" disabled={savingPersonal} className="gap-1.5">
+                    <Save size={14} /> {savingPersonal ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={startEditPersonal} variant="outline" size="sm" className="gap-1.5">
+                  <Pencil size={14} /> Edit
+                </Button>
+              ))}
             </div>
 
-            <h3 className="text-lg font-semibold text-slate-800 border-b pb-3 mt-8 mb-4">Contact & Address</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-slate-500">Email Address {profile?.email_verified && <span className="text-emerald-600 text-xs font-bold ml-2">(Verified)</span>}</p>
-                <p className="font-medium text-slate-800">{profile?.email || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Phone Number {profile?.mobile_verified && <span className="text-emerald-600 text-xs font-bold ml-2">(Verified)</span>}</p>
-                <p className="font-medium text-slate-800">{profile?.phone || 'N/A'}</p>
-              </div>
-              <div><p className="text-sm text-slate-500">Current Address</p><p className="font-medium text-slate-800">{profile?.current_address || 'N/A'}</p></div>
-              <div><p className="text-sm text-slate-500">Permanent Address</p><p className="font-medium text-slate-800">{profile?.permanent_address || 'N/A'}</p></div>
-            </div>
+            {editingPersonal ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div><label className={labelCls}>Full Name</label><input className={inputCls} value={personalDraft.name} onChange={(e) => setPersonalDraft((p) => ({ ...p, name: e.target.value }))} /></div>
+                  <div><label className={labelCls}>Father's Name</label><input className={inputCls} value={personalDraft.father_name} onChange={(e) => setPersonalDraft((p) => ({ ...p, father_name: e.target.value }))} /></div>
+                  <div><label className={labelCls}>CNIC</label><input className={inputCls} value={personalDraft.cnic} onChange={(e) => setPersonalDraft((p) => ({ ...p, cnic: e.target.value }))} /></div>
+                  <div><label className={labelCls}>Date of Birth</label><input type="date" className={inputCls} value={personalDraft.date_of_birth} onChange={(e) => setPersonalDraft((p) => ({ ...p, date_of_birth: e.target.value }))} /></div>
+                  <div>
+                    <label className={labelCls}>Gender</label>
+                    <select className={inputCls} value={personalDraft.gender} onChange={(e) => setPersonalDraft((p) => ({ ...p, gender: e.target.value }))}>
+                      <option value="">Select...</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Religion</label>
+                    <select className={inputCls} value={personalDraft.religion} onChange={(e) => setPersonalDraft((p) => ({ ...p, religion: e.target.value }))}>
+                      <option value="">Select...</option>
+                      <option value="Muslim">Muslim</option>
+                      <option value="Non-Muslim">Non-Muslim</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Domicile District</label>
+                    <select className={inputCls} value={personalDraft.domicile_district} onChange={(e) => setPersonalDraft((p) => ({ ...p, domicile_district: e.target.value }))}>
+                      <option value="">Select...</option>
+                      {/* Keep the candidate's current value selectable even if it's since been
+                          renamed/deactivated in Settings, so saving doesn't silently blank it. */}
+                      {personalDraft.domicile_district && !districts.includes(personalDraft.domicile_district) && (
+                        <option value={personalDraft.domicile_district}>{personalDraft.domicile_district}</option>
+                      )}
+                      {districts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-semibold text-slate-800 border-b pb-3 mt-8 mb-4">Contact & Address</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div><label className={labelCls}>Email Address</label><input type="email" className={inputCls} value={personalDraft.email} onChange={(e) => setPersonalDraft((p) => ({ ...p, email: e.target.value }))} /></div>
+                  <div><label className={labelCls}>Phone Number</label><input className={inputCls} value={personalDraft.mobile_number} onChange={(e) => setPersonalDraft((p) => ({ ...p, mobile_number: e.target.value }))} /></div>
+                  <div><label className={labelCls}>Current Address</label><input className={inputCls} value={personalDraft.current_address} onChange={(e) => setPersonalDraft((p) => ({ ...p, current_address: e.target.value }))} /></div>
+                  <div><label className={labelCls}>Permanent Address</label><input className={inputCls} value={personalDraft.permanent_address} onChange={(e) => setPersonalDraft((p) => ({ ...p, permanent_address: e.target.value }))} /></div>
+                </div>
+                <p className="text-xs text-slate-400 mt-4">Saving here updates the candidate's own profile on the candidate portal — this is not a local-only admin note.</p>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div><p className="text-sm text-slate-500">Full Name</p><p className="font-medium text-slate-800">{profile?.full_name || 'N/A'}</p></div>
+                  <div><p className="text-sm text-slate-500">Father's Name</p><p className="font-medium text-slate-800">{profile?.father_name || 'N/A'}</p></div>
+                  <div><p className="text-sm text-slate-500">CNIC</p><p className="font-medium text-slate-800">{profile?.cnic || 'N/A'}</p></div>
+                  <div><p className="text-sm text-slate-500">Date of Birth</p><p className="font-medium text-slate-800">{profile?.dob ? formatDate(profile.dob) : 'N/A'}</p></div>
+                  <div><p className="text-sm text-slate-500">Gender</p><p className="font-medium text-slate-800 capitalize">{profile?.gender || 'N/A'}</p></div>
+                  <div><p className="text-sm text-slate-500">Religion</p><p className="font-medium text-slate-800 capitalize">{profile?.religion || 'N/A'}</p></div>
+                  <div><p className="text-sm text-slate-500">Domicile District</p><p className="font-medium text-slate-800">{profile?.domicile || 'N/A'}</p></div>
+                </div>
+
+                <h3 className="text-lg font-semibold text-slate-800 border-b pb-3 mt-8 mb-4">Contact & Address</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-slate-500">Email Address {profile?.email_verified && <span className="text-emerald-600 text-xs font-bold ml-2">(Verified)</span>}</p>
+                    <p className="font-medium text-slate-800">{profile?.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Phone Number {profile?.mobile_verified && <span className="text-emerald-600 text-xs font-bold ml-2">(Verified)</span>}</p>
+                    <p className="font-medium text-slate-800">{profile?.phone || 'N/A'}</p>
+                  </div>
+                  <div><p className="text-sm text-slate-500">Current Address</p><p className="font-medium text-slate-800">{profile?.current_address || 'N/A'}</p></div>
+                  <div><p className="text-sm text-slate-500">Permanent Address</p><p className="font-medium text-slate-800">{profile?.permanent_address || 'N/A'}</p></div>
+                </div>
+              </>
+            )}
 
             {profile?.is_blacklisted && (
               <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -289,6 +469,7 @@ const ApplicationDetail = () => {
 
           </div>
         );
+      }
 
       case 'exam_cities':
         return (
@@ -743,7 +924,7 @@ const ApplicationDetail = () => {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
           <Button
-            onClick={() => navigate('/dashboard/roll-numbers')}
+            onClick={() => navigate('/dashboard/applications')}
             variant="secondary"
             size="sm"
             className="gap-2"

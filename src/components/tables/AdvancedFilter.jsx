@@ -129,7 +129,7 @@ const AdvancedFilter = ({
                   value={fieldValue(config.name)}
                   onChange={(e) => handleFilterChange(config.name, e.target.value)}
                   options={config.options || []}
-                  placeholder={`All ${config.label}`}
+                  placeholder={config.label}
                 />
               );
 
