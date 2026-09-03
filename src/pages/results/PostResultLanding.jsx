@@ -131,9 +131,13 @@ const PostResultLanding = () => {
     }
   };
 
+  // toast.error is deferred a tick everywhere in this file — fired
+  // synchronously inside a click handler, it races ToastProvider's
+  // document-level "click anywhere dismisses the visible toast" listener,
+  // which sees and kills the just-created toast in the same click's bubble.
   const openPublishModal = (jobIds) => {
     if (jobIds.length === 0) {
-      toast.error('No publishable posts in this selection');
+      setTimeout(() => toast.error('No publishable posts in this selection'), 0);
       return;
     }
     setPublishJobIds(jobIds);
@@ -141,7 +145,7 @@ const PostResultLanding = () => {
 
   const openWithdrawModal = (jobIds) => {
     if (jobIds.length === 0) {
-      toast.error('No published posts in this selection');
+      setTimeout(() => toast.error('No published posts in this selection'), 0);
       return;
     }
     setWithdrawJobIds(jobIds);

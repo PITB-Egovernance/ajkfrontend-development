@@ -3,41 +3,34 @@ import {
   Send,
   X,
   CheckCircle2,
-  AlertCircle,
-  FileText,
   ShieldCheck,
   BellRing
 } from 'lucide-react';
 import Button from 'components/ui/Button';
-import { Card } from 'components/ui/Card';
-import SearchableSelect from 'components/ui/SearchableSelect';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Publication Type / Gazette Reference are no longer surfaced to the user —
+// every result publish always goes out as the final official merit list.
+const PUB_TYPE = 'final_merit';
+
 const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [notify, setNotify] = useState(true);
-  const [gazetteRef, setGazetteRef] = useState('');
-  const [pubType, setPubType] = useState('final_merit');
 
   if (!isOpen || !job) return null;
 
   const handlePublish = async () => {
-    if (!gazetteRef) {
-      toast.error('Please enter a Gazette Reference number');
-      return;
-    }
-
     setLoading(true);
     try {
       // Use helper to get correct ID (hashed or numeric)
       const jobId = job.hash_id || job.id;
-      
+
       await ResultsApi.publishResults({
         job_post_id: jobId,
-        pub_type: pubType,
-        gazette_ref: gazetteRef,
+        pub_type: PUB_TYPE,
+        gazette_ref: '',
         notify_candidates: notify
       });
       onSuccess();
@@ -83,33 +76,6 @@ const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
 
             {/* Publication Settings */}
             <div className="space-y-6">
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Publication Type</label>
-                <SearchableSelect
-                  value={pubType}
-                  onChange={(e) => setPubType(e.target.value)}
-                  options={[
-                    { value: 'final_merit', label: 'Official Final Merit List' },
-                    { value: 'written_test', label: 'Written Examination Result' },
-                    { value: 'interview', label: 'Interview/Viva Voce Result' },
-                  ]}
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Gazette Reference Number</label>
-                <div className="relative">
-                  <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="e.g. AJKPSC/RESULTS/2024/042"
-                    className="w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-100 focus:border-indigo-500 rounded-2xl text-sm font-bold transition-all outline-none"
-                    value={gazetteRef}
-                    onChange={(e) => setGazetteRef(e.target.value)}
-                  />
-                </div>
-              </div>
-
               <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                 <div className="flex items-center gap-3">
                   <BellRing className="text-emerald-600" size={20} />

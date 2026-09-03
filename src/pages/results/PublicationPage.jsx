@@ -2,9 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/Card';
 import Button from 'components/ui/Button';
-import SearchableSelect from 'components/ui/SearchableSelect';
 import { TextField, Switch, FormControlLabel, IconButton } from '@mui/material';
-import { ArrowLeft, Send, Download, AlertTriangle, CheckCircle2, History, Trash2, ShieldCheck, FileText, Info } from 'lucide-react';
+import { ArrowLeft, Send, Download, AlertTriangle, CheckCircle2, History, Trash2, ShieldCheck, FileText } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
 import PublicationChecklist from 'components/results/PublicationChecklist';
 import toast from 'react-hot-toast';
@@ -226,29 +225,6 @@ const PublicationPage = () => {
           <div className="lg:col-span-2 space-y-10">
             <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white">
               <CardContent className="p-10 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <SearchableSelect
-                    label="Publication Type"
-                    value={formData.pub_type}
-                    onChange={(e) => setFormData(prev => ({ ...prev, pub_type: e.target.value }))}
-                    disabled={isPublished}
-                    options={[
-                      { value: 'provisional', label: 'Provisional (Subject to Objections)' },
-                      { value: 'final', label: 'Final (Official Release)' },
-                      { value: 'supplementary', label: 'Supplementary (Addendum)' },
-                    ]}
-                  />
-                  <TextField
-                    label="Gazette Reference"
-                    fullWidth
-                    placeholder="Ex: PSC/RE/2024/782"
-                    value={formData.gazette_ref}
-                    onChange={(e) => setFormData(prev => ({ ...prev, gazette_ref: e.target.value }))}
-                    disabled={isPublished}
-                    InputProps={{ sx: { fontWeight: 'bold' } }}
-                  />
-                </div>
-
                 <TextField
                   label="Authorized Remarks (Optional)"
                   fullWidth
@@ -370,17 +346,8 @@ const PublicationPage = () => {
               </CardContent>
             </Card>
 
-            <div className="p-8 bg-amber-50 border border-amber-100 rounded-[2.5rem] flex items-start gap-4 shadow-inner">
-              <Info className="text-amber-600 shrink-0" size={24} />
-              <div className="space-y-1">
-                <h5 className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Officer Note</h5>
-                <p className="text-xs text-amber-700 font-bold leading-relaxed">
-                  Ensure the Gazette Reference matches the physical file record for archiving purposes.
-                </p>
-              </div>
-            </div>
           </div>
-          
+
         </div>
       </div>
     </div>
