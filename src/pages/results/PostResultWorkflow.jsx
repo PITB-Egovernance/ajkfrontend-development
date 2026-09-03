@@ -402,7 +402,7 @@ const PostResultWorkflow = () => {
   const handleGenerateInterviewList = async () => {
     if (selectedIds.length === 0) return;
     const ok = await confirmDelete({
-      title: 'Generate List for Shortlisted Interview',
+      title: 'Shortlisted for  Interview',
       message: `Select ${selectedIds.length} candidate(s) for interview and generate draft call letters?`,
       warning: 'Call letters are created in draft — publish them from the Interview Candidates tab.',
       confirmLabel: 'Select for Interview',
@@ -914,7 +914,7 @@ const PostResultWorkflow = () => {
     if (activeTab === 'passed') return wrap(<Button size="sm" onClick={handleShortlist} disabled={busy}>Select / Shortlist for Documents</Button>);
 
     if (activeTab === 'shortlisted') return wrap(<>
-      <Button size="sm" onClick={handleGenerateInterviewList} disabled={busy}>Generate List for Shortlisted Interview</Button>
+      <Button size="sm" onClick={handleGenerateInterviewList} disabled={busy}>Shortlisted for Interview</Button>
       <Button size="sm" variant="secondary" onClick={handleInitialRejection} disabled={busy}>Generate List for Initial Rejection</Button>
       <Button size="sm" variant="destructive" onClick={handleFinalRejectionDirect} disabled={busy}>Generate List for Final Rejection</Button>
     </>);
@@ -958,9 +958,9 @@ const PostResultWorkflow = () => {
             </Button>
           </>
         : <>
-            <Button size="sm" onClick={handleCompleteOnboarding} disabled={busy}>Candidate Onboarded</Button>
+            <Button size="sm" onClick={handleCompleteOnboarding} disabled={busy}>Candidate Recommended to Onboard</Button>
             <Button size="sm" variant="outline" onClick={handleRevertOnboardingStart} disabled={busy} className="border-amber-300 text-amber-700 hover:bg-amber-50">
-              Revert to Eligible to Start
+              Proceed for Onboarding
             </Button>
             <Button size="sm" variant="outline" onClick={handleRevertOnboardingComplete} disabled={busy} className="border-amber-300 text-amber-700 hover:bg-amber-50">
               Revert to In Progress
