@@ -92,6 +92,11 @@ const PscTable = () => {
     id: item.hash_id || item.id || `psc-${index}`,
     hash_id: item.hash_id,
     designation: item.designation,
+    // department is a plain column on job_details (not a relation object
+    // here — paginatePSC() doesn't eager-load the relation, so this is the
+    // raw department name string, same as elsewhere in this codebase where
+    // that column shadows the department() relation).
+    department: item.department || '-',
     requisition_form: item.requisition_form,
     remarks: item.remarks || '-',
     status: item.status || 'Pending',
@@ -270,6 +275,8 @@ const PscTable = () => {
 
   const columns = [
     { field: 'hash_id', headerName: 'Ref', flex: 1, minWidth: 120 },
+    { field: 'designation', headerName: 'Post Name', flex: 1.5, minWidth: 160 },
+    { field: 'department', headerName: 'Department', flex: 1.5, minWidth: 160 },
     { field: 'requisition_form', headerName: 'Requisition Form', flex: 2, minWidth: 180, renderCell: (params) => renderFileLink(params.value) },
     { field: 'remarks', headerName: 'Remarks', flex: 2, minWidth: 200 },
     {

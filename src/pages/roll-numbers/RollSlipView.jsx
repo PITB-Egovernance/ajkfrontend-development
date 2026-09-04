@@ -222,10 +222,17 @@ const RollSlipView = () => {
               );
               const hasLabels = groups.some(g => g.label);
               // If every group has the identical set of posts, show description
-              // only once (rowspan) so it doesn't repeat for Paper 1 / Paper 2.
-              const descKey = (posts) => posts.map(p =>
-                `${p.advertisementNo ?? ''}||${p.department ?? ''}||${p.postName ?? ''}`
-              ).join('|');
+              // only once (rowspan) so it doesn't repeat down every subject/paper
+              // row — normalized (trimmed + lowercased, and sorted so post order
+              // doesn't matter) so a whitespace/casing quirk or a different post
+              // order between two clubbed applications' resolved context still
+              // counts as "the same description" — the raw, original values are
+              // still what's actually displayed, only the comparison is loosened.
+              const norm = (v) => String(v ?? '').trim().toLowerCase();
+              const descKey = (posts) => posts
+                .map(p => `${norm(p.advertisementNo)}||${norm(p.department)}||${norm(p.postName)}`)
+                .sort()
+                .join('|');
               const firstKey = descKey(groups[0]?.posts ?? []);
               const allSameDesc = groups.length > 1 && groups.every(g => descKey(g.posts) === firstKey);
               return (
