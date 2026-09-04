@@ -224,7 +224,7 @@ export const MENU_ITEMS = [
           { label: "Commission Members",      path: "/dashboard/settings/commission-members",  icon: Users },
           { label: "Secretary and Officials",  path: "/dashboard/settings/secretary-officials", icon: Landmark },
           { label: "News & Notices",           path: "/dashboard/settings/news",                icon: Newspaper },
-          { label: "Syllabus",                 path: "/dashboard/settings/syllabus",            icon: BookOpen },
+         // { label: "Syllabus",                 path: "/dashboard/settings/syllabus",            icon: BookOpen },
           { label: "Images",                   path: "/dashboard/settings/images",              icon: ImageIcon },
         ],
       },

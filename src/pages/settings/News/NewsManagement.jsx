@@ -16,6 +16,7 @@ import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { fetchPaginatedApiList } from "utils/paginatedApiUtils";
 
 const PERM = "settings.news";
 
@@ -213,39 +214,34 @@ const NewsManagement = () => {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/news`, { headers: authHeaders() });
-      const result = await res.json();
-
-      if (res.ok || result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
-        setRows(
-          (Array.isArray(data) ? data : []).map((item, i) => ({
-            id:                item.hash_id ?? item.id,
-            hash_id:           item.hash_id ?? item.id,
-            sr_no:             i + 1,
-            category:          item.category ?? "",
-            title:             item.title ?? "-",
-            slug:              item.slug ?? "",
-            short_description: item.short_description ?? "",
-            description:       item.description ?? "",
-            news_type:         item.news_type ?? "general",
-            display_type:      item.display_type ?? "normal",
-            attachment:        item.attachment ?? "",
-            attachment_title:  item.attachment_title ?? "",
-            attachments:       Array.isArray(item.attachments) ? item.attachments : [],
-            external_link:     item.external_link ?? "",
-            publish_date:      (item.publish_date ?? "").slice(0, 10),
-            expiry_date:       (item.expiry_date ?? "").slice(0, 10),
-            is_featured:       !!item.is_featured,
-            is_marquee:        !!item.is_marquee,
-            show_on_home:      item.show_on_home === undefined ? true : !!item.show_on_home,
-            status:            item.status ?? "draft",
-          }))
-        );
-      } else {
-        toast.error(result.message || "Failed to load news");
-        setRows([]);
-      }
+      const data = await fetchPaginatedApiList(`${API_BASE}/settings/news`, {
+        headers: authHeaders(),
+        perPage: 200,
+      });
+      setRows(
+        (Array.isArray(data) ? data : []).map((item, i) => ({
+          id:                item.hash_id ?? item.id,
+          hash_id:           item.hash_id ?? item.id,
+          sr_no:             i + 1,
+          category:          item.category ?? "",
+          title:             item.title ?? "-",
+          slug:              item.slug ?? "",
+          short_description: item.short_description ?? "",
+          description:       item.description ?? "",
+          news_type:         item.news_type ?? "general",
+          display_type:      item.display_type ?? "normal",
+          attachment:        item.attachment ?? "",
+          attachment_title:  item.attachment_title ?? "",
+          attachments:       Array.isArray(item.attachments) ? item.attachments : [],
+          external_link:     item.external_link ?? "",
+          publish_date:      (item.publish_date ?? "").slice(0, 10),
+          expiry_date:       (item.expiry_date ?? "").slice(0, 10),
+          is_featured:       !!item.is_featured,
+          is_marquee:        !!item.is_marquee,
+          show_on_home:      item.show_on_home === undefined ? true : !!item.show_on_home,
+          status:            item.status ?? "draft",
+        }))
+      );
     } catch {
       toast.error("Failed to load news");
       setRows([]);

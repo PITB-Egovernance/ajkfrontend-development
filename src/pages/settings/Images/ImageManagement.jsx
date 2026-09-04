@@ -35,7 +35,7 @@ const ACCEPT_ATTR = "image/jpeg,image/jpg,image/png,image/webp,image/svg+xml,.jp
 
 const CATEGORIES = [
   { value: "images", label: "Images" },
-  { value: "gallery", label: "Gallery" },
+  //{ value: "gallery", label: "Gallery" },
   { value: "logo",   label: "Logo" },
 ];
 
@@ -199,6 +199,7 @@ const ImageManagement = () => {
   const total        = totalRows;
   const galleryCount = allRows.filter((r) => r.category === "gallery").length;
   const logoCount    = allRows.filter((r) => r.category === "logo").length;
+  const imageCount    = allRows.filter((r) => r.category === "images").length;
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -409,8 +410,8 @@ const ImageManagement = () => {
           </Card>
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
             <CardContent className="p-5">
-              <p className="text-sm text-emerald-700 font-medium">Gallery</p>
-              <h2 className="text-3xl font-bold text-emerald-900 mt-1">{galleryCount}</h2>
+              <p className="text-sm text-emerald-700 font-medium">Image</p>
+              <h2 className="text-3xl font-bold text-emerald-900 mt-1">{imageCount}</h2>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200">
