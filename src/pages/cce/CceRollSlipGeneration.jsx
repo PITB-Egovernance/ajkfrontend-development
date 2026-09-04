@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TextField, MenuItem } from '@mui/material';
-import { Stamp, ArrowLeft, ArrowRight, Users, MapPin, CheckCircle2, Search, Filter, Eye, Download, CalendarClock, Lock, Pencil } from 'lucide-react';
+import { Stamp, ArrowLeft, ArrowRight, Users, MapPin, CheckCircle2, Search, Filter, Eye, Download, CalendarClock, Lock, Pencil, Trash2 } from 'lucide-react';
+import confirmDelete from 'components/ui/ConfirmDelete';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
@@ -43,12 +44,7 @@ const ZONE_LABELS = { muzaffarabad: 'Muzaffarabad', rawalakot: 'Rawalakot', mirp
 
 // A CCE candidate keeps the same roll number across every post they applied
 // for (screening → written stage carries it forward, and posts can be
-// "clubbed" onto one sitting), so bare roll_number is NOT a safe lookup key
-// anywhere in this page — two different posts/applications can share one.
-// Every roll_number-keyed lookup here is instead scoped by advertisement too,
-// which is enough to tell apart the concrete case this page has to handle
-// (the same candidate applying to CCE posts under different advertisements).
-const rollKey = (advertisementId, rollNumber) => `${advertisementId}::${String(rollNumber || '').toLowerCase()}`;
+// "clubbed" onto one sitting).
 
 const resolveDistrictZone = (meta) => {
   const raw = [meta?.domicile_district].filter(Boolean).map((v) => String(v).toLowerCase().trim());
@@ -111,25 +107,55 @@ const CceRollSlipGeneration = () => {
   // by one on the Master Date Sheet page.
   const [masterSheets, setMasterSheets] = useState([]);
   const [masterSheetsLoading, setMasterSheetsLoading] = useState(true);
+  const [deletingGroupKey, setDeletingGroupKey] = useState(null);
 
-  useEffect(() => {
-    (async () => {
-      setMasterSheetsLoading(true);
-      try {
-        const res = await CceDateSheetApi.getAllMasterDateSheets();
-        const list = Array.isArray(res?.data) ? res.data : [];
-        setMasterSheets(list);
-      } catch (err) {
-        // Non-fatal — the overview just stays empty; slip generation itself
-        // doesn't depend on this list.
-        setMasterSheets([]);
-      } finally {
-        setMasterSheetsLoading(false);
-      }
-    })();
+  const loadMasterSheets = useCallback(async () => {
+    setMasterSheetsLoading(true);
+    try {
+      const res = await CceDateSheetApi.getAllMasterDateSheets();
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setMasterSheets(list);
+    } catch (err) {
+      // Non-fatal — the overview just stays empty; slip generation itself
+      // doesn't depend on this list.
+      setMasterSheets([]);
+    } finally {
+      setMasterSheetsLoading(false);
+    }
   }, []);
 
-  // Stage 1 — search/filter + post selection
+  const handleDeleteMasterDateSheet = async (group) => {
+    const confirmed = await confirmDelete({
+      title: 'Delete Master Date Sheet',
+      message: `Permanently delete the saved schedule for ${group.adv_number || group.group_key} (${group.papers_count} paper${group.papers_count === 1 ? '' : 's'})? This cannot be undone.`,
+      warning: 'Any candidate date sheets already built from this schedule are not affected, but Roll No Slip generation will no longer find one here.',
+      confirmLabel: 'Delete',
+    });
+    if (!confirmed) return;
+
+    setDeletingGroupKey(group.group_key);
+    try {
+      await CceDateSheetApi.deleteMasterDateSheet(group.group_key);
+      toast.success('Master date sheet deleted');
+      await loadMasterSheets();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to delete master date sheet');
+    } finally {
+      setDeletingGroupKey(null);
+    }
+  };
+
+  useEffect(() => {
+    loadMasterSheets();
+  }, [loadMasterSheets]);
+
+  // Stage 1 — search/filter + post selection. Draft state is what the
+  // inputs are bound to; it only takes effect (feeding postGroups below)
+  // once Search is clicked — typing/selecting alone does nothing, matching
+  // AdvancedFilter's deferApply convention used elsewhere in the admin.
+  const [draftSearch, setDraftSearch] = useState('');
+  const [draftFilterAdvertisement, setDraftFilterAdvertisement] = useState('all');
+  const [draftFilterPost, setDraftFilterPost] = useState('all');
   const [search, setSearch] = useState('');
   const [filterAdvertisement, setFilterAdvertisement] = useState('all');
   const [filterPost, setFilterPost] = useState('all');
@@ -338,9 +364,12 @@ const CceRollSlipGeneration = () => {
     return [...seen.entries()];
   }, [posts]);
 
+  // Narrows the Post dropdown's own choices as soon as an Advertisement is
+  // picked in the draft — this only affects which options are offered, not
+  // the results table itself, so it's fine to react before Search is clicked.
   const postOptions = useMemo(
-    () => posts.filter((p) => filterAdvertisement === 'all' || p.advertisementId === filterAdvertisement),
-    [posts, filterAdvertisement]
+    () => posts.filter((p) => draftFilterAdvertisement === 'all' || p.advertisementId === draftFilterAdvertisement),
+    [posts, draftFilterAdvertisement]
   );
 
   const postGroups = useMemo(() => {
@@ -356,7 +385,15 @@ const CceRollSlipGeneration = () => {
   }, [posts, filterAdvertisement, filterPost, search]);
 
   const togglePost = (key) => setSelectedPostKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
-  const resetFilters = () => { setSearch(''); setFilterAdvertisement('all'); setFilterPost('all'); };
+  const applyFilters = () => {
+    setSearch(draftSearch);
+    setFilterAdvertisement(draftFilterAdvertisement);
+    setFilterPost(draftFilterPost);
+  };
+  const resetFilters = () => {
+    setDraftSearch(''); setDraftFilterAdvertisement('all'); setDraftFilterPost('all');
+    setSearch(''); setFilterAdvertisement('all'); setFilterPost('all');
+  };
 
   const selectedPosts = posts.filter((p) => selectedPostKeys.includes(p.key));
   const selectedCandidateRows = dedupedCandidateRows.filter((c) => selectedPostKeys.includes(c.postKey));
@@ -443,30 +480,49 @@ const CceRollSlipGeneration = () => {
         applications: await fetchApplicationsForAdvertisement(adId),
       })));
 
-      const appNumberByRollKey = {};
+      // metaByAppNumber only needs ReceivedApplication for zone-allocation
+      // metadata (domicile_district/preferred_exam_cities) — it's keyed by
+      // application_number, which is always present regardless of whether
+      // that application's roll_number column has been written yet.
       const metaByAppNumber = {};
-      applicationsByAd.forEach(({ adId, applications }) => {
+      applicationsByAd.forEach(({ applications }) => {
         applications.forEach((a) => {
-          if (a.roll_number) {
-            appNumberByRollKey[rollKey(adId, a.roll_number)] = a.application_number;
-          }
           metaByAppNumber[a.application_number] = {
             domicile_district:     a.domicile_district,
             preferred_exam_cities: a.preferred_exam_cities || [],
           };
         });
       });
-      const resolveAppNumber = (row) => appNumberByRollKey[rollKey(row.advertisementId, row.roll_number)];
-      // Every clubbed post's own application_number, resolved via its own
-      // advertisement_id — this, not resolveAppNumber() above, is what feeds
-      // the actual generateSlips() call, so one candidate's whole clubbed
-      // group is generated together as a single roll slip instead of once
-      // per post.
+
+      // application_number itself is resolved fresh per roll number via
+      // CceScreeningResult (screening-import time), NOT via
+      // ReceivedApplication.roll_number — that column stays null until this
+      // very generation job writes it (GenerateRollNumberSlipsJob), so
+      // resolving against it here would be circular and fail for every
+      // candidate who hasn't already been through written-stage generation
+      // once before.
+      const uniqueRollNumbersForGen = [...new Set(completeCandidateRows.map((r) => r.roll_number).filter(Boolean))];
+      const appNumberEntries = await Promise.all(uniqueRollNumbersForGen.map(async (rollNumber) => {
+        try {
+          const res = await CceScreeningApi.applicationNumbersForRollNumber(rollNumber);
+          return [rollNumber, Array.isArray(res?.data) ? res.data : []];
+        } catch (err) {
+          return [rollNumber, []];
+        }
+      }));
+      const appNumbersByRoll = Object.fromEntries(appNumberEntries);
+
+      const resolveAppNumber = (row) => {
+        const list = appNumbersByRoll[row.roll_number] || [];
+        return (list.find((x) => x.advertisement_id === row.advertisementId) || list[0])?.application_number;
+      };
+      // Every clubbed post's own application_number — this, not
+      // resolveAppNumber() above, is what feeds the actual generateSlips()
+      // call, so one candidate's whole clubbed group is generated together
+      // as a single roll slip instead of once per post.
       const resolveAllAppNumbers = (row) => {
-        const posts = row.clubbedPosts.length > 0 ? row.clubbedPosts : [{ advertisement_id: row.advertisementId }];
-        return [...new Set(
-          posts.map((p) => appNumberByRollKey[rollKey(p.advertisement_id, row.roll_number)]).filter(Boolean)
-        )];
+        const list = appNumbersByRoll[row.roll_number] || [];
+        return [...new Set(list.map((x) => x.application_number).filter(Boolean))];
       };
 
       let centerByPost;
@@ -690,12 +746,23 @@ const CceRollSlipGeneration = () => {
                           {g.updated_at ? new Date(g.updated_at).toLocaleString() : '—'}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Button
-                            variant="outline" size="sm" className="gap-1 bg-white"
-                            onClick={() => navigate(`/dashboard/cce/date-sheet/master?advertisement_id=${encodeURIComponent(g.advertisement_hash)}`)}
-                          >
-                            <Pencil size={12} /> {g.is_published ? 'View' : 'Edit'}
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline" size="sm" className="gap-1 bg-white"
+                              onClick={() => navigate(`/dashboard/cce/date-sheet/master?advertisement_id=${encodeURIComponent(g.advertisement_hash)}`)}
+                            >
+                              <Pencil size={12} /> {g.is_published ? 'View' : 'Edit'}
+                            </Button>
+                            <Button
+                              variant="outline" size="sm"
+                              className="gap-1 bg-white border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                              disabled={g.is_published || deletingGroupKey === g.group_key}
+                              title={g.is_published ? 'Unpublish before deleting' : undefined}
+                              onClick={() => handleDeleteMasterDateSheet(g)}
+                            >
+                              <Trash2 size={12} /> {deletingGroupKey === g.group_key ? 'Deleting…' : 'Delete'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -752,20 +819,21 @@ const CceRollSlipGeneration = () => {
                       size="small"
                       label="Search"
                       placeholder="Search post or advertisement"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="lg:col-span-5"
+                      value={draftSearch}
+                      onChange={(e) => setDraftSearch(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') applyFilters(); }}
+                      className="lg:col-span-4"
                       InputProps={{ startAdornment: <Search size={16} className="mr-2 text-slate-400" /> }}
                     />
                     <TextField
-                      select size="small" label="Advertisement" value={filterAdvertisement}
-                      onChange={(e) => { setFilterAdvertisement(e.target.value); setFilterPost('all'); }}
-                      className="lg:col-span-4"
+                      select size="small" label="Advertisement" value={draftFilterAdvertisement}
+                      onChange={(e) => { setDraftFilterAdvertisement(e.target.value); setDraftFilterPost('all'); }}
+                      className="lg:col-span-3"
                     >
                       <MenuItem value="all">All Advertisements</MenuItem>
                       {advertisementOptions.map(([id, title]) => <MenuItem key={id} value={id}>{title}</MenuItem>)}
                     </TextField>
-                    <TextField select size="small" label="Post" value={filterPost} onChange={(e) => setFilterPost(e.target.value)} className="lg:col-span-2">
+                    <TextField select size="small" label="Post" value={draftFilterPost} onChange={(e) => setDraftFilterPost(e.target.value)} className="lg:col-span-2">
                       <MenuItem value="all">All Posts</MenuItem>
                       {postOptions.map((p) => (
                         <MenuItem key={p.key} value={p.key}>
@@ -773,6 +841,7 @@ const CceRollSlipGeneration = () => {
                         </MenuItem>
                       ))}
                     </TextField>
+                    <Button className="gap-2 lg:col-span-2" onClick={applyFilters}><Search size={15} /> Search</Button>
                     <Button variant="outline" className="gap-2 bg-white lg:col-span-1" onClick={resetFilters}><Filter size={15} /> Reset</Button>
                   </div>
 

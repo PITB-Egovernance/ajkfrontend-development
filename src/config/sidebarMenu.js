@@ -89,6 +89,10 @@ export const MENU_ITEMS = [
     label: "Candidate Applications",
     icon: UserCheck,
     path: "/dashboard/applications",
+    submenu: [
+      { label: "Applications",          path: "/dashboard/applications",            icon: FileText },
+      { label: "Candidate Complaints",   path: "/dashboard/applications/complaints", icon: MessageSquareWarning },
+    ],
   },
   {
     id: "results",
@@ -99,11 +103,12 @@ export const MENU_ITEMS = [
       { label: "One Paper MCQs", path: "/dashboard/results/exam/one-paper-mcqs",    icon: FileText },
       { label: "Two Paper MCQs", path: "/dashboard/results/exam/two-paper-mcqs",    icon: FileText },
       { label: "Written Exams",  path: "/dashboard/results/exam/written-exams",     icon: FileCheck },
-      { label: "CCE Exams",      
-        path: "/dashboard/results/exam/cce-exams",        
-        icon: FileQuestion ,
-        children:[
-          { label: "CCE Screening Results",    path: "/dashboard/cce/screening",            icon: CheckCircle },
+      { label: "CCE Result",
+        path: "/dashboard/cce/screening",
+        icon: FileQuestion,
+        children: [
+          { label: "CCE Screening Result",    path: "/dashboard/cce/screening",             icon: CheckCircle },
+          { label: "CCE Written Exam Result", path: "/dashboard/results/exam/cce-exams",    icon: FileQuestion },
         ],
       },
       { label: "Post Result Processing", path: "/dashboard/results/post-result",    icon: ClipboardCheck },

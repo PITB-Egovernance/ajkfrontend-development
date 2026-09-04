@@ -41,6 +41,18 @@ const CceScreeningApi = {
     return handleResponse(res);
   },
 
+  // Resolves a CCE roll number to every application_number sharing it, via
+  // CceScreeningResult (fresh at screening-import time) rather than
+  // ReceivedApplication.roll_number, which stays null until the written-stage
+  // Roll No Slip job itself writes it — needed before that job can even run.
+  applicationNumbersForRollNumber: async (rollNumber) => {
+    const search = new URLSearchParams({ roll_number: rollNumber });
+    const res = await fetch(`${ADMIN_API_BASE}/cce/screening/application-numbers?${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
   // List CCE screening results for one or more advertisements — auto-synced
   // server-side from already-roll-numbered candidates on every load. Pass an
   // array to view a clubbed group of advertisements together.

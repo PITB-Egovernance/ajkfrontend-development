@@ -503,12 +503,32 @@ const RollNumberExamFlow = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [generating]);
 
-  // Stage 3 filter + manual-update state
+  // Stage 3 filter + manual-update state. Draft state is what the inputs
+  // are bound to; it only takes effect (feeding s3FilteredCandidates below)
+  // once Search is clicked — same deferred-apply convention as Stage 1's
+  // post filter above.
+  const [draftS3Search, setDraftS3Search] = useState('');
+  const [draftS3District, setDraftS3District] = useState('');
+  const [draftS3Gender, setDraftS3Gender] = useState('');
+  const [draftS3CnicFilter, setDraftS3CnicFilter] = useState('');
+  const [draftS3Preference, setDraftS3Preference] = useState('');
   const [s3Search, setS3Search] = useState('');
   const [s3District, setS3District] = useState('');
   const [s3Gender, setS3Gender] = useState('');
   const [s3CnicFilter, setS3CnicFilter] = useState('');
   const [s3Preference, setS3Preference] = useState('');
+
+  const applyS3Filters = () => {
+    setS3Search(draftS3Search);
+    setS3District(draftS3District);
+    setS3Gender(draftS3Gender);
+    setS3CnicFilter(draftS3CnicFilter);
+    setS3Preference(draftS3Preference);
+  };
+  const resetS3Filters = () => {
+    setDraftS3Search(''); setDraftS3District(''); setDraftS3Gender(''); setDraftS3CnicFilter(''); setDraftS3Preference('');
+    setS3Search(''); setS3District(''); setS3Gender(''); setS3CnicFilter(''); setS3Preference('');
+  };
   const [s3SelectedIds, setS3SelectedIds] = useState(new Set());
   const [rollStartSeq, setRollStartSeq] = useState('');
   const [manualUpdateCenterId, setManualUpdateCenterId] = useState('');
@@ -543,6 +563,17 @@ const RollNumberExamFlow = () => {
   const [generatedCandidates, setGeneratedCandidates] = useState(() => stage3Snapshot?.generatedCandidates || []);
   const [allCandidateApps, setAllCandidateApps] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Draft state is what the Stage 1 filter inputs are bound to; it only
+  // takes effect (feeding filteredPosts below) once Search is clicked —
+  // typing/selecting alone does nothing, matching AdvancedFilter's
+  // deferApply convention used elsewhere in the admin. The cascading
+  // Advertisement → Department → Post narrowing still reacts live off the
+  // draft, since that only affects which options are offered next, not the
+  // results table itself.
+  const [draftFilterAdvertisement, setDraftFilterAdvertisement] = useState('all');
+  const [draftFilterPost, setDraftFilterPost] = useState('all');
+  const [draftFilterDepartment, setDraftFilterDepartment] = useState('all');
+  const [draftSearch, setDraftSearch] = useState('');
   const [filterAdvertisement, setFilterAdvertisement] = useState('all');
   const [filterPost, setFilterPost] = useState('all');
   const [filterDepartment, setFilterDepartment] = useState('all');
@@ -1110,25 +1141,36 @@ const RollNumberExamFlow = () => {
 
   // Cascade: departments available under the currently selected advertisement
   const availableDepartments = useMemo(() => {
-    const pool = filterAdvertisement === 'all'
+    const pool = draftFilterAdvertisement === 'all'
       ? allPosts
-      : allPosts.filter((p) => p.advertisementId === filterAdvertisement);
+      : allPosts.filter((p) => p.advertisementId === draftFilterAdvertisement);
     return [...new Set(pool.filter(postHasActivity).map((p) => p.department).filter(Boolean))];
-  }, [allPosts, filterAdvertisement]);
+  }, [allPosts, draftFilterAdvertisement]);
 
   // Cascade: posts available under the currently selected advertisement + department
   const availablePosts = useMemo(() =>
     allPosts.filter((p) => {
       if (!postHasActivity(p)) return false;
-      if (filterAdvertisement !== 'all' && p.advertisementId !== filterAdvertisement) return false;
-      if (filterDepartment !== 'all' && p.department !== filterDepartment) return false;
+      if (draftFilterAdvertisement !== 'all' && p.advertisementId !== draftFilterAdvertisement) return false;
+      if (draftFilterDepartment !== 'all' && p.department !== draftFilterDepartment) return false;
       return true;
     }),
-  [allPosts, filterAdvertisement, filterDepartment]);
+  [allPosts, draftFilterAdvertisement, draftFilterDepartment]);
 
   // Reset child filters when parent selection changes
-  useEffect(() => { setFilterDepartment('all'); setFilterPost('all'); }, [filterAdvertisement]);
-  useEffect(() => { setFilterPost('all'); }, [filterDepartment]);
+  useEffect(() => { setDraftFilterDepartment('all'); setDraftFilterPost('all'); }, [draftFilterAdvertisement]);
+  useEffect(() => { setDraftFilterPost('all'); }, [draftFilterDepartment]);
+
+  const applyPostFilters = () => {
+    setSearch(draftSearch);
+    setFilterAdvertisement(draftFilterAdvertisement);
+    setFilterDepartment(draftFilterDepartment);
+    setFilterPost(draftFilterPost);
+  };
+  const resetPostFilters = () => {
+    setDraftSearch(''); setDraftFilterAdvertisement('all'); setDraftFilterPost('all'); setDraftFilterDepartment('all');
+    setSearch(''); setFilterAdvertisement('all'); setFilterPost('all'); setFilterDepartment('all');
+  };
 
   const filteredPosts = useMemo(() => {
     return advertisements.map((ad) => {
@@ -1990,12 +2032,17 @@ const RollNumberExamFlow = () => {
           <Card className="rounded-lg"><CardContent className="space-y-5 p-5">
             <StepHeader number="1" title="Select Advertisement, Posts, Departments & Applicants" subtitle="Select the posts you want to include in this roll number generation batch." />
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-              <TextField size="small" label="Search" value={search} onChange={(event) => setSearch(event.target.value)} className="lg:col-span-3" InputProps={{ startAdornment: <Search size={16} className="mr-2 text-slate-400" /> }} />
+              <TextField
+                size="small" label="Search" value={draftSearch}
+                onChange={(event) => setDraftSearch(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Enter') applyPostFilters(); }}
+                className="lg:col-span-3" InputProps={{ startAdornment: <Search size={16} className="mr-2 text-slate-400" /> }}
+              />
               <div className="lg:col-span-3">
                 <SearchableSelect
                   label="Advertisement"
-                  value={filterAdvertisement}
-                  onChange={(e) => setFilterAdvertisement(e.target.value)}
+                  value={draftFilterAdvertisement}
+                  onChange={(e) => setDraftFilterAdvertisement(e.target.value)}
                   options={[
                     { value: 'all', label: 'All Advertisements' },
                     ...availableAdvertisements.map((ad) => ({ value: ad.id, label: ad.advertisement })),
@@ -2003,11 +2050,11 @@ const RollNumberExamFlow = () => {
                   placeholder="All Advertisements"
                 />
               </div>
-              <div className="lg:col-span-3">
+              <div className="lg:col-span-2">
                 <SearchableSelect
                   label="Department"
-                  value={filterDepartment}
-                  onChange={(e) => setFilterDepartment(e.target.value)}
+                  value={draftFilterDepartment}
+                  onChange={(e) => setDraftFilterDepartment(e.target.value)}
                   options={[
                     { value: 'all', label: 'All Departments' },
                     ...availableDepartments.map((d) => ({ value: d, label: d })),
@@ -2018,8 +2065,8 @@ const RollNumberExamFlow = () => {
               <div className="lg:col-span-2">
                 <SearchableSelect
                   label="Post"
-                  value={filterPost}
-                  onChange={(e) => setFilterPost(e.target.value)}
+                  value={draftFilterPost}
+                  onChange={(e) => setDraftFilterPost(e.target.value)}
                   options={[
                     { value: 'all', label: 'All Posts' },
                     ...availablePosts.map((post) => ({ value: post.id, label: post.post })),
@@ -2027,7 +2074,8 @@ const RollNumberExamFlow = () => {
                   placeholder="All Posts"
                 />
               </div>
-              <Button variant="outline" className="h-10 gap-2 bg-white lg:col-span-1" onClick={() => { setSearch(''); setFilterAdvertisement('all'); setFilterPost('all'); setFilterDepartment('all'); }}><Filter size={15} /> Reset</Button>
+              <Button className="h-10 gap-2 lg:col-span-1" onClick={applyPostFilters}><Search size={15} /> Search</Button>
+              <Button variant="outline" className="h-10 gap-2 bg-white lg:col-span-1" onClick={resetPostFilters}><Filter size={15} /> Reset</Button>
             </div>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full min-w-[900px] text-left text-sm">
@@ -2480,33 +2528,34 @@ const RollNumberExamFlow = () => {
                 <div className="flex items-center gap-2">
                   <Filter size={15} className="text-slate-500" />
                   <span className="text-sm font-semibold text-slate-700">Filter Candidates</span>
-                  {(s3Search || s3District || s3Gender || s3CnicFilter || s3Preference) && (
+                  {(draftS3Search || draftS3District || draftS3Gender || draftS3CnicFilter || draftS3Preference || s3Search || s3District || s3Gender || s3CnicFilter || s3Preference) && (
                     <button
                       type="button"
-                      onClick={() => { setS3Search(''); setS3District(''); setS3Gender(''); setS3CnicFilter(''); setS3Preference(''); }}
+                      onClick={resetS3Filters}
                       className="ml-auto flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
                     >
                       <X size={12} /> Clear All
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                   <TextField
                     size="small" label="Search" placeholder="Name, CNIC, Ref ID"
-                    value={s3Search} onChange={(e) => setS3Search(e.target.value)}
+                    value={draftS3Search} onChange={(e) => setDraftS3Search(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyS3Filters(); }}
                     InputProps={{ startAdornment: <Search size={14} className="mr-2 text-slate-400" /> }}
                   />
                   <SearchableSelect
                     label="District / Zone"
-                    value={s3District}
-                    onChange={(e) => setS3District(e.target.value)}
+                    value={draftS3District}
+                    onChange={(e) => setDraftS3District(e.target.value)}
                     options={s3UniqueDistricts.map(d => ({ value: d, label: d }))}
                     placeholder="All Districts"
                   />
                   <SearchableSelect
                     label="Gender"
-                    value={s3Gender}
-                    onChange={(e) => setS3Gender(e.target.value)}
+                    value={draftS3Gender}
+                    onChange={(e) => setDraftS3Gender(e.target.value)}
                     options={[
                       { value: 'male', label: 'Male' },
                       { value: 'female', label: 'Female' },
@@ -2516,15 +2565,17 @@ const RollNumberExamFlow = () => {
                   />
                   <TextField
                     size="small" label="CNIC" placeholder="e.g. 3110470679173"
-                    value={s3CnicFilter} onChange={(e) => setS3CnicFilter(e.target.value)}
+                    value={draftS3CnicFilter} onChange={(e) => setDraftS3CnicFilter(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyS3Filters(); }}
                   />
                   <SearchableSelect
                     label="Preference"
-                    value={s3Preference}
-                    onChange={(e) => setS3Preference(e.target.value)}
+                    value={draftS3Preference}
+                    onChange={(e) => setDraftS3Preference(e.target.value)}
                     options={examCities.map(p => ({ value: p, label: p }))}
                     placeholder="All Preferences"
                   />
+                  <Button className="h-10 gap-2" onClick={applyS3Filters}><Search size={14} /> Search</Button>
                 </div>
                 <p className="text-xs text-slate-400">
                   Showing {s3FilteredCandidates.length} of {s3UniqueCandidateCount} candidate{s3UniqueCandidateCount !== 1 ? 's' : ''}

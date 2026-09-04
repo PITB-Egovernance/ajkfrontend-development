@@ -89,6 +89,20 @@ const CceDateSheetApi = {
     return handleResponse(res);
   },
 
+  // Deletes every saved paper under one exact group_key (from
+  // getAllMasterDateSheets()'s own group_key field) — not an advertisement_id,
+  // since a stale group can share an advertisement with a newer one after a
+  // clubbing change (see CceMasterDateSheetService::deleteGroup()). Refuses
+  // while published — unpublish first.
+  deleteMasterDateSheet: async (groupKey) => {
+    const search = new URLSearchParams({ group_key: groupKey });
+    const res = await fetch(`${ADMIN_API_BASE}/cce/master-date-sheet?${search}`, {
+      method:  'DELETE',
+      headers: getAdminHeaders(),
+    });
+    return handleResponse(res);
+  },
+
   // ── Candidate Date Sheet ─────────────────────────────────────────────────
   // Admin-backend candidate listing — unlike getEligibleCandidatesFromPortal
   // (which hits the candidate portal directly), this one enriches each row

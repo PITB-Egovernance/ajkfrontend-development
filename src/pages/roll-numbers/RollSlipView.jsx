@@ -199,9 +199,16 @@ const RollSlipView = () => {
               // Group sessions sharing the same day+date+time into one table row.
               // Supports both new backend (separate label field) and old backend
               // (label embedded in postName as "Post Title — Paper 1").
+              // subjectId+paperLabel (when present) join the key too — without
+              // it, a Group A/B subject's Paper I and Paper II would merge into
+              // one row whenever they share a time slot (e.g. before their
+              // schedules are differentiated), silently dropping Paper II's own
+              // label from the SUBJECT/PAPER column since only the first
+              // session in a group keeps its label at the top level.
               const groups = Object.values(
                 data.examSessions.reduce((acc, s) => {
-                  const key = `${s.day}||${s.date}||${s.time}`;
+                  const paperIdentity = s.subjectId != null ? `${s.subjectId}:${s.paperLabel ?? ''}` : '';
+                  const key = `${s.day}||${s.date}||${s.time}||${paperIdentity}`;
                   let lbl = s.label ?? null;
                   let name = s.postName ?? '';
                   if (!lbl) {

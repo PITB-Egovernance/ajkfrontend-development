@@ -82,6 +82,7 @@ import DepartmentUserList from 'pages/settings/DepartmentUsers/DepartmentUserLis
 import DepartmentUserForm from 'pages/settings/DepartmentUsers/DepartmentUserForm';
 import ApplicationDetail from 'pages/applications/ApplicationDetail';
 import ApplicationsList from 'pages/applications/ApplicationsList';
+import ComplaintsPage from 'pages/applications/ComplaintsPage';
 import UnpublishedRollSlips from 'pages/roll-numbers/UnpublishedRollSlips';
 import PublishedRollSlips from 'pages/roll-numbers/PublishedRollSlips';
 import RollSlipEditor from 'pages/roll-numbers/RollSlipEditor';
@@ -227,6 +228,7 @@ function App() {
             }
           />
           <Route path="applications" element={<ApplicationsList />} />
+          <Route path="applications/complaints" element={<ComplaintsPage />} />
           <Route path="applications/:id" element={<ApplicationDetail />} />
           <Route path="annex-a" element={<AnnexAList />} />
           <Route path="annex-a/:id" element={<AnnexADetail />} />

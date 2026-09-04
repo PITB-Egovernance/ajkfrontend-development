@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
-import { IconButton, Menu, MenuItem, Tabs, Tab } from '@mui/material';
+import { IconButton, Menu, MenuItem } from '@mui/material';
 import { Eye, XCircle, MoreVertical, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from 'components/ui/Loader';
@@ -13,7 +13,6 @@ import toast from 'react-hot-toast';
 import { getApplicationOcrBatch } from 'utils/applicationOcrUtils';
 import { formatDate } from 'utils/dateUtils';
 import { formatCNIC } from 'utils/stringUtils';
-import ComplaintsReview from './ComplaintsReview';
 
 // ── Module-level constants ────────────────────────────────────────────────────
 
@@ -38,7 +37,6 @@ const ApplicationsList = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [advertisementMap, setAdvertisementMap] = useState({});
-  const [tab, setTab] = useState(0); // 0 = Applications, 1 = Complaints
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -405,46 +403,29 @@ const ApplicationsList = () => {
       <div className="max-w-8xl mx-auto">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              {tab === 0 ? 'Applications Management' : 'Candidate Complaints'}
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {tab === 0
-                ? 'Manage and review all incoming job applications.'
-                : 'Review and respond to complaints candidates have filed from their portal.'}
-            </p>
+            <h1 className="text-2xl font-bold text-slate-900">Applications Management</h1>
+            <p className="text-sm text-slate-500 mt-1">Manage and review all incoming job applications.</p>
           </div>
-          {tab === 0 && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportExcel}
-                disabled={loading || rows.length === 0}
-                className="h-10 flex-shrink-0 flex items-center gap-1.5 px-3 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-semibold"
-              >
-                <FileSpreadsheet size={16} /> Export Excel
-              </button>
-              <button
-                onClick={fetchApplications}
-                disabled={loading}
-                title="Refresh"
-                aria-label="Refresh"
-                className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              disabled={loading || rows.length === 0}
+              className="h-10 flex-shrink-0 flex items-center gap-1.5 px-3 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-semibold"
+            >
+              <FileSpreadsheet size={16} /> Export Excel
+            </button>
+            <button
+              onClick={fetchApplications}
+              disabled={loading}
+              title="Refresh"
+              aria-label="Refresh"
+              className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
-          <Tab label="Applications" />
-          <Tab label="Complaints" />
-        </Tabs>
-
-        {tab === 1 ? (
-          <ComplaintsReview />
-        ) : (
-          <>
         {/* Filters — same AdvancedFilter (Search/Reset) pattern used across the admin portal */}
         <AdvancedFilter
           filters={filters}
@@ -506,8 +487,6 @@ const ApplicationsList = () => {
             />
           )}
         </div>
-          </>
-        )}
       </div>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}
