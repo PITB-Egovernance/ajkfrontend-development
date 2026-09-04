@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { TextField, MenuItem, Tabs, Tab, ListItemText } from '@mui/material';
-import { Calendar, Save } from 'lucide-react';
+import { Calendar, Save, Send, EyeOff, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import CceScreeningApi from 'api/cceScreeningApi';
 import CceDateSheetApi from 'api/cceDateSheetApi';
+import { groupByClubbedAdvertisements } from 'utils/cceClubbing';
+import confirmDelete from 'components/ui/ConfirmDelete';
 
 // Same group ordering as the public CCE syllabus page (SubjectsSyllabus.jsx).
 const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G'];
@@ -53,6 +56,7 @@ const to12Hour = (time24) => {
 };
 
 const CceMasterDateSheet = () => {
+  const [searchParams] = useSearchParams();
   const [advertisements, setAdvertisements] = useState([]);
   const [advertisementsLoading, setAdvertisementsLoading] = useState(true);
   // The one advertisement shown/edited in the grid below. Master date sheets
@@ -66,6 +70,9 @@ const CceMasterDateSheet = () => {
   const [sharedPosts, setSharedPosts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
+  const [publishedAt, setPublishedAt] = useState(null);
+  const [publishing, setPublishing] = useState(false);
 
   const [activeTab, setActiveTab] = useState('Compulsory');
 
@@ -74,22 +81,33 @@ const CceMasterDateSheet = () => {
       setAdvertisementsLoading(true);
       try {
         // Reuse the CCE Screening advertisement list — already scoped to
-        // advertisements with at least one generated CCE roll number.
+        // advertisements with at least one generated CCE roll number. The
+        // backend already shares one schedule across a whole clubbed group
+        // (CceMasterDateSheetService::resolveGroup()) regardless of which
+        // member is passed in — collapsing the dropdown to match (same
+        // logic Roll No Slip generation / CCE Screening use) just makes the
+        // picker itself match what's actually a single post/single schedule
+        // vs. a clubbed group, instead of listing every clubbed
+        // advertisement as if each had its own.
         const res = await CceScreeningApi.advertisements();
         const list = res?.data ?? [];
         const safeList = Array.isArray(list) ? list : [];
 
-        const entries = safeList.map((adv) => {
-          const advId = adv.hash_id || adv.id;
-          const jobs = adv.jobs || adv.job_details || adv.jobDetails || [];
-          const designation = jobs.map((j) => j.designation).filter(Boolean).join(' & ') || adv.adv_number || advId;
-          return { id: advId, advId, designation, adv_number: adv.adv_number };
-        });
+        const entries = groupByClubbedAdvertisements(safeList);
         setAdvertisements(entries);
 
         if (entries.length > 0) {
-          setAdvertisementId(entries[0].advId);
-          setSelectedEntry(entries[0]);
+          // Deep-linked from the Roll No Slip page's "Master Date Sheets
+          // Created" list (?advertisement_id=<hash>) — that hash can be any
+          // member of a clubbed group (resolveGroup() is symmetric), so
+          // match against the whole advIds list, not just the anchor id.
+          const requestedId = searchParams.get('advertisement_id');
+          const requestedEntry = requestedId
+            ? entries.find((e) => e.advIds.includes(requestedId))
+            : null;
+          const initialEntry = requestedEntry || entries[0];
+          setAdvertisementId(initialEntry.advId);
+          setSelectedEntry(initialEntry);
         }
       } catch (err) {
         toast.error(err?.message || 'Failed to load advertisements');
@@ -97,6 +115,7 @@ const CceMasterDateSheet = () => {
         setAdvertisementsLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadRows = useCallback(async () => {
@@ -107,10 +126,14 @@ const CceMasterDateSheet = () => {
       const data = res?.data ?? {};
       setRows(Array.isArray(data.rows) ? data.rows : []);
       setSharedPosts(Array.isArray(data.posts) ? data.posts : []);
+      setIsPublished(Boolean(data.is_published));
+      setPublishedAt(data.published_at || null);
     } catch (err) {
       toast.error(err?.message || 'Failed to load master date sheet');
       setRows([]);
       setSharedPosts([]);
+      setIsPublished(false);
+      setPublishedAt(null);
     } finally {
       setLoading(false);
     }
@@ -204,6 +227,49 @@ const CceMasterDateSheet = () => {
     }
   };
 
+  const handlePublish = async () => {
+    const confirmed = await confirmDelete({
+      title: 'Publish Master Date Sheet',
+      message: 'Publish this master date sheet? It will be locked from further edits until unpublished, and is the schedule Roll No Slip generation will use.',
+      confirmLabel: 'Publish',
+      confirmColor: 'bg-emerald-700 hover:bg-emerald-800',
+    });
+    if (!confirmed) return;
+
+    setPublishing(true);
+    try {
+      await CceDateSheetApi.publishMasterDateSheet(advertisementId);
+      toast.success('Master date sheet published successfully');
+      await loadRows();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to publish master date sheet');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    const confirmed = await confirmDelete({
+      title: 'Unpublish Master Date Sheet',
+      message: 'Unpublish this master date sheet so it can be edited again?',
+      warning: 'Roll No Slip generation still reads whatever schedule is saved, published or not.',
+      confirmLabel: 'Unpublish',
+      confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    });
+    if (!confirmed) return;
+
+    setPublishing(true);
+    try {
+      await CceDateSheetApi.unpublishMasterDateSheet(advertisementId);
+      toast.success('Master date sheet unpublished successfully');
+      await loadRows();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to unpublish master date sheet');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   // A group-level schedule block (used for Group A/B's Paper I/II, and for
   // the single shared schedule in every other non-Compulsory group). Plain
   // render function, not a nested component — a nested component would get a
@@ -219,17 +285,17 @@ const CceMasterDateSheet = () => {
         {title && <p className="text-sm font-bold text-indigo-900 mb-3">{title}</p>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
           <TextField type="date" size="small" label="Paper Date *" required InputLabelProps={{ shrink: true }}
-            error={!dateVal} value={dateVal}
+            error={!dateVal} value={dateVal} disabled={isPublished}
             onChange={(e) => updateGroupSchedule(group, paperLabel, 'paper_date', e.target.value)}
             sx={{ backgroundColor: 'white' }} />
           <TextField size="small" label="Paper Day" InputProps={{ readOnly: true }} disabled
             value={dayFromDate(dateVal)} sx={{ backgroundColor: 'white' }} />
           <TextField type="time" size="small" label="Paper Time *" required InputLabelProps={{ shrink: true }}
-            error={!timeVal} value={timeVal}
+            error={!timeVal} value={timeVal} disabled={isPublished}
             onChange={(e) => updateGroupSchedule(group, paperLabel, 'paper_time', e.target.value)}
             sx={{ backgroundColor: 'white' }} />
           <TextField type="number" size="small" label="Duration (min) *" required inputProps={{ min: 1 }}
-            error={!durationVal} value={durationVal}
+            error={!durationVal} value={durationVal} disabled={isPublished}
             onChange={(e) => updateGroupSchedule(group, paperLabel, 'duration_minutes', e.target.value)}
             sx={{ backgroundColor: 'white' }} />
           <TextField size="small" label="Closing Time" InputProps={{ readOnly: true }} disabled
@@ -308,7 +374,7 @@ const CceMasterDateSheet = () => {
                 <MenuItem key={entry.id} value={entry.id} title={entry.designation}>
                   <ListItemText
                     primary={entry.designation}
-                    secondary={`Adv: ${entry.adv_number || 'N/A'}`}
+                    secondary={`Adv: ${entry.adv_number || 'N/A'}${entry.isClubbedGroup ? ' · Clubbed' : ''}`}
                     primaryTypographyProps={{ noWrap: true, sx: { maxWidth: 340 } }}
                   />
                 </MenuItem>
@@ -401,16 +467,16 @@ const CceMasterDateSheet = () => {
                                 </td>
                                 <td className="py-2 px-4 text-slate-500">{row.total_marks}</td>
                                 <td className="py-2 px-4">
-                                  <TextField type="date" size="small" InputLabelProps={{ shrink: true }}
+                                  <TextField type="date" size="small" InputLabelProps={{ shrink: true }} disabled={isPublished}
                                     value={row.paper_date || ''} onChange={(e) => updateRow(index, 'paper_date', e.target.value)} />
                                 </td>
                                 <td className="py-2 px-4 text-slate-500">{dayFromDate(row.paper_date)}</td>
                                 <td className="py-2 px-4">
-                                  <TextField type="time" size="small" InputLabelProps={{ shrink: true }}
+                                  <TextField type="time" size="small" InputLabelProps={{ shrink: true }} disabled={isPublished}
                                     value={row.paper_time || ''} onChange={(e) => updateRow(index, 'paper_time', e.target.value)} />
                                 </td>
                                 <td className="py-2 px-4">
-                                  <TextField type="number" size="small" sx={{ width: 100 }} inputProps={{ min: 1 }}
+                                  <TextField type="number" size="small" sx={{ width: 100 }} inputProps={{ min: 1 }} disabled={isPublished}
                                     value={row.duration_minutes || ''} onChange={(e) => updateRow(index, 'duration_minutes', e.target.value)} />
                                 </td>
                                 <td className="py-2 px-4 text-slate-500">
@@ -436,10 +502,34 @@ const CceMasterDateSheet = () => {
                   )}
                 </div>
 
-                <div className="flex justify-end p-4 border-t border-slate-100">
-                  <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
-                    <Save size={14} /> {saving ? 'Saving…' : 'Save Master Date Sheet'}
-                  </Button>
+                <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-t border-slate-100">
+                  <div>
+                    {isPublished ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                        <Lock size={12} /> Published{publishedAt ? ` — ${new Date(publishedAt).toLocaleString()}` : ''}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                        Not Published — editable
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isPublished ? (
+                      <Button variant="outline" onClick={handleUnpublish} disabled={publishing} className="flex items-center gap-2 bg-white">
+                        <EyeOff size={14} /> {publishing ? 'Unpublishing…' : 'Unpublish'}
+                      </Button>
+                    ) : (
+                      <>
+                        <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
+                          <Save size={14} /> {saving ? 'Saving…' : 'Save Master Date Sheet'}
+                        </Button>
+                        <Button variant="outline" onClick={handlePublish} disabled={publishing || rows.every((r) => !r.paper_date)} className="flex items-center gap-2 bg-white">
+                          <Send size={14} /> {publishing ? 'Publishing…' : 'Publish'}
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </>
             )}

@@ -62,6 +62,33 @@ const CceDateSheetApi = {
     return handleResponse(res);
   },
 
+  // Every clubbed group that has at least one saved paper — powers the Roll
+  // No Slip Generation page's "master date sheets created" overview.
+  getAllMasterDateSheets: async () => {
+    const res = await fetch(`${ADMIN_API_BASE}/cce/master-date-sheet/all`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  publishMasterDateSheet: async (advertisementId) => {
+    const res = await fetch(`${ADMIN_API_BASE}/cce/master-date-sheet/publish`, {
+      method:  'POST',
+      headers: getAdminHeaders(),
+      body:    JSON.stringify({ advertisement_id: advertisementId }),
+    });
+    return handleResponse(res);
+  },
+
+  unpublishMasterDateSheet: async (advertisementId) => {
+    const res = await fetch(`${ADMIN_API_BASE}/cce/master-date-sheet/unpublish`, {
+      method:  'POST',
+      headers: getAdminHeaders(),
+      body:    JSON.stringify({ advertisement_id: advertisementId }),
+    });
+    return handleResponse(res);
+  },
+
   // ── Candidate Date Sheet ─────────────────────────────────────────────────
   // Admin-backend candidate listing — unlike getEligibleCandidatesFromPortal
   // (which hits the candidate portal directly), this one enriches each row

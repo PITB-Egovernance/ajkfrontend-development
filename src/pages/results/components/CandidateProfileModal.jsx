@@ -158,12 +158,16 @@ export default function CandidateProfileModal({ isOpen, onClose, identifier, can
                   <div className="space-y-3">
                     {education.map((e, i) => (
                       <div key={i} className="text-sm text-slate-700 border-b border-slate-100 last:border-0 pb-2 last:pb-0">
-                        <span className="font-semibold">{e.degree || e.qualification || e.level}</span>
-                        {e.institute && <span className="text-slate-500"> — {e.institute}</span>}
-                        {(e.marks_obtained || e.obtained_marks) && (
-                          <span className="text-slate-500"> · {e.marks_obtained || e.obtained_marks}/{e.total_marks} marks</span>
+                        <span className="font-semibold">
+                          {e.degree_title || e.degree_level || e.professional_qualification || e.required_qualification_name || e.degree || e.qualification || e.level || 'Education Record'}
+                        </span>
+                        {e.major_subject && <span className="text-slate-500"> · {e.major_subject}</span>}
+                        {(e.institution_name || e.institute) && <span className="text-slate-500"> — {e.institution_name || e.institute}</span>}
+                        {(e.obtained_marks || e.marks_obtained) && (
+                          <span className="text-slate-500"> · {e.obtained_marks ?? e.marks_obtained}/{e.total_marks} marks</span>
                         )}
-                        {e.year && <span className="text-slate-500"> · {e.year}</span>}
+                        {e.division_grade && <span className="text-slate-500"> · {e.division_grade}</span>}
+                        {(e.passing_year || e.year) && <span className="text-slate-500"> · {e.passing_year || e.year}</span>}
                       </div>
                     ))}
                   </div>

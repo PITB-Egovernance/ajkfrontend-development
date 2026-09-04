@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TextField, MenuItem } from '@mui/material';
-import { Stamp, ArrowLeft, ArrowRight, Users, MapPin, CheckCircle2, Search, Filter, Eye, Download } from 'lucide-react';
+import { Stamp, ArrowLeft, ArrowRight, Users, MapPin, CheckCircle2, Search, Filter, Eye, Download, CalendarClock, Lock, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
@@ -95,10 +95,39 @@ const CceRollSlipGeneration = () => {
   // into "posts" the same way Roll Number Management groups applications.
   const [candidates, setCandidates] = useState([]);
   const [masterRowsByAd, setMasterRowsByAd] = useState({});
+  // advertisement hash_id -> whether that advertisement's master date sheet
+  // has been published — a post is only actually ready for roll no slip
+  // generation once its schedule is published, not merely saved/complete
+  // (see CceMasterDateSheetService::publish()).
+  const [masterPublishedByAd, setMasterPublishedByAd] = useState({});
   const [selectionsByKey, setSelectionsByKey] = useState({});
   // advertisement hash_id -> display title, used only as a fallback when a
   // candidate's own subject-selection response doesn't carry one.
   const [advertisementTitleById, setAdvertisementTitleById] = useState({});
+
+  // Every master date sheet that's been saved so far, across every clubbed
+  // group — shown as an overview so the admin can see what's actually been
+  // created (and published) without having to open each advertisement one
+  // by one on the Master Date Sheet page.
+  const [masterSheets, setMasterSheets] = useState([]);
+  const [masterSheetsLoading, setMasterSheetsLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setMasterSheetsLoading(true);
+      try {
+        const res = await CceDateSheetApi.getAllMasterDateSheets();
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setMasterSheets(list);
+      } catch (err) {
+        // Non-fatal — the overview just stays empty; slip generation itself
+        // doesn't depend on this list.
+        setMasterSheets([]);
+      } finally {
+        setMasterSheetsLoading(false);
+      }
+    })();
+  }, []);
 
   // Stage 1 — search/filter + post selection
   const [search, setSearch] = useState('');
@@ -134,12 +163,15 @@ const CceRollSlipGeneration = () => {
         setAdvertisementTitleById(adTitleById);
 
         const masterMap = {};
+        const publishedMap = {};
         await Promise.all(adList.map(async (ad) => {
           const adId = ad.hash_id || ad.id;
           const masterRes = await CceDateSheetApi.getMasterDateSheet(adId).catch(() => ({ data: { rows: [] } }));
           masterMap[adId] = Array.isArray(masterRes?.data?.rows) ? masterRes.data.rows : [];
+          publishedMap[adId] = Boolean(masterRes?.data?.is_published);
         }));
         setMasterRowsByAd(masterMap);
+        setMasterPublishedByAd(publishedMap);
 
         // Every submitted CCE subject selection, fetched once with no
         // advertisement_id filter. The candidate portal's advertisement_id
@@ -226,6 +258,7 @@ const CceRollSlipGeneration = () => {
     const postName = ownPost?.post_name || '—';
 
     const masterRows = advertisementId ? (masterRowsByAd[advertisementId] || []) : [];
+    const masterPublished = advertisementId ? Boolean(masterPublishedByAd[advertisementId]) : false;
     const groups = buildCandidateDateSheetGroups(masterRows, selection?.selections);
     const papers = flattenPapers(groups);
     return {
@@ -235,12 +268,17 @@ const CceRollSlipGeneration = () => {
       post_name: postName,
       papers,
       papersCount: papers.length,
-      complete: isDateSheetComplete(papers),
+      // A post's date sheet only counts as "ready" once its Master Date
+      // Sheet is published, not merely saved/complete — publishing is what
+      // locks the schedule so generation can't run against something still
+      // being edited.
+      masterPublished,
+      complete: isDateSheetComplete(papers) && masterPublished,
       clubbedPosts,
       isClubbed: clubbedPosts.length > 1,
       postKey: `${advertisementId || 'unresolved'}::${postName}`,
     };
-  }), [candidates, masterRowsByAd, selectionsByKey, advertisementTitleById]);
+  }), [candidates, masterRowsByAd, masterPublishedByAd, selectionsByKey, advertisementTitleById]);
 
   // The same clubbed candidate appears once per advertisement in
   // candidateRows (their raw applicant pool is fetched per-advertisement) —
@@ -273,6 +311,7 @@ const CceRollSlipGeneration = () => {
           applicants: 0,
           complete: 0,
           clubbed: 0,
+          masterPublished: c.masterPublished,
           clubbedWith: [], // deduped {advertisement_number, post_name} pairs, excluding this row's own post
         };
       }
@@ -580,6 +619,93 @@ const CceRollSlipGeneration = () => {
           </Button>
         </div>
 
+        {/* Every master date sheet saved so far, across every clubbed
+            group — created on the Master Date Sheet page and picked up here
+            automatically the moment it's saved (Roll No Slip generation
+            below already reads live from the same source). */}
+        <Card className="border border-slate-200">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <CalendarClock size={18} className="text-indigo-700" />
+              <h2 className="text-base font-bold text-slate-900">Master Date Sheets Created</h2>
+            </div>
+            {masterSheetsLoading ? (
+              <div className="flex justify-center py-6"><InlineLoader text="Loading master date sheets..." variant="ring" size="sm" /></div>
+            ) : masterSheets.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No master date sheet has been saved yet. Create one on the{' '}
+                <button type="button" className="font-semibold text-emerald-700 hover:underline" onClick={() => navigate('/dashboard/cce/date-sheet/master')}>
+                  Master Date Sheet
+                </button>{' '}page.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="w-full min-w-[700px] text-left text-sm">
+                  <thead className="bg-slate-100 text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Advertisement / Posts</th>
+                      <th className="px-4 py-3 text-right">Papers Saved</th>
+                      <th className="px-4 py-3 text-right">Complete</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Last Updated</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {masterSheets.map((g) => (
+                      <tr key={g.group_key} className="hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-900">{g.adv_number || g.group_key}</div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {g.posts.map((p) => (
+                              <span key={p.post_id} className="inline-block rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800">
+                                {p.post_name}
+                              </span>
+                            ))}
+                            {g.advertisement_ids.length > 1 && (
+                              <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                                Clubbed ({g.advertisement_ids.length})
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-900">{g.papers_count}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={g.is_complete ? 'font-semibold text-emerald-700' : 'font-semibold text-amber-600'}>
+                            {g.is_complete ? 'Yes' : 'Partial'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {g.is_published ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                              <Lock size={11} /> Published
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                              Draft
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {g.updated_at ? new Date(g.updated_at).toLocaleString() : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button
+                            variant="outline" size="sm" className="gap-1 bg-white"
+                            onClick={() => navigate(`/dashboard/cce/date-sheet/master?advertisement_id=${encodeURIComponent(g.advertisement_hash)}`)}
+                          >
+                            <Pencil size={12} /> {g.is_published ? 'View' : 'Edit'}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {loading ? (
           <div className="bg-white rounded-lg shadow-sm p-10 flex justify-center">
             <InlineLoader text="Loading CCE candidates..." variant="ring" size="lg" />
@@ -641,7 +767,11 @@ const CceRollSlipGeneration = () => {
                     </TextField>
                     <TextField select size="small" label="Post" value={filterPost} onChange={(e) => setFilterPost(e.target.value)} className="lg:col-span-2">
                       <MenuItem value="all">All Posts</MenuItem>
-                      {postOptions.map((p) => <MenuItem key={p.key} value={p.key}>{p.postName}</MenuItem>)}
+                      {postOptions.map((p) => (
+                        <MenuItem key={p.key} value={p.key}>
+                          {p.postName}{p.clubbedWith.length > 0 ? ' (Clubbed)' : ''}
+                        </MenuItem>
+                      ))}
                     </TextField>
                     <Button variant="outline" className="gap-2 bg-white lg:col-span-1" onClick={resetFilters}><Filter size={15} /> Reset</Button>
                   </div>
@@ -651,6 +781,7 @@ const CceRollSlipGeneration = () => {
                       <thead className="bg-slate-100 text-xs uppercase text-slate-500">
                         <tr>
                           <th className="px-4 py-3">Designation / Post</th>
+                          <th className="px-4 py-3">Master Date Sheet</th>
                           <th className="px-4 py-3 text-right">Applicants</th>
                           <th className="px-4 py-3 text-right">Date Sheet Complete</th>
                         </tr>
@@ -659,7 +790,7 @@ const CceRollSlipGeneration = () => {
                         {postGroups.map(({ advertisementTitle, items }) => (
                           <React.Fragment key={advertisementTitle}>
                             {/* <tr className="bg-emerald-50/60">
-                              <td colSpan={3} className="px-4 py-1.5 text-xs font-bold uppercase text-emerald-800">{advertisementTitle}</td>
+                              <td colSpan={4} className="px-4 py-1.5 text-xs font-bold uppercase text-emerald-800">{advertisementTitle}</td>
                             </tr> */}
                             {items.map((p) => (
                               <tr key={p.key} className="hover:bg-slate-50">
@@ -673,20 +804,37 @@ const CceRollSlipGeneration = () => {
                                     />
                                     <span>
                                       <span className="font-semibold text-slate-900">{p.postName}</span>
-                                      {p.clubbedWith.length > 0 && (
-                                        <span className="mt-1 flex flex-wrap gap-1">
-                                          {p.clubbedWith.map((w) => (
-                                            <span
-                                              key={w.label}
-                                              className="inline-block rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800"
-                                            >
-                                              {w.label}
-                                            </span>
-                                          ))}
+                                      <span className="mt-1 flex flex-wrap gap-1">
+                                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.clubbedWith.length > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'}`}>
+                                          {p.clubbedWith.length > 0 ? 'Clubbed' : 'Single'}
                                         </span>
-                                      )}
+                                        {p.clubbedWith.map((w) => (
+                                          <span
+                                            key={w.label}
+                                            className="inline-block rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800"
+                                          >
+                                            {w.label}
+                                          </span>
+                                        ))}
+                                      </span>
                                     </span>
                                   </label>
+                                </td>
+                                <td className="px-4 py-3">
+                                  {p.masterPublished ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                      <Lock size={11} /> Published
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-200"
+                                      onClick={() => navigate(`/dashboard/cce/date-sheet/master?advertisement_id=${encodeURIComponent(p.advertisementId)}`)}
+                                      title="Not published — Roll No Slip generation is disabled for this post until its Master Date Sheet is published"
+                                    >
+                                      Not Published
+                                    </button>
+                                  )}
                                 </td>
                                 <td className="px-4 py-3 text-right font-bold text-slate-900">{p.applicants}</td>
                                 <td className="px-4 py-3 text-right font-semibold text-emerald-700">{p.complete} / {p.applicants}</td>

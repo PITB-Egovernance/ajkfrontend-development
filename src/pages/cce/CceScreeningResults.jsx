@@ -337,6 +337,16 @@ const CceScreeningResults = () => {
       if (pendingCount > 0) {
         toast.error(`${pendingCount} pending result(s) were skipped — mark pass/fail first`);
       }
+      // publish() finishes the admin's response early (before it relays
+      // notifications to the candidate portal) so this button doesn't sit
+      // waiting on however many of those calls follow — but that leaves a
+      // window where loadResults()'s refetch can land before the update is
+      // fully visible, showing the row as still unpublished until a manual
+      // reload. Patching the rows already on screen closes that window
+      // instead of depending on refetch timing; loadResults() still runs to
+      // reconcile anything else (pagination, other filters).
+      const now = new Date().toISOString();
+      setRows((prev) => prev.map((r) => (publishableIds.includes(r.hash_id) ? { ...r, published_at: now } : r)));
       await loadResults();
     } catch (err) {
       toast.error(err?.message || 'Failed to publish screening results');
@@ -364,6 +374,8 @@ const CceScreeningResults = () => {
     try {
       const res = await CceScreeningApi.publish([row.hash_id]);
       toast.success(res?.message || 'Screening result published');
+      const now = new Date().toISOString();
+      setRows((prev) => prev.map((r) => (r.hash_id === row.hash_id ? { ...r, published_at: now } : r)));
       await loadResults();
     } catch (err) {
       toast.error(err?.message || 'Failed to publish screening result');
@@ -449,6 +461,8 @@ const CceScreeningResults = () => {
       toast.dismiss(tid);
       toast.success(res?.message || 'Screening results published');
       setSelectionModel([]);
+      const now = new Date().toISOString();
+      setRows((prev) => prev.map((r) => (publishable.includes(r.hash_id) ? { ...r, published_at: now } : r)));
       await loadResults();
     } catch (err) {
       toast.dismiss(tid);
