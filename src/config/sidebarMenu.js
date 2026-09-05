@@ -68,6 +68,7 @@ export const MENU_ITEMS = [
     submenu: [
       { label: "Unpublished Slips", path: "/dashboard/roll-numbers",           icon: ClipboardList },
       { label: "Published Slips",   path: "/dashboard/roll-numbers/published", icon: CheckCircle },
+      { label: "Resumable Batches", path: "/dashboard/roll-numbers/batches",   icon: Layers },
       { label: "One Paper MCQs",   path: "/dashboard/roll-numbers/exam/one-paper-mcqs", icon: FileText },
       { label: "Two Paper MCQs",   path: "/dashboard/roll-numbers/exam/two-paper-mcqs", icon: ClipboardList },
       { label: "Written Exams",    path: "/dashboard/roll-numbers/exam/written-exams",  icon: FileCheck },

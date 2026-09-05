@@ -90,6 +90,8 @@ import RollSlipView from 'pages/roll-numbers/RollSlipView';
 import RollNumberVerify from 'pages/roll-numbers/RollNumberVerify';
 import RollNumberPublicSlip from 'pages/roll-numbers/RollNumberPublicSlip';
 import RollNumberExamFlow from 'pages/roll-numbers/RollNumberExamFlow';
+import RollNumberBatchHistory from 'pages/roll-numbers/RollNumberBatchHistory';
+import RollNumberBatchDetails from 'pages/roll-numbers/RollNumberBatchDetails';
 import CceScreeningResults from 'pages/cce/CceScreeningResults';
 import CceMasterDateSheet from 'pages/cce/CceMasterDateSheet';
 import CceCandidateDateSheet from 'pages/cce/CceCandidateDateSheet';
@@ -297,6 +299,15 @@ function App() {
           <Route path="roll-numbers/exam/:examType" element={<RollNumberExamFlow />} />
           <Route path="roll-numbers/edit-slip/:applicationNumber" element={<RollSlipEditor />} />
           <Route path="roll-numbers/slip/:rollNumber" element={<RollSlipView />} />
+          {/* Resumable generation -> center allocation -> slip generation —
+              additive alongside the exam-flow wizard above, see
+              AJK_PSC_ROLL_NUMBER_ENTERPRISE_TECHNICAL_DESIGN.md. The "new"
+              route (no batchRef) and the batchRef route render the same
+              page — RollNumberBatchDetails switches on whether the param
+              is present. */}
+          <Route path="roll-numbers/batches" element={<RollNumberBatchHistory />} />
+          <Route path="roll-numbers/batches/new" element={<RollNumberBatchDetails />} />
+          <Route path="roll-numbers/batches/:batchRef" element={<RollNumberBatchDetails />} />
           <Route path="cce/screening" element={<CceScreeningResults />} />
           <Route path="cce/date-sheet/master" element={<CceMasterDateSheet />} />
           <Route path="cce/date-sheet/candidate" element={<CceCandidateDateSheet />} />

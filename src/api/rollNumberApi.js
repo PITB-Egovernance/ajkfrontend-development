@@ -272,6 +272,128 @@ const RollNumberApi = {
     });
     return handleResponse(res);
   },
+
+  // ── Resumable generation -> center allocation -> slip generation ──
+  // Additive alongside generateSlips()/getGenerationStatus() above — see
+  // AJK_PSC_ROLL_NUMBER_ENTERPRISE_TECHNICAL_DESIGN.md. Every batch is
+  // addressed by its hash id (batchRef), same convention as
+  // application_number/rollNumber elsewhere in this file.
+
+  createBatch: async (body) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
+  previewRange: async (batchRef, startingNumber) => {
+    const search = startingNumber ? `?starting_number=${encodeURIComponent(startingNumber)}` : '';
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/preview-range${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  generateRollNumbers: async (batchRef, body) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/generate-roll-numbers`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
+  getBatch: async (batchRef) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  getBatchHistory: async (params = {}) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') search.set(k, String(v)); });
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches?${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  getResumableBatches: async () => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/resumable`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  resumeBatch: async (batchRef) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/resume`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+    });
+    return handleResponse(res);
+  },
+
+  allocateAutomatic: async (batchRef, body) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/allocate-center/automatic`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
+  allocateCustom: async (batchRef, body) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/allocate-center/custom`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
+  getBatchPending: async (batchRef, params = {}) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') search.set(k, String(v)); });
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/pending?${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  getBatchItems: async (batchRef, params = {}) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') search.set(k, String(v)); });
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/items?${search}`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  getBatchRanges: async (batchRef) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/ranges`, {
+      headers: getAdminHeaders(false),
+    });
+    return handleResponse(res);
+  },
+
+  // Returns the raw Response — caller streams the .xlsx blob, same pattern as downloadSlip().
+  exportBatch: async (batchRef) => {
+    return fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/export`, {
+      headers: getAdminHeaders(false),
+    });
+  },
+
+  generateFinalSlips: async (batchRef, body = {}) => {
+    const res = await fetch(`${ADMIN_API_BASE}/roll-numbers/generation-batches/${batchRef}/generate-slips`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
 };
 
 export default RollNumberApi;
