@@ -197,6 +197,25 @@ const RollNumberPublicSlip = () => {
           />
         )}
 
+        {/* QR + SIGNATURE — same footer block RollSlipView.jsx (the admin's
+            native view) already renders; this page just never had it. */}
+        <div className="grid grid-cols-3 items-end text-center mb-2">
+          <div>
+            {data.qrDataUri && (
+              <>
+                <img src={data.qrDataUri} alt="QR Code" className="w-16 h-16 mx-auto" />
+                <p className="text-[10px] text-slate-500 mt-0.5">{data.cnic}</p>
+              </>
+            )}
+          </div>
+          <div className="text-xs text-slate-500" />
+          <div>
+            <div className="border-t border-slate-600 w-28 mx-auto mb-1" />
+            <p className="text-xs font-bold">Assistant Director Examination</p>
+            <p className="text-[11px] text-slate-600">AJK PSC Muzaffarabad</p>
+          </div>
+        </div>
+
         {/* FOOTER */}
         <div className="mt-4 pt-2 border-t-2 border-emerald-900 text-center">
           <p className="text-xs font-bold text-emerald-900">Azad Jammu &amp; Kashmir Public Service Commission</p>

@@ -631,15 +631,25 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
 
   const bulkPublishSlips = async () => {
     if (selectedIds.length === 0) return;
-    const rows = selectedRows.filter((r) => r.roll_number && !r.published_at);
-    if (rows.length === 0) {
+    const eligible = selectedRows.filter((r) => r.roll_number && !r.published_at);
+    if (eligible.length === 0) {
       toast.error('None of the selected candidates have an unpublished slip to publish');
+      return;
+    }
+
+    // A roll number alone isn't enough to publish — every candidate also
+    // needs an allocated exam center. Publish only the ones that have one
+    // rather than silently skipping the whole selection.
+    const rows = eligible.filter((r) => r.exam_center_id);
+    const missingCenter = eligible.length - rows.length;
+    if (rows.length === 0) {
+      toast.error(`${missingCenter} selected candidate${missingCenter === 1 ? '' : 's'} have no exam center allocated yet — allocate centers before publishing.`);
       return;
     }
 
     const ok = await confirmDelete({
       title:       'Publish Roll Number Slips',
-      message:     `Publish roll number slips for ${rows.length} selected candidate${rows.length === 1 ? '' : 's'}? They will become visible to candidates immediately.`,
+      message:     `Publish roll number slips for ${rows.length} selected candidate${rows.length === 1 ? '' : 's'}?${missingCenter > 0 ? ` (${missingCenter} other selected candidate${missingCenter === 1 ? '' : 's'} skipped — no exam center allocated yet.)` : ''} They will become visible to candidates immediately.`,
       identifier:  `${rows.length} slips`,
       warning:     'Candidates will be able to view and download these slips right away.',
       confirmLabel: 'Publish',
@@ -655,7 +665,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       fetchApplications();
       fetchStats();
       if (failed.length === 0) {
-        toast.success(`${count} roll number slip${count === 1 ? '' : 's'} published successfully`);
+        toast.success(`${count} roll number slip${count === 1 ? '' : 's'} published successfully${missingCenter > 0 ? ` (${missingCenter} skipped — no exam center allocated)` : ''}`);
       } else {
         toast.error(`${count} slip${count === 1 ? '' : 's'} published, but ${failed.length} advertisement${failed.length === 1 ? '' : 's'} failed — try again to retry ${failed.length === 1 ? 'it' : 'them'}.`);
       }
@@ -736,11 +746,21 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       return;
     }
 
+    // Backend also enforces this (RollNumberController::publish() only
+    // publishes rows with exam_center_id set) — filtering here first just
+    // gives an accurate upfront count instead of a surprising "published
+    // fewer than expected" result after the fact.
+    const missingCenterCount = unpublished.filter((item) => !item.exam_center_id).length;
+    if (missingCenterCount === unpublished.length) {
+      toast.error('None of the matching candidates have an exam center allocated yet — allocate centers before publishing.');
+      return;
+    }
+
     const adIds = [...new Set(unpublished.map((item) => item.advertisement_hash_id))];
 
     const ok = await confirmDelete({
       title:       'Publish All Unpublished Slips',
-      message:     `Publish roll number slips for all ${unpublished.length} unpublished candidate${unpublished.length === 1 ? '' : 's'} matching the current filters (across ${adIds.length} advertisement${adIds.length === 1 ? '' : 's'})? They will become visible to candidates immediately.`,
+      message:     `Publish roll number slips for all ${unpublished.length} unpublished candidate${unpublished.length === 1 ? '' : 's'} matching the current filters (across ${adIds.length} advertisement${adIds.length === 1 ? '' : 's'})?${missingCenterCount > 0 ? ` ${missingCenterCount} of them have no exam center allocated yet and will be skipped.` : ''} They will become visible to candidates immediately.`,
       identifier:  `${unpublished.length} slips`,
       warning:     'Candidates will be able to view and download these slips right away.',
       confirmLabel: 'Publish All',
@@ -857,6 +877,12 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
 
   const publishRow = async (row) => {
     if (!row?.roll_number || row.published_at) return;
+    // A roll number alone isn't enough to publish — the candidate also needs
+    // an allocated exam center, or the slip they'd see has no venue on it.
+    if (!row.exam_center_id) {
+      toast.error('Allocate an exam center for this candidate before publishing.');
+      return;
+    }
     const ok = await confirmDelete({
       title:       'Publish Roll Number Slip',
       message:     `Publish the roll number slip for ${row.applicant_name || row.application_number}? It will become visible to the candidate immediately.`,
@@ -1225,7 +1251,8 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
         </MenuItem>
         {canEdit && !selectedRow?.published_at && (
           <MenuItem key="publish" onClick={() => { const row = selectedRow; handleMenuClose(); publishRow(row); }}
-            disabled={!selectedRow?.roll_number}>
+            disabled={!selectedRow?.roll_number || !selectedRow?.exam_center_id}
+            title={!selectedRow?.exam_center_id ? 'Allocate an exam center before publishing' : undefined}>
             <Send size={16} style={{ marginRight: '8px' }} className="text-emerald-600" /> Publish Slip
           </MenuItem>
         )}

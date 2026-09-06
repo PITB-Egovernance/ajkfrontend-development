@@ -12,6 +12,9 @@ import WrittenExamSubjectApi from 'api/writtenExamSubjectApi';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { useGenerationGuard } from 'context/GenerationGuardContext';
+import RollNumberGenerationMode from 'components/roll-numbers/RollNumberGenerationMode';
+import PendingRangeCard from 'components/roll-numbers/PendingRangeCard';
+import RollNumberProgressCard from 'components/roll-numbers/RollNumberProgressCard';
 
 // "View Slip" opens a separate route (/dashboard/roll-numbers/slip/:rollNumber).
 // Navigating there and pressing Back unmounts this page, so its stage/results
@@ -36,65 +39,12 @@ const clearStage3Snapshot = (examType) => {
   } catch {}
 };
 
-// ── AJK district → exam-center zone mapping ───────────────────────────────
-// Key: district name (lower-case) OR district code (string)
-// Value: zone key that is matched against the center name in `centers` list
-const DISTRICT_ZONE_MAP = {
-  // Muzaffarabad zone (districts 01 02 03 12)
-  '02': 'muzaffarabad', 'muzaffarabad': 'muzaffarabad',
-  '01': 'muzaffarabad', 'neelum': 'muzaffarabad',
-  '03': 'muzaffarabad', 'jehlum valley': 'muzaffarabad', 'jhelum valley': 'muzaffarabad',
-  '12': 'muzaffarabad', 'refugees (1989)': 'muzaffarabad', 'refugee (1989)': 'muzaffarabad',
-  '13': 'muzaffarabad', 'special persons': 'muzaffarabad', // default to capital
-  // Rawalakot / Poonch zone (districts 04 05 06 07)
-  '06': 'rawalakot', 'poonch': 'rawalakot', 'rawalakot': 'rawalakot',
-  '04': 'rawalakot', 'bagh': 'rawalakot',
-  '07': 'rawalakot', 'sudhnoti': 'rawalakot',
-  '05': 'rawalakot', 'haveli': 'rawalakot',
-  // Mirpur zone (districts 08 09 10 11)
-  '10': 'mirpur', 'mirpur': 'mirpur',
-  '09': 'mirpur', 'bhimber': 'mirpur',
-  '08': 'mirpur', 'kotli': 'mirpur',
-  '11': 'mirpur',
-  'refugees settled in pakistan (1947)': 'mirpur',
-  'refugees settled in paskistan (1947)': 'mirpur',
-};
-const ZONE_ORDER  = ['muzaffarabad', 'rawalakot', 'mirpur'];
-const ZONE_LABELS = { muzaffarabad: 'Muzaffarabad', rawalakot: 'Rawalakot', mirpur: 'Mirpur' };
-
-// Resolve district → zone from a candidate application (checks name + code)
-const resolveDistrictZone = (app) => {
-  const raw = [
-    app.snapshot_data?.district,
-    app.snapshot_data?.district_code,
-    app.snapshot_data?.domicile_district,
-    app.snapshot_data?.permanent_district,
-    app.snapshot_data?.address?.district,
-    app.snapshot_data?.permanent_address?.district,
-  ].filter(Boolean).map(v => String(v).toLowerCase().trim());
-
-  for (const v of raw) {
-    if (DISTRICT_ZONE_MAP[v]) return DISTRICT_ZONE_MAP[v];
-    for (const [key, zone] of Object.entries(DISTRICT_ZONE_MAP)) {
-      if (v.includes(key) || key.includes(v)) return zone;
-    }
-  }
-  return 'muzaffarabad'; // default to capital zone
-};
-
-// Resolve preferred-city → zone; falls back to district if no match
-const resolvePreferenceZone = (app) => {
-  const cities = (app.preferred_exam_cities || [])
-    .map(c => (typeof c === 'string' ? c : (c?.city || '')).toLowerCase().trim())
-    .filter(Boolean);
-  for (const city of cities) {
-    if (DISTRICT_ZONE_MAP[city]) return DISTRICT_ZONE_MAP[city];
-    for (const [key, zone] of Object.entries(DISTRICT_ZONE_MAP)) {
-      if (city.includes(key) || key.includes(city)) return zone;
-    }
-  }
-  return resolveDistrictZone(app);
-};
+// The AJK district -> exam-center zone mapping and its resolvers used to
+// live here, driving a client-side per-zone generation loop. The new
+// resumable "Automatic -> District" allocation strategy resolves zones
+// server-side instead (see CenterAllocationService::DISTRICT_ZONE_MAP on
+// the backend, ported from this exact mapping) — nothing here calls these
+// anymore.
 
 const examTypeMeta = {
   'one-paper-mcqs': { title: 'One Paper MCQs Roll Number Management', badge: 'One Paper MCQs', description: 'Club one or multiple posts and generate one common roll number slip per candidate.', papers: ['One Paper'], testTypeFilter: (tt) => /mcq/i.test(tt) && !/two/i.test(tt) },
@@ -443,34 +393,10 @@ const to12Hour = (time24) => {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-// Roll number slip generation now runs as a backend queue job. This polls
-// the status endpoint until the job completes/fails, resolving with the same
-// { data: { generated_count, slips } } envelope the old synchronous call used
-// to return, so all downstream consumption code stays unchanged.
-const GENERATION_POLL_INTERVAL_MS = 2500;
-const GENERATION_POLL_TIMEOUT_MS = 35 * 60 * 1000; // slightly above the backend job's 30-minute timeout
-
-const pollGenerationStatus = (generationId) => new Promise((resolve, reject) => {
-  const startedAt = Date.now();
-  const check = async () => {
-    try {
-      const res = await RollNumberApi.getGenerationStatus(generationId);
-      const status = res?.data?.status;
-      if (status === 'completed') {
-        resolve(res);
-      } else if (status === 'failed') {
-        reject(new Error(res?.data?.message || 'Roll number slip generation failed'));
-      } else if (Date.now() - startedAt > GENERATION_POLL_TIMEOUT_MS) {
-        reject(new Error('Roll number slip generation is taking longer than expected. Please check back later or try again.'));
-      } else {
-        setTimeout(check, GENERATION_POLL_INTERVAL_MS);
-      }
-    } catch (err) {
-      reject(err);
-    }
-  };
-  check();
-});
+// The old one-shot flow's queue-job status poller lived here — the
+// resumable batch flow polls RollNumberApi.getBatch()/getBatchRanges()
+// instead (see refreshBatch() inside the component below), so this is no
+// longer called from anywhere.
 
 const RollNumberExamFlow = () => {
   const navigate = useNavigate();
@@ -480,28 +406,45 @@ const RollNumberExamFlow = () => {
 
   // Read once per exam type — used only by the lazy useState initializers below.
   const stage3Snapshot = useMemo(() => readStage3Snapshot(examType), [examType]);
-  const [stage, setStage] = useState(() => (stage3Snapshot ? 3 : 1));
+  const [stage, setStage] = useState(() => (stage3Snapshot ? 4 : 1));
   const [search, setSearch] = useState('');
   const [selectedPostIds, setSelectedPostIds] = useState(() => stage3Snapshot?.selectedPostIds || []);
   const [selectedCenterIds, setSelectedCenterIds] = useState([]);
+  // Custom Selection: per-center roll-number range the admin types directly
+  // (e.g. Center A: OPM-00001 -> OPM-05000, Center B: OPM-05001 -> OPM-05500)
+  // instead of an auto-distributed pool — keyed by center.id.
+  const [centerRanges, setCenterRanges] = useState({});
   const [generated, setGenerated] = useState(() => !!stage3Snapshot);
   const [allocationMethod, setAllocationMethod] = useState('district');
   const [centerSelectionMode, setCenterSelectionMode] = useState('auto');
-  const [generating, setGenerating] = useState(false);
-  const [generationQueue, setGenerationQueue] = useState([]); // [{zone,label,centerName,centerId,total,status,error}]
 
-  // Warn on tab close/refresh while roll number slip generation is in flight —
-  // the queue job keeps running server-side, but the admin should know a
-  // reload here won't show progress until they come back and re-check.
+  // ── Resumable batch flow state (Stage 2) ──────────────────────────────────
+  // `batch` is the persistent generation-batch summary from the backend —
+  // the actual source of truth for progress; nothing here is trusted as the
+  // "real" state the way `batch.pending`/`batch.ready_for_slip_generation`
+  // are (§9 Invariant 5 of the technical design).
+  const [batch, setBatch] = useState(null);
+  const [batchRanges, setBatchRanges] = useState(null);
+  const [creatingBatch, setCreatingBatch] = useState(false);
+  const [generatingRollNumbers, setGeneratingRollNumbers] = useState(false);
+  const [allocatingCenters, setAllocatingCenters] = useState(false);
+  const [generatingFinalSlips, setGeneratingFinalSlips] = useState(false);
+  const batchPollRef = useRef(null);
+
+  // Warn on tab close/refresh while a request to the batch API is actually
+  // in flight — purely a courtesy against losing an in-progress click, NOT
+  // a "don't close the browser" warning: the whole point of the resumable
+  // batch flow is that closing the browser mid-job is safe and resumable.
   useEffect(() => {
-    if (!generating) return;
+    const busy = creatingBatch || generatingRollNumbers || allocatingCenters || generatingFinalSlips;
+    if (!busy) return;
     const handleBeforeUnload = (event) => {
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [generating]);
+  }, [creatingBatch, generatingRollNumbers, allocatingCenters, generatingFinalSlips]);
 
   // Stage 3 filter + manual-update state. Draft state is what the inputs
   // are bound to; it only takes effect (feeding s3FilteredCandidates below)
@@ -533,7 +476,7 @@ const RollNumberExamFlow = () => {
   const [rollStartSeq, setRollStartSeq] = useState('');
   const [manualUpdateCenterId, setManualUpdateCenterId] = useState('');
   const [updating, setUpdating] = useState(false);
-  const [s3BackStage, setS3BackStage] = useState(() => stage3Snapshot?.s3BackStage ?? 2);
+  const [s3BackStage, setS3BackStage] = useState(() => stage3Snapshot?.s3BackStage ?? 3);
   const [scheduleDates, setScheduleDates] = useState(() => stage3Snapshot?.scheduleDates || meta.papers.map(() => ''));
   const [scheduleTimes, setScheduleTimes] = useState(() => meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
   const [scheduleDurations, setScheduleDurations] = useState(() => meta.papers.map((_, i) => i === 1 ? 120 : 90));
@@ -584,7 +527,7 @@ const RollNumberExamFlow = () => {
   // up to date while the admin is on stage 3 — e.g. after a manual roll number
   // reassignment updates generatedCandidates.
   useEffect(() => {
-    if (stage !== 3) return;
+    if (stage !== 4) return;
     try {
       sessionStorage.setItem(
         `${STAGE3_SNAPSHOT_PREFIX}${examType}`,
@@ -1114,8 +1057,6 @@ const RollNumberExamFlow = () => {
   const selectedCenters = useMemo(() => centers.filter((center) => selectedCenterIds.includes(center.id)), [centers, selectedCenterIds]);
   const selectedApplicants = selectedPosts.reduce((sum, post) => sum + (post.applicants || 0), 0);
   const selectedCapacity = selectedCenters.reduce((sum, center) => sum + center.capacity, 0);
-  const capacityShortage = Math.max(0, selectedApplicants - selectedCapacity);
-  const capacityPassed = selectedApplicants > 0 && selectedCapacity >= selectedApplicants;
 
   // Show a post only if it has at least one application in total (pending or
   // already roll-numbered) — applies the same rule across One Paper MCQs,
@@ -1306,484 +1247,404 @@ const RollNumberExamFlow = () => {
       setSelectedPostIds([post.id]);
       setGenerated(true);
       setS3BackStage(1);
-      setStage(3);
+      setStage(4);
     } catch (err) {
       toast.dismiss(tid);
       toast.error(err?.message || 'Failed to load generated slips');
     }
   }, [allCandidateApps, centers]);
 
-  const generateRollNumbers = async () => {
-    // Validation
-    if (centerSelectionMode === 'custom') {
-      if (!capacityPassed) { toast.error(`Center capacity is short by ${capacityShortage} seats. Select more centers.`); return; }
-      if (selectedCenterIds.length === 0) { toast.error('Select at least one exam center'); return; }
-    }
-    if (examType === 'written-exams') {
-      for (const sch of writtenExamSchedules) {
-        if (!sch.date)      { toast.error('All subject schedules must have a date'); return; }
-        if (!sch.startTime) { toast.error('All subject schedules must have a start time'); return; }
-        if (!sch.subjectId) { toast.error('Please select a subject for each schedule'); return; }
-      }
-    } else {
-      for (let i = 0; i < meta.papers.length; i++) {
-        if (!scheduleDates[i]) { toast.error(`${meta.papers[i]} Schedule: Start Date is required`); return; }
-        if (!scheduleTimes[i]) { toast.error(`${meta.papers[i]} Schedule: Start Time is required`); return; }
-      }
-    }
+  // ── Resumable batch flow ─────────────────────────────────────────────────
+  // Resolves the concrete list of applications behind `selectedPosts`,
+  // reusing every fallback this screen already relied on (candidate-portal
+  // cache -> admin advertisement-applications endpoint -> single-post
+  // advertisement-scoped fallback). Unrelated to roll number/center
+  // allocation, so it's needed unchanged by the new flow — only what
+  // happens AFTER this resolves has changed.
+  const resolveSelectedApplications = async () => {
+    const selectedPostIdentifierSet = new Set(
+      selectedPosts.flatMap((post) =>
+        uniqueIds([
+          post.id,
+          ...(post.matchingIds || []),
+          lookupKey('case', post.caseNo),
+          lookupKey('post', post.post),
+        ])
+      )
+    );
 
-    setGenerating(true);
-    setBusy(true, 'Roll number slip generation is in progress. Please wait until it finishes.');
-    setGenerationQueue([]);
-    try {
-      // Collect applications for selected posts. Start with the candidate portal
-      // cache, then fall back to the admin advertisement-applications endpoint.
-      // The fallback is required because the listing table can use an admin-side
-      // applications_count while the candidate portal records may expose a
-      // different post identifier (or may not have loaded at all).
-      const selectedPostIdentifierSet = new Set(
-        selectedPosts.flatMap((post) =>
-          uniqueIds([
-            post.id,
-            ...(post.matchingIds || []),
-            lookupKey('case', post.caseNo),
-            lookupKey('post', post.post),
-          ])
-        )
-      );
+    const isApplicationForSelectedPost = (app) =>
+      getCandidatePostIdentifiers(app)
+        .some((identifier) => selectedPostIdentifierSet.has(identifier));
 
-      const isApplicationForSelectedPost = (app) =>
-        getCandidatePostIdentifiers(app)
-          .some((identifier) => selectedPostIdentifierSet.has(identifier));
+    let matchedApps = allCandidateApps
+      .filter(isApplicationForSelectedPost)
+      .map(normalizeApplicationForGeneration);
 
-      let matchedApps = allCandidateApps
-        .filter(isApplicationForSelectedPost)
-        .map(normalizeApplicationForGeneration);
+    if (matchedApps.length === 0) {
+      const selectedByAdvertisement = selectedPosts.reduce((groups, post) => {
+        const advertisementId = normalizeId(post.advertisementId);
+        if (!advertisementId) return groups;
+        if (!groups[advertisementId]) groups[advertisementId] = [];
+        groups[advertisementId].push(post);
+        return groups;
+      }, {});
 
-      // Admin API fallback: retrieve applications advertisement by advertisement.
-      // When records contain a post identifier, filter strictly. If the endpoint
-      // is already scoped to an advertisement with exactly one selected/available
-      // post and records contain no post identifier, it is safe to include them.
-      if (matchedApps.length === 0) {
-        const selectedByAdvertisement = selectedPosts.reduce((groups, post) => {
-          const advertisementId = normalizeId(post.advertisementId);
-          if (!advertisementId) return groups;
-          if (!groups[advertisementId]) groups[advertisementId] = [];
-          groups[advertisementId].push(post);
-          return groups;
-        }, {});
+      const adminFallbackApps = [];
 
-        const adminFallbackApps = [];
-
-        for (const [advertisementId, postsForAdvertisement] of Object.entries(selectedByAdvertisement)) {
-          try {
-            const response = await RollNumberApi.getApplicationsByAdvertisement(
-              advertisementId,
-              { per_page: 1000 }
-            );
-            const rows = extractAdminApplications(response);
-
-            const allPostsForAdvertisement = allPosts.filter(
-              (post) => normalizeId(post.advertisementId) === advertisementId
-            );
-            const mayUseAdvertisementScopedRows =
-              postsForAdvertisement.length === 1 &&
-              allPostsForAdvertisement.length === 1;
-
-            rows.forEach((rawApp) => {
-              const app = normalizeApplicationForGeneration(rawApp);
-              const identifiers = getCandidatePostIdentifiers(app);
-              const hasUsablePostIdentifier = identifiers.length > 0;
-              const exactMatch = identifiers.some((identifier) =>
-                selectedPostIdentifierSet.has(identifier)
-              );
-
-              if (exactMatch || (!hasUsablePostIdentifier && mayUseAdvertisementScopedRows)) {
-                adminFallbackApps.push(app);
-              }
-            });
-          } catch (error) {
-            console.warn(
-              `[RollNumberExamFlow] Could not load applications for advertisement ${advertisementId}:`,
-              error?.message || error
-            );
-          }
-        }
-
-        matchedApps = adminFallbackApps;
-      }
-
-      // Final fallback for records where the admin endpoint returns the correct
-      // advertisement data but omits post identifiers. This is only allowed when
-      // exactly one post is selected under that advertisement, preventing sibling
-      // posts from being mixed into clubbed/multi-post generation.
-      if (matchedApps.length === 0 && selectedPosts.length === 1) {
-        const onlyPost = selectedPosts[0];
+      for (const [advertisementId, postsForAdvertisement] of Object.entries(selectedByAdvertisement)) {
         try {
           const response = await RollNumberApi.getApplicationsByAdvertisement(
-            onlyPost.advertisementId,
+            advertisementId,
             { per_page: 1000 }
           );
-          const rows = extractAdminApplications(response)
-            .map(normalizeApplicationForGeneration);
+          const rows = extractAdminApplications(response);
 
           const allPostsForAdvertisement = allPosts.filter(
-            (post) => normalizeId(post.advertisementId) === normalizeId(onlyPost.advertisementId)
+            (post) => normalizeId(post.advertisementId) === advertisementId
           );
+          const mayUseAdvertisementScopedRows =
+            postsForAdvertisement.length === 1 &&
+            allPostsForAdvertisement.length === 1;
 
-          if (allPostsForAdvertisement.length === 1) {
-            matchedApps = rows;
-          }
-        } catch (error) {
-          console.warn('[RollNumberExamFlow] Final application fallback failed:', error);
-        }
-      }
+          rows.forEach((rawApp) => {
+            const app = normalizeApplicationForGeneration(rawApp);
+            const identifiers = getCandidatePostIdentifiers(app);
+            const hasUsablePostIdentifier = identifiers.length > 0;
+            const exactMatch = identifiers.some((identifier) =>
+              selectedPostIdentifierSet.has(identifier)
+            );
 
-      const seen = new Set();
-      const uniqueApps = matchedApps.filter((app, index) => {
-        const applicationNumber = normalizeId(app.application_number);
-        const key = applicationNumber || normalizeId(app.id) || `application-${index}`;
-        if (!applicationNumber || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-
-      if (uniqueApps.length === 0) {
-        console.group('[RollNumberExamFlow] No applications matched — diagnostic dump');
-        console.log('selectedPosts:', selectedPosts.map((post) => ({
-          post: post.post,
-          id: post.id,
-          advertisementId: post.advertisementId,
-          matchingIds: post.matchingIds,
-        })));
-        console.log('selectedPostIdentifierSet:', [...selectedPostIdentifierSet]);
-        console.log('allCandidateApps.length:', allCandidateApps.length);
-        console.log('sample candidate identifiers:', allCandidateApps.slice(0, 10).map((app) => ({
-          application_number: app.application_number,
-          computedIdentifiers: getCandidatePostIdentifiers(app),
-        })));
-        console.groupEnd();
-        toast.error('No applications found for the selected posts. The application records are not linked with the selected post identifier.');
-        return;
-      }
-
-      // Per-paper / per-subject schedule
-      const papers = examType === 'written-exams'
-        ? writtenExamSchedules.map(sch => ({
-            label: availableSubjectsForSchedule.find(s => s.id === sch.subjectId)?.name
-                || writtenExamSubjects.find(s => s.id === sch.subjectId)?.name
-                || sch.subjectId,
-            subject_id: sch.subjectId,
-            date: sch.date || null,
-            time: sch.startTime || null,
-            end_time: computeEndTime(sch.startTime, sch.duration) || null,
-          }))
-        : meta.papers.map((label, index) => ({
-            label,
-            date: scheduleDates[index] || null,
-            time: scheduleTimes[index] || null,
-            end_time: computeEndTime(scheduleTimes[index], scheduleDurations[index]) || null,
-          })).filter(p => p.date || p.time);
-
-      const firstExamDate = examType === 'written-exams'
-        ? (writtenExamSchedules[0]?.date || null)
-        : (scheduleDates[0] || null);
-      const firstExamTime = examType === 'written-exams'
-        ? (writtenExamSchedules[0]?.startTime || null)
-        : (scheduleTimes[0] || null);
-
-      // Reusable candidate object builder
-      const buildCandidate = (app) => {
-        const personal = app.snapshot_data || app.personal_details || {};
-        const documents = app.candidate?.documents || app.documents || [];
-
-        return {
-          application_number: app.application_number,
-          candidate_name:
-            personal.name ||
-            personal.candidate_name ||
-            app.candidate_name ||
-            app.candidate?.name ||
-            '',
-          candidate_cnic:
-            personal.cnic ||
-            personal.candidate_cnic ||
-            app.candidate_cnic ||
-            app.candidate?.cnic ||
-            '',
-          candidate_email:
-            personal.email ||
-            personal.candidate_email ||
-            app.candidate_email ||
-            app.candidate?.email ||
-            '',
-          candidate_mobile:
-            personal.mobile_number ||
-            personal.mobile ||
-            personal.candidate_mobile ||
-            app.candidate_mobile ||
-            app.candidate?.mobile_number ||
-            app.candidate?.mobile ||
-            '',
-          // Laravel validation requires both external identifiers to be strings.
-          // Admin API fallback applications can contain numeric IDs, so normalize
-          // the final resolved value instead of passing a number in the payload.
-          ext_adv_id: normalizeId(
-            app.job_post?.ext_adv_id ??
-            app.ext_adv_id ??
-            app.job_detail_id ??
-            selectedPosts[0]?.id ??
-            ''
-          ),
-          ext_advertisement_id: normalizeId(
-            app.job_post?.ext_advertisement_id ??
-            app.ext_advertisement_id ??
-            app.advertisement_id ??
-            selectedPosts[0]?.advertisementId ??
-            ''
-          ),
-          preferred_exam_cities: (app.preferred_exam_cities || [])
-            .map((city) => typeof city === 'string' ? city : (city?.city || city?.name || ''))
-            .filter(Boolean),
-          personal_details: personal,
-          documents: (Array.isArray(documents) ? documents : [])
-            .map((document) => ({
-              doc_type: document.doc_type || document.type || '',
-              file_url: document.file_url || document.url || document.path || '',
-            }))
-            .filter((document) => document.doc_type && document.file_url),
-        };
-      };
-
-      // ── AUTO MODE — district / preference queue ────────────────────────────
-      if (centerSelectionMode === 'auto') {
-        const resolver = allocationMethod === 'preference' ? resolvePreferenceZone : resolveDistrictZone;
-
-        // Build per-application lookup for enrichment
-        const appByNumber = {};
-        uniqueApps.forEach(app => { appByNumber[app.application_number] = app; });
-
-        // Helper to build an enriched candidate object from an existing roll record
-        const buildExistingCandidate = (app, existing) => {
-          const name = app.snapshot_data?.name || app.candidate?.name || '';
-          const zone = resolver(app);
-          return {
-            id: app.application_number,
-            photo: name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
-            roll: existing?.roll_number,
-            name,
-            cnic: app.snapshot_data?.cnic || app.candidate?.cnic || '',
-            district: ZONE_LABELS[zone] || zone,
-            center: existing?.examCenter?.name || existing?.exam_center?.name || '',
-            gender: (app.snapshot_data?.gender || '').toLowerCase(),
-            preferred_cities: (app.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-            start_date: firstExamDate || '',
-          };
-        };
-
-        // Pre-check: if all selected candidates already have roll numbers, display
-        // them without hitting the generate endpoint (mirrors custom mode behaviour).
-        const advIdsAuto = [...new Set(selectedPosts.map(p => p.advertisementId))];
-        const existingRollMapAuto = {};
-        try {
-          for (const advId of advIdsAuto) {
-            const r = await RollNumberApi.getApplicationsByAdvertisement(advId, { per_page: 1000 });
-            (r?.data?.applications?.data ?? []).forEach(a => {
-              const roll = a.rollNumber || a.roll_number;
-              if (roll?.roll_number) existingRollMapAuto[a.application_number] = roll;
-            });
-          }
-        } catch { /* silent — fall through to generation */ }
-
-        if (uniqueApps.length > 0 && uniqueApps.every(a => existingRollMapAuto[a.application_number])) {
-          const existingSlips = uniqueApps.map(app => buildExistingCandidate(app, existingRollMapAuto[app.application_number]));
-          setGeneratedCandidates(existingSlips);
-          toast.success(`${existingSlips.length} candidate${existingSlips.length !== 1 ? 's' : ''} already have roll numbers — displaying existing slips`);
-          setGenerated(true);
-          setStage(3);
-          return;
-        }
-
-        // Group candidates by zone
-        const zoneGroups = {};
-        uniqueApps.forEach(app => {
-          const zone = resolver(app);
-          (zoneGroups[zone] = zoneGroups[zone] || []).push(app);
-        });
-
-        // Match zone → exam center: check both center name AND district field
-        const zoneCenterLookup = {};
-        ZONE_ORDER.forEach(zone => {
-          const found = centers.find(c =>
-            c.center.toLowerCase().includes(zone) ||
-            (c.district || '').toLowerCase().includes(zone)
-          );
-          if (found) zoneCenterLookup[zone] = found;
-        });
-
-        // Build processing queue (only zones that have candidates)
-        const queue = ZONE_ORDER
-          .filter(z => zoneGroups[z]?.length)
-          .map(z => ({
-            zone: z,
-            label: ZONE_LABELS[z],
-            centerName: zoneCenterLookup[z]?.center || 'No center configured',
-            centerId: zoneCenterLookup[z]?.id ?? null,
-            total: zoneGroups[z].length,
-            status: 'pending',
-            error: null,
-          }));
-        setGenerationQueue(queue);
-
-        const allSlips = [];
-        for (let qi = 0; qi < queue.length; qi++) {
-          const item = queue[qi];
-
-          setGenerationQueue(prev => prev.map((q, i) => i === qi ? { ...q, status: 'processing' } : q));
-
-          if (!item.centerId) {
-            setGenerationQueue(prev => prev.map((q, i) => i === qi ? { ...q, status: 'error', error: `No exam center found for ${item.label} zone. Add a center with "${item.label}" in its name or district in Settings → Exam Centers.` } : q));
-            continue;
-          }
-
-          try {
-            const groupApps = zoneGroups[item.zone];
-            const dispatch = await RollNumberApi.generateSlips({
-              application_numbers: groupApps.map(a => a.application_number),
-              candidates: groupApps.map(buildCandidate),
-              exam_center_id: Number(item.centerId),
-              exam_type: examType,
-              exam_date: firstExamDate || null,
-              attendance_time: firstExamTime || null,
-              papers: papers.length > 0 ? papers : undefined,
-              allocation_method: allocationMethod,
-              auto_allocate: true,
-              prefix: rollPrefix.trim(),
-            });
-            const result = await pollGenerationStatus(dispatch?.data?.generation_id);
-
-            const slips = result?.data?.slips ?? [];
-
-            // If the API returned no slips, candidates may already be generated —
-            // fall back to existing roll records for this group.
-            if (slips.length === 0) {
-              groupApps.forEach(app => {
-                const existing = existingRollMapAuto[app.application_number];
-                if (existing) allSlips.push(buildExistingCandidate(app, existing));
-              });
-            } else {
-              allSlips.push(...slips.map(s => {
-                const orig = appByNumber[s.application_number] || {};
-                return {
-                  id: s.application_number,
-                  photo: (s.candidate_name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
-                  roll: s.roll_number,
-                  name: s.candidate_name,
-                  cnic: s.candidate_cnic || '',
-                  district: item.label,
-                  center: s.exam_center || item.centerName,
-                  gender: (orig.snapshot_data?.gender || '').toLowerCase(),
-                  preferred_cities: (orig.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-                  start_date: firstExamDate || '',
-                };
-              }));
+            if (exactMatch || (!hasUsablePostIdentifier && mayUseAdvertisementScopedRows)) {
+              adminFallbackApps.push(app);
             }
-
-            setGenerationQueue(prev => prev.map((q, i) => i === qi ? { ...q, status: 'done' } : q));
-          } catch (err) {
-            setGenerationQueue(prev => prev.map((q, i) => i === qi ? { ...q, status: 'error', error: err?.message || 'Generation failed' } : q));
-          }
+          });
+        } catch (error) {
+          console.warn(
+            `[RollNumberExamFlow] Could not load applications for advertisement ${advertisementId}:`,
+            error?.message || error
+          );
         }
+      }
 
-        setGeneratedCandidates(allSlips);
-        if (allSlips.length > 0) {
-          toast.success(`Generated ${allSlips.length} roll number${allSlips.length !== 1 ? 's' : ''} across ${queue.length} center${queue.length !== 1 ? 's' : ''}`);
-          setGenerated(true);
-          setStage(3);
-        } else {
-          const zoneErrors = queue.filter(q => q.status === 'error');
-          if (zoneErrors.length > 0) {
-            zoneErrors.forEach(q => toast.error(`${q.label}: ${q.error}`));
-          } else {
-            toast.error('No roll numbers generated — the API returned empty results. Check backend logs.');
-          }
+      matchedApps = adminFallbackApps;
+    }
+
+    if (matchedApps.length === 0 && selectedPosts.length === 1) {
+      const onlyPost = selectedPosts[0];
+      try {
+        const response = await RollNumberApi.getApplicationsByAdvertisement(
+          onlyPost.advertisementId,
+          { per_page: 1000 }
+        );
+        const rows = extractAdminApplications(response)
+          .map(normalizeApplicationForGeneration);
+
+        const allPostsForAdvertisement = allPosts.filter(
+          (post) => normalizeId(post.advertisementId) === normalizeId(onlyPost.advertisementId)
+        );
+
+        if (allPostsForAdvertisement.length === 1) {
+          matchedApps = rows;
         }
-        return;
+      } catch (error) {
+        console.warn('[RollNumberExamFlow] Final application fallback failed:', error);
       }
+    }
 
-      // ── CUSTOM MODE — existing single-center flow ──────────────────────────
-      const advIds = [...new Set(selectedPosts.map(p => p.advertisementId))];
-      const existingRollMap = {};
-      for (const advId of advIds) {
-        const r = await RollNumberApi.getApplicationsByAdvertisement(advId, { per_page: 1000 });
-        (r?.data?.applications?.data ?? []).forEach(a => {
-          const roll = a.rollNumber || a.roll_number;
-          if (roll?.roll_number) existingRollMap[a.application_number] = roll;
-        });
-      }
+    const seen = new Set();
+    const uniqueApps = matchedApps.filter((app, index) => {
+      const applicationNumber = normalizeId(app.application_number);
+      const key = applicationNumber || normalizeId(app.id) || `application-${index}`;
+      if (!applicationNumber || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-      if (uniqueApps.every(a => existingRollMap[a.application_number])) {
-        setGeneratedCandidates(uniqueApps.map(app => {
-          const existing = existingRollMap[app.application_number];
-          const name = app.snapshot_data?.name || app.candidate?.name || '';
-          return {
-            id: app.application_number,
-            photo: name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
-            roll: existing?.roll_number,
-            name,
-            cnic: app.snapshot_data?.cnic || app.candidate?.cnic || '',
-            district: app.snapshot_data?.district || '',
-            center: existing?.examCenter?.name || existing?.exam_center?.name || '',
-            gender: (app.snapshot_data?.gender || '').toLowerCase(),
-            preferred_cities: (app.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-            start_date: firstExamDate || '',
-          };
-        }));
-        toast.success('All selected candidates already have roll numbers generated');
-        setGenerated(true);
-        setStage(3);
-        return;
-      }
+    if (uniqueApps.length === 0) {
+      console.group('[RollNumberExamFlow] No applications matched — diagnostic dump');
+      console.log('selectedPosts:', selectedPosts.map((post) => ({
+        post: post.post,
+        id: post.id,
+        advertisementId: post.advertisementId,
+        matchingIds: post.matchingIds,
+      })));
+      console.log('selectedPostIdentifierSet:', [...selectedPostIdentifierSet]);
+      console.log('allCandidateApps.length:', allCandidateApps.length);
+      console.log('sample candidate identifiers:', allCandidateApps.slice(0, 10).map((app) => ({
+        application_number: app.application_number,
+        computedIdentifiers: getCandidatePostIdentifiers(app),
+      })));
+      console.groupEnd();
+      toast.error('No applications found for the selected posts. The application records are not linked with the selected post identifier.');
+      return null;
+    }
 
-      const dispatch = await RollNumberApi.generateSlips({
-        application_numbers: uniqueApps.map(a => a.application_number),
-        candidates: uniqueApps.map(buildCandidate),
-        exam_center_id: Number(selectedCenterIds[0]),
+    return uniqueApps;
+  };
+
+  // candidates[] auto-sync payload for one application — same shape
+  // RollNumberGenerationService::syncMissingApplications() expects, ported
+  // from the old flow's buildCandidate().
+  const buildCandidateForSync = useCallback((app) => {
+    const personal = app.snapshot_data || app.personal_details || {};
+    const documents = app.candidate?.documents || app.documents || [];
+
+    return {
+      application_number: app.application_number,
+      candidate_name: personal.name || personal.candidate_name || app.candidate_name || app.candidate?.name || '',
+      candidate_cnic: personal.cnic || personal.candidate_cnic || app.candidate_cnic || app.candidate?.cnic || '',
+      candidate_email: personal.email || personal.candidate_email || app.candidate_email || app.candidate?.email || '',
+      candidate_mobile: personal.mobile_number || personal.mobile || personal.candidate_mobile || app.candidate_mobile || app.candidate?.mobile_number || app.candidate?.mobile || '',
+      // Laravel validation requires both external identifiers to be strings.
+      ext_adv_id: normalizeId(app.job_post?.ext_adv_id ?? app.ext_adv_id ?? app.job_detail_id ?? selectedPosts[0]?.id ?? ''),
+      ext_advertisement_id: normalizeId(app.job_post?.ext_advertisement_id ?? app.ext_advertisement_id ?? app.advertisement_id ?? selectedPosts[0]?.advertisementId ?? ''),
+      preferred_exam_cities: (app.preferred_exam_cities || [])
+        .map((city) => typeof city === 'string' ? city : (city?.city || city?.name || ''))
+        .filter(Boolean),
+      personal_details: personal,
+      documents: (Array.isArray(documents) ? documents : [])
+        .map((document) => ({
+          doc_type: document.doc_type || document.type || '',
+          file_url: document.file_url || document.url || document.path || '',
+        }))
+        .filter((document) => document.doc_type && document.file_url),
+    };
+  }, [selectedPosts]);
+
+  // Creates the persistent batch as soon as Stage 2 is entered — before any
+  // schedule/center configuration — matching the resumable design's
+  // "POST / Generate Roll Numbers" step happening first, ahead of center
+  // allocation, with its own persistent record from that point on.
+  const prepareBatch = useCallback(async () => {
+    if (batch || creatingBatch) return;
+    setCreatingBatch(true);
+    setBusy(true, 'Preparing roll number batch…');
+    try {
+      const uniqueApps = await resolveSelectedApplications();
+      if (!uniqueApps) { setStage(1); return; }
+
+      const res = await RollNumberApi.createBatch({
         exam_type: examType,
-        exam_date: scheduleDates[0] || null,
-        attendance_time: scheduleTimes[0] || null,
-        papers: papers.length > 0 ? papers : undefined,
-        allocation_method: allocationMethod,
-        auto_allocate: false,
-        prefix: rollPrefix.trim(),
+        application_numbers: uniqueApps.map((a) => a.application_number),
+        candidates: uniqueApps.map(buildCandidateForSync),
       });
-      const result = await pollGenerationStatus(dispatch?.data?.generation_id);
-      const slips = result?.data?.slips ?? [];
-      const count = result?.data?.generated_count ?? slips.length;
-      const appByNumberCustom = {};
-      uniqueApps.forEach(app => { appByNumberCustom[app.application_number] = app; });
-      setGeneratedCandidates(slips.map(s => {
-        const orig = appByNumberCustom[s.application_number] || {};
-        return {
-          id: s.application_number,
-          photo: (s.candidate_name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
-          roll: s.roll_number,
-          name: s.candidate_name,
-          cnic: s.candidate_cnic || '',
-          district: orig.snapshot_data?.district || '',
-          center: `${s.exam_center || ''}${s.exam_city ? ` ${s.exam_city}` : ''}`,
-          gender: (orig.snapshot_data?.gender || '').toLowerCase(),
-          preferred_cities: (orig.preferred_exam_cities || []).map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean),
-          start_date: firstExamDate || '',
-        };
-      }));
-      toast.success(`Generated ${count} roll number${count === 1 ? '' : 's'} successfully`);
-      setGenerated(true);
-      setStage(3);
+      setBatch(res?.data || null);
+    } catch (err) {
+      toast.error(err?.message || 'Failed to create batch');
+      setStage(1);
+    } finally {
+      setCreatingBatch(false);
+      setBusy(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batch, creatingBatch, examType, selectedPosts]);
+
+  useEffect(() => {
+    if (stage === 2 && !batch && !creatingBatch) prepareBatch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
+
+  const refreshBatch = useCallback(async () => {
+    if (!batch?.hash_id) return;
+    try {
+      const [batchRes, rangesRes] = await Promise.all([
+        RollNumberApi.getBatch(batch.hash_id),
+        RollNumberApi.getBatchRanges(batch.hash_id).catch(() => null),
+      ]);
+      setBatch(batchRes?.data || null);
+      if (rangesRes) setBatchRanges(rangesRes.data);
+    } catch (err) {
+      // Non-fatal — the next poll tick / manual refresh retries.
+    }
+  }, [batch?.hash_id]);
+
+  // Poll only while a background job is genuinely running (§62) — never the
+  // source of truth itself, just what keeps this screen fresh without a
+  // manual reload while roll numbers/centers are being processed.
+  useEffect(() => {
+    clearTimeout(batchPollRef.current);
+    const inProgress = batch && ['roll_numbers_generating', 'center_allocation_in_progress', 'slips_generating'].includes(batch.status);
+    if (inProgress) {
+      batchPollRef.current = setTimeout(refreshBatch, 3000);
+    }
+    return () => clearTimeout(batchPollRef.current);
+  }, [batch, refreshBatch]);
+
+  const handleGenerateRollNumbers = async (mode, startingNumber) => {
+    if (!batch?.hash_id) return;
+    setGeneratingRollNumbers(true);
+    setBusy(true, 'Generating roll numbers…');
+    try {
+      await RollNumberApi.generateRollNumbers(batch.hash_id, { mode, starting_number: startingNumber });
+      toast.success('Roll number generation started');
+      await refreshBatch();
     } catch (err) {
       toast.error(err?.message || 'Failed to generate roll numbers');
     } finally {
-      setGenerating(false);
+      setGeneratingRollNumbers(false);
+      setBusy(false);
+    }
+  };
+
+  // Same papers/exam_date/attendance_time payload the old one-shot flow
+  // built from these same schedule inputs — now sent to the new
+  // allocate-center endpoints instead of generateSlips.
+  const buildSchedulePayload = () => {
+    const papers = examType === 'written-exams'
+      ? writtenExamSchedules.map((sch) => ({
+          label: availableSubjectsForSchedule.find((s) => s.id === sch.subjectId)?.name
+              || writtenExamSubjects.find((s) => s.id === sch.subjectId)?.name
+              || sch.subjectId,
+          subject_id: sch.subjectId,
+          date: sch.date || null,
+          time: sch.startTime || null,
+          end_time: computeEndTime(sch.startTime, sch.duration) || null,
+        }))
+      : meta.papers.map((label, index) => ({
+          label,
+          date: scheduleDates[index] || null,
+          time: scheduleTimes[index] || null,
+          end_time: computeEndTime(scheduleTimes[index], scheduleDurations[index]) || null,
+        })).filter((p) => p.date || p.time);
+
+    const examDate = examType === 'written-exams' ? (writtenExamSchedules[0]?.date || null) : (scheduleDates[0] || null);
+    const attendanceTime = examType === 'written-exams' ? (writtenExamSchedules[0]?.startTime || null) : (scheduleTimes[0] || null);
+
+    return { papers, examDate, attendanceTime };
+  };
+
+  const validateSchedule = () => {
+    if (examType === 'written-exams') {
+      if (writtenExamSchedules.length === 0) { toast.error('Select at least one subject schedule'); return false; }
+      for (const sch of writtenExamSchedules) {
+        if (!sch.date) { toast.error('All subject schedules must have a date'); return false; }
+        if (!sch.startTime) { toast.error('All subject schedules must have a start time'); return false; }
+      }
+    } else {
+      for (let i = 0; i < meta.papers.length; i++) {
+        if (!scheduleDates[i]) { toast.error(`${meta.papers[i]} Schedule: Start Date is required`); return false; }
+        if (!scheduleTimes[i]) { toast.error(`${meta.papers[i]} Schedule: Start Time is required`); return false; }
+      }
+    }
+    if (centerSelectionMode === 'custom' && selectedCenterIds.length === 0) {
+      toast.error('Select at least one exam center');
+      return false;
+    }
+    return true;
+  };
+
+  // "Auto Selection" (district/preference) — full server-side automatic
+  // distribution across every active center, or across allocationMethod's
+  // chosen strategy.
+  const handleAllocateCenters = async () => {
+    if (!batch?.hash_id || !validateSchedule()) return;
+    const { papers, examDate, attendanceTime } = buildSchedulePayload();
+
+    setAllocatingCenters(true);
+    setBusy(true, 'Allocating exam centers…');
+    try {
+      await RollNumberApi.allocateAutomatic(batch.hash_id, {
+        strategy: allocationMethod,
+        exam_date: examDate,
+        attendance_time: attendanceTime,
+        papers: papers.length ? papers : undefined,
+      });
+      toast.success('Center allocation started');
+      await refreshBatch();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to allocate centers');
+    } finally {
+      setAllocatingCenters(false);
+      setBusy(false);
+    }
+  };
+
+  const updateCenterRange = (centerId, field, value) => {
+    setCenterRanges((prev) => ({ ...prev, [centerId]: { ...(prev[centerId] || { start: '', end: '' }), [field]: value } }));
+  };
+
+  // Same numeric-suffix extraction the backend uses (CenterAllocationService::extractNumericPart)
+  // — lets the range/capacity check work regardless of exam-type prefix (OPM/TPM/WE/CCE).
+  const parseRollSeq = (roll) => {
+    const m = String(roll || '').match(/(\d+)$/);
+    return m ? parseInt(m[1], 10) : null;
+  };
+
+  const rangeRequestedCount = (start, end) => {
+    const s = parseRollSeq(start);
+    const e = parseRollSeq(end);
+    return (s !== null && e !== null && e >= s) ? (e - s + 1) : null;
+  };
+
+  // "Custom Selection" — the admin types an explicit roll-number range
+  // directly against each center row (e.g. Center A: OPM-00001 -> OPM-05000),
+  // one allocateCustom() call per filled-in row, instead of an
+  // auto-distributed pool. Each call re-validates capacity server-side
+  // (CenterAllocationService::allocateCustomRange) regardless of this
+  // client-side pre-check, which only exists to fail fast with a clear
+  // message before making any request.
+  const handleAllocateCustomRanges = async () => {
+    if (!batch?.hash_id || !validateSchedule()) return;
+
+    const rows = centers.filter((c) => selectedCenterIds.includes(c.id) && centerRanges[c.id]?.start && centerRanges[c.id]?.end);
+    if (rows.length === 0) {
+      toast.error('Check at least one center and enter its start/end roll number.');
+      return;
+    }
+
+    for (const c of rows) {
+      const { start, end } = centerRanges[c.id];
+      const requested = rangeRequestedCount(start, end);
+      if (requested === null) {
+        toast.error(`${c.center}: enter a valid range (e.g. start OPM-00001, end OPM-05000).`);
+        return;
+      }
+      if (requested > c.capacity) {
+        toast.error(`${c.center}: maximum capacity reached — ${c.capacity} seat${c.capacity === 1 ? '' : 's'} available, ${requested} requested.`);
+        return;
+      }
+    }
+
+    const { papers, examDate, attendanceTime } = buildSchedulePayload();
+
+    setAllocatingCenters(true);
+    setBusy(true, 'Allocating exam centers…');
+    try {
+      for (const c of rows) {
+        const { start, end } = centerRanges[c.id];
+        await RollNumberApi.allocateCustom(batch.hash_id, {
+          center_id: c.id,
+          start_roll_number: start.trim(),
+          end_roll_number: end.trim(),
+          exam_date: examDate,
+          attendance_time: attendanceTime,
+          papers: papers.length ? papers : undefined,
+        });
+      }
+      toast.success(`Centers allocated for ${rows.length} range${rows.length === 1 ? '' : 's'}`);
+      setCenterRanges({});
+      await refreshBatch();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to allocate centers');
+    } finally {
+      setAllocatingCenters(false);
+      setBusy(false);
+    }
+  };
+
+  const handleGenerateFinalSlips = async () => {
+    if (!batch?.hash_id) return;
+    setGeneratingFinalSlips(true);
+    setBusy(true, 'Generating roll number slips…');
+    try {
+      await RollNumberApi.generateFinalSlips(batch.hash_id);
+      toast.success('Slip generation started');
+      await refreshBatch();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to generate slips');
+    } finally {
+      setGeneratingFinalSlips(false);
       setBusy(false);
     }
   };
@@ -2015,14 +1876,16 @@ const RollNumberExamFlow = () => {
           <Card className="rounded-lg border-violet-200 bg-violet-50"><CardContent className="flex items-center gap-3 p-4"><CheckCircle2 size={24} className="text-violet-700" /><div><p className="text-xs font-semibold text-violet-700">Generated</p><p className="text-2xl font-bold text-violet-950">{generated ? s3UniqueCandidateCount : 0}</p></div></CardContent></Card>
         </div>
 
-        {stage !== 3 && (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {['Select Posts', 'Center Allocation & Generate'].map((label, index) => {
+        {stage !== 4 && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {['Select Posts', 'Roll No Generation', 'Center Allocation'].map((label, index) => {
               const step = index + 1;
-              // Both tabs lock while a generation job is running — without this,
-              // "Select Posts" stayed clickable mid-job and let the admin jump
-              // back to stage 1 and change the post selection underneath it.
-              const isDisabled = step === 2 || generating;
+              // Every tab past Step 1 locks while a batch operation is running
+              // — without this, "Select Posts" stayed clickable mid-job and let
+              // the admin jump back and change the post selection underneath
+              // it. Steps 2/3 are progress indicators, not free navigation —
+              // same as the old 2-step design.
+              const isDisabled = step !== 1 || creatingBatch || generatingRollNumbers || allocatingCenters || generatingFinalSlips;
               return <button key={label} type="button" disabled={isDisabled} onClick={() => { if (!isDisabled) setStage(step); }} className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${stage === step ? 'border-emerald-700 bg-emerald-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed`}><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/20 text-xs">{step}</span>{label}</button>;
             })}
           </div>
@@ -2133,339 +1996,406 @@ const RollNumberExamFlow = () => {
               <div><p className="text-xs font-semibold text-emerald-700">Already Generated</p><p className="text-lg font-bold text-emerald-950">{selectedPosts.reduce((s, p) => s + (p.generatedCount || 0), 0)}</p></div>
               <div><p className="text-xs font-semibold text-emerald-700">Roll Slip Rule</p><p className="text-lg font-bold text-emerald-950">One roll number</p></div>
             </div>
-            <div className="flex justify-end"><Button className="gap-2" disabled={!selectedPosts.length} onClick={() => setStage(2)}>Next: Center Allocation <ArrowRight size={15} /></Button></div>
+            <div className="flex justify-end"><Button className="gap-2" disabled={!selectedPosts.length} onClick={() => setStage(2)}>Next: Roll No Generation <ArrowRight size={15} /></Button></div>
           </CardContent></Card>
         )}
 
         {stage === 2 && (
-          <Card className="rounded-lg"><CardContent className="space-y-5 p-5">
-            <StepHeader number="2" title="Center Allocation & Generate Roll Numbers" subtitle="Select centers, configure schedule, then generate roll numbers." />
-
-            {/* ── In-progress banner — shown for both auto and custom modes while the queue job runs ── */}
-            {generating && (
-              <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                <div className="h-4 w-4 flex-shrink-0 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
-                <p className="text-sm font-semibold text-emerald-900">
-                  Roll number slip generation is in progress. Please wait — all selections on this screen are locked until it finishes.
-                </p>
-              </div>
-            )}
-
-            {/* Disables every form control in this step (radios, inputs, buttons)
-                while a generation job is running, so the admin can't change any
-                selection mid-job — the fieldset's native `disabled` cascades to
-                all descendants; `contents` keeps it out of the layout flow. */}
-            <fieldset disabled={generating} className="contents">
-
-            {/* ── Selection mode ── */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {[
-                { value: 'auto',   label: 'Auto Selection',   desc: 'System automatically allocates candidates to centers based on the chosen method.' },
-                { value: 'custom', label: 'Custom Selection', desc: 'Manually select exam centers and control capacity allocation.' },
-              ].map(({ value, label, desc }) => (
-                <label key={value} className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all ${centerSelectionMode === value ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
-                  <input type="radio" name="centerSelectionMode" value={value} checked={centerSelectionMode === value} onChange={() => setCenterSelectionMode(value)} className="mt-0.5 h-4 w-4 accent-emerald-800" />
-                  <div>
-                    <p className={`text-sm font-bold ${centerSelectionMode === value ? 'text-emerald-900' : 'text-slate-800'}`}>{label}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{desc}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            {/* ── Roll Number Prefix ── */}
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Hash size={15} className="text-emerald-700" />
-                <h3 className="text-sm font-bold text-slate-900">Roll Number Prefix</h3>
-                <span className="ml-1 text-xs text-slate-400">Optional — prepended before the sequence number</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="relative w-56">
-                  <input
-                    type="text"
-                    value={rollPrefix}
-                    onChange={(e) => setRollPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                    placeholder={`Default: ${DEFAULT_ROLL_PREFIXES[examType] ?? 'none'}`}
-                    maxLength={10}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 pr-8 font-mono text-sm font-semibold uppercase tracking-widest text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                  {rollPrefix && (
-                    <button
-                      type="button"
-                      onClick={() => setRollPrefix('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      title="Remove prefix"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                  <span className="font-mono text-sm font-bold text-slate-700">
-                    {rollPrefix ? `${rollPrefix}-00001` : '00001'}
-                  </span>
-                  <span className="text-xs text-slate-400">preview</span>
-                </div>
-                {rollPrefix !== (DEFAULT_ROLL_PREFIXES[examType] ?? '') && (
-                  <button
-                    type="button"
-                    onClick={() => setRollPrefix(DEFAULT_ROLL_PREFIXES[examType] ?? '')}
-                    className="text-xs text-emerald-700 underline hover:text-emerald-900"
-                  >
-                    Reset to default
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* ── Schedule — shown in BOTH modes ── */}
-            {examType === 'written-exams' ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <CalendarDays size={17} className="text-emerald-700" />
-                  <h3 className="text-sm font-bold text-slate-900">Subject Schedules</h3>
-                  {writtenExamSchedules.length > 0 && (
-                    <span className="text-xs text-emerald-600 font-medium">{writtenExamSchedules.length} selected</span>
-                  )}
-                </div>
-
-                {availableSubjectsForSchedule.length === 0 ? (
-                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
-                    No subjects found for the selected posts. Please check written exam subjects configuration.
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-slate-200 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-100 text-xs uppercase text-slate-500">
-                        <tr>
-                          <th className="w-10 px-4 py-3"></th>
-                          <th className="px-4 py-3 text-left">Subject</th>
-                          <th className="px-4 py-3 text-left">Date</th>
-                          <th className="px-4 py-3 text-left">Start Time</th>
-                          <th className="px-4 py-3 text-left">Duration</th>
-                          <th className="px-4 py-3 text-left">End Time</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {availableSubjectsForSchedule.map(subj => {
-                          const sch = subjectSchedules[subj.id] ?? { selected: false, date: '', startTime: '10:00', duration: 90 };
-                          const isSelected = !!sch.selected;
-                          return (
-                            <tr key={subj.id} className={isSelected ? 'bg-emerald-50/60' : 'hover:bg-slate-50'}>
-                              <td className="px-4 py-3">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={e => updateSubjectSchedule(subj.id, 'selected', e.target.checked)}
-                                  className="h-4 w-4 accent-emerald-700 cursor-pointer"
-                                />
-                              </td>
-                              <td className="px-4 py-3">
-                                <p className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-slate-700'}`}>{subj.name}</p>
-                                <p className="text-xs text-slate-400">{subj.marks} marks</p>
-                              </td>
-                              <td className="px-4 py-3">
-                                <TextField
-                                  size="small" type="date"
-                                  disabled={!isSelected}
-                                  value={sch.date}
-                                  onChange={e => updateSubjectSchedule(subj.id, 'date', e.target.value)}
-                                  InputLabelProps={{ shrink: true }}
-                                  error={isSelected && !sch.date}
-                                  sx={{ width: 150 }}
-                                />
-                              </td>
-                              <td className="px-4 py-3">
-                                <TextField
-                                  size="small" type="time"
-                                  disabled={!isSelected}
-                                  value={sch.startTime}
-                                  onChange={e => updateSubjectSchedule(subj.id, 'startTime', e.target.value)}
-                                  InputLabelProps={{ shrink: true }}
-                                  sx={{ width: 130 }}
-                                />
-                              </td>
-                              <td className="px-4 py-3">
-                                <TextField
-                                  size="small" type="number"
-                                  disabled={!isSelected}
-                                  value={sch.duration}
-                                  onChange={e => updateSubjectSchedule(subj.id, 'duration', Number(e.target.value))}
-                                  InputLabelProps={{ shrink: true }}
-                                  inputProps={{ min: 1 }}
-                                  sx={{ width: 140 }}
-                                />
-                              </td>
-                              <td className="px-4 py-3 text-slate-500 text-sm">
-                                {isSelected ? (to12Hour(computeEndTime(sch.startTime, sch.duration)) || '—') : '—'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+          <div className="space-y-5">
+            {(!batch || creatingBatch) ? (
+              <Card className="rounded-lg"><CardContent className="flex justify-center p-10">
+                <InlineLoader text="Preparing roll number batch…" variant="ring" size="lg" />
+              </CardContent></Card>
             ) : (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {meta.papers.map((paper, index) => (
-                  <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-                      <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
-                      <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleTimes((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
-                      <TextField
-                        size="small" type="number"
-                        label="Duration (Minutes) *"
-                        value={scheduleDurations[index] ?? 90}
-                        onChange={(e) => { const v = Number(e.target.value); setScheduleDurations((cur) => { const a = [...cur]; while (a.length <= index) a.push(90); a[index] = v; return a; }); }}
-                        required
-                        error={!scheduleDurations[index]}
-                        helperText={!scheduleDurations[index] ? 'Required' : ''}
-                        InputLabelProps={{ shrink: true }}
-                        inputProps={{ min: 1 }}
-                      />
-                      <TextField size="small" label="End Time" value={to12Hour(computeEndTime(scheduleTimes[index], scheduleDurations[index])) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+              <Card className="rounded-lg"><CardContent className="space-y-5 p-5">
+                <StepHeader number="2" title="Generate Roll Numbers" subtitle="Review the range and generate roll numbers for the selected candidates." />
 
-            {/* ── Auto Selection: only method picker ── */}
-            {centerSelectionMode === 'auto' && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h3 className="mb-3 text-sm font-bold text-slate-900">Center Allocation Method</h3>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {[{ value: 'district', label: 'By District' }, { value: 'preference', label: 'By Preference' }].map(({ value, label }) => (
-                    <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${allocationMethod === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                      <input type="radio" name="allocationMethod" value={value} checked={allocationMethod === value} onChange={() => setAllocationMethod(value)} className="h-4 w-4 accent-emerald-800" />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
+                <RollNumberProgressCard
+                  summary={batch}
+                  generatingSlips={generatingFinalSlips}
+                  onContinueAllocation={() => setStage(3)}
+                  onExport={async () => {
+                    try {
+                      const res = await RollNumberApi.exportBatch(batch.hash_id);
+                      if (!res.ok) throw new Error('Export failed');
+                      const blob = await res.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `roll-numbers-batch-${batch.hash_id}.xlsx`;
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err) {
+                      toast.error(err?.message || 'Export failed');
+                    }
+                  }}
+                  onResume={async () => {
+                    try {
+                      await RollNumberApi.resumeBatch(batch.hash_id);
+                      toast.success('Batch resumed');
+                      await refreshBatch();
+                    } catch (err) {
+                      toast.error(err?.message || 'Failed to resume batch');
+                    }
+                  }}
+                  onGenerateSlips={handleGenerateFinalSlips}
+                />
 
-            {/* ── Custom Selection: center table + capacity + method ── */}
-            {centerSelectionMode === 'custom' && (
-              <div className="space-y-4">
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full min-w-[760px] text-left text-sm">
-                    <thead className="bg-slate-100 text-xs uppercase text-slate-500">
-                      <tr><th className="w-12 px-4 py-3"></th><th className="px-4 py-3">Center Name</th><th className="px-4 py-3">District</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Allocated</th><th className="px-4 py-3 text-right">Remaining</th><th className="px-4 py-3">Start Date</th><th className="px-4 py-3">Status</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {centers.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No exam centers found</td></tr>}
-                      {pagedCenters.map((center) => (
-                        <tr key={center.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3"><input type="checkbox" checked={selectedCenterIds.includes(center.id)} onChange={() => toggleCenter(center.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /></td>
-                          <td className="px-4 py-3 font-medium text-slate-800">{center.center}</td>
-                          <td className="px-4 py-3 text-slate-600">{center.district}</td>
-                          <td className="px-4 py-3 text-right text-slate-600">{center.totalCapacity}</td>
-                          <td className="px-4 py-3 text-right font-medium text-rose-600">{center.allocated}</td>
-                          <td className="px-4 py-3 text-right font-bold text-emerald-700">{center.capacity}</td>
-                          <td className="px-4 py-3 font-medium text-slate-700">{scheduleDates[0] || '—'}</td>
-                          <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${center.capacity === 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}`}>{center.capacity === 0 ? 'Full' : 'Available'}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {centers.length > 0 && (
-                  <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>{centers.length} center{centers.length === 1 ? '' : 's'}</span>
-                    <Pagination page={centersPage} totalPages={centersTotalPages} onChange={setCentersPage} />
-                  </div>
+                {batch.roll_numbers_generated < batch.total && (
+                  <RollNumberGenerationMode batch={batch} generating={generatingRollNumbers} onGenerate={handleGenerateRollNumbers} />
                 )}
-                <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${capacityPassed ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
-                  {capacityPassed ? `Capacity check passed — ${selectedCapacity} seats for ${selectedApplicants} applicants.` : `Center capacity is short by ${capacityShortage} seats. Select more centers.`}
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Button
+                    variant="outline"
+                    className="gap-2 bg-white"
+                    disabled={generatingRollNumbers || allocatingCenters || generatingFinalSlips}
+                    onClick={() => { setBatch(null); setBatchRanges(null); setStage(1); }}
+                  >
+                    <ArrowLeft size={15} /> Back to Post Selection
+                  </Button>
+
+                  {batch.roll_numbers_generated >= batch.total && batch.total > 0 && (
+                    <Button className="gap-2" onClick={() => setStage(3)}>
+                      Next: Center Allocation <ArrowRight size={15} />
+                    </Button>
+                  )}
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="mb-3 text-sm font-bold text-slate-900">Center Allocation Method</h3>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {[{ value: 'district', label: 'By District' }, { value: 'preference', label: 'By Preference' }].map(({ value, label }) => (
-                      <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${allocationMethod === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                        <input type="radio" name="allocationMethod" value={value} checked={allocationMethod === value} onChange={() => setAllocationMethod(value)} className="h-4 w-4 accent-emerald-800" />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              </CardContent></Card>
             )}
-
-            {/* ── Queue progress (auto mode — visible while generating OR when there are errors) ── */}
-            {centerSelectionMode === 'auto' && generationQueue.length > 0 && (generating || generationQueue.some(q => q.status === 'error')) && (
-              <div className={`rounded-lg border p-4 space-y-3 ${generationQueue.some(q => q.status === 'error') && !generating ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
-                <div className="flex items-center gap-2 mb-1">
-                  {generating
-                    ? <div className="h-4 w-4 flex-shrink-0 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
-                    : <AlertTriangle size={16} className="text-rose-600 flex-shrink-0" />
-                  }
-                  <p className="text-sm font-bold text-slate-800">
-                    {generating ? 'Generating Roll Numbers — Queue' : 'Generation Errors — Center Configuration Required'}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {generationQueue.map((item, qi) => (
-                    <div key={item.zone} className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors ${
-                      item.status === 'done'       ? 'border-emerald-200 bg-emerald-50' :
-                      item.status === 'processing' ? 'border-blue-200 bg-blue-50' :
-                      item.status === 'error'      ? 'border-rose-200 bg-rose-50' :
-                                                     'border-slate-200 bg-slate-50'
-                    }`}>
-                      <div className="flex-shrink-0">
-                        {item.status === 'pending'    && <div className="h-5 w-5 rounded-full border-2 border-slate-300" />}
-                        {item.status === 'processing' && <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />}
-                        {item.status === 'done'       && <CheckCircle2 size={20} className="text-emerald-600" />}
-                        {item.status === 'error'      && <AlertTriangle size={20} className="text-rose-600" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-800">{item.label} Center</p>
-                        <p className="text-xs text-slate-500 truncate">{item.centerName} · {item.total} candidate{item.total !== 1 ? 's' : ''}</p>
-                        {item.error && <p className="mt-0.5 text-xs text-rose-600">{item.error}</p>}
-                      </div>
-                      <span className={`flex-shrink-0 text-xs font-bold ${
-                        item.status === 'done'       ? 'text-emerald-700' :
-                        item.status === 'error'      ? 'text-rose-700' :
-                        item.status === 'processing' ? 'text-blue-700' :
-                                                       'text-slate-400'
-                      }`}>
-                        {item.status === 'done' ? 'Done' : item.status === 'error' ? 'Error' : item.status === 'processing' ? 'Processing…' : 'Pending'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── Footer navigation ── */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button variant="outline" className="gap-2 bg-white" disabled={generating} onClick={() => setStage(1)}><ArrowLeft size={15} /> Back</Button>
-              <Button
-                className="gap-2"
-                disabled={
-                  generating ||
-                  (examType === 'written-exams'
-                    ? writtenExamSchedules.length === 0
-                    : (scheduleDates.some((d) => !d) || scheduleTimes.some((t) => !t))
-                  ) ||
-                  (centerSelectionMode === 'custom' && (!capacityPassed || selectedCenterIds.length === 0))
-                }
-                onClick={generateRollNumbers}
-              >
-                <Send size={15} /> {generating ? 'Generating…' : 'Generate Roll Numbers'}
-              </Button>
-            </div>
-
-            </fieldset>
-          </CardContent></Card>
+          </div>
         )}
 
         {stage === 3 && (
+          <div className="space-y-5">
+            {(!batch || batch.roll_numbers_generated < batch.total || batch.total === 0) ? (
+              <Card className="rounded-lg"><CardContent className="space-y-3 p-8 text-center">
+                <AlertTriangle className="mx-auto text-amber-600" size={28} />
+                <p className="font-semibold text-slate-800">Generate roll numbers before allocating centers.</p>
+                <Button className="gap-2" onClick={() => setStage(2)}><ArrowLeft size={15} /> Back to Roll No Generation</Button>
+              </CardContent></Card>
+            ) : (
+              <>
+                {/* ── Center allocation — once roll numbers exist ── */}
+                {!batch.ready_for_slip_generation && batch.status !== 'completed' && (
+                  <Card className="rounded-lg" id="center-allocation-section"><CardContent className="space-y-5 p-5">
+                    <StepHeader number="3" title="Center Allocation" subtitle="Select centers, configure schedule, then allocate." />
+
+                    <fieldset disabled={allocatingCenters} className="contents">
+
+                    {/* ── Selection mode ── */}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {[
+                        { value: 'auto',   label: 'Auto Selection',   desc: 'System automatically allocates candidates to centers based on the chosen method.' },
+                        { value: 'custom', label: 'Custom Selection', desc: 'Manually type a roll-number range against each center.' },
+                      ].map(({ value, label, desc }) => (
+                        <label key={value} className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-all ${centerSelectionMode === value ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
+                          <input type="radio" name="centerSelectionMode" value={value} checked={centerSelectionMode === value} onChange={() => setCenterSelectionMode(value)} className="mt-0.5 h-4 w-4 accent-emerald-800" />
+                          <div>
+                            <p className={`text-sm font-bold ${centerSelectionMode === value ? 'text-emerald-900' : 'text-slate-800'}`}>{label}</p>
+                            <p className="mt-0.5 text-xs text-slate-500">{desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* ── Schedule — shown in BOTH modes ── */}
+                    {examType === 'written-exams' ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <CalendarDays size={17} className="text-emerald-700" />
+                          <h3 className="text-sm font-bold text-slate-900">Subject Schedules</h3>
+                          {writtenExamSchedules.length > 0 && (
+                            <span className="text-xs text-emerald-600 font-medium">{writtenExamSchedules.length} selected</span>
+                          )}
+                        </div>
+
+                        {availableSubjectsForSchedule.length === 0 ? (
+                          <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
+                            No subjects found for the selected posts. Please check written exam subjects configuration.
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-slate-200 overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead className="bg-slate-100 text-xs uppercase text-slate-500">
+                                <tr>
+                                  <th className="w-10 px-4 py-3"></th>
+                                  <th className="px-4 py-3 text-left">Subject</th>
+                                  <th className="px-4 py-3 text-left">Date</th>
+                                  <th className="px-4 py-3 text-left">Start Time</th>
+                                  <th className="px-4 py-3 text-left">Duration</th>
+                                  <th className="px-4 py-3 text-left">End Time</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 bg-white">
+                                {availableSubjectsForSchedule.map(subj => {
+                                  const sch = subjectSchedules[subj.id] ?? { selected: false, date: '', startTime: '10:00', duration: 90 };
+                                  const isSelected = !!sch.selected;
+                                  return (
+                                    <tr key={subj.id} className={isSelected ? 'bg-emerald-50/60' : 'hover:bg-slate-50'}>
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={e => updateSubjectSchedule(subj.id, 'selected', e.target.checked)}
+                                          className="h-4 w-4 accent-emerald-700 cursor-pointer"
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <p className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-slate-700'}`}>{subj.name}</p>
+                                        <p className="text-xs text-slate-400">{subj.marks} marks</p>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <TextField
+                                          size="small" type="date"
+                                          disabled={!isSelected}
+                                          value={sch.date}
+                                          onChange={e => updateSubjectSchedule(subj.id, 'date', e.target.value)}
+                                          InputLabelProps={{ shrink: true }}
+                                          error={isSelected && !sch.date}
+                                          sx={{ width: 150 }}
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <TextField
+                                          size="small" type="time"
+                                          disabled={!isSelected}
+                                          value={sch.startTime}
+                                          onChange={e => updateSubjectSchedule(subj.id, 'startTime', e.target.value)}
+                                          InputLabelProps={{ shrink: true }}
+                                          sx={{ width: 130 }}
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <TextField
+                                          size="small" type="number"
+                                          disabled={!isSelected}
+                                          value={sch.duration}
+                                          onChange={e => updateSubjectSchedule(subj.id, 'duration', Number(e.target.value))}
+                                          InputLabelProps={{ shrink: true }}
+                                          inputProps={{ min: 1 }}
+                                          sx={{ width: 140 }}
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3 text-slate-500 text-sm">
+                                        {isSelected ? (to12Hour(computeEndTime(sch.startTime, sch.duration)) || '—') : '—'}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        {meta.papers.map((paper, index) => (
+                          <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4">
+                            <div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                              <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                              <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleTimes((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                              <TextField
+                                size="small" type="number"
+                                label="Duration (Minutes) *"
+                                value={scheduleDurations[index] ?? 90}
+                                onChange={(e) => { const v = Number(e.target.value); setScheduleDurations((cur) => { const a = [...cur]; while (a.length <= index) a.push(90); a[index] = v; return a; }); }}
+                                required
+                                error={!scheduleDurations[index]}
+                                helperText={!scheduleDurations[index] ? 'Required' : ''}
+                                InputLabelProps={{ shrink: true }}
+                                inputProps={{ min: 1 }}
+                              />
+                              <TextField size="small" label="End Time" value={to12Hour(computeEndTime(scheduleTimes[index], scheduleDurations[index])) || '—'} InputProps={{ readOnly: true }} disabled InputLabelProps={{ shrink: true }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ── Auto Selection: only method picker ── */}
+                    {centerSelectionMode === 'auto' && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <h3 className="mb-3 text-sm font-bold text-slate-900">Center Allocation Method</h3>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {[{ value: 'district', label: 'By District' }, { value: 'preference', label: 'By Preference' }].map(({ value, label }) => (
+                            <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${allocationMethod === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                              <input type="radio" name="allocationMethod" value={value} checked={allocationMethod === value} onChange={() => setAllocationMethod(value)} className="h-4 w-4 accent-emerald-800" />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Custom Selection: per-center roll-number range ── */}
+                    {centerSelectionMode === 'custom' && (
+                      <div className="space-y-4">
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <table className="w-full min-w-[980px] text-left text-sm">
+                            <thead className="bg-slate-100 text-xs uppercase text-slate-500">
+                              <tr>
+                                <th className="w-12 px-4 py-3"></th>
+                                <th className="px-4 py-3">Center Name</th>
+                                <th className="px-4 py-3">District</th>
+                                <th className="px-4 py-3 text-right">Total</th>
+                                <th className="px-4 py-3 text-right">Allocated</th>
+                                <th className="px-4 py-3 text-right">Remaining</th>
+                                <th className="px-4 py-3">Start Roll No</th>
+                                <th className="px-4 py-3">End Roll No</th>
+                                <th className="px-4 py-3">Start Date</th>
+                                <th className="px-4 py-3">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {centers.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-400">No exam centers found</td></tr>}
+                              {pagedCenters.map((center) => {
+                                const range = centerRanges[center.id] || { start: '', end: '' };
+                                const isChecked = selectedCenterIds.includes(center.id);
+                                const requested = rangeRequestedCount(range.start, range.end);
+                                const exceedsCapacity = requested !== null && requested > center.capacity;
+                                return (
+                                  <tr key={center.id} className="hover:bg-slate-50">
+                                    <td className="px-4 py-3"><input type="checkbox" checked={isChecked} onChange={() => toggleCenter(center.id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" /></td>
+                                    <td className="px-4 py-3 font-medium text-slate-800">{center.center}</td>
+                                    <td className="px-4 py-3 text-slate-600">{center.district}</td>
+                                    <td className="px-4 py-3 text-right text-slate-600">{center.totalCapacity}</td>
+                                    <td className="px-4 py-3 text-right font-medium text-rose-600">{center.allocated}</td>
+                                    <td className="px-4 py-3 text-right font-bold text-emerald-700">{center.capacity}</td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="text"
+                                        placeholder="OPM-00001"
+                                        value={range.start}
+                                        disabled={!isChecked}
+                                        onChange={(e) => updateCenterRange(center.id, 'start', e.target.value)}
+                                        className="w-28 rounded border border-slate-300 px-2 py-1 font-mono text-xs disabled:bg-slate-100 disabled:text-slate-400"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="text"
+                                        placeholder="OPM-05000"
+                                        value={range.end}
+                                        disabled={!isChecked}
+                                        onChange={(e) => updateCenterRange(center.id, 'end', e.target.value)}
+                                        className={`w-28 rounded border px-2 py-1 font-mono text-xs disabled:bg-slate-100 disabled:text-slate-400 ${exceedsCapacity ? 'border-rose-500 text-rose-700' : 'border-slate-300'}`}
+                                      />
+                                      {exceedsCapacity && (
+                                        <div className="mt-1 text-[11px] font-semibold text-rose-600">Maximum capacity reached ({center.capacity} available)</div>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 font-medium text-slate-700">{scheduleDates[0] || '—'}</td>
+                                    <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${center.capacity === 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}`}>{center.capacity === 0 ? 'Full' : 'Available'}</span></td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {centers.length > 0 && (
+                          <div className="flex items-center justify-between text-sm text-slate-600">
+                            <span>{centers.length} center{centers.length === 1 ? '' : 's'}</span>
+                            <Pagination page={centersPage} totalPages={centersTotalPages} onChange={setCentersPage} />
+                          </div>
+                        )}
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                          Check a center, then type its roll-number range (e.g. <span className="font-mono font-semibold">OPM-00001</span> to <span className="font-mono font-semibold">OPM-05000</span>). Each checked row with a range is allocated separately — repeat for as many centers as needed until every candidate is allocated.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Footer navigation ── */}
+                    <div className="flex flex-wrap items-center justify-end gap-3">
+                      {centerSelectionMode === 'auto' ? (
+                        <Button
+                          className="gap-2"
+                          disabled={
+                            allocatingCenters ||
+                            (examType === 'written-exams'
+                              ? writtenExamSchedules.length === 0
+                              : (scheduleDates.some((d) => !d) || scheduleTimes.some((t) => !t))
+                            )
+                          }
+                          onClick={handleAllocateCenters}
+                        >
+                          <Send size={15} /> {allocatingCenters ? 'Allocating…' : 'Allocate Centers'}
+                        </Button>
+                      ) : (
+                        <Button
+                          className="gap-2"
+                          disabled={
+                            allocatingCenters ||
+                            (examType === 'written-exams'
+                              ? writtenExamSchedules.length === 0
+                              : (scheduleDates.some((d) => !d) || scheduleTimes.some((t) => !t))
+                            ) ||
+                            selectedCenterIds.every((id) => !centerRanges[id]?.start || !centerRanges[id]?.end) ||
+                            selectedCenterIds.some((id) => {
+                              const r = centerRanges[id];
+                              if (!r?.start || !r?.end) return false;
+                              const requested = rangeRequestedCount(r.start, r.end);
+                              const center = centers.find((c) => c.id === id);
+                              return requested !== null && center && requested > center.capacity;
+                            })
+                          }
+                          onClick={handleAllocateCustomRanges}
+                        >
+                          <Send size={15} /> {allocatingCenters ? 'Allocating…' : 'Allocate Ranges'}
+                        </Button>
+                      )}
+                    </div>
+
+                    </fieldset>
+
+                    {batchRanges && <PendingRangeCard ranges={batchRanges} />}
+
+                    {batch.pending > 0 && batch.allocation_mode && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        {batch.pending} candidate{batch.pending !== 1 ? 's' : ''} still pending allocation.{' '}
+                        <button type="button" className="font-semibold underline" onClick={() => navigate(`/dashboard/roll-numbers/batches/${batch.hash_id}`)}>
+                          Continue in Batch Details
+                        </button> for further custom-range/center tools.
+                      </div>
+                    )}
+                  </CardContent></Card>
+                )}
+
+                {/* ── Ready to generate slips ── */}
+                {batch.ready_for_slip_generation && (
+                  <Card className="rounded-lg"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+                    <div>
+                      <p className="font-bold text-emerald-900">Ready for slip generation</p>
+                      <p className="text-sm text-slate-500">Every candidate has a roll number and an allocated center.</p>
+                    </div>
+                    <Button className="gap-2" disabled={generatingFinalSlips} onClick={handleGenerateFinalSlips}>
+                      <Send size={15} /> {generatingFinalSlips ? 'Generating…' : 'Generate Roll Number Slip'}
+                    </Button>
+                  </CardContent></Card>
+                )}
+
+                {/* ── Complete ── */}
+                {batch.status === 'completed' && (
+                  <Card className="rounded-lg"><CardContent className="space-y-3 p-8 text-center">
+                    <CheckCircle2 className="mx-auto text-emerald-600" size={36} />
+                    <p className="text-lg font-bold text-emerald-900">Roll number slips generated</p>
+                    <p className="text-sm text-slate-500">
+                      {batch.slips_generated} slip{batch.slips_generated !== 1 ? 's' : ''} {batch.slips_generated !== 1 ? 'are' : 'is'} now available under Unpublished Roll Slips.
+                    </p>
+                    <Button onClick={() => navigate('/dashboard/roll-numbers')}>View Unpublished Roll Slips</Button>
+                  </CardContent></Card>
+                )}
+
+                <Button variant="outline" className="gap-2 bg-white" disabled={allocatingCenters} onClick={() => setStage(2)}>
+                  <ArrowLeft size={15} /> Back to Roll No Generation
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        {stage === 4 && (
           <Card className="rounded-lg">
             <CardContent className="space-y-6 p-6">
 

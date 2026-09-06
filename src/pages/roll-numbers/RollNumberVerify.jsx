@@ -105,39 +105,49 @@ const RollNumberVerify = () => {
             </div>
 
             {/* Schedule table */}
-            {data.sessionGroups?.length > 0 && (
-              <div className="px-6 py-4">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Examination Schedule</p>
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-emerald-50">
-                        <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left whitespace-nowrap">Day</th>
-                        <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left whitespace-nowrap">Date</th>
-                        <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left whitespace-nowrap">Time</th>
-                        <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.sessionGroups.map((group, idx) => (
-                        <tr key={idx} className="even:bg-slate-50">
-                          <td className="border border-slate-200 px-2 py-2 align-middle whitespace-nowrap">{group.day || '—'}</td>
-                          <td className="border border-slate-200 px-2 py-2 align-middle whitespace-nowrap">{group.date || '—'}</td>
-                          <td className="border border-slate-200 px-2 py-2 align-middle whitespace-nowrap">{to12Hour(group.time)}</td>
-                          <td className="border border-slate-200 px-2 py-2 align-top font-semibold text-emerald-900">
-                            {group.posts?.map((post, pIdx) => (
-                              <div key={pIdx} className={pIdx > 0 ? 'border-t border-emerald-100 mt-1 pt-1' : ''}>
-                                {[post.advertisementNo, post.department, post.postName].filter(Boolean).join(', ')}
-                              </div>
-                            ))}
-                          </td>
+            {data.sessionGroups?.length > 0 && (() => {
+              // Same SUBJECT/PAPER column RollNumberPublicSlip.jsx already
+              // shows from this same sessionGroups data — this table was
+              // just missing it entirely.
+              const hasLabels = data.sessionGroups.some((g) => g.label);
+              return (
+                <div className="px-6 py-4">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Examination Schedule</p>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-emerald-50">
+                          <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left whitespace-nowrap">Day</th>
+                          <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left whitespace-nowrap">Date</th>
+                          <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left whitespace-nowrap">Time</th>
+                          {hasLabels && <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left whitespace-nowrap">Subject/Paper</th>}
+                          <th className="border border-slate-200 px-2 py-2 text-emerald-800 font-bold text-left">Description</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {data.sessionGroups.map((group, idx) => (
+                          <tr key={idx} className="even:bg-slate-50">
+                            <td className="border border-slate-200 px-2 py-2 align-middle whitespace-nowrap">{group.day || '—'}</td>
+                            <td className="border border-slate-200 px-2 py-2 align-middle whitespace-nowrap">{group.date || '—'}</td>
+                            <td className="border border-slate-200 px-2 py-2 align-middle whitespace-nowrap">{to12Hour(group.time)}</td>
+                            {hasLabels && (
+                              <td className="border border-slate-200 px-2 py-2 align-top font-bold text-emerald-900">{group.label || '—'}</td>
+                            )}
+                            <td className="border border-slate-200 px-2 py-2 align-top font-semibold text-emerald-900">
+                              {group.posts?.map((post, pIdx) => (
+                                <div key={pIdx} className={pIdx > 0 ? 'border-t border-emerald-100 mt-1 pt-1' : ''}>
+                                  {[post.advertisementNo, post.department, post.postName].filter(Boolean).join(', ')}
+                                </div>
+                              ))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* View Full Slip */}
             <div className="px-6 py-4 border-t border-slate-100">
