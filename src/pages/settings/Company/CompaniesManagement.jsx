@@ -109,16 +109,26 @@ const CompaniesManagement = () => {
     status: "active",
   });
 
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+
   /* ===============================
-     FETCH COMPANIES
+     FETCH COMPANIES (server-side pagination + filters)
   =============================== */
   const fetchCompanies = async () => {
     setLoading(true);
 
     try {
-      const url = `${API_BASE}/settings/company?per_page=500`;
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.company_type.trim()) params.set('company_type', filters.company_type.trim());
+      if (filters.ntn.trim()) params.set('ntn', filters.ntn.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
 
-      const response = await fetch(url, {
+      const response = await fetch(`${API_BASE}/settings/company?${params.toString()}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${TOKEN}`,
@@ -136,9 +146,10 @@ const CompaniesManagement = () => {
       if (result.success == true) {
         const dataArray = result.data?.data || [];
 
-        const formatted = dataArray.map((item) => ({
+        const formatted = dataArray.map((item, i) => ({
           id: item.hash_id,
           hash_id: item.hash_id,
+          sr_no: paginationModel.page * paginationModel.pageSize + i + 1,
           name: item.company_name,
           type: item.type,
           contact_person: item.contact_person,
@@ -150,7 +161,9 @@ const CompaniesManagement = () => {
         }));
 
         setRows(formatted);
-        setTotal(formatted.length);
+        setTotal(Number(result.data?.total ?? formatted.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load companies");
       }
@@ -163,30 +176,8 @@ const CompaniesManagement = () => {
 
   useEffect(() => {
     fetchCompanies();
-    // eslint-disable-next-line
-  }, []);
-
-  /* ===============================
-     STATUS COUNTS
-  =============================== */
-  const activeCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "active"
-  ).length;
-
-  const inactiveCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "inactive"
-  ).length;
-
-  /* ===============================
-     FILTERS
-  =============================== */
-  const filteredRows = rows.filter((row) => {
-    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) return false;
-    if (filters.company_type && row.type !== filters.company_type) return false;
-    if (filters.ntn && !row.ntn?.toLowerCase().includes(filters.ntn.toLowerCase())) return false;
-    if (filters.status && (row.status ?? "active").toLowerCase() !== filters.status.toLowerCase()) return false;
-    return true;
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.company_type, filters.ntn, filters.status]);
 
   /* ===============================
      ADD / UPDATE COMPANY
@@ -434,13 +425,13 @@ const CompaniesManagement = () => {
 
         {/* TABLE */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="client"
-          rowCount={filteredRows.length}
+          paginationMode="server"
+          rowCount={total}
           loading={loading}
           autoHeight
           sx={GRID_SX}

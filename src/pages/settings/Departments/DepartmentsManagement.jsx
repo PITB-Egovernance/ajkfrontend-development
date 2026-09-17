@@ -10,15 +10,12 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
-import Config from 'config/baseUrl';
 import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { hasPermission } from 'utils/permissions';
 import settingsCatalogApi from 'api/settingsCatalogApi';
-import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 
 const PERM = 'settings.departments';
-const API_BASE = Config.apiUrl;
 
 const gridSx = {
   border: 'none',
@@ -46,7 +43,6 @@ const DepartmentsManagement = () => {
 
   const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(true);
-  const [allRows, setAllRows] = useState([]);
   const [total,   setTotal]   = useState(0);
   const [filters, setFilters] = useState({
     department_name: '',
@@ -62,7 +58,6 @@ const DepartmentsManagement = () => {
   const [formData,    setFormData]    = useState(emptyForm);
   const [saving,      setSaving]      = useState(false);
   const [formError,   setFormError]   = useState('');
-  const hasActiveFilters = Object.values(filters).some((value) => String(value ?? '').trim() !== '');
 
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
@@ -113,65 +108,25 @@ const DepartmentsManagement = () => {
     status:          String(item.status || 'active').toLowerCase(),
   }));
 
-  const matchesFilters = (row) => {
-    const departmentName = filters.department_name.trim().toLowerCase();
-    const contactPerson = filters.contact_person.trim().toLowerCase();
-    const status = filters.status.trim().toLowerCase();
-
-    if (departmentName && !String(row.department_name || '').toLowerCase().includes(departmentName)) {
-      return false;
-    }
-    if (contactPerson && !String(row.contact_person || '').toLowerCase().includes(contactPerson)) {
-      return false;
-    }
-    if (status && String(row.status || '').toLowerCase() !== status) {
-      return false;
-    }
-
-    return true;
-  };
-
+  /* ── FETCH (always server-side pagination + filters) ── */
   const fetchPage = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const { items, pagination } = await settingsCatalogApi.getPage('departments', page + 1, pageSize);
+      const { items, pagination } = await settingsCatalogApi.getPage('departments', page + 1, pageSize, {
+        name: filters.department_name.trim(),
+        contact_person: filters.contact_person.trim(),
+        status: filters.status,
+      });
       setRows(formatDepartmentRows(items, page * pageSize));
       setTotal(Number(pagination.total) || 0);
-      const backendPage = Math.max(0, Number(pagination.current_page || page + 1) - 1);
-      const backendPageSize = Number(pagination.per_page || pageSize);
-      if (backendPage !== paginationModel.page || backendPageSize !== paginationModel.pageSize) {
-        setPaginationModel({ page: backendPage, pageSize: backendPageSize });
-      }
     } catch { toast.error('Server error while loading departments'); }
     finally { setLoading(false); }
   };
 
-  const fetchAllForFilters = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchPaginatedApiList(`${API_BASE}/settings/departments`, {
-        headers: settingsCatalogApi.getHeaders(),
-        perPage: 200,
-      });
-      setAllRows(formatDepartmentRows(data));
-      setTotal(Array.isArray(data) ? data.length : 0);
-    } catch {
-      toast.error('Server error while loading departments');
-      setAllRows([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (hasActiveFilters) {
-      fetchAllForFilters();
-      return;
-    }
     fetchPage(paginationModel.page, paginationModel.pageSize);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasActiveFilters, paginationModel.page, paginationModel.pageSize]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.department_name, filters.contact_person, filters.status]);
 
   const openAdd = () => {
     setEditing(null);
@@ -215,11 +170,7 @@ const DepartmentsManagement = () => {
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Department updated successfully' : 'Department created successfully');
         setOpenModal(false);
-        if (hasActiveFilters) {
-          fetchAllForFilters();
-        } else {
-          fetchPage(paginationModel.page, paginationModel.pageSize);
-        }
+        fetchPage(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || (isUpdate ? 'Failed to update department' : 'Failed to create department'));
       }
@@ -236,10 +187,8 @@ const DepartmentsManagement = () => {
       const result = await settingsCatalogApi.remove('departments', row.hash_id);
       if (result.success || result.status === 200) {
         toast.success('Department deleted successfully');
-        if (!hasActiveFilters && rows.length === 1 && paginationModel.page > 0) {
+        if (rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
-        } else if (hasActiveFilters) {
-          fetchAllForFilters();
         } else {
           fetchPage(paginationModel.page, paginationModel.pageSize);
         }
@@ -265,11 +214,7 @@ const DepartmentsManagement = () => {
 
       if (result.success || result.status === 200) {
         toast.success(`Department marked as ${newStatus}`);
-        if (hasActiveFilters) {
-          fetchAllForFilters();
-        } else {
-          fetchPage(paginationModel.page, paginationModel.pageSize);
-        }
+        fetchPage(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || 'Status update failed');
       }
@@ -315,8 +260,6 @@ const DepartmentsManagement = () => {
     }] : []),
   ];
 
-  const filteredRows = (hasActiveFilters ? allRows : rows).filter(matchesFilters);
-
   if (loading && rows.length === 0) return <InlineLoader text="Loading departments..." variant="ring" size="lg" />;
 
   return (
@@ -360,16 +303,15 @@ const DepartmentsManagement = () => {
         />
 
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
-          paginationMode={hasActiveFilters ? 'client' : 'server'}
-          rowCount={hasActiveFilters ? filteredRows.length : total}
+          paginationMode="server"
+          rowCount={total}
           loading={loading}
-          initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
           autoHeight
           disableRowSelectionOnClick
           sx={gridSx}

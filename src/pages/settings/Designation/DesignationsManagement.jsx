@@ -69,6 +69,8 @@ const DesignationsManagement = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
 
   const [grades, setGrades] = useState([]);
 
@@ -157,41 +159,31 @@ const DesignationsManagement = () => {
       };
     });
 
-  const matchesFilters = (row) => {
-    const name = filters.name.trim().toLowerCase();
-    const gradeId = String(filters.grade_id || '').trim();
-    const status = filters.status.trim().toLowerCase();
-
-    if (name && !String(row.name || '').toLowerCase().includes(name)) return false;
-    if (
-      gradeId &&
-      String(row.grade_id) !== gradeId &&
-      String(row.grade_hash_id) !== gradeId
-    ) {
-      return false;
-    }
-    if (status && String(row.status || '').toLowerCase() !== status) return false;
-
-    return true;
-  };
-
   /* ===============================
-     FETCH DESIGNATIONS
+     FETCH DESIGNATIONS (server-side pagination + filters)
   =============================== */
   const fetchDesignations = async () => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.grade_id) params.set('grade_id', filters.grade_id);
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
       const response = await fetch(
-        `${API_BASE}/settings/designations?per_page=500`,
+        `${API_BASE}/settings/designations?${params.toString()}`,
         { headers: getHeaders(false) }
       );
       const result = await response.json();
       if (result.success === true || result.status === 200) {
-        const dataArray = Array.isArray(result.data?.data)
-          ? result.data.data
-          : (Array.isArray(result.data) ? result.data : []);
+        const dataArray = Array.isArray(result.data?.data) ? result.data.data : [];
         setRows(formatDesignationRows(dataArray));
-        setTotal(Number(result.data?.total ?? result.meta?.total ?? result.total ?? dataArray.length));
+        setTotal(Number(result.data?.total ?? dataArray.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load designations");
       }
@@ -237,19 +229,12 @@ const DesignationsManagement = () => {
 
   useEffect(() => {
     fetchDesignations();
-    // eslint-disable-next-line
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.grade_id, filters.status]);
 
   /* ===============================
      STATUS COUNTS
   =============================== */
-  const activeCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "active"
-  ).length;
-
-  const inactiveCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "inactive"
-  ).length;
 
   /* ===============================
      ADD / UPDATE
@@ -272,29 +257,8 @@ const DesignationsManagement = () => {
 
   setLoading(true);
 
-  console.log("Designation payload", formData)
   try {
     const isUpdate = !!editingDesignation;
-
-    // Prevent duplicate designation names (case-insensitive, regardless of grade).
-    // Fetch the full list so duplicates on other pages are also caught.
-    try {
-      const dupRes = await fetch(`${API_BASE}/settings/designations?per_page=1000`, { headers: getHeaders(false) });
-      const dupResult = await dupRes.json();
-      const all = dupResult.data?.data || dupResult.data || [];
-      const target = formData.name.trim().toLowerCase();
-      const duplicate = all.some(
-        (d) => d.name?.trim().toLowerCase() === target &&
-          (!isUpdate || (d.hash_id !== editingDesignation.hash_id))
-      );
-      if (duplicate) {
-        toast.error("This designation already exists");
-        setLoading(false);
-        return;
-      }
-    } catch {
-      // if the duplicate check fails, fall through and let the backend validate
-    }
 
     const url = isUpdate
       ? `${API_BASE}/settings/designations/${editingDesignation.hash_id}/update`
@@ -324,7 +288,8 @@ const DesignationsManagement = () => {
       setEditingDesignation(null);
       fetchDesignations();
     } else {
-      toast.error(result.message || (isUpdate ? "Failed to update designation" : "Failed to create designation"));
+      const fieldErrors = result.errors ? Object.values(result.errors).flat().join(", ") : "";
+      toast.error(fieldErrors || result.message || (isUpdate ? "Failed to update designation" : "Failed to create designation"));
     }
 
   } catch (error) {
@@ -437,8 +402,6 @@ const DesignationsManagement = () => {
   }] : []),
 ];
 
-  const filteredRows = rows.filter(matchesFilters);
-
   if (loading && rows.length === 0) {
     return <InlineLoader text="Loading designations..." variant="ring" />;
   }
@@ -529,13 +492,13 @@ const DesignationsManagement = () => {
 
         {/* TABLE */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
-          paginationMode="client"
-          rowCount={filteredRows.length}
+          paginationMode="server"
+          rowCount={total}
           loading={loading}
           autoHeight
           sx={GRID_SX}

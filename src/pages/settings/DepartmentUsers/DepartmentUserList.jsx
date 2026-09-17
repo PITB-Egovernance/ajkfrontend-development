@@ -141,12 +141,23 @@ const DepartmentUserList = () => {
   const [selectedHashId, setSelectedHashId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const result = await DepartmentUserService.getAll({ per_page: 100 });
+      const result = await DepartmentUserService.getAll({
+        per_page: 100,
+        name: filters.dept_user_name,
+        email: filters.email,
+        mobile: filters.mobile,
+        department: filters.department,
+        status: filters.status,
+      });
       setRows(result.data.map(mapUser));
+      setActiveCount(Number(result.statusCounts?.active ?? 0));
+      setInactiveCount(Number(result.statusCounts?.inactive ?? 0));
     } catch (error) {
       toast.error(error.message || 'Failed to load department users');
     } finally {
@@ -154,7 +165,10 @@ const DepartmentUserList = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.dept_user_name, filters.email, filters.mobile, filters.department, filters.status]);
 
   const handleToggleStatus = async (row) => {
     const newStatus = row.status === 'active' ? 'inactive' : 'active';
@@ -189,21 +203,13 @@ const DepartmentUserList = () => {
     ));
   };
 
+  // Quick-search box — separate from the AdvancedFilter fields above (already applied
+  // server-side), matches across whatever the server returned for the current filters.
   const filteredRows = rows.filter((r) => {
-    if (searchTerm.trim()) {
-      const t = searchTerm.toLowerCase();
-      if (!(r.full_name?.toLowerCase().includes(t) || r.cnic?.toLowerCase().includes(t) || r.email?.toLowerCase().includes(t) || r.department?.toLowerCase().includes(t))) return false;
-    }
-    if (filters.dept_user_name && !r.dept_user_name?.toLowerCase().includes(filters.dept_user_name.toLowerCase())) return false;
-    if (filters.cnic && !r.cnic?.toLowerCase().includes(filters.cnic.toLowerCase())) return false;
-    if (filters.email && !r.email?.toLowerCase().includes(filters.email.toLowerCase())) return false;
-    if (filters.department && !r.department?.toLowerCase().includes(filters.department.toLowerCase())) return false;
-    if (filters.status && r.status !== filters.status) return false;
-    return true;
+    if (!searchTerm.trim()) return true;
+    const t = searchTerm.toLowerCase();
+    return r.full_name?.toLowerCase().includes(t) || r.cnic?.toLowerCase().includes(t) || r.email?.toLowerCase().includes(t) || r.department?.toLowerCase().includes(t);
   });
-
-  const activeCount = rows.filter((r) => r.status === 'active').length;
-  const inactiveCount = rows.filter((r) => r.status !== 'active').length;
 
   const columns = [
     { field: 'dept_user_name', headerName: 'Focal Person', flex: 1, minWidth: 160 },

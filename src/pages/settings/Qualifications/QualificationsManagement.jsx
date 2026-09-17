@@ -11,16 +11,12 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
-import Config from 'config/baseUrl';
 import { InlineLoader } from 'components/ui/Loader';
 import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
 import settingsCatalogApi from 'api/settingsCatalogApi';
-import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 const PERM = 'settings.qualifications';
-
-const API_BASE = Config.apiUrl;
 
 const QualificationsManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);
@@ -30,7 +26,6 @@ const QualificationsManagement = () => {
   const navigate = useNavigate();
 
   const [rows,     setRows]     = useState([]);
-  const [allRows,  setAllRows]  = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [totalRows, setTotalRows] = useState(0);
   const [open,     setOpen]     = useState(false);
@@ -48,7 +43,6 @@ const QualificationsManagement = () => {
   const [saving,   setSaving]   = useState(false);
   const [filters,  setFilters]  = useState({ name: '', type: '', status: '' });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
-  const hasActiveFilters = Object.values(filters).some((v) => v.trim().length > 0);
 
   const filterConfig = [
     { name: 'name', label: 'Qualification Name', type: 'text', placeholder: 'Search qualifications...' },
@@ -86,7 +80,11 @@ const QualificationsManagement = () => {
   const fetchPage = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const { items, pagination } = await settingsCatalogApi.getPage('qualifications', page + 1, pageSize);
+      const { items, pagination } = await settingsCatalogApi.getPage('qualifications', page + 1, pageSize, {
+        name: filters.name.trim(),
+        type: filters.type,
+        status: filters.status,
+      });
       setRows(items.map((item, i) => ({
           id:       item.hash_id || item.id,
           sr_no:    page * pageSize + i + 1,
@@ -96,57 +94,14 @@ const QualificationsManagement = () => {
           status:   String(item.status || 'active').toLowerCase(),
         })));
       setTotalRows(Number(pagination.total) || 0);
-      const backendPage = Math.max(0, Number(pagination.current_page || page + 1) - 1);
-      const backendPageSize = Number(pagination.per_page || pageSize);
-      if (backendPage !== paginationModel.page || backendPageSize !== paginationModel.pageSize) {
-        setPaginationModel({ page: backendPage, pageSize: backendPageSize });
-      }
     } catch { toast.error('Server error'); setRows([]); setTotalRows(0); }
     finally { setLoading(false); }
   };
 
-  const fetchAllForSearch = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchPaginatedApiList(`${API_BASE}/settings/qualifications`, {
-        headers: settingsCatalogApi.getHeaders(),
-        perPage: 200,
-      });
-      const mapped = (Array.isArray(data) ? data : []).map((item, i) => ({
-        id:       item.hash_id || item.id,
-        sr_no:    i + 1,
-        hash_id:  item.hash_id,
-        name:     item.qualification_name || item.name,
-        type:     String(item.type || 'required').toLowerCase(),
-        status:   String(item.status || 'active').toLowerCase(),
-      }));
-      setAllRows(mapped);
-      setTotalRows(mapped.length);
-    } catch {
-      toast.error('Server error');
-      setAllRows([]);
-      setTotalRows(0);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (hasActiveFilters) {
-      fetchAllForSearch();
-      return;
-    }
     fetchPage(paginationModel.page, paginationModel.pageSize);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasActiveFilters, paginationModel.page, paginationModel.pageSize]);
-
-
-  const filtered = (hasActiveFilters ? allRows : rows).filter((r) => {
-    if (filters.name.trim() && !r.name?.toLowerCase().includes(filters.name.trim().toLowerCase())) return false;
-    if (filters.type && r.type !== filters.type) return false;
-    if (filters.status && r.status !== filters.status) return false;
-    return true;
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.type, filters.status]);
 
   const openAdd = () => {
     setEditing(null);
@@ -181,11 +136,7 @@ const QualificationsManagement = () => {
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Updated successfully' : 'Qualification added');
         setOpen(false);
-        if (hasActiveFilters) {
-          fetchAllForSearch();
-        } else {
-          fetchPage(paginationModel.page, paginationModel.pageSize);
-        }
+        fetchPage(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || 'Operation failed');
       }
@@ -199,10 +150,8 @@ const QualificationsManagement = () => {
       const result = await settingsCatalogApi.remove('qualifications', row.hash_id);
       if (result.success || result.status === 200) {
         toast.success('Deleted');
-        if (!hasActiveFilters && rows.length === 1 && paginationModel.page > 0) {
+        if (rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
-        } else if (hasActiveFilters) {
-          fetchAllForSearch();
         } else {
           fetchPage(paginationModel.page, paginationModel.pageSize);
         }
@@ -225,11 +174,7 @@ const QualificationsManagement = () => {
       });
       if (result.success || result.status === 200) {
         toast.success(`Marked as ${newStatus}`);
-        if (hasActiveFilters) {
-          fetchAllForSearch();
-        } else {
-          fetchPage(paginationModel.page, paginationModel.pageSize);
-        }
+        fetchPage(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || 'Status update failed');
       }
@@ -274,7 +219,7 @@ const QualificationsManagement = () => {
     }] : []),
   ];
 
-  if (loading && rows.length === 0 && allRows.length === 0) return <InlineLoader text="Loading qualifications..." variant="ring" size="lg" />;
+  if (loading && rows.length === 0) return <InlineLoader text="Loading qualifications..." variant="ring" size="lg" />;
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
@@ -316,10 +261,10 @@ const QualificationsManagement = () => {
           title="Filter Qualifications"
         />
 
-        <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
+        <TooltipDataGrid rows={rows} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
-          paginationMode={hasActiveFilters ? 'client' : 'server'}
-          rowCount={hasActiveFilters ? filtered.length : totalRows}
+          paginationMode="server"
+          rowCount={totalRows}
           pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
           loading={loading} />
 

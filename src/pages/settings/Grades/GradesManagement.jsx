@@ -42,6 +42,8 @@ const GradesManagement = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
   const [filters, setFilters] = useState({
     name: '',
     status: ''
@@ -65,6 +67,11 @@ const GradesManagement = () => {
     }
   ];
 
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 15,
+  });
+
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
@@ -82,11 +89,6 @@ const GradesManagement = () => {
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const [paginationModel, setPaginationModel] = useState({
-    page: 0,
-    pageSize: 15,
-  });
-
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
@@ -97,14 +99,6 @@ const GradesManagement = () => {
     name: "",
     status: "active",
   });
-
-  const activeCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "active"
-  ).length;
-
-  const inactiveCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "inactive"
-  ).length;
 
   const headers = () => ({
     Authorization: `Bearer ${TOKEN}`,
@@ -119,31 +113,28 @@ const GradesManagement = () => {
     status: item.status ?? "active",
   }));
 
-  const matchesFilters = (row) => {
-    const name = filters.name.trim().toLowerCase();
-    const status = filters.status.trim().toLowerCase();
-
-    if (name && !String(row.name || '').toLowerCase().includes(name)) return false;
-    if (status && String(row.status || '').toLowerCase() !== status) return false;
-
-    return true;
-  };
-
-  /* ================= FETCH ================= */
+  /* ================= FETCH (server-side pagination + filters) ================= */
   const fetchGrades = async () => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
       const response = await fetch(
-        `${API_BASE}/settings/grades?per_page=500`,
+        `${API_BASE}/settings/grades?${params.toString()}`,
         { headers: headers() }
       );
       const result = await response.json();
       if (result.status === 200 || result.success === true) {
-        const dataArray = Array.isArray(result.data?.data)
-          ? result.data.data
-          : (Array.isArray(result.data) ? result.data : []);
+        const dataArray = Array.isArray(result.data?.data) ? result.data.data : [];
         setRows(formatGradeRows(dataArray));
-        setTotal(Number(result.data?.total ?? result.meta?.total ?? result.total ?? dataArray.length));
+        setTotal(Number(result.data?.total ?? dataArray.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load grades");
       }
@@ -157,7 +148,7 @@ const GradesManagement = () => {
   useEffect(() => {
     fetchGrades();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.status]);
 
   // ── Workaround for live backend unique-name bug ──────────────────────────
   // The live UpdateGradeRequest ignores null instead of the grade's own ID,
@@ -338,8 +329,6 @@ const GradesManagement = () => {
     }] : []),
   ];
 
-  const filteredRows = rows.filter(matchesFilters);
-
   if (loading && rows.length === 0) {
     return <InlineLoader text="Loading grades..." variant="ring" />;
   }
@@ -422,13 +411,13 @@ const GradesManagement = () => {
 
         {/* TABLE */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="client"
-          rowCount={filteredRows.length}
+          paginationMode="server"
+          rowCount={total}
           loading={loading}
           autoHeight
           sx={GRID_SX}

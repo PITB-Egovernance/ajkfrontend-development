@@ -60,6 +60,8 @@ const DistrictsManagement = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
 
   const [filters, setFilters] = useState({
     name: '',
@@ -140,34 +142,32 @@ const DistrictsManagement = () => {
     status: item.status ?? "active",
   }));
 
-  const matchesFilters = (row) => {
-    const name = filters.name.trim().toLowerCase();
-    const code = filters.code.trim().toLowerCase();
-    const status = filters.status.trim().toLowerCase();
-
-    if (name && !String(row.name || '').toLowerCase().includes(name)) return false;
-    if (code && !String(row.code || '').toLowerCase().includes(code)) return false;
-    if (status && String(row.status || '').toLowerCase() !== status) return false;
-
-    return true;
-  };
-
   /* ===============================
-     FETCH DISTRICTS
+     FETCH DISTRICTS (server-side pagination + filters)
   =============================== */
   const fetchDistricts = async () => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.code.trim()) params.set('code', filters.code.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
       const response = await fetch(
-        `${API_BASE}/settings/districts?per_page=500`,
+        `${API_BASE}/settings/districts?${params.toString()}`,
         { headers: getHeaders() }
       );
       const result = await response.json();
       if (response.ok || result.status === 200 || result.success) {
         const payload = result.data ?? {};
-        const data = payload.data ?? result.data ?? [];
-        setRows(formatDistrictRows(Array.isArray(data) ? data : []));
-        setTotal(Number(payload.total ?? data.length ?? 0));
+        const data = Array.isArray(payload.data) ? payload.data : [];
+        setRows(formatDistrictRows(data));
+        setTotal(Number(payload.total ?? data.length));
+        setActiveCount(Number(payload.status_counts?.active ?? 0));
+        setInactiveCount(Number(payload.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load districts");
       }
@@ -180,8 +180,8 @@ const DistrictsManagement = () => {
 
   useEffect(() => {
     fetchDistricts();
-    // eslint-disable-next-line
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.code, filters.status]);
 
   /* ===============================
      ACTION MENU
@@ -351,19 +351,9 @@ const DistrictsManagement = () => {
     }] : []),
   ];
 
-  const filteredRows = rows.filter(matchesFilters);
-
   if (loading && rows.length === 0) {
     return  <InlineLoader text="Loading districts..." variant="ring" size="lg" />;
   }
-
-  const activeCount = rows.filter(
-  (row) => (row.status ?? "active").toLowerCase() === "active"
-  ).length;
-
-  const inactiveCount = rows.filter(
-    (row) => (row.status ?? "active").toLowerCase() === "inactive"
-  ).length;
 
  return (
   <div className="p-6 bg-slate-50 min-h-screen">
@@ -451,14 +441,14 @@ const DistrictsManagement = () => {
 
       {/* DATAGRID */}
       <TooltipDataGrid
-        rows={filteredRows}
+        rows={rows}
         columns={columns}
         getRowId={(row) => row.id}
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[15, 25, 50]}
-        paginationMode="client"
-        rowCount={filteredRows.length}
+        paginationMode="server"
+        rowCount={total}
         loading={loading}
         autoHeight
         sx={gridSx}

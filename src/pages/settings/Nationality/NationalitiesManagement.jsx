@@ -99,17 +99,28 @@ const NationalitiesManagement = () => {
     status:           item.status ?? 'active',
   }));
 
+  const [activeCount,   setActiveCount]   = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/settings/nationalities?per_page=500`, { headers: getHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res = await fetch(`${API_BASE}/settings/nationalities?${params.toString()}`, { headers: getHeaders() });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         const payload = result.data ?? {};
-        const data = result.data?.data ?? result.data ?? [];
-        const dataArray = Array.isArray(data) ? data : [];
-        setRows(formatNationalityRows(dataArray));
+        const dataArray = Array.isArray(payload.data) ? payload.data : [];
+        setRows(formatNationalityRows(dataArray, paginationModel.page * paginationModel.pageSize));
         setTotal(Number(payload.total ?? dataArray.length ?? 0));
+        setActiveCount(Number(payload.status_counts?.active ?? 0));
+        setInactiveCount(Number(payload.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || 'Failed to load nationalities');
       }
@@ -117,10 +128,10 @@ const NationalitiesManagement = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); }, []);
-
-  const activeCount   = rows.filter((r) => (r.status ?? 'active') === 'active').length;
-  const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.status]);
 
   /* ── BULK ACTIONS ── */
   const bulkAction = async (url, method, body, successMsg) => {
@@ -254,14 +265,6 @@ const NationalitiesManagement = () => {
     }] : []),
   ];
 
-  const filteredRows = rows.filter((row) => {
-    const name = filters.name.trim().toLowerCase();
-    const status = filters.status.trim().toLowerCase();
-    if (name && !String(row.nationality_name || '').toLowerCase().includes(name)) return false;
-    if (status && String(row.status || '').toLowerCase() !== status) return false;
-    return true;
-  });
-
   if (loading && rows.length === 0) return <InlineLoader text="Loading nationalities..." variant="ring" size="lg" />;
 
   return (
@@ -335,15 +338,14 @@ const NationalitiesManagement = () => {
         </div>
 
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
-          paginationMode="client"
-          rowCount={filteredRows.length}
-          initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
+          paginationMode="server"
+          rowCount={total}
           loading={loading}
           autoHeight
           checkboxSelection

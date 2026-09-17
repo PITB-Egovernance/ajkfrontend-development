@@ -74,24 +74,38 @@ const GroupsManagement = () => {
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
-  /* ── FETCH ── */
+  const [total,         setTotal]         = useState(0);
+  const [activeCount,   setActiveCount]   = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchGroups = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/group`, { headers: authHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.group_name.trim()) params.set('name', filters.group_name.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res    = await fetch(`${API_BASE}/settings/group?${params.toString()}`, { headers: authHeaders() });
       const result = await res.json();
 
       if (res.ok || result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
+        const data = result.data?.data ?? [];
         setRows(
           (Array.isArray(data) ? data : []).map((item, i) => ({
             id:         item.hash_id ?? item.id,
             hash_id:    item.hash_id ?? item.id,
-            sr_no:      i + 1,
+            sr_no:      paginationModel.page * paginationModel.pageSize + i + 1,
             group_name: item.group_name ?? item.name ?? "-",
             status:     item.status ?? "active",
           }))
         );
+        setTotal(Number(result.data?.total ?? data.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load groups");
         setRows([]);
@@ -104,16 +118,10 @@ const GroupsManagement = () => {
     }
   };
 
-  useEffect(() => { fetchGroups(); }, []); // eslint-disable-line
-
-  const activeCount   = rows.filter((r) => r.status === "active").length;
-  const inactiveCount = rows.filter((r) => r.status === "inactive").length;
-
-  const filtered = rows.filter((r) => {
-    if (filters.group_name.trim() && !r.group_name?.toLowerCase().includes(filters.group_name.trim().toLowerCase())) return false;
-    if (filters.status && r.status !== filters.status) return false;
-    return true;
-  });
+  useEffect(() => {
+    fetchGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.group_name, filters.status]);
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -280,7 +288,7 @@ const GroupsManagement = () => {
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-            <CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total Groups</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{rows.length}</h2></CardContent>
+            <CardContent className="p-5"><p className="text-sm text-blue-700 font-medium">Total Groups</p><h2 className="text-3xl font-bold text-blue-900 mt-1">{total}</h2></CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200">
             <CardContent className="p-5"><p className="text-sm text-emerald-700 font-medium">Active</p><h2 className="text-3xl font-bold text-emerald-900 mt-1">{activeCount}</h2></CardContent>
@@ -301,8 +309,9 @@ const GroupsManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filtered} columns={columns} getRowId={(r) => r.id}
+          rows={rows} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
+          paginationMode="server" rowCount={total}
           pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
           loading={loading}
         />

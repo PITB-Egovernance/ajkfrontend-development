@@ -57,7 +57,10 @@ const RequisitionStatementsManagement = () => {
   const canDelete = hasPermission(`${PERM}.delete`);
   const canRowActions = canEdit || canDelete;
 
-  const [allRows,    setAllRows]    = useState([]);
+  const [rows,       setRows]       = useState([]);
+  const [total,      setTotal]      = useState(0);
+  const [activeCount,   setActiveCount]   = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [filters,    setFilters]    = useState({ statement: "", status: "" });
@@ -71,30 +74,41 @@ const RequisitionStatementsManagement = () => {
   const [formData,    setFormData]    = useState(EMPTY_FORM);
   const [formErrors,  setFormErrors]  = useState({});
 
-  /* ── FETCH ── */
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const result = await RequisitionStatementApi.getAll();
-      const data = result.data?.data ?? result.data ?? [];
-      setAllRows(
+      const result = await RequisitionStatementApi.getAll({
+        per_page: paginationModel.pageSize,
+        page: paginationModel.page + 1,
+        name: filters.statement.trim() || undefined,
+        status: filters.status.trim() || undefined,
+      });
+      const data = result.data?.data ?? [];
+      setRows(
         (Array.isArray(data) ? data : []).map((item, i) => ({
           id:         item.hash_id || item.id,
           hash_id:    item.hash_id || item.id,
-          sr_no:      i + 1,
+          sr_no:      paginationModel.page * paginationModel.pageSize + i + 1,
           statement:  item.statement,
           status:     item.status ?? "active",
         }))
       );
+      setTotal(Number(result.data?.total ?? data.length));
+      setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+      setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
     } catch {
       toast.error("Failed to load requisition statements");
-      setAllRows([]);
+      setRows([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchAll(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.statement, filters.status]);
 
   /* ── FILTER CONFIG ── */
   const filterConfig = [
@@ -105,20 +119,13 @@ const RequisitionStatementsManagement = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const handleClearFilters = () => setFilters({ statement: "", status: "" });
-
-  /* ── CLIENT-SIDE FILTER ── */
-  const filteredRows = allRows.filter((row) => {
-    if (filters.statement && !row.statement?.toLowerCase().includes(filters.statement.toLowerCase())) return false;
-    if (filters.status && row.status !== filters.status) return false;
-    return true;
-  });
-
-  const total         = allRows.length;
-  const activeCount   = allRows.filter((r) => r.status === "active").length;
-  const inactiveCount = allRows.filter((r) => r.status === "inactive").length;
+  const handleClearFilters = () => {
+    setFilters({ statement: "", status: "" });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -170,8 +177,8 @@ const RequisitionStatementsManagement = () => {
     if (!selectionModel.length) return;
     if (!await confirmDelete({ title: "Delete Requisition Statements", message: `Delete ${selectionModel.length} statement${selectionModel.length > 1 ? "s" : ""}?` })) return;
     try {
-      const rows = allRows.filter((r) => selectionModel.includes(r.id));
-      await Promise.all(rows.map((r) => RequisitionStatementApi.delete(r.hash_id)));
+      const selected = rows.filter((r) => selectionModel.includes(r.id));
+      await Promise.all(selected.map((r) => RequisitionStatementApi.delete(r.hash_id)));
       toast.success("Deleted selected statements");
       setSelectionModel([]);
       fetchAll();
@@ -183,9 +190,9 @@ const RequisitionStatementsManagement = () => {
   const handleBulkStatus = async (status) => {
     if (!selectionModel.length) return;
     try {
-      const rows = allRows.filter((r) => selectionModel.includes(r.id));
+      const selected = rows.filter((r) => selectionModel.includes(r.id));
       await Promise.all(
-        rows.map((r) =>
+        selected.map((r) =>
           RequisitionStatementApi.update(r.hash_id, {
             statement: r.statement,
             status,
@@ -274,7 +281,7 @@ const RequisitionStatementsManagement = () => {
     }] : []),
   ];
 
-  if (loading && allRows.length === 0)
+  if (loading && rows.length === 0)
     return (
       <div className="flex justify-center items-center min-h-screen">
         <InlineLoader text="Loading requisition statements..." variant="ring" size="lg" />
@@ -375,11 +382,13 @@ const RequisitionStatementsManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={total}
           pageSizeOptions={[15, 25, 50]}
           loading={loading}
           autoHeight

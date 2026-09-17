@@ -66,8 +66,12 @@ const TehsilsManagement = () => {
         headers: getHeaders(false),
       });
       const result = await response.json();
-      if (result.status === 200) {
-        setTehsils(result.data || []);
+      // This endpoint's response has no top-level `status` field (see
+      // JsonResponseTrait::successResponse()) — checking for it here always silently failed.
+      if (result.success === true) {
+        setTehsils(Array.isArray(result.data) ? result.data : []);
+      } else {
+        toast.error(result.message || 'Failed to load tehsils');
       }
     } catch (error) {
       toast.error('Failed to load tehsils');
@@ -78,12 +82,15 @@ const TehsilsManagement = () => {
 
   const fetchDistricts = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings/districts`, {
+      // A dedicated "give me every district" need for this dropdown (rule #2) — not the
+      // paginated Districts settings page itself, so a generously large per_page here is
+      // correct, not a bug to fix.
+      const response = await fetch(`${API_BASE}/settings/districts?per_page=500`, {
         headers: getHeaders(false),
       });
       const result = await response.json();
       if (result.status === 200) {
-        setDistricts(result.data || []);
+        setDistricts(Array.isArray(result.data?.data) ? result.data.data : []);
       }
     } catch (error) {
     }

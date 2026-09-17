@@ -63,7 +63,6 @@ const ExamCentersManagement = () => {
   const [importing, setImporting] = useState(false);
   const [cities,    setCities]    = useState([]);   // full city objects with district_id
   const [districts, setDistricts] = useState([]);   // for name lookup
-  const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     name: '',
     city: '',
@@ -100,6 +99,7 @@ const ExamCentersManagement = () => {
       ...prev,
       [name]: value
     }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
@@ -108,6 +108,7 @@ const ExamCentersManagement = () => {
       city: '',
       status: ''
     });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
@@ -125,17 +126,28 @@ const ExamCentersManagement = () => {
     status: "active",
   });
 
-  /* ── FETCH ALL (client-side search needs full dataset) ── */
+  const [total, setTotal] = useState(0);
+  const [totalCapacity, setTotalCapacity] = useState(0);
+
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchCenters = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/exam-centers?per_page=1000`, { headers: getHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.city.trim()) params.set('city', filters.city.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res    = await fetch(`${API_BASE}/settings/exam-centers?${params.toString()}`, { headers: getHeaders() });
       const result = await res.json();
       if (result.status === 200 || result.success) {
-        const data = result.data?.data ?? result.data ?? [];
+        const data = Array.isArray(result.data?.data) ? result.data.data : [];
         setAllRows(data.map((item, i) => ({
           id:          item.hash_id || item.id,
-          sr_no:       i + 1,
+          sr_no:       paginationModel.page * paginationModel.pageSize + i + 1,
           hash_id:     item.hash_id,
           name:        item.name,
           city:        item.city,
@@ -144,6 +156,8 @@ const ExamCentersManagement = () => {
           created_at:  item.created_at,
           status:      String(item.status || "active").toLowerCase(),
         })));
+        setTotal(Number(result.data?.total ?? data.length));
+        setTotalCapacity(Number(result.data?.total_capacity ?? 0));
       } else {
         toast.error(result.message || "Failed to load exam centers");
         setAllRows([]);
@@ -183,7 +197,11 @@ const ExamCentersManagement = () => {
     } catch {}
   };
 
-  useEffect(() => { Promise.all([fetchCenters(), fetchCities(), fetchDistricts()]); }, []); // eslint-disable-line
+  useEffect(() => { fetchCities(); fetchDistricts(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchCenters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.city, filters.status]);
 
   // Resolve district name from a district_id
   const getDistrictName = (districtId) => {
@@ -203,36 +221,6 @@ const ExamCentersManagement = () => {
       district_name: districtId ? (getDistrictName(districtId) ?? "") : "",
     }));
   };
-
-  /* ── CLIENT-SIDE SEARCH ── */
-  const filteredRows = allRows.filter((row) => {
-    // Basic search term filter
-    const q = searchTerm.toLowerCase();
-    const searchMatch = !searchTerm.trim() || 
-      row.name?.toLowerCase().includes(q) ||
-      row.city?.toLowerCase().includes(q) ||
-      String(row.capacity).includes(q);
-    
-    if (!searchMatch) return false;
-
-    // Advanced filters
-    if (filters.name && !row.name?.toLowerCase().includes(filters.name.toLowerCase())) {
-      return false;
-    }
-    
-    if (filters.city && row.city !== filters.city) {
-      return false;
-    }
-
-    if (filters.status && row.status !== filters.status) {
-      return false;
-    }
-    
-    return true;
-  });
-
-  const total        = allRows.length;
-  const totalCapacity= allRows.reduce((s, r) => s + (Number(r.capacity) || 0), 0);
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -474,13 +462,15 @@ const ExamCentersManagement = () => {
           title="Filter Exam Centers"
         />
 
-        {/* GRID — client-side pagination + search */}
+        {/* GRID */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={allRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={total}
           pageSizeOptions={[15, 25, 50]}
           loading={loading}
           autoHeight

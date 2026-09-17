@@ -85,7 +85,7 @@ const WrittenExamSubjectsManagement = () => {
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [totalRows,  setTotalRows]  = useState(0);
-  const [filters,    setFilters]    = useState({ designation: "", subject_name: "", status: "" });
+  const [filters,    setFilters]    = useState({ designation_id: "", subject_name: "", status: "" });
 
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [selectionModel,  setSelectionModel]  = useState([]);
@@ -111,15 +111,24 @@ const WrittenExamSubjectsManagement = () => {
     status:           item.status ?? "active",
   });
 
-  /* ── FETCH ── */
-  const fetchAll = async () => {
+  const [activeCount,   setActiveCount]   = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+
+  /* ── FETCH (server-side pagination + filters) ── */
+  const fetchAll = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const result = await WrittenExamSubjectApi.getAll(1, 500);
+      const result = await WrittenExamSubjectApi.getAll(page + 1, pageSize, {
+        name: filters.subject_name.trim(),
+        designation_id: filters.designation_id,
+        status: filters.status,
+      });
       const pagination = result.data ?? {};
-      const data = pagination.data ?? result.data ?? [];
-      setAllRows((Array.isArray(data) ? data : []).map(mapSubjectRow));
+      const data = pagination.data ?? [];
+      setAllRows((Array.isArray(data) ? data : []).map((item, i) => mapSubjectRow(item, page * pageSize + i)));
       setTotalRows(Number(pagination.total) || 0);
+      setActiveCount(Number(pagination.status_counts?.active ?? 0));
+      setInactiveCount(Number(pagination.status_counts?.inactive ?? 0));
     } catch {
       toast.error("Failed to load written exam subjects");
       setAllRows([]);
@@ -148,15 +157,18 @@ const WrittenExamSubjectsManagement = () => {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll(paginationModel.page, paginationModel.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.subject_name, filters.designation_id, filters.status]);
 
   useEffect(() => { fetchDesignations(); }, []);
 
   /* ── FILTER CONFIG ── */
   const filterConfig = [
-    { name: "designation",  label: "Designation",  type: "select", options: designations.map((d) => ({ value: d.name, label: d.name })) },
-    { name: "subject_name", label: "Subject Name", type: "text",   placeholder: "Filter by name" },
-    { name: "status",       label: "Status",       type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
+    { name: "designation_id", label: "Designation",  type: "select", options: designations.map((d) => ({ value: d.id, label: d.name })) },
+    { name: "subject_name",   label: "Subject Name", type: "text",   placeholder: "Filter by name" },
+    { name: "status",         label: "Status",       type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
   ];
 
   const handleFilterChange = (e) => {
@@ -166,21 +178,11 @@ const WrittenExamSubjectsManagement = () => {
   };
 
   const handleClearFilters = () => {
-    setFilters({ designation: "", subject_name: "", status: "" });
+    setFilters({ designation_id: "", subject_name: "", status: "" });
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  /* ── CLIENT-SIDE FILTER ── */
-  const filteredRows = allRows.filter((row) => {
-    if (filters.designation  && row.designation !== filters.designation) return false;
-    if (filters.subject_name && !row.subject_name?.toLowerCase().includes(filters.subject_name.toLowerCase())) return false;
-    if (filters.status       && row.status !== filters.status) return false;
-    return true;
-  });
-
-  const total         = totalRows;
-  const activeCount   = allRows.filter((r) => r.status === "active").length;
-  const inactiveCount = allRows.filter((r) => r.status === "inactive").length;
+  const total = totalRows;
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -477,14 +479,14 @@ const WrittenExamSubjectsManagement = () => {
 
         {/* GRID */}
         <DataGrid
-          rows={filteredRows}
+          rows={allRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="client"
-          rowCount={filteredRows.length}
+          paginationMode="server"
+          rowCount={totalRows}
           loading={loading}
           autoHeight
           checkboxSelection

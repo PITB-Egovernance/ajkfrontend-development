@@ -21,8 +21,11 @@ const handleResponse = async (response) => {
 };
 
 const RequisitionStatementApi = {
-  getAll: async () => {
-    const response = await fetch(`${API_BASE}/settings/requisition-statements`, {
+  getAll: async (params = {}) => {
+    const query = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null))
+    ).toString();
+    const response = await fetch(`${API_BASE}/settings/requisition-statements${query ? `?${query}` : ''}`, {
       method: 'GET',
       headers: getHeaders(),
     });

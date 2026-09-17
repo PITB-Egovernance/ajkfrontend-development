@@ -113,17 +113,29 @@ const TestsManagement = () => {
     finally { setLoadingTypes(false); }
   };
 
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/settings/tests?per_page=500`, { headers: getHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.test_type_id.trim()) params.set('test_type_id', filters.test_type_id.trim());
+      if (filters.test_fees.trim()) params.set('test_fees', filters.test_fees.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res = await fetch(`${API_BASE}/settings/tests?${params.toString()}`, { headers: getHeaders() });
       const result = await res.json();
       if (res.ok || result.success || result.status === 200) {
         const payload = result.data ?? {};
-        const data = result.data?.data ?? result.data ?? [];
-        const dataArray = Array.isArray(data) ? data : [];
-        setRows(formatTestRows(dataArray));
-        setTotal(Number(payload.total ?? dataArray.length ?? 0));
+        const dataArray = Array.isArray(payload.data) ? payload.data : [];
+        setRows(formatTestRows(dataArray, paginationModel.page * paginationModel.pageSize));
+        setTotal(Number(payload.total ?? dataArray.length));
+        setActiveCount(Number(payload.status_counts?.active ?? 0));
+        setInactiveCount(Number(payload.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || 'Failed to load tests');
       }
@@ -132,13 +144,13 @@ const TestsManagement = () => {
   };
 
   useEffect(() => { fetchExamTypes(); }, []);
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.test_type_id, filters.test_fees, filters.status]);
 
   // Resolve a test-type display name — prefer the name from the list, fall back to the dropdown options
   const typeNameById = (id) => examTypes.find((t) => t.hash_id === id)?.name || '';
-
-  const activeCount   = rows.filter((r) => (r.status ?? 'active') === 'active').length;
-  const inactiveCount = rows.filter((r) => r.status === 'inactive').length;
 
   /* ── BULK ACTIONS ── */
   const bulkAction = async (url, method, body, successMsg) => {
@@ -302,15 +314,6 @@ const TestsManagement = () => {
     }] : []),
   ];
 
-  const filteredRows = rows.filter((row) => {
-    const testTypeId = String(filters.test_type_id || '').trim();
-    const testFees = String(filters.test_fees || '').trim().toLowerCase();
-    const status = String(filters.status || '').trim().toLowerCase();
-    if (testTypeId && String(row.test_type_id) !== testTypeId) return false;
-    if (testFees && !String(row.test_fees ?? '').toLowerCase().includes(testFees)) return false;
-    if (status && String(row.status || '').toLowerCase() !== status) return false;
-    return true;
-  });
 
   if (loading && rows.length === 0) return <InlineLoader text="Loading tests..." variant="ring" size="lg" />;
 
@@ -431,15 +434,14 @@ const TestsManagement = () => {
         </div>
 
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50, 100]}
-          paginationMode="client"
-          rowCount={filteredRows.length}
-          initialState={{ pagination: { paginationModel: { pageSize: 15, page: 0 } } }}
+          paginationMode="server"
+          rowCount={total}
           loading={loading}
           autoHeight
           checkboxSelection

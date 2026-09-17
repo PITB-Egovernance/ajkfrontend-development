@@ -91,20 +91,30 @@ const SyllabusManagement = () => {
   const [formErrors,  setFormErrors]  = useState({});
   const [dragActive,  setDragActive]  = useState(false);
 
-  /* ── FETCH SYLLABUS LIST ── */
+  const [total, setTotal] = useState(0);
+
+  /* ── FETCH SYLLABUS LIST (server-side pagination + filters) ── */
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/syllabus`, { headers: authHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.case_number.trim()) params.set('case_number', filters.case_number.trim());
+      if (filters.designation.trim()) params.set('designation', filters.designation.trim());
+      if (filters.department) params.set('department', filters.department);
+
+      const res    = await fetch(`${API_BASE}/settings/syllabus?${params.toString()}`, { headers: authHeaders() });
       const result = await res.json();
 
       if (res.ok || result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
+        const data = Array.isArray(result.data?.data) ? result.data.data : [];
         setAllRows(
-          (Array.isArray(data) ? data : []).map((item, i) => ({
+          data.map((item, i) => ({
             id:               item.hash_id ?? item.id,
             hash_id:          item.hash_id ?? item.id,
-            sr_no:            i + 1,
+            sr_no:            paginationModel.page * paginationModel.pageSize + i + 1,
             job_hash_id:      item.job_detail_hash_id ?? item.job_hash_id ?? "",
             case_number:      item.case_number ?? "",
             designation:      item.designation ?? "",
@@ -113,6 +123,7 @@ const SyllabusManagement = () => {
             created_at:       item.created_at ?? null,
           }))
         );
+        setTotal(Number(result.data?.total ?? data.length));
       } else {
         toast.error(result.message || "Failed to load syllabus records");
         setAllRows([]);
@@ -125,7 +136,10 @@ const SyllabusManagement = () => {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.case_number, filters.designation, filters.department]);
 
   /* ── FETCH JOB DETAILS (Case Number dropdown source) ── */
   const fetchJobDetails = async () => {
@@ -248,18 +262,14 @@ const SyllabusManagement = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((p) => ({ ...p, page: 0 }));
   };
 
-  const handleClearFilters = () => setFilters({ case_number: "", designation: "", department: "" });
+  const handleClearFilters = () => {
+    setFilters({ case_number: "", designation: "", department: "" });
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
 
-  const filteredRows = allRows.filter((row) => {
-    if (filters.case_number && !row.case_number.toLowerCase().includes(filters.case_number.toLowerCase())) return false;
-    if (filters.designation && !row.designation.toLowerCase().includes(filters.designation.toLowerCase())) return false;
-    if (filters.department && row.department !== filters.department) return false;
-    return true;
-  });
-
-  const total = allRows.length;
   const departmentsCovered = new Set(allRows.map((r) => r.department).filter(Boolean)).size;
   const recentCount = allRows.filter((r) => {
     if (!r.created_at) return false;
@@ -490,11 +500,13 @@ const SyllabusManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={allRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={total}
           pageSizeOptions={[15, 25, 50]}
           loading={loading}
           autoHeight

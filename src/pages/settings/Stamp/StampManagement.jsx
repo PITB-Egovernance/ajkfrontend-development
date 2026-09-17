@@ -82,24 +82,37 @@ const StampManagement = () => {
   const [formErrors,  setFormErrors]  = useState({});
   const [previewImage, setPreviewImage] = useState(null);
 
-  /* ── FETCH ── */
+  const [total, setTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/stamp`, { headers: authHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res    = await fetch(`${API_BASE}/settings/stamp?${params.toString()}`, { headers: authHeaders() });
       const result = await res.json();
 
       if (res.ok || result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
+        const data = Array.isArray(result.data?.data) ? result.data.data : [];
         setAllRows(
-          (Array.isArray(data) ? data : []).map((item, i) => ({
+          data.map((item, i) => ({
             id:      item.hash_id ?? item.id,
             hash_id: item.hash_id ?? item.id,
-            sr_no:   i + 1,
+            sr_no:   paginationModel.page * paginationModel.pageSize + i + 1,
             image:   resolveImage(item.image ?? item.image_url),
             status:  item.status ?? "active",
           }))
         );
+        setTotal(Number(result.data?.total ?? data.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load stamps");
         setAllRows([]);
@@ -112,7 +125,10 @@ const StampManagement = () => {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.status]);
 
   /* ── FILE INPUT (validate type + 2 MB size) ── */
   const handleFileChange = (e) => {
@@ -155,18 +171,13 @@ const StampManagement = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((p) => ({ ...p, page: 0 }));
   };
 
-  const handleClearFilters = () => setFilters({ status: "" });
-
-  const filteredRows = allRows.filter((row) => {
-    if (filters.status && row.status !== filters.status) return false;
-    return true;
-  });
-
-  const total         = allRows.length;
-  const activeCount   = allRows.filter((r) => r.status === "active").length;
-  const inactiveCount = allRows.filter((r) => r.status === "inactive").length;
+  const handleClearFilters = () => {
+    setFilters({ status: "" });
+    setPaginationModel((p) => ({ ...p, page: 0 }));
+  };
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -418,11 +429,13 @@ const StampManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={allRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={total}
           pageSizeOptions={[15, 25, 50]}
           loading={loading}
           autoHeight

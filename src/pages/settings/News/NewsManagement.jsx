@@ -16,7 +16,6 @@ import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import AdvancedFilter from "components/tables/AdvancedFilter";
-import { fetchPaginatedApiList } from "utils/paginatedApiUtils";
 
 const PERM = "settings.news";
 
@@ -210,19 +209,37 @@ const NewsManagement = () => {
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
-  /* ── FETCH ── */
+  const [total, setTotal] = useState(0);
+  const [publishedCount, setPublishedCount] = useState(0);
+  const [draftCount, setDraftCount] = useState(0);
+  const [featuredCount, setFeaturedCount] = useState(0);
+
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const data = await fetchPaginatedApiList(`${API_BASE}/settings/news`, {
-        headers: authHeaders(),
-        perPage: 200,
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
       });
+      if (filters.title.trim()) params.set('title', filters.title.trim());
+      if (filters.category) params.set('category', filters.category);
+      if (filters.news_type) params.set('news_type', filters.news_type);
+      if (filters.status) params.set('status', filters.status);
+
+      const res = await fetch(`${API_BASE}/settings/news?${params.toString()}`, { headers: authHeaders() });
+      const result = await res.json();
+      if (!(result.success || result.status === 200 || res.ok)) {
+        toast.error(result.message || "Failed to load news");
+        setRows([]);
+        return;
+      }
+      const data = Array.isArray(result.data?.data) ? result.data.data : [];
       setRows(
-        (Array.isArray(data) ? data : []).map((item, i) => ({
+        data.map((item, i) => ({
           id:                item.hash_id ?? item.id,
           hash_id:           item.hash_id ?? item.id,
-          sr_no:             i + 1,
+          sr_no:             paginationModel.page * paginationModel.pageSize + i + 1,
           category:          item.category ?? "",
           title:             item.title ?? "-",
           slug:              item.slug ?? "",
@@ -242,6 +259,10 @@ const NewsManagement = () => {
           status:            item.status ?? "draft",
         }))
       );
+      setTotal(Number(result.data?.total ?? data.length));
+      setPublishedCount(Number(result.data?.status_counts?.published ?? 0));
+      setDraftCount(Number(result.data?.status_counts?.draft ?? 0));
+      setFeaturedCount(Number(result.data?.status_counts?.featured ?? 0));
     } catch {
       toast.error("Failed to load news");
       setRows([]);
@@ -250,20 +271,10 @@ const NewsManagement = () => {
     }
   };
 
-  useEffect(() => { fetchNews(); }, []); // eslint-disable-line
-
-  const total         = rows.length;
-  const publishedCount = rows.filter((r) => r.status === "published").length;
-  const draftCount     = rows.filter((r) => r.status === "draft").length;
-  const featuredCount  = rows.filter((r) => r.is_featured).length;
-
-  const filtered = rows.filter((r) => {
-    if (filters.title.trim() && !r.title?.toLowerCase().includes(filters.title.trim().toLowerCase())) return false;
-    if (filters.category && r.category !== filters.category) return false;
-    if (filters.news_type && r.news_type !== filters.news_type) return false;
-    if (filters.status && r.status !== filters.status) return false;
-    return true;
-  });
+  useEffect(() => {
+    fetchNews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.title, filters.category, filters.news_type, filters.status]);
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -499,8 +510,9 @@ const NewsManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filtered} columns={columns} getRowId={(r) => r.id}
+          rows={rows} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
+          paginationMode="server" rowCount={total}
           pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
           loading={loading}
         />

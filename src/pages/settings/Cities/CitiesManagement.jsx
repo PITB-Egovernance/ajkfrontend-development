@@ -23,7 +23,7 @@ import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
-import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 
 const PERM = "settings.cities";
 
@@ -62,18 +62,17 @@ const CitiesManagement = () => {
   const canRowActions = canEdit || canDelete;
   const navigate = useNavigate();
 
-  // City→district mapping cache (backend doesn't return district_id yet)
-  const DISTRICT_MAP_KEY = 'ajk_city_district_map';
-  const loadDistrictMap  = () => { try { return JSON.parse(localStorage.getItem(DISTRICT_MAP_KEY) || '{}'); } catch { return {}; } };
-  const saveDistrictMap  = (map) => { try { localStorage.setItem(DISTRICT_MAP_KEY, JSON.stringify(map)); } catch {} };
-
-  const [allRows,    setAllRows]    = useState([]);
+  const [rows,       setRows]       = useState([]);
+  const [total,      setTotal]      = useState(0);
+  const [activeCount,   setActiveCount]   = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({ city: '', status: '' });
 
-  // Districts for the city-district linking dropdown
+  // Districts for the city-district linking dropdown only — a real "all possible values"
+  // need, unlike the old per-row lookup this page used to do to resolve district_name
+  // (the backend now embeds district_name directly, see ExamCity::getDistrictNameAttribute()).
   const [districts,         setDistricts]         = useState([]);
   const [loadingDistricts,  setLoadingDistricts]  = useState(false);
 
@@ -85,36 +84,50 @@ const CitiesManagement = () => {
   const [editingCity, setEditingCity] = useState(null);
   const [formData,    setFormData]    = useState({ city_name: "", district_id: "" });
 
-  /* ── FETCH ALL ── */
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchCities = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/cities?per_page=1000`, { headers: getHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.city.trim()) params.set('name', filters.city.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res    = await fetch(`${API_BASE}/settings/cities?${params.toString()}`, { headers: getHeaders() });
       const result = await res.json();
       if (result.status === 200 || result.success) {
-        const data     = result.data?.data ?? result.data ?? [];
-        setAllRows(data.map((item, i) => {
+        const data     = result.data?.data ?? [];
+        setRows(data.map((item, i) => {
           const hid = item.hash_id || item.id;
           return {
-            id:          hid,
-            sr_no:       i + 1,
-            hash_id:     item.hash_id,
+            id:            hid,
+            sr_no:         paginationModel.page * paginationModel.pageSize + i + 1,
+            hash_id:       item.hash_id,
             city:          item.city_name || item.city || item.name,
             district_name: item.district_name || null,
             district_id:   item.district_id   || null,
-            created_at:  item.created_at,
-            status:      item.status ?? "active",
+            created_at:    item.created_at,
+            status:        item.status ?? "active",
           };
         }));
+        setTotal(Number(result.data?.total ?? data.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load cities");
-        setAllRows([]);
+        setRows([]);
       }
-    } catch { toast.error("Server error"); setAllRows([]); }
+    } catch { toast.error("Server error"); setRows([]); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { Promise.all([fetchCities(), fetchDistricts()]); }, []); // eslint-disable-line
+  useEffect(() => { fetchDistricts(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchCities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.city, filters.status]);
 
   /* ── FETCH DISTRICTS FOR DROPDOWN ── */
   const fetchDistricts = async () => {
@@ -161,6 +174,7 @@ const CitiesManagement = () => {
       ...prev,
       [name]: value
     }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const handleClearFilters = () => {
@@ -168,30 +182,8 @@ const CitiesManagement = () => {
       city: '',
       status: ''
     });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
-
-  /* ── CLIENT-SIDE FILTERING ── */
-  const filteredRows = allRows.filter((row) => {
-    // Basic search term filter
-    if (searchTerm.trim() && !row.city?.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
-    
-    // Advanced filters
-    if (filters.city && !row.city?.toLowerCase().includes(filters.city.toLowerCase())) {
-      return false;
-    }
-    
-    if (filters.status && row.status !== filters.status) {
-      return false;
-    }
-    
-    return true;
-  });
-
-  const total        = allRows.length;
-  const activeCount  = allRows.filter((r) => (r.status ?? "active") === "active").length;
-  const inactiveCount= allRows.filter((r) => r.status === "inactive").length;
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -289,13 +281,10 @@ const CitiesManagement = () => {
       field: "district_name",
       headerName: "District",
       width: 180,
-      renderCell: (p) => {
-        const dist = districts.find(d => (d.hash_id || d.id) === p.row.district_id);
-        const name = dist ? dist.name : (p.value || p.row.district_name);
-        return name
-          ? <span className="text-slate-700 text-sm">{name}</span>
-          : <span className="text-slate-400 text-xs">—</span>;
-      },
+      renderCell: (p) => (p.value
+        ? <span className="text-slate-700 text-sm">{p.value}</span>
+        : <span className="text-slate-400 text-xs">—</span>
+      ),
     },
     { field: "status",     headerName: "Status",    width: 110,
       renderCell: (p) => (
@@ -313,7 +302,7 @@ const CitiesManagement = () => {
       renderCell: (p) => <IconButton size="small" onClick={(e) => handleMenuOpen(e, p.row)}><MoreVertical size={18} /></IconButton> }] : []),
   ];
 
-  if (loading && allRows.length === 0)
+  if (loading && rows.length === 0)
     return <div className="flex justify-center items-center min-h-screen"><InlineLoader text="Loading cities..." variant="ring" size="lg" /></div>;
 
   return (
@@ -379,12 +368,13 @@ const CitiesManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
-          initialState={GRID_INITIAL_STATE}
+          paginationMode="server"
+          rowCount={total}
           pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
           loading={loading}
           autoHeight

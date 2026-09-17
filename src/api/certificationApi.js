@@ -21,8 +21,11 @@ const handleResponse = async (response) => {
 };
 
 const CertificationApi = {
-  getAll: async () => {
-    const response = await fetch(`${API_BASE}/settings/certifications`, {
+  getAll: async (params = {}) => {
+    const query = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null))
+    ).toString();
+    const response = await fetch(`${API_BASE}/settings/certifications${query ? `?${query}` : ''}`, {
       method: 'GET',
       headers: getHeaders(),
     });

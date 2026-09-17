@@ -88,25 +88,42 @@ const RollNumberSlipInstructions = () => {
   const [anchorEl,    setAnchorEl]    = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
-  /* ── FETCH ── */
+  const [total, setTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [noteCount, setNoteCount] = useState(0);
+  const [instrCount, setInstrCount] = useState(0);
+
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchInstructions = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/roll-number-slip-instructions`, { headers: authHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.slip_text.trim()) params.set('slip_text', filters.slip_text.trim());
+      if (filters.slip_text_type) params.set('slip_text_type', filters.slip_text_type);
+      if (filters.status) params.set('status', filters.status);
+
+      const res    = await fetch(`${API_BASE}/settings/roll-number-slip-instructions?${params.toString()}`, { headers: authHeaders() });
       const result = await res.json();
 
       if (res.ok || result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
+        const data = Array.isArray(result.data?.data) ? result.data.data : [];
         setRows(
-          (Array.isArray(data) ? data : []).map((item, i) => ({
+          data.map((item, i) => ({
             id:             item.hash_id ?? item.id,
             hash_id:        item.hash_id ?? item.id,
-            sr_no:          i + 1,
+            sr_no:          paginationModel.page * paginationModel.pageSize + i + 1,
             slip_text_type: item.slip_text_type ?? "note",
             slip_text:      item.slip_text ?? item.slip_text ?? item.text ?? "",
             status:         item.status ?? "active",
           }))
         );
+        setTotal(Number(result.data?.total ?? data.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setNoteCount(Number(result.data?.type_counts?.note ?? 0));
+        setInstrCount(Number(result.data?.type_counts?.instruction ?? 0));
       } else {
         toast.error(result.message || "Failed to load slip instructions");
         setRows([]);
@@ -119,19 +136,10 @@ const RollNumberSlipInstructions = () => {
     }
   };
 
-  useEffect(() => { fetchInstructions(); }, []); // eslint-disable-line
-
-  const total         = rows.length;
-  const activeCount   = rows.filter((r) => r.status === "active").length;
-  const noteCount     = rows.filter((r) => r.slip_text_type === "note").length;
-  const instrCount    = rows.filter((r) => r.slip_text_type === "instruction").length;
-
-  const filtered = rows.filter((r) => {
-    if (filters.slip_text.trim() && !stripHtml(r.slip_text).toLowerCase().includes(filters.slip_text.trim().toLowerCase())) return false;
-    if (filters.slip_text_type && r.slip_text_type !== filters.slip_text_type) return false;
-    if (filters.status && r.status !== filters.status) return false;
-    return true;
-  });
+  useEffect(() => {
+    fetchInstructions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.slip_text, filters.slip_text_type, filters.status]);
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -352,8 +360,9 @@ const RollNumberSlipInstructions = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filtered} columns={columns} getRowId={(r) => r.id}
+          rows={rows} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
+          paginationMode="server" rowCount={total}
           pageSizeOptions={[15, 25, 50]} autoHeight disableRowSelectionOnClick sx={GRID_SX}
           loading={loading}
         />

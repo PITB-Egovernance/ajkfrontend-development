@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import TooltipDataGrid from "components/ui/TooltipDataGrid";
 import {
   TextField,
@@ -133,21 +133,30 @@ const SecretaryOfficialsManagement = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
 
+  const [totalCount, setTotalCount] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+
   /* ===============================
-     FETCH SECRETARY AND OFFICIALS
+     FETCH SECRETARY AND OFFICIALS (server-side filters)
   =============================== */
   const fetchOfficials = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/settings/secretary-officials`, {
+      const params = new URLSearchParams({ per_page: '1000' });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.title.trim()) params.set('title', filters.title.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res = await fetch(`${API_BASE}/settings/secretary-officials?${params.toString()}`, {
         headers: authHeaders(),
       });
       const result = await res.json();
 
       if (res.ok || result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
+        const data = Array.isArray(result.data?.data) ? result.data.data : [];
         setRows(
-          (Array.isArray(data) ? data : []).map((item) => ({
+          data.map((item) => ({
             id: item.hash_id ?? item.id,
             hash_id: item.hash_id ?? item.id,
             name: item.name ?? "",
@@ -156,6 +165,9 @@ const SecretaryOfficialsManagement = () => {
             status: item.status ?? "active",
           }))
         );
+        setTotalCount(Number(result.data?.total ?? data.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load secretary and officials");
         setRows([]);
@@ -170,29 +182,8 @@ const SecretaryOfficialsManagement = () => {
 
   useEffect(() => {
     fetchOfficials();
-  }, []); // eslint-disable-line
-
-  // Filter logic
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      const nameMatch =
-        !filters.name ||
-        row.name.toLowerCase().includes(filters.name.trim().toLowerCase());
-      const titleMatch =
-        !filters.title ||
-        row.title.toLowerCase().includes(filters.title.trim().toLowerCase());
-      const statusMatch =
-        !filters.status ||
-        row.status.toLowerCase() === filters.status.trim().toLowerCase();
-
-      return nameMatch && titleMatch && statusMatch;
-    });
-  }, [rows, filters]);
-
-  // Statistics Calculation
-  const totalCount = rows.length;
-  const activeCount = rows.filter((r) => r.status === "active").length;
-  const inactiveCount = rows.filter((r) => r.status === "inactive").length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.name, filters.title, filters.status]);
 
   /* ===============================
      ACTION MENU HANDLERS
@@ -564,9 +555,9 @@ const SecretaryOfficialsManagement = () => {
 
         {/* DATA GRID TABLE */}
         <div className="mt-4">
-          {filteredRows.length > 0 ? (
+          {rows.length > 0 ? (
             <TooltipDataGrid
-              rows={filteredRows}
+              rows={rows}
               columns={columns}
               autoHeight
               disableSelectionOnClick

@@ -21,10 +21,13 @@ const handleResponse = async (response) => {
 };
 
 const WrittenExamSubjectApi = {
-  getAll: async (page = 1, perPage = 15) => {
+  getAll: async (page = 1, perPage = 15, filters = {}) => {
     const params = new URLSearchParams({
       page: String(page),
       per_page: String(perPage),
+    });
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== '' && value != null) params.set(key, value);
     });
     const response = await fetch(`${API_BASE}/settings/written-exam-subjects?${params.toString()}`, {
       method: 'GET',

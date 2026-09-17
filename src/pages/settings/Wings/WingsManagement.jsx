@@ -62,6 +62,8 @@ const WingsManagement = () => {
   const [loading, setLoading]                 = useState(true);
   const [total, setTotal]                     = useState(0);
   const [secretaryId, setSecretaryId] = useState(null);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({ name: "", code: "", status: "" });
@@ -89,16 +91,25 @@ const WingsManagement = () => {
   const [editingWing, setEditingWing]     = useState(null);
   const [formData, setFormData] = useState({ name: "", status: "active" });
 
-  /* ───────────────────────── FETCH ───────────────────────── */
+  /* ───────────────────────── FETCH (server-side pagination + filters) ───────────────────────── */
   const fetchWings = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/wings?per_page=500`, { headers: headers(false) });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.code.trim()) params.set('code', filters.code.trim());
+      if (searchTerm.trim()) params.set('search', searchTerm.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res    = await fetch(`${API_BASE}/settings/wings?${params.toString()}`, { headers: headers(false) });
       const result = await res.json();
 
       if (res.ok || result.status === 200 || result.success) {
         const payload = result.data ?? {};
-        const data    = payload.data ?? result.data ?? [];
+        const data    = payload.data ?? [];
 
         const formatted = data.map((item) => ({
           id:          item.hash_id,
@@ -112,7 +123,9 @@ const WingsManagement = () => {
         }));
 
         setRows(formatted);
-        setTotal(formatted.length);
+        setTotal(Number(payload.total ?? formatted.length));
+        setActiveCount(Number(payload.status_counts?.active ?? 0));
+        setInactiveCount(Number(payload.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load wings");
       }
@@ -140,22 +153,13 @@ const WingsManagement = () => {
 
   useEffect(() => {
     fetchSecretaryId();
-    fetchWings();
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ───────────────────────── FILTER ───────────────────────── */
-  const filteredRows = rows.filter((row) => {
-    if (searchTerm.trim()) {
-      const t = searchTerm.toLowerCase();
-      const match = row.name?.toLowerCase().includes(t) || String(row.code)?.includes(t);
-      if (!match) return false;
-    }
-    if (filters.name   && !row.name?.toLowerCase().includes(filters.name.toLowerCase()))       return false;
-    if (filters.code   && !String(row.code).toLowerCase().includes(filters.code.toLowerCase())) return false;
-    if (filters.status && row.status !== filters.status)                                        return false;
-    return true;
-  });
+  useEffect(() => {
+    fetchWings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.code, filters.status, searchTerm]);
 
   /* ───────────────────────── SUBMIT ───────────────────────── */
   const handleSubmit = async () => {
@@ -233,10 +237,6 @@ const WingsManagement = () => {
       toast.error("Status update failed");
     }
   };
-
-  /* ───────────────────────── STATS ───────────────────────── */
-  const activeCount   = rows.filter((r) => (r.status ?? "active") === "active").length;
-  const inactiveCount = rows.filter((r) => (r.status ?? "active") === "inactive").length;
 
   /* ───────────────────────── COLUMNS ───────────────────────── */
   const columns = [
@@ -359,14 +359,14 @@ const WingsManagement = () => {
 
         {/* TABLE */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           getRowId={(row) => row.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[15, 25, 50]}
-          paginationMode="client"
-          rowCount={filteredRows.length}
+          paginationMode="server"
+          rowCount={total}
           loading={loading}
           autoHeight
           sx={gridSx}

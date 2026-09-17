@@ -57,7 +57,10 @@ const CertificatesManagement = () => {
   const canDelete = hasPermission(`${PERM}.delete`);
   const canRowActions = canEdit || canDelete;
 
-  const [allRows,    setAllRows]    = useState([]);
+  const [rows,       setRows]       = useState([]);
+  const [total,      setTotal]      = useState(0);
+  const [activeCount,   setActiveCount]   = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [filters,    setFilters]    = useState({ certification_name: "", status: "" });
@@ -71,30 +74,41 @@ const CertificatesManagement = () => {
   const [formData,    setFormData]    = useState(EMPTY_FORM);
   const [formErrors,  setFormErrors]  = useState({});
 
-  /* ── FETCH ── */
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const result = await CertificationApi.getAll();
-      const data = result.data?.data ?? result.data ?? [];
-      setAllRows(
+      const result = await CertificationApi.getAll({
+        per_page: paginationModel.pageSize,
+        page: paginationModel.page + 1,
+        name: filters.certification_name.trim() || undefined,
+        status: filters.status.trim() || undefined,
+      });
+      const data = result.data?.data ?? [];
+      setRows(
         (Array.isArray(data) ? data : []).map((item, i) => ({
           id:                   item.hash_id || item.id,
           hash_id:              item.hash_id || item.id,
-          sr_no:                i + 1,
+          sr_no:                paginationModel.page * paginationModel.pageSize + i + 1,
           certification_name:   item.certification_name,
           status:               item.status ?? "active",
         }))
       );
+      setTotal(Number(result.data?.total ?? data.length));
+      setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+      setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
     } catch {
       toast.error("Failed to load certifications");
-      setAllRows([]);
+      setRows([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchAll(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.certification_name, filters.status]);
 
   /* ── FILTER CONFIG ── */
   const filterConfig = [
@@ -105,20 +119,13 @@ const CertificatesManagement = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const handleClearFilters = () => setFilters({ certification_name: "", status: "" });
-
-  /* ── CLIENT-SIDE FILTER ── */
-  const filteredRows = allRows.filter((row) => {
-    if (filters.certification_name && !row.certification_name?.toLowerCase().includes(filters.certification_name.toLowerCase())) return false;
-    if (filters.status && row.status !== filters.status) return false;
-    return true;
-  });
-
-  const total         = allRows.length;
-  const activeCount   = allRows.filter((r) => r.status === "active").length;
-  const inactiveCount = allRows.filter((r) => r.status === "inactive").length;
+  const handleClearFilters = () => {
+    setFilters({ certification_name: "", status: "" });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -170,8 +177,8 @@ const CertificatesManagement = () => {
     if (!selectionModel.length) return;
     if (!await confirmDelete({ title: "Delete Certifications", message: `Delete ${selectionModel.length} certification${selectionModel.length > 1 ? "s" : ""}?` })) return;
     try {
-      const rows = allRows.filter((r) => selectionModel.includes(r.id));
-      await Promise.all(rows.map((r) => CertificationApi.delete(r.hash_id)));
+      const selected = rows.filter((r) => selectionModel.includes(r.id));
+      await Promise.all(selected.map((r) => CertificationApi.delete(r.hash_id)));
       toast.success("Deleted selected certifications");
       setSelectionModel([]);
       fetchAll();
@@ -183,9 +190,9 @@ const CertificatesManagement = () => {
   const handleBulkStatus = async (status) => {
     if (!selectionModel.length) return;
     try {
-      const rows = allRows.filter((r) => selectionModel.includes(r.id));
+      const selected = rows.filter((r) => selectionModel.includes(r.id));
       await Promise.all(
-        rows.map((r) =>
+        selected.map((r) =>
           CertificationApi.update(r.hash_id, {
             certification_name: r.certification_name,
             status,
@@ -270,7 +277,7 @@ const CertificatesManagement = () => {
     }] : []),
   ];
 
-  if (loading && allRows.length === 0)
+  if (loading && rows.length === 0)
     return (
       <div className="flex justify-center items-center min-h-screen">
         <InlineLoader text="Loading certifications..." variant="ring" size="lg" />
@@ -371,11 +378,13 @@ const CertificatesManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={total}
           pageSizeOptions={[15, 25, 50]}
           loading={loading}
           autoHeight

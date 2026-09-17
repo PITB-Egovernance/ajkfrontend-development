@@ -5,6 +5,7 @@ import { useAuth } from 'context/AuthContext';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import ApplicationApi from 'api/applicationApi';
+import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 import { isAdminUser, hasModuleAccess, hasAnyModuleAccess } from 'utils/permissions';
 import {
   Megaphone, Briefcase, Users, Clock, CheckCircle2,
@@ -137,11 +138,25 @@ const Dashboard = () => {
     const fetchAll = async () => {
       setStatsLoading(true);
 
-      const [appR, pscReqR, advR] = await Promise.allSettled([
+      const [appR, pscReqR, advR, approvedJobsR] = await Promise.allSettled([
         ApplicationApi.getAll({ per_page: 1000 }),
         fetchAllPages('/psc/requisitions'),
         fetchAllPages('/advertisements'),
+        // Once a requisition is approved it moves out of /psc/requisitions
+        // into this separate endpoint (same source ApprovedRequisitions.jsx
+        // reads — see its comment on why it's queried independently: its
+        // paginator is nested under data.jobs, not data). Without this,
+        // "Approved Requisitions" / "Posts Approved" undercount (often to 0)
+        // because /psc/requisitions rarely still holds rows with
+        // status === 'approved' once they've graduated to this endpoint.
+        fetchPaginatedApiList(`${API_BASE}/advertisements/approved-requisitions`, {
+          headers: getAdminHeaders(),
+          getPaginator: (result) => result?.data?.jobs,
+        }),
       ]);
+
+      const approvedJobs = approvedJobsR.status === 'fulfilled' ? approvedJobsR.value : [];
+      const approvedJobIds = new Set(approvedJobs.map((j) => j.hash_id).filter(Boolean));
 
       // ── PSC Requisitions: total + status counts + status chart from full list ──
       let totalRequisitions = null;
@@ -161,7 +176,6 @@ const Dashboard = () => {
             return acc;
           }, {});
           pendingCount  = counts['Pending']  ?? 0;
-          approvedCount = counts['Approved'] ?? 0;
           rejectedCount = counts['Rejected'] ?? 0;
           setReqStatusChart(
             Object.entries(counts).map(([name, value]) => ({
@@ -169,13 +183,25 @@ const Dashboard = () => {
             }))
           );
 
-          // Total posts (vacancies) requested across approved requisitions
-          totalPostsApproved = items.reduce((sum, r) => {
+          // "Approved" outcome spans two sources: requisitions still sitting
+          // in /psc/requisitions with status Approved, plus ones that have
+          // already moved to /advertisements/approved-requisitions — avoid
+          // double-counting the same requisition if it (unexpectedly) shows
+          // up in both, same dedup direction ApprovedRequisitions.jsx uses.
+          const pscApproved = items.filter((r) => {
             const raw = (r.status?.name ?? r.status ?? '').toString().trim().toLowerCase();
-            if (raw !== 'approved') return sum;
-            return sum + (Number(r.num_posts) || 0);
-          }, 0);
+            return raw === 'approved' && !(r.hash_id && approvedJobIds.has(r.hash_id));
+          });
+
+          approvedCount = approvedJobs.length + pscApproved.length;
+
+          // Total posts (vacancies) requested across approved requisitions
+          totalPostsApproved = [...approvedJobs, ...pscApproved]
+            .reduce((sum, r) => sum + (Number(r.num_posts) || 0), 0);
         }
+      } else {
+        approvedCount = approvedJobs.length;
+        totalPostsApproved = approvedJobs.reduce((sum, r) => sum + (Number(r.num_posts) || 0), 0);
       }
 
       // ── Advertisements: total + status pie chart from full list ──

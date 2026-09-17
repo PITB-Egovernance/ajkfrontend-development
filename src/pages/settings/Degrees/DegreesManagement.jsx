@@ -32,7 +32,6 @@ const DegreesManagement = () => {
   const navigate = useNavigate();
 
   const [rows,   setRows]   = useState([]);
-  const [allRows, setAllRows] = useState([]);
   const [groups, setGroups] = useState([]);   // all known degree groups — used for the filter dropdown
   const [loading, setLoading] = useState(true);
   const [totalRows, setTotalRows] = useState(0);
@@ -48,7 +47,6 @@ const DegreesManagement = () => {
   const [togglingId, setTogglingId] = useState(null);
   const [filters, setFilters] = useState({ degree_name: '', degree_group: '', status: '' });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
-  const hasActiveFilters = Object.values(filters).some((value) => String(value ?? '').trim() !== '');
 
   const mapDegreeRow = (item, i) => ({
     id:           item.hash_id || item.id,
@@ -59,62 +57,31 @@ const DegreesManagement = () => {
     status:       String(item.status || 'active').toLowerCase(),
   });
 
-  const matchesFilters = (row) => {
-    const name = filters.degree_name.trim().toLowerCase();
-    if (name && !String(row.degree_name || '').toLowerCase().includes(name)) return false;
-    if (filters.degree_group && row.degree_group !== filters.degree_group) return false;
-    if (filters.status && String(row.status || '').toLowerCase() !== filters.status) return false;
-    return true;
-  };
-
+  /* ── FETCH (always server-side pagination + filters) ── */
   const fetchPage = async (page = paginationModel.page, pageSize = paginationModel.pageSize) => {
     setLoading(true);
     try {
-      const { items, pagination } = await settingsCatalogApi.getPage('degrees', page + 1, pageSize);
+      const { items, pagination } = await settingsCatalogApi.getPage('degrees', page + 1, pageSize, {
+        name: filters.degree_name.trim(),
+        degree_group: filters.degree_group,
+        status: filters.status,
+      });
       const mapped = (Array.isArray(items) ? items : []).filter(Boolean).map((item, index) =>
         mapDegreeRow(item, page * pageSize + index)
       );
       setRows(mapped);
       setTotalRows(Number(pagination.total) || 0);
-      const backendPage = Math.max(0, Number(pagination.current_page || page + 1) - 1);
-      const backendPageSize = Number(pagination.per_page || pageSize);
-      if (backendPage !== paginationModel.page || backendPageSize !== paginationModel.pageSize) {
-        setPaginationModel({ page: backendPage, pageSize: backendPageSize });
-      }
     } catch { toast.error('Server error'); setRows([]); setTotalRows(0); }
     finally { setLoading(false); }
   };
 
-  const fetchAllForFilters = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchPaginatedApiList(`${API_BASE}/settings/degrees`, {
-        headers: settingsCatalogApi.getHeaders(),
-        perPage: 200,
-      });
-      const mapped = (Array.isArray(data) ? data : []).filter(Boolean).map(mapDegreeRow);
-      setAllRows(mapped);
-      setTotalRows(mapped.length);
-      setGroups([...new Set(mapped.map((d) => d.degree_group).filter(Boolean))]);
-    } catch {
-      toast.error('Server error');
-      setAllRows([]);
-      setTotalRows(0);
-      setGroups([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (hasActiveFilters) {
-      fetchAllForFilters();
-      return;
-    }
     fetchPage(paginationModel.page, paginationModel.pageSize);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasActiveFilters, paginationModel.page, paginationModel.pageSize]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.degree_name, filters.degree_group, filters.status]);
 
+  // Full known-groups list for the filter dropdown only — a legitimate "all possible values"
+  // need (rule #2), separate from the paginated listing above.
   useEffect(() => {
     const fetchGroups = async () => {
       try {
@@ -148,13 +115,6 @@ const DegreesManagement = () => {
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const filtered = (hasActiveFilters ? allRows : rows).filter((r) => {
-    const matchName  = !filters.degree_name.trim() || r.degree_name?.toLowerCase().includes(filters.degree_name.toLowerCase());
-    const matchGroup = !filters.degree_group || r.degree_group === filters.degree_group;
-    const matchStatus = !filters.status || r.status === filters.status;
-    return matchName && matchGroup && matchStatus;
-  });
-
   const openAdd  = () => { setEditing(null); setForm(emptyForm); setOpen(true); };
   const openEdit = (row) => {
     setEditing(row);
@@ -182,11 +142,7 @@ const DegreesManagement = () => {
       if (result.success || result.status === 200 || result.status === 201) {
         toast.success(isUpdate ? 'Updated successfully' : 'Degree added');
         setOpen(false);
-        if (hasActiveFilters) {
-          fetchAllForFilters();
-        } else {
-          fetchPage(paginationModel.page, paginationModel.pageSize);
-        }
+        fetchPage(paginationModel.page, paginationModel.pageSize);
       } else {
         toast.error(result.message || 'Operation failed');
       }
@@ -200,10 +156,8 @@ const DegreesManagement = () => {
       const result = await settingsCatalogApi.remove('degrees', row.hash_id);
       if (result.success || result.status === 200) {
         toast.success('Deleted');
-        if (!hasActiveFilters && rows.length === 1 && paginationModel.page > 0) {
+        if (rows.length === 1 && paginationModel.page > 0) {
           setPaginationModel((p) => ({ ...p, page: p.page - 1 }));
-        } else if (hasActiveFilters) {
-          fetchAllForFilters();
         } else {
           fetchPage(paginationModel.page, paginationModel.pageSize);
         }
@@ -229,23 +183,13 @@ const DegreesManagement = () => {
       });
 
       if (result.success || result.status === 200) {
-        if (hasActiveFilters) {
-          setAllRows((currentRows) =>
-            currentRows.map((degree) =>
-              (degree.hash_id || degree.id) === rowId
-                ? { ...degree, status: newStatus }
-                : degree
-            )
-          );
-        } else {
-          setRows((currentRows) =>
-            currentRows.map((degree) =>
-              (degree.hash_id || degree.id) === rowId
-                ? { ...degree, status: newStatus }
-                : degree
-            )
-          );
-        }
+        setRows((currentRows) =>
+          currentRows.map((degree) =>
+            (degree.hash_id || degree.id) === rowId
+              ? { ...degree, status: newStatus }
+              : degree
+          )
+        );
         toast.success(`Marked as ${newStatus}`);
       } else {
         toast.error(result.message || 'Status update failed');
@@ -332,11 +276,11 @@ const DegreesManagement = () => {
           title="Filter Degrees"
         />
 
-        <TooltipDataGrid rows={filtered} columns={columns} getRowId={(r) => r.id}
+        <TooltipDataGrid rows={rows} columns={columns} getRowId={(r) => r.id}
           paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
           pageSizeOptions={GRID_PAGE_SIZE_OPTIONS}
-          paginationMode={hasActiveFilters ? 'client' : 'server'}
-          rowCount={hasActiveFilters ? filtered.length : totalRows}
+          paginationMode="server"
+          rowCount={totalRows}
           loading={loading} autoHeight disableRowSelectionOnClick sx={GRID_SX} />
 
         {/* 3-dot action menu */}

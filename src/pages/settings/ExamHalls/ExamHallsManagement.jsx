@@ -68,16 +68,28 @@ const ExamHallsManagement = () => {
   const [editingHall,     setEditingHall]     = useState(null);
   const [formData,        setFormData]        = useState(emptyForm);
 
+  const [total, setTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+  const [totalCapacity, setTotalCapacity] = useState(0);
+
   const fetchHalls = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/exam-halls?per_page=1000`, { headers: getHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (searchTerm.trim()) params.set('search', searchTerm.trim());
+      if (filterCenterId) params.set('exam_center_id', filterCenterId);
+
+      const res    = await fetch(`${API_BASE}/settings/exam-halls?${params.toString()}`, { headers: getHeaders() });
       const result = await res.json();
       if (result.status === 200 || result.success) {
-        const data = result.data?.data ?? result.data ?? [];
+        const data = Array.isArray(result.data?.data) ? result.data.data : [];
         setAllRows(data.map((item, i) => ({
           id:           item.hash_id || item.id,
-          sr_no:        i + 1,
+          sr_no:        paginationModel.page * paginationModel.pageSize + i + 1,
           hash_id:      item.hash_id,
           name:         item.name,
           floor:        item.floor ?? "—",
@@ -86,6 +98,10 @@ const ExamHallsManagement = () => {
           center_name:  item.exam_center?.name ?? "—",
           exam_center_id: item.exam_center_id,
         })));
+        setTotal(Number(result.data?.total ?? data.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
+        setTotalCapacity(Number(result.data?.total_capacity ?? 0));
       } else {
         toast.error(result.message || "Failed to load exam halls");
         setAllRows([]);
@@ -99,23 +115,15 @@ const ExamHallsManagement = () => {
       const res    = await fetch(`${API_BASE}/settings/exam-centers?per_page=1000`, { headers: getHeaders() });
       const result = await res.json();
       if (result.status === 200 || result.success)
-        setCenters(result.data?.data ?? result.data ?? []);
+        setCenters(Array.isArray(result.data?.data) ? result.data.data : []);
     } catch {}
   };
 
-  useEffect(() => { fetchHalls(); fetchCenters(); }, []); // eslint-disable-line
-
-  const filteredRows = allRows.filter((r) => {
-    const matchSearch = !searchTerm.trim() || [r.name, r.floor, r.center_name, String(r.capacity)]
-      .some((v) => v?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchCenter = !filterCenterId || String(r.exam_center_id) === String(filterCenterId);
-    return matchSearch && matchCenter;
-  });
-
-  const total         = allRows.length;
-  const activeCount   = allRows.filter((r) => r.status === "active").length;
-  const inactiveCount = allRows.filter((r) => r.status === "inactive").length;
-  const totalCapacity = allRows.reduce((s, r) => s + (Number(r.capacity) || 0), 0);
+  useEffect(() => { fetchCenters(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchHalls();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, searchTerm, filterCenterId]);
 
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
   const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
@@ -297,11 +305,13 @@ const ExamHallsManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={allRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={total}
           pageSizeOptions={[15, 25, 50, 100]}
           loading={loading}
           autoHeight

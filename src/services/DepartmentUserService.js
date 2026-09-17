@@ -40,8 +40,10 @@ class DepartmentUserService {
   }
 
   static async getAll(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE}/department-users`, {
+    const query = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null))
+    ).toString();
+    const response = await fetch(`${API_BASE}/department-users${query ? `?${query}` : ''}`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -50,6 +52,7 @@ class DepartmentUserService {
     return {
       data: extractList(result),
       total: result?.data?.total ?? result?.total ?? extractList(result).length,
+      statusCounts: result?.data?.status_counts ?? null,
     };
   }
 

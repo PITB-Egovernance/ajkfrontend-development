@@ -101,26 +101,41 @@ const DigitalSignatureManagement = () => {
   const [formErrors,  setFormErrors]  = useState({});
   const [previewImage, setPreviewImage] = useState(null);
 
-  /* ── FETCH ── */
+  const [total, setTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+
+  /* ── FETCH (server-side pagination + filters) ── */
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res    = await fetch(`${API_BASE}/settings/digital-signature`, { headers: authHeaders() });
+      const params = new URLSearchParams({
+        per_page: String(paginationModel.pageSize),
+        page: String(paginationModel.page + 1),
+      });
+      if (filters.name.trim()) params.set('name', filters.name.trim());
+      if (filters.designation.trim()) params.set('designation', filters.designation.trim());
+      if (filters.status.trim()) params.set('status', filters.status.trim());
+
+      const res    = await fetch(`${API_BASE}/settings/digital-signature?${params.toString()}`, { headers: authHeaders() });
       const result = await res.json();
 
       if (res.ok || result.success || result.status === 200) {
-        const data = result.data?.data ?? result.data ?? [];
+        const data = Array.isArray(result.data?.data) ? result.data.data : [];
         setAllRows(
-          (Array.isArray(data) ? data : []).map((item, i) => ({
+          data.map((item, i) => ({
             id:          item.hash_id ?? item.id,
             hash_id:     item.hash_id ?? item.id,
-            sr_no:       i + 1,
+            sr_no:       paginationModel.page * paginationModel.pageSize + i + 1,
             name:        item.name        ?? "-",
             designation: item.designation ?? "-",
             image:       resolveImage(item.image ?? item.image_url),
             status:      item.status      ?? "active",
           }))
         );
+        setTotal(Number(result.data?.total ?? data.length));
+        setActiveCount(Number(result.data?.status_counts?.active ?? 0));
+        setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
         toast.error(result.message || "Failed to load digital signatures");
         setAllRows([]);
@@ -223,7 +238,11 @@ const DigitalSignatureManagement = () => {
     setLoadingEmployees(false);
   }
 };
-  useEffect(() => { fetchAll(); fetchDesignations(); }, []); // eslint-disable-line
+  useEffect(() => { fetchDesignations(); }, []); // eslint-disable-line
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationModel.page, paginationModel.pageSize, filters.name, filters.designation, filters.status]);
 
   /* ── FILE INPUT ── */
   const handleFileChange = (e) => {
@@ -253,21 +272,13 @@ const DigitalSignatureManagement = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  const handleClearFilters = () => setFilters({ name: "", designation: "", status: "" });
-
-  /* ── CLIENT-SIDE FILTER ── */
-  const filteredRows = allRows.filter((row) => {
-    if (filters.name        && !row.name?.toLowerCase().includes(filters.name.toLowerCase()))               return false;
-    if (filters.designation && !row.designation?.toLowerCase().includes(filters.designation.toLowerCase())) return false;
-    if (filters.status      && row.status !== filters.status)                                               return false;
-    return true;
-  });
-
-  const total         = allRows.length;
-  const activeCount   = allRows.filter((r) => r.status === "active").length;
-  const inactiveCount = allRows.filter((r) => r.status === "inactive").length;
+  const handleClearFilters = () => {
+    setFilters({ name: "", designation: "", status: "" });
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
 
   /* ── MENU ── */
   const handleMenuOpen  = (e, row) => { setAnchorEl(e.currentTarget); setSelectedRow(row); };
@@ -706,11 +717,13 @@ const DigitalSignatureManagement = () => {
 
         {/* GRID */}
         <TooltipDataGrid
-          rows={filteredRows}
+          rows={allRows}
           columns={columns}
           getRowId={(r) => r.id}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={total}
           pageSizeOptions={[15, 25, 50]}
           loading={loading}
           autoHeight

@@ -20,10 +20,13 @@ const parsePagination = (result, fallbackPage = 1, fallbackPerPage = 15, fallbac
   };
 };
 
-const getPage = async (resource, page = 1, perPage = 15) => {
+const getPage = async (resource, page = 1, perPage = 15, filters = {}) => {
   const params = new URLSearchParams({
     page: String(page),
     per_page: String(perPage),
+  });
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== '' && value != null) params.set(key, value);
   });
   const response = await fetch(`${API_BASE}/settings/${resource}?${params.toString()}`, {
     method: 'GET',

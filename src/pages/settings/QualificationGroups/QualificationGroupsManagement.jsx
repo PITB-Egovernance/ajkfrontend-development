@@ -54,10 +54,13 @@ const QualificationGroupsManagement = () => {
   const load = async () => {
     setLoading(true);
     try {
-      // Qualifications and degrees come from the live API
+      // Qualifications and degrees come from the live API — status=active narrows server-side
+      // (both endpoints are now properly paginated/filtered) so this dropdown-population fetch
+      // doesn't miss anything past the first page, the way an unfiltered per_page-less request
+      // would once either list grew past 15 rows.
       const [qRes, dRes] = await Promise.all([
-        fetch(`${API_BASE}/settings/qualifications`, { headers: getApiHeaders() }),
-        fetch(`${API_BASE}/settings/degrees`,        { headers: getApiHeaders() }),
+        fetch(`${API_BASE}/settings/qualifications?per_page=1000&status=active`, { headers: getApiHeaders() }),
+        fetch(`${API_BASE}/settings/degrees?per_page=1000&status=active`,        { headers: getApiHeaders() }),
       ]);
       const [qData, dData] = await Promise.all([qRes.json(), dRes.json()]);
 
