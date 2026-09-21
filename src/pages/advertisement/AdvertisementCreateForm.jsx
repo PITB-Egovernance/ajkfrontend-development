@@ -10,6 +10,7 @@ import RequisitionApi from "../../api/requisitionApi";
 import Config from "../../config/baseUrl";
 import AuthService from "../../services/authService";
 import "../job-creation/JobCreationForm.css";
+import { handleApiError } from 'utils/apiErrors';
 
 const formatDateForDisplay = (value) => {
   if (!value) return "";
@@ -472,9 +473,7 @@ const AdvertisementCreateForm = () => {
         }
       }
 
-      toast.error(err.message || "Failed to create advertisement", {
-        id: loadingToast,
-      });
+      handleApiError(err, { fallback: "Failed to create advertisement" });
     } finally {
       setLoading(false);
     }

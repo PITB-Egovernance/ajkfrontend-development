@@ -9,6 +9,7 @@ import AdvertisementApi from 'api/advertisementApi';
 import { getJobRouteId } from 'utils/jobMapper';
 import BulkPublishModal from 'components/results/BulkPublishModal';
 import BulkWithdrawModal from 'components/results/BulkWithdrawModal';
+import { handleApiError } from 'utils/apiErrors';
 
 // Same "results verified/approved onward" gate used by the per-job Actions
 // menu (ResultsExamFlow.jsx / ResultsDashboard.jsx isShortlistable) — a post
@@ -62,7 +63,7 @@ const PostResultLanding = () => {
       );
       setJobs(flatJobs.filter((job) => ELIGIBLE_STATUSES.includes(job.result_status)));
     } catch (err) {
-      toast.error(err.message || 'Failed to load posts');
+      handleApiError(err, { fallback: 'Failed to load posts' });
     } finally {
       setLoading(false);
     }

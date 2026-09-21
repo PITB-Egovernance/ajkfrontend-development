@@ -6,7 +6,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -26,6 +25,7 @@ import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import SubjectApi from "api/subjectApi";
+import FormDialog from 'components/ui/FormDialog';
 const PERM = "settings.subjects";
 
 const gridSx = {
@@ -481,7 +481,7 @@ const SubjectManagement = () => {
         </Menu>
 
         {/* ADD / EDIT MODAL */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
+        <FormDialog fieldCount={4} open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
           <DialogTitle className="font-bold">
             {editingRow ? "Edit Subject" : "Add Subject"}
           </DialogTitle>
@@ -600,7 +600,7 @@ const SubjectManagement = () => {
               {saving ? "Saving…" : editingRow ? "Update" : "Create"}
             </button>
           </DialogActions>
-        </Dialog>
+        </FormDialog>
 
       </div>
     </div>

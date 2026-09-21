@@ -1,4 +1,5 @@
 import Config from 'config/baseUrl';
+import { apiErrorMessage } from 'utils/apiErrors';
 import AuthService from 'services/authService';
 const API_BASE = Config.apiUrl;
 const API_KEY  = Config.apiKey;
@@ -12,7 +13,7 @@ const getHeaders = () => ({
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error  = new Error(result.message || `Request failed (${response.status})`);
+    const error  = new Error(apiErrorMessage(result, response.status, 'The request could not be completed.'));
     error.status = response.status;
     error.errors = result.errors || {};
     throw error;
@@ -46,7 +47,7 @@ const downloadFile = async (path, params = {}, fallbackFilename = 'export') => {
 
   if (!res.ok) {
     const result = await res.json().catch(() => ({}));
-    const error  = new Error(result.message || `Export failed (${res.status})`);
+    const error  = new Error(apiErrorMessage(result, res.status, 'The export could not be completed.'));
     error.status = res.status;
     throw error;
   }

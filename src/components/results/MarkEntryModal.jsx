@@ -13,6 +13,7 @@ import SearchableSelect from 'components/ui/SearchableSelect';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { handleApiError } from 'utils/apiErrors';
 
 /**
  * MarkEntryModal
@@ -133,7 +134,7 @@ const MarkEntryModal = ({ isOpen, onClose, candidate, jobId, onSuccess }) => {
       toast.success('Marks saved successfully!');
       onSuccess();
     } catch (err) {
-      toast.error(err.message || 'Failed to save marks');
+      handleApiError(err, { fallback: 'Failed to save marks' });
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,7 @@ import RollNumberGenerationMode from 'components/roll-numbers/RollNumberGenerati
 import CenterAllocationMode from 'components/roll-numbers/CenterAllocationMode';
 import PendingRangeCard from 'components/roll-numbers/PendingRangeCard';
 import RollNumberApi from 'api/rollNumberApi';
+import { handleApiError } from 'utils/apiErrors';
 
 const EXAM_TYPES = [
   { value: 'one-paper-mcqs', label: 'One Paper MCQs' },
@@ -49,7 +50,7 @@ const NewBatchForm = ({ onCreated }) => {
       const res = await RollNumberApi.getShortlisted({ search, per_page: 50 });
       setApplications(res?.data?.data || []);
     } catch (e) {
-      toast.error(e.message || 'Failed to load applications');
+      handleApiError(e, { fallback: 'Failed to load applications' });
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ const NewBatchForm = ({ onCreated }) => {
       toast.success('Batch created');
       onCreated(res?.data?.hash_id);
     } catch (e) {
-      toast.error(e.message || 'Failed to create batch');
+      handleApiError(e, { fallback: 'Failed to create batch' });
     } finally {
       setCreating(false);
     }
@@ -146,7 +147,7 @@ const RollNumberBatchDetails = () => {
       setSummary(batchRes?.data || null);
       if (rangesRes) setRanges(rangesRes.data);
     } catch (e) {
-      toast.error(e.message || 'Failed to load batch');
+      handleApiError(e, { fallback: 'Failed to load batch' });
     } finally {
       setLoading(false);
     }
@@ -191,7 +192,7 @@ const RollNumberBatchDetails = () => {
       if (successMessage) toast.success(successMessage);
       await load();
     } catch (e) {
-      toast.error(e.message || 'Action failed');
+      handleApiError(e, { fallback: 'Action failed' });
     } finally {
       setBusy(false);
     }
@@ -209,7 +210,7 @@ const RollNumberBatchDetails = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e) {
-      toast.error(e.message || 'Export failed');
+      handleApiError(e, { fallback: 'Export failed' });
     }
   };
 

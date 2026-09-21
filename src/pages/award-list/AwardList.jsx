@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Chip, Dialog, DialogActions, DialogContent,
+  Box, Button, Chip, DialogActions, DialogContent,
   DialogTitle, TextField, Typography, CircularProgress,
   InputAdornment, IconButton, Tooltip,
 } from '@mui/material';
@@ -12,6 +12,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
+import FormDialog from 'components/ui/FormDialog';
 
 const PERM = 'candidates.award_lists'; // permission scope for this module
 
@@ -306,7 +307,7 @@ export default function AwardList() {
       </Box>
 
       {/* Create Modal */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+      <FormDialog fieldCount={7} open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>New Award List</DialogTitle>
         <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {formError && (
@@ -390,10 +391,10 @@ export default function AwardList() {
             Create
           </Button>
         </DialogActions>
-      </Dialog>
+      </FormDialog>
 
       {/* Edit Details Modal */}
-      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
+      <FormDialog fieldCount={6} open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Edit Award List Details</DialogTitle>
         <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {editFormError && (
@@ -463,7 +464,7 @@ export default function AwardList() {
             Save Changes
           </Button>
         </DialogActions>
-      </Dialog>
+      </FormDialog>
     </Box>
   );
 }

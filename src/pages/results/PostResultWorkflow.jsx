@@ -14,6 +14,7 @@ import PostResultApi from 'api/postResultApi';
 import AdvertisementApi from 'api/advertisementApi';
 import { getJobRouteId } from 'utils/jobMapper';
 import CandidateProfileModal from './components/CandidateProfileModal';
+import { handleApiError } from 'utils/apiErrors';
 
 const FILTER_DEBOUNCE_MS = 400;
 const DEFAULT_FILTERS = { search: '', adv_number: '' };
@@ -175,7 +176,7 @@ const PostResultWorkflow = () => {
         );
         setJobs(flatJobs.filter((job) => ELIGIBLE_STATUSES.includes(job.result_status)));
       } catch (err) {
-        toast.error(err.message || 'Failed to load posts');
+        handleApiError(err, { fallback: 'Failed to load posts' });
       }
     };
     fetchJobs();
@@ -342,7 +343,7 @@ const PostResultWorkflow = () => {
       setRows(list.map((r) => ({ id: r.award_list_entry_id ?? r.exam_result_id ?? r.sr_no, ...r })));
       setTotalCount(candidates.total ?? list.length ?? 0);
     } catch (err) {
-      toast.error(err.message || 'Failed to load candidates');
+      handleApiError(err, { fallback: 'Failed to load candidates' });
       setRows([]);
       setTotalCount(0);
     } finally {
@@ -358,7 +359,7 @@ const PostResultWorkflow = () => {
       const res = await PostResultApi.getInterviewPhases(jobId);
       setPhases(res?.data || []);
     } catch (err) {
-      toast.error(err.message || 'Failed to load interview phases');
+      handleApiError(err, { fallback: 'Failed to load interview phases' });
     } finally {
       setPhasesLoading(false);
     }
@@ -378,7 +379,7 @@ const PostResultWorkflow = () => {
       resetSelectionAndPage();
       await fetchList();
     } catch (err) {
-      toast.error(err.message || 'Action failed');
+      handleApiError(err, { fallback: 'Action failed' });
     } finally {
       setBusy(false);
     }
@@ -562,7 +563,7 @@ const PostResultWorkflow = () => {
       setNewPhase(EMPTY_NEW_PHASE);
       fetchPhases();
     } catch (err) {
-      toast.error(err.message || 'Failed to create phase');
+      handleApiError(err, { fallback: 'Failed to create phase' });
     }
   };
 
@@ -582,7 +583,7 @@ const PostResultWorkflow = () => {
       const res = await PostResultApi.publishPhase(phaseId);
       toast.success(res?.message || 'Phase published');
       fetchPhases(); fetchList();
-    } catch (err) { toast.error(err.message || 'Failed to publish phase'); }
+    } catch (err) { handleApiError(err, { fallback: 'Failed to publish phase' }); }
   };
 
   const handleUnpublishPhase = async (phaseId) => {
@@ -596,7 +597,7 @@ const PostResultWorkflow = () => {
       const res = await PostResultApi.unpublishPhase(phaseId);
       toast.success(res?.message || 'Phase unpublished');
       fetchPhases(); fetchList();
-    } catch (err) { toast.error(err.message || 'Failed to unpublish phase'); }
+    } catch (err) { handleApiError(err, { fallback: 'Failed to unpublish phase' }); }
   };
 
   const handlePhaseMenuOpen = (e, row) => { setPhaseMenuAnchor(e.currentTarget); setPhaseMenuRow(row); };
@@ -626,7 +627,7 @@ const PostResultWorkflow = () => {
       toast.success(res?.message || 'Interview phase deleted');
       fetchPhases();
     } catch (err) {
-      toast.error(err.message || 'Failed to delete interview phase');
+      handleApiError(err, { fallback: 'Failed to delete interview phase' });
     }
   };
 
@@ -634,7 +635,7 @@ const PostResultWorkflow = () => {
     if (!row.call_letter_id) { toast.error('No call letter generated yet'); return; }
     try {
       await PostResultApi.downloadCallLetter(row.call_letter_id, `InterviewCallLetter_${row.roll_number || row.call_letter_id}.pdf`);
-    } catch (err) { toast.error(err.message || 'Download failed'); }
+    } catch (err) { handleApiError(err, { fallback: 'Download failed' }); }
   };
 
   // ── Interview Candidates row menu ──
@@ -653,7 +654,7 @@ const PostResultWorkflow = () => {
       await PostResultApi.bulkPublishCallLetters([row.call_letter_id]);
       toast.success('Call letter published');
       fetchList();
-    } catch (err) { toast.error(err.message || 'Failed to publish call letter'); }
+    } catch (err) { handleApiError(err, { fallback: 'Failed to publish call letter' }); }
   };
 
   const handleUnpublishRow = async (row) => {
@@ -668,7 +669,7 @@ const PostResultWorkflow = () => {
       await PostResultApi.bulkUnpublishCallLetters([row.call_letter_id]);
       toast.success('Call letter unpublished');
       fetchList();
-    } catch (err) { toast.error(err.message || 'Failed to unpublish call letter'); }
+    } catch (err) { handleApiError(err, { fallback: 'Failed to unpublish call letter' }); }
   };
 
   // Bulk publish/unpublish call letters — "selected" uses the checked rows,
@@ -687,7 +688,7 @@ const PostResultWorkflow = () => {
       await PostResultApi.bulkPublishCallLetters(ids);
       toast.success(`${ids.length} call letter(s) published`);
       fetchList();
-    } catch (err) { toast.error(err.message || 'Failed to publish call letters'); }
+    } catch (err) { handleApiError(err, { fallback: 'Failed to publish call letters' }); }
   };
   const handleUnpublishCallLetters = async (targetRows, labelForEmpty) => {
     const ids = targetRows.map((r) => r.call_letter_id).filter(Boolean);
@@ -702,7 +703,7 @@ const PostResultWorkflow = () => {
       await PostResultApi.bulkUnpublishCallLetters(ids);
       toast.success(`${ids.length} call letter(s) unpublished`);
       fetchList();
-    } catch (err) { toast.error(err.message || 'Failed to unpublish call letters'); }
+    } catch (err) { handleApiError(err, { fallback: 'Failed to unpublish call letters' }); }
   };
   const handlePublishSelected = () => handlePublishCallLetters(rows.filter((r) => selectedIds.includes(r.id)), 'No selected candidates to publish');
   const handleUnpublishSelected = () => handleUnpublishCallLetters(rows.filter((r) => selectedIds.includes(r.id)), 'No selected candidates to unpublish');
@@ -736,7 +737,7 @@ const PostResultWorkflow = () => {
       toast.success('Viva marks updated');
       return { ...newRow, viva_marks: updated.viva_marks, final_marks: updated.final_marks };
     } catch (err) {
-      toast.error(err.message || 'Failed to update viva marks');
+      handleApiError(err, { fallback: 'Failed to update viva marks' });
       throw err;
     }
   };
@@ -755,7 +756,7 @@ const PostResultWorkflow = () => {
     if (!tab) return;
     try {
       await PostResultApi.exportList(jobId, tab, format, `${tab}_${jobId}`);
-    } catch (err) { toast.error(err.message || 'Export failed'); }
+    } catch (err) { handleApiError(err, { fallback: 'Export failed' }); }
   };
 
   // ── Column sets per tab ──
@@ -883,7 +884,7 @@ const PostResultWorkflow = () => {
       const res = await PostResultApi.downloadApplicationFormsBulk(identifiers, `application_forms_${activeTab}_${jobId}.zip`);
       toast.success(res?.message || 'Application forms download started');
     } catch (err) {
-      toast.error(err.message || 'Failed to download application forms');
+      handleApiError(err, { fallback: 'Failed to download application forms' });
     }
   };
 

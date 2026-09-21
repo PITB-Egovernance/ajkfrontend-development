@@ -327,7 +327,7 @@ const ComplaintsReview = () => {
                       <span className="text-xs text-slate-500">{c.candidate?.cnic}</span>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{CATEGORY_LABELS[c.category] || c.category}</td>
-                    <td className="px-4 py-3 text-slate-600">{c.subject}</td>
+                    <td className="px-4 py-3 text-slate-600 max-w-xs break-words">{c.subject}</td>
                     <td className="px-4 py-3 text-slate-500">{c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[c.status] || 'bg-slate-100 text-slate-500'}`}>
@@ -371,11 +371,11 @@ const ComplaintsReview = () => {
                 </div>
                 <div className="sm:col-span-2">
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Subject</p>
-                  <p className="text-slate-800 mt-0.5">{selected.subject}</p>
+                  <p className="text-slate-800 mt-0.5 break-words">{selected.subject}</p>
                 </div>
                 <div className="sm:col-span-2">
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Description</p>
-                  <p className="text-slate-700 mt-0.5">{selected.description}</p>
+                  <p className="text-slate-700 mt-0.5 whitespace-pre-wrap break-words">{selected.description}</p>
                 </div>
               </div>
 

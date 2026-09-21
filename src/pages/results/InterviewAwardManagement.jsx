@@ -26,6 +26,7 @@ import { toast } from 'react-hot-toast';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
 import { formatDate } from 'utils/dateUtils';
+import { handleApiError } from 'utils/apiErrors';
 
 const InterviewAwardManagement = () => {
   const navigate = useNavigate();
@@ -111,7 +112,7 @@ const InterviewAwardManagement = () => {
         toast.success(`Created list for ${data.data.created} new candidates`);
         handleLoadList();
       } else {
-        toast.error(data.message || 'Initialization failed');
+        handleApiError(data, { fallback: 'Initialization failed' });
       }
     } catch (err) {
       toast.error('Failed to initialize award list');

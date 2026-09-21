@@ -23,6 +23,7 @@ import Button from 'components/ui/Button';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
+import FormOverlay from 'components/ui/FormOverlay';
 
 const AnnexAList = () => {
   const navigate = useNavigate();
@@ -395,16 +396,12 @@ const AnnexAList = () => {
       )}
 
       {/* Edit Modal */}
-      <AnimatePresence>
-        {showEditModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowEditModal(false)}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
+      <FormOverlay
+        open={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        fieldCount={7}
+        cardClassName="max-w-3xl"
+      >
               <div className="sticky top-0 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 p-6 border-b z-10">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -528,10 +525,8 @@ const AnnexAList = () => {
                   </Button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            
+      </FormOverlay>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>

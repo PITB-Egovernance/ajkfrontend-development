@@ -4,6 +4,7 @@ import { useAuth } from 'context/AuthContext';
 import { getUserRole } from 'utils/roleUtils';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
+import { handleApiError } from 'utils/apiErrors';
 
 /**
  * CnicCell Component
@@ -50,7 +51,7 @@ const CnicCell = ({ resultId, maskedCnic }) => {
         toast.success('CNIC revealed (Audit logged)');
       }
     } catch (error) {
-      toast.error(error.message || 'Failed to reveal CNIC');
+      handleApiError(error, { fallback: 'Failed to reveal CNIC' });
     } finally {
       setLoading(false);
     }

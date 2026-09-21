@@ -27,6 +27,7 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import RollNumberApi from 'api/rollNumberApi';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
+import { handleApiError } from 'utils/apiErrors';
 
 const PERM = 'roll_number.roll_number_generation';
 
@@ -375,7 +376,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
         return next;
       });
     } catch (err) {
-      toast.error(err?.message || 'Failed to load roll number slips');
+      handleApiError(err, { fallback: 'Failed to load roll number slips' });
       setAllRows([]);
       setTotalCount(0);
     } finally {
@@ -442,7 +443,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         toast.dismiss(tid);
-        toast.error(err.message || 'Failed to download slip');
+        handleApiError(err, { fallback: 'Failed to download slip' });
         return;
       }
       const blob = await res.blob();
@@ -484,7 +485,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       fetchStats();
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err?.message || 'Failed to delete slip');
+      handleApiError(err, { fallback: 'Failed to delete slip' });
     }
   };
 
@@ -517,7 +518,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       fetchStats();
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err?.message || 'Failed to delete slips');
+      handleApiError(err, { fallback: 'Failed to delete slips' });
     }
   };
 
@@ -546,7 +547,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       }
     } catch (err) {
       toast.dismiss(findingTid);
-      toast.error(err?.message || `Failed to load ${tabLabel} slips`);
+      handleApiError(err, { fallback: `Failed to load ${tabLabel} slips` });
       return;
     }
     toast.dismiss(findingTid);
@@ -575,7 +576,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       fetchStats();
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err?.message || 'Failed to delete slips');
+      handleApiError(err, { fallback: 'Failed to delete slips' });
     }
   };
 
@@ -671,7 +672,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       }
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err?.message || 'Failed to publish slips');
+      handleApiError(err, { fallback: 'Failed to publish slips' });
     }
   };
 
@@ -707,7 +708,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       }
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err?.message || 'Failed to unpublish slips');
+      handleApiError(err, { fallback: 'Failed to unpublish slips' });
     }
   };
 
@@ -736,7 +737,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       }
     } catch (err) {
       toast.dismiss(findingTid);
-      toast.error(err?.message || 'Failed to load unpublished slips');
+      handleApiError(err, { fallback: 'Failed to load unpublished slips' });
       return;
     }
     toast.dismiss(findingTid);
@@ -825,7 +826,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       }
     } catch (err) {
       toast.dismiss(findingTid);
-      toast.error(err?.message || 'Failed to load published slips');
+      handleApiError(err, { fallback: 'Failed to load published slips' });
       return;
     }
     toast.dismiss(findingTid);
@@ -906,7 +907,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       }
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err?.message || 'Failed to publish slip');
+      handleApiError(err, { fallback: 'Failed to publish slip' });
     }
   };
 
@@ -935,7 +936,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
       }
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err?.message || 'Failed to unpublish slip');
+      handleApiError(err, { fallback: 'Failed to unpublish slip' });
     }
   };
 

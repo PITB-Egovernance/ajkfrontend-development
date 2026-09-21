@@ -10,6 +10,7 @@ import StatusUpdateModal from 'components/results/StatusUpdateModal';
 import toast from 'react-hot-toast';
 import { useAuth } from 'context/AuthContext';
 import { getUserRole } from 'utils/roleUtils';
+import { handleApiError } from 'utils/apiErrors';
 
 const MeritManagementPage = () => {
   const { jobId } = useParams();
@@ -69,7 +70,7 @@ const MeritManagementPage = () => {
         });
       }
     } catch (err) {
-      toast.error(err.message || 'Status update failed');
+      handleApiError(err, { fallback: 'Status update failed' });
     }
   };
 
@@ -100,7 +101,7 @@ const MeritManagementPage = () => {
       setReplacementModal({ isOpen: false, outgoing: null, incoming: null });
       fetchData();
     } catch (err) {
-      toast.error(err.message || 'Replacement failed');
+      handleApiError(err, { fallback: 'Replacement failed' });
     }
   };
 

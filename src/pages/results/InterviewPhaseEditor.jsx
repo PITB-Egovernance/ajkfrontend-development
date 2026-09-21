@@ -7,6 +7,7 @@ import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import PostResultApi from 'api/postResultApi';
+import { handleApiError } from 'utils/apiErrors';
 
 const INTERVIEW_VENUE = 'AJK Public Service Commission Main Office';
 
@@ -72,7 +73,7 @@ const InterviewPhaseEditor = () => {
       toast.success('Interview phase updated successfully');
       navigate(backPath);
     } catch (err) {
-      toast.error(err?.message || 'Failed to update interview phase');
+      handleApiError(err, { fallback: 'Failed to update interview phase' });
     } finally {
       setSaving(false);
     }

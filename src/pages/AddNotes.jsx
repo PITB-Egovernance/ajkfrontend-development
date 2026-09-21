@@ -14,6 +14,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import { GRID_SX } from 'utils/gridStyles';
+import { handleApiError } from 'utils/apiErrors';
 
 const API_BASE = Config.apiUrl;
 
@@ -86,7 +87,7 @@ const TermsConditions = () => {
         const terms = notes.terms_conditions;
         setRawTerms(Array.isArray(terms) && terms.length > 0 ? terms : []);
       } else {
-        toast.error(result.message || 'Failed to load data');
+        handleApiError(result, { fallback: 'Failed to load data' });
       }
     } catch (err) {
       toast.error('Failed to load data');
@@ -172,7 +173,7 @@ const TermsConditions = () => {
       } else {
         toast.error('Failed to save');
       }
-    } catch { toast.error('Server error'); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); }
     finally { setSaving(false); }
   };
 
@@ -203,7 +204,7 @@ const TermsConditions = () => {
       } else {
         toast.error('Failed to delete');
       }
-    } catch { toast.error('Server error'); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); }
   };
 
   /* ── Filter + columns ───────────────────────── */

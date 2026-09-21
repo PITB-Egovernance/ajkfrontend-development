@@ -8,8 +8,8 @@ import {
 } from 'lucide-react';
 import Button from 'components/ui/Button';
 import ResultsApi from 'api/resultsApi';
-import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { handleApiError } from 'utils/apiErrors';
 
 // Publication Type / Gazette Reference are no longer surfaced to the user —
 // every result publish always goes out as the final official merit list.
@@ -35,7 +35,7 @@ const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
       });
       onSuccess();
     } catch (err) {
-      toast.error(err.message || 'Publication failed');
+      handleApiError(err, { fallback: 'Publication failed' });
     } finally {
       setLoading(false);
     }

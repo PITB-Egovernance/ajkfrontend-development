@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   TextField, IconButton, Menu, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions, Switch,
+  DialogTitle, DialogContent, DialogActions, Switch,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
 import { Plus, ArrowLeft, MoreVertical, Building } from 'lucide-react';
@@ -14,6 +14,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { hasPermission } from 'utils/permissions';
 import settingsCatalogApi from 'api/settingsCatalogApi';
+import FormDialog from 'components/ui/FormDialog';
 
 const PERM = 'settings.departments';
 
@@ -322,7 +323,7 @@ const DepartmentsManagement = () => {
           {canDelete && <MenuItem onClick={handleDelete} sx={{ color: 'red' }}>Delete</MenuItem>}
         </Menu>
 
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
+        <FormDialog fieldCount={4} open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
           <DialogTitle className="font-bold">{editing ? 'Edit Department' : 'Add Department'}</DialogTitle>
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {formError && <p className="text-red-600 text-sm mt-2 mb-1">{formError}</p>}
@@ -360,7 +361,7 @@ const DepartmentsManagement = () => {
               {saving ? 'Saving…' : editing ? 'Update' : 'Create'}
             </button>
           </DialogActions>
-        </Dialog>
+        </FormDialog>
       </div>
     </div>
   );

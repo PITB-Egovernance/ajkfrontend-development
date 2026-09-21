@@ -16,6 +16,7 @@ import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
 import { getJobRouteId } from 'utils/jobMapper';
 import MarkEntryModal from 'components/results/MarkEntryModal';
+import { handleApiError } from 'utils/apiErrors';
 
 /**
  * ResultsViewPage (v2.0)
@@ -289,7 +290,7 @@ const ResultsViewPage = () => {
 
       toast.success('Template downloaded successfully', { id: 'download' });
     } catch (error) {
-      toast.error(error.message || 'Failed to download template', { id: 'download' });
+      handleApiError(error, { fallback: 'Failed to download template' });
     }
   };
 

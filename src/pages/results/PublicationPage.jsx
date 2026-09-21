@@ -5,6 +5,7 @@ import Button from 'components/ui/Button';
 import { TextField, Switch, FormControlLabel, IconButton } from '@mui/material';
 import { ArrowLeft, Send, Download, AlertTriangle, CheckCircle2, History, Trash2, ShieldCheck, FileText } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
+import { handleApiError, getErrorCode, getErrorMessage } from 'utils/apiErrors';
 import PublicationChecklist from 'components/results/PublicationChecklist';
 import toast from 'react-hot-toast';
 import { formatDate } from 'utils/dateUtils';
@@ -131,10 +132,10 @@ const PublicationPage = () => {
       setIsPublished(true);
       fetchPublicationData(); // Refresh to see audit update
     } catch (err) {
-      if (err.status === 422) {
-        toast.error(`Publication Denied: ${err.message || 'Validation failed'}`);
+      if (err.status === 422 && !getErrorCode(err)) {
+        toast.error(`Publication Denied: ${getErrorMessage(err, 'Validation failed')}`);
       } else {
-        toast.error(err.message || 'Final publication failed');
+        handleApiError(err, { fallback: 'The results could not be published. Please try again.', title: getErrorCode(err) ? undefined : 'Publication failed' });
       }
     } finally {
       setPublishing(false);
@@ -170,7 +171,7 @@ const PublicationPage = () => {
       setIsPublished(false);
       fetchPublicationData();
     } catch (err) {
-      toast.error(err.message || 'Withdrawal request failed');
+      handleApiError(err, { fallback: 'Withdrawal request failed' });
     }
   };
 

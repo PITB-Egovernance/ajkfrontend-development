@@ -7,6 +7,7 @@ import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import PostResultApi from 'api/postResultApi';
+import { handleApiError } from 'utils/apiErrors';
 
 // "HH:MM" -> "H:MM AM/PM" — same convention as the Roll Slip / Interview
 // Phase editors.
@@ -59,7 +60,7 @@ const CandidateInterviewEditor = () => {
         const res = await PostResultApi.getInterviewPhases(jobId);
         if (alive) setPhases(res?.data || []);
       } catch (err) {
-        toast.error(err?.message || 'Failed to load interview phases');
+        handleApiError(err, { fallback: 'Failed to load interview phases' });
       } finally {
         if (alive) setPhasesLoading(false);
       }
@@ -85,7 +86,7 @@ const CandidateInterviewEditor = () => {
       toast.success('Interview details updated successfully');
       navigate(backPath);
     } catch (err) {
-      toast.error(err?.message || 'Failed to update interview details');
+      handleApiError(err, { fallback: 'Failed to update interview details' });
     } finally {
       setSaving(false);
     }

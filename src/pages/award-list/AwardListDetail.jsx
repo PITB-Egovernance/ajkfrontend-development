@@ -18,6 +18,7 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import { formatDate } from 'utils/dateUtils';
 import { toast } from 'react-hot-toast';
 import CSVUploadZone from 'components/results/CSVUploadZone';
+import FormDialog from 'components/ui/FormDialog';
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
@@ -1069,7 +1070,7 @@ export default function AwardListDetail() {
       )}
 
       {/* Edit Marks Dialog */}
-      <Dialog open={marksOpen} onClose={() => setMarksOpen(false)} maxWidth="sm" fullWidth>
+      <FormDialog fieldCount={6} open={marksOpen} onClose={() => setMarksOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
           Edit Marks — {marksEntry?.candidate_name}
           <Typography variant="caption" display="block" color="text.secondary">
@@ -1186,7 +1187,7 @@ export default function AwardListDetail() {
             Save Marks
           </Button>
         </DialogActions>
-      </Dialog>
+      </FormDialog>
 
       {/* Change Status Dialog */}
       <Dialog open={statusOpen} onClose={() => setStatusOpen(false)} maxWidth="xs" fullWidth>

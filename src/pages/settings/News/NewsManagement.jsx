@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import TooltipDataGrid from "components/ui/TooltipDataGrid";
 import SearchableSelect from "components/ui/SearchableSelect";
 import {
-  TextField, MenuItem, IconButton, Menu, Dialog, DialogTitle,
+  TextField, MenuItem, IconButton, Menu, DialogTitle,
   DialogContent, DialogActions, Switch, FormControlLabel, Chip,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
@@ -16,6 +16,7 @@ import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import FormDialog from 'components/ui/FormDialog';
 
 const PERM = "settings.news";
 
@@ -524,7 +525,7 @@ const NewsManagement = () => {
         </Menu>
 
         {/* ADD / EDIT MODAL */}
-        <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
+        <FormDialog fieldCount={13} open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
           <DialogTitle className="font-bold flex items-center gap-2">
             <Newspaper size={18} className="text-emerald-700" />
             {editing ? "Edit News" : "Add News"}
@@ -694,7 +695,7 @@ const NewsManagement = () => {
               {saving ? "Saving…" : editing ? "Update News" : "Create News"}
             </button>
           </DialogActions>
-        </Dialog>
+        </FormDialog>
       </div>
     </div>
   );

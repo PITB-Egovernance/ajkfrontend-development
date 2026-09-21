@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { TextField } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from 'components/ui/Card';
@@ -27,6 +27,7 @@ import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import FormOverlay from 'components/ui/FormOverlay';
 
 const ContractorsManagement = () => {
   const navigate = useNavigate();
@@ -444,22 +445,12 @@ const ContractorsManagement = () => {
       </div>
 
       {/* Add/Edit Modal */}
-      <AnimatePresence>
-        {showModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide"
-            >
+      <FormOverlay
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        fieldCount={6}
+        cardClassName="max-w-2xl"
+      >
               <form onSubmit={handleSubmit}>
                 <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 px-6 py-4 flex items-center justify-between rounded-t-xl sticky top-0 z-10">
                   <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -583,10 +574,8 @@ const ContractorsManagement = () => {
                   </Button>
                 </div>
               </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            
+      </FormOverlay>
     </div>
   );
 };

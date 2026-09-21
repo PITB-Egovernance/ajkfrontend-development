@@ -1,4 +1,5 @@
 import Config from 'config/baseUrl';
+import { apiErrorMessage } from 'utils/apiErrors';
 import AuthService from 'services/authService';
 
 const ADMIN_API_BASE = Config.apiUrl;
@@ -27,11 +28,7 @@ const getCandidateAdminHeaders = () => ({
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    let message = result.message || `Request failed (${response.status})`;
-    if (response.status === 404) {
-      message = `${result.message ? result.message + ' — ' : ''}Endpoint not found. The backend route may be missing or its route cache may be stale. Ask the backend team to run \`php artisan optimize:clear\`.`;
-    }
-    const error  = new Error(message);
+    const error  = new Error(apiErrorMessage(result, response.status, 'The request could not be completed.'));
     error.status = response.status;
     error.errors = result.errors || {};
     throw error;

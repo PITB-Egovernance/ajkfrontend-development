@@ -1,4 +1,5 @@
 import Config from 'config/baseUrl';
+import { apiErrorMessage } from 'utils/apiErrors';
 import AuthService from 'services/authService';
 
 const API_BASE = Config.apiUrl;
@@ -13,7 +14,7 @@ const getHeaders = () => ({
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(result.message || result.error || 'Request failed');
+    const error = new Error(apiErrorMessage(result, response.status, 'The request could not be completed.'));
     error.status = response.status;
     throw error;
   }

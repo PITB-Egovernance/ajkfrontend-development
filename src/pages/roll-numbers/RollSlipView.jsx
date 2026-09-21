@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import RollNumberApi from 'api/rollNumberApi';
+import { handleApiError } from 'utils/apiErrors';
 
 const InfoRow = ({ label, value, bold }) => (
   <div className="flex text-sm py-0.5">
@@ -45,7 +46,7 @@ const RollSlipView = () => {
         if (!cancelled) setData(result.data);
       } catch (err) {
         if (!cancelled) {
-          toast.error(err?.message || 'Failed to load slip');
+          handleApiError(err, { fallback: 'Failed to load slip' });
           navigate(-1);
         }
       } finally {
@@ -67,7 +68,7 @@ const RollSlipView = () => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         toast.dismiss(tid);
-        toast.error(err.message || 'Failed to download slip');
+        handleApiError(err, { fallback: 'Failed to download slip' });
         return;
       }
       const blob = await res.blob();

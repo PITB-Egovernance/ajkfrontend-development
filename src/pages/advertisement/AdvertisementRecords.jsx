@@ -4,6 +4,9 @@ import { motion } from 'framer-motion';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
+import { showNotice } from 'components/ui/noticeDialog';
+import { getErrorMessage, getErrorCode } from 'utils/apiErrors';
+import { getAdvertisementLifecycle } from 'utils/advertisementLifecycle';
 import {
   Megaphone,
   Eye,
@@ -32,6 +35,7 @@ import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { handleApiError } from 'utils/apiErrors';
 
 const PERM = 'advertisement.advertisement'; // permission scope for this module
 const API_BASE = Config.apiUrl;
@@ -164,6 +168,10 @@ const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelet
 
   const normalizedStatus = normalizeAdvertisementStatus(ad?.status);
   const isAlreadyPublished = normalizedStatus === 'active' || normalizedStatus === 'published';
+  const lifecycle = getAdvertisementLifecycle(ad);
+  // Closed advertisements (permanently / automatically) are view-only: Edit, Publish
+  // and Delete stay visible but disabled, with the reason as a tooltip.
+  const isClosedLock = Boolean(lifecycle.editLockCode);
 
   return (
     <div className="flex justify-center items-center h-full w-full">
@@ -203,22 +211,35 @@ const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelet
           <Eye className="w-4 h-4" /> View
         </MenuItem>
         {canEdit && (
-          <MenuItem onClick={(e) => { handleClose(e); onEdit(ad.id); }}>
-            <Pencil className="w-4 h-4" /> Edit
-          </MenuItem>
+          <div title={isClosedLock ? lifecycle.editLockMessage : undefined}>
+            <MenuItem
+              disabled={isClosedLock}
+              onClick={(e) => { handleClose(e); onEdit(ad.id); }}
+            >
+              <Pencil className="w-4 h-4" /> Edit
+            </MenuItem>
+          </div>
         )}
         {canEdit && !isAlreadyPublished && (
-          <MenuItem onClick={(e) => { handleClose(e); onPublish(ad); }}>
-            <Send className="w-4 h-4" /> Publish
-          </MenuItem>
+          <div title={isClosedLock ? lifecycle.editLockMessage : undefined}>
+            <MenuItem
+              disabled={isClosedLock}
+              onClick={(e) => { handleClose(e); onPublish(ad); }}
+            >
+              <Send className="w-4 h-4" /> Publish
+            </MenuItem>
+          </div>
         )}
         {canDelete && (
-          <MenuItem
-            onClick={(e) => { handleClose(e); onDelete(ad.id); }}
-            sx={{ color: '#ef4444 !important' }}
-          >
-            <Trash2 className="w-4 h-4" /> Delete
-          </MenuItem>
+          <div title={isClosedLock ? lifecycle.deleteLockMessage : undefined}>
+            <MenuItem
+              disabled={isClosedLock}
+              onClick={(e) => { handleClose(e); onDelete(ad); }}
+              sx={{ color: '#ef4444 !important' }}
+            >
+              <Trash2 className="w-4 h-4" /> Delete
+            </MenuItem>
+          </div>
         )}
       </Menu>
     </div>
@@ -341,7 +362,7 @@ const AdvertisementRecords = () => {
             }
           : prev
       );
-      toast.error(error.message || 'Failed to load secretary');
+      handleApiError(error, { fallback: 'Failed to load secretary' });
     }
   };
 
@@ -375,10 +396,10 @@ const AdvertisementRecords = () => {
         closePublishModal();
         fetchAdvertisements();
       } else {
-        toast.error(result.message || 'Failed to publish advertisement');
+        handleApiError(result, { fallback: 'Failed to publish advertisement' });
       }
     } catch (error) {
-      toast.error(error.message || 'Error publishing advertisement');
+      handleApiError(error, { fallback: 'Error publishing advertisement' });
     } finally {
       setPublishModal(prev => ({ ...prev, loading: false }));
     }
@@ -415,7 +436,7 @@ const AdvertisementRecords = () => {
       const first = await AdvertisementApi.getAll(1);
 
       if (!first.success) {
-        toast.error(first.message || 'Failed to fetch advertisements');
+        handleApiError(first, { fallback: 'Failed to fetch advertisements' });
         return;
       }
 
@@ -454,7 +475,7 @@ const AdvertisementRecords = () => {
       } catch {}
       setAdvertisements(ads);
     } catch (error) {
-      toast.error(error.message || 'Error loading advertisements');
+      handleApiError(error, { fallback: 'Error loading advertisements' });
     } finally {
       setLoading(false);
     }
@@ -468,7 +489,24 @@ const AdvertisementRecords = () => {
     navigate(`/dashboard/advertisements/edit/${id}`);
   };
 
-  const deleteAdvertisement = async (id) => {
+  const explainDeleteRestriction = (message, applications) =>
+    showNotice({
+      tone: 'warning',
+      title: 'Advertisement cannot be deleted',
+      message,
+      details: applications > 0 ? [{ label: 'Candidates who applied', value: applications }] : undefined,
+    });
+
+  const deleteAdvertisement = async (ad) => {
+    const id = ad.id;
+
+    // Locked advertisements never reach the confirmation: explain why instead.
+    const lifecycle = getAdvertisementLifecycle(ad);
+    if (!lifecycle.canDelete) {
+      await explainDeleteRestriction(lifecycle.deleteLockMessage, Number(ad.total_applications || 0));
+      return;
+    }
+
     if (!await confirmDelete({ title: 'Delete Advertisement', message: 'Are you sure you want to delete this advertisement?' })) {
       return;
     }
@@ -481,10 +519,17 @@ const AdvertisementRecords = () => {
         toast.success(result.message || 'Advertisement deleted successfully', { id: loadingToast });
         fetchAdvertisements();
       } else {
-        toast.error(result.message || 'Failed to delete advertisement', { id: loadingToast });
+        toast.error(getErrorMessage(result, 'Could not delete the advertisement.'), { id: loadingToast });
       }
     } catch (error) {
-      toast.error(error.message || 'Error deleting advertisement', { id: loadingToast });
+      toast.dismiss(loadingToast);
+      // The backend enforces the same restrictions (data may have changed since the list loaded).
+      if (getErrorCode(error)) {
+        await explainDeleteRestriction(error.message, Number(error.errors?.applications_count || 0));
+        fetchAdvertisements();
+      } else {
+        toast.error(getErrorMessage(error, 'Could not delete the advertisement.'));
+      }
     }
   };
 
@@ -661,6 +706,8 @@ const AdvertisementRecords = () => {
     hash_id: ad.hash_id,
     status: ad.status,
     extend_date: ad.extend_date,
+    lifecycle: ad.lifecycle,
+    total_applications: ad.total_applications,
     change_logs: parseChangeLogs(ad),
   });
 

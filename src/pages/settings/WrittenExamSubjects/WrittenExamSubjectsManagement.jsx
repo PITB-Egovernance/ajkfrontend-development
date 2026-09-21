@@ -5,7 +5,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -22,6 +21,7 @@ import AdvancedFilter from "components/tables/AdvancedFilter";
 import SearchableMultiSelect from "components/ui/SearchableMultiSelect";
 import { hasPermission } from "utils/permissions";
 import WrittenExamSubjectApi from "api/writtenExamSubjectApi";
+import FormDialog from 'components/ui/FormDialog';
 
 const PERM = "settings.written_exam_subjects";
 
@@ -503,7 +503,7 @@ const WrittenExamSubjectsManagement = () => {
         </Menu>
 
         {/* ADD / EDIT MODAL */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
+        <FormDialog fieldCount={4} open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
           <DialogTitle className="font-bold">
             {editingRow ? "Edit Written Exam Subject" : "Add Written Exam Subject"}
           </DialogTitle>
@@ -591,7 +591,7 @@ const WrittenExamSubjectsManagement = () => {
               {saving ? "Saving…" : editingRow ? "Update" : "Create"}
             </button>
           </DialogActions>
-        </Dialog>
+        </FormDialog>
 
       </div>
     </div>

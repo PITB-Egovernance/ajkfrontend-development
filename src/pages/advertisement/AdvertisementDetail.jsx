@@ -4,12 +4,12 @@ import {
   Download,
   AlertCircle
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import AdvertisementApi from '../../api/advertisementApi';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
+import { handleApiError } from 'utils/apiErrors';
 
 // Advertisement edits are recorded on the `advertisement_change_logs` /
 // `change_logs` JSON column (see BACKEND_ADVERTISEMENT_CHANGE_LOGS_IMPLEMENTATION.md).
@@ -212,11 +212,11 @@ const AdvertisementDetail = () => {
       if (result.success) {
         setAdvertisement(result.data);
       } else {
-        toast.error(result.message || 'Failed to load advertisement details');
+        handleApiError(result, { fallback: 'Failed to load advertisement details' });
         navigate('/dashboard/advertisement-records');
       }
     } catch (error) {
-      toast.error(error.message || 'Error loading details');
+      handleApiError(error, { fallback: 'Error loading details' });
       navigate('/dashboard/advertisement-records');
     } finally {
       setLoading(false);

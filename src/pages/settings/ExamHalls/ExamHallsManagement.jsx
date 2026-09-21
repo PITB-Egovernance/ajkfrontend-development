@@ -5,7 +5,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -21,6 +20,8 @@ import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import { GRID_SX } from 'utils/gridStyles';
 import { hasPermission } from 'utils/permissions';
+import { handleApiError } from 'utils/apiErrors';
+import FormDialog from 'components/ui/FormDialog';
 
 const PERM = 'settings.exam_center';
 
@@ -103,10 +104,10 @@ const ExamHallsManagement = () => {
         setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
         setTotalCapacity(Number(result.data?.total_capacity ?? 0));
       } else {
-        toast.error(result.message || "Failed to load exam halls");
+        handleApiError(result, { fallback: "Failed to load exam halls" });
         setAllRows([]);
       }
-    } catch { toast.error("Server error"); setAllRows([]); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); setAllRows([]); }
     finally { setLoading(false); }
   };
 
@@ -153,7 +154,7 @@ const ExamHallsManagement = () => {
       const res = await fetch(`${API_BASE}/settings/exam-halls/${selectedRow.hash_id}/delete`, { method: "DELETE", headers: getHeaders() });
       const r   = await res.json();
       if (r.status === 200 || r.success) { toast.success("Deleted"); setSelectionModel((p) => p.filter((id) => id !== selectedRow.hash_id)); fetchHalls(); }
-      else toast.error(r.message || "Delete failed");
+      else handleApiError(r, { fallback: "Delete failed" });
     } catch { toast.error("Delete failed"); }
   };
 
@@ -162,7 +163,7 @@ const ExamHallsManagement = () => {
       const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
       const r   = await res.json();
       if (r.status === 200 || r.success) { toast.success(r.success || successMsg); setSelectionModel([]); fetchHalls(); }
-      else toast.error(r.message || "Action failed");
+      else handleApiError(r, { fallback: "Action failed" });
     } catch { toast.error("Action failed"); }
   };
 
@@ -202,7 +203,7 @@ const ExamHallsManagement = () => {
         toast.success(isUpdate ? "Updated" : "Hall created");
         setOpenModal(false);
         fetchHalls();
-      } else toast.error(r.message || "Operation failed");
+      } else handleApiError(r, { fallback: "Operation failed" });
     } catch { toast.error("Operation failed"); }
     finally { setSaving(false); }
   };
@@ -329,7 +330,7 @@ const ExamHallsManagement = () => {
         </Menu>
 
         {/* ADD / EDIT MODAL */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="sm">
+        <FormDialog fieldCount={4} open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="sm">
           <DialogTitle className="font-bold">{editingHall ? "Edit Exam Hall" : "Add Exam Hall"}</DialogTitle>
           <DialogContent>
             <SearchableSelect
@@ -369,7 +370,7 @@ const ExamHallsManagement = () => {
               {saving ? "Saving…" : editingHall ? "Update" : "Create"}
             </button>
           </DialogActions>
-        </Dialog>
+        </FormDialog>
       </div>
     </div>
   );

@@ -15,6 +15,8 @@ import { useGenerationGuard } from 'context/GenerationGuardContext';
 import RollNumberGenerationMode from 'components/roll-numbers/RollNumberGenerationMode';
 import PendingRangeCard from 'components/roll-numbers/PendingRangeCard';
 import RollNumberProgressCard from 'components/roll-numbers/RollNumberProgressCard';
+import { handleApiError } from 'utils/apiErrors';
+import { showNotice } from 'components/ui/noticeDialog';
 
 // "View Slip" opens a separate route (/dashboard/roll-numbers/slip/:rollNumber).
 // Navigating there and pressing Back unmounts this page, so its stage/results
@@ -1042,7 +1044,7 @@ const RollNumberExamFlow = () => {
           .sort()
       );
     } catch (err) {
-      if (!isStale()) toast.error(err?.message || 'Failed to load data');
+      if (!isStale()) handleApiError(err, { fallback: 'Failed to load data' });
     } finally {
       if (!isStale()) setLoading(false);
     }
@@ -1250,7 +1252,7 @@ const RollNumberExamFlow = () => {
       setStage(4);
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err?.message || 'Failed to load generated slips');
+      handleApiError(err, { fallback: 'Failed to load generated slips' });
     }
   }, [allCandidateApps, centers]);
 
@@ -1431,7 +1433,7 @@ const RollNumberExamFlow = () => {
       });
       setBatch(res?.data || null);
     } catch (err) {
-      toast.error(err?.message || 'Failed to create batch');
+      handleApiError(err, { fallback: 'Failed to create batch' });
       setStage(1);
     } finally {
       setCreatingBatch(false);
@@ -1480,7 +1482,7 @@ const RollNumberExamFlow = () => {
       toast.success('Roll number generation started');
       await refreshBatch();
     } catch (err) {
-      toast.error(err?.message || 'Failed to generate roll numbers');
+      handleApiError(err, { fallback: 'Failed to generate roll numbers' });
     } finally {
       setGeneratingRollNumbers(false);
       setBusy(false);
@@ -1553,7 +1555,7 @@ const RollNumberExamFlow = () => {
       toast.success('Center allocation started');
       await refreshBatch();
     } catch (err) {
-      toast.error(err?.message || 'Failed to allocate centers');
+      handleApiError(err, { fallback: 'Failed to allocate centers' });
     } finally {
       setAllocatingCenters(false);
       setBusy(false);
@@ -1597,11 +1599,29 @@ const RollNumberExamFlow = () => {
       const { start, end } = centerRanges[c.id];
       const requested = rangeRequestedCount(start, end);
       if (requested === null) {
-        toast.error(`${c.center}: enter a valid range (e.g. start OPM-00001, end OPM-05000).`);
+        await showNotice({
+          tone: 'warning',
+          title: 'Invalid roll number range',
+          message: `${c.center}: the start roll number must come before (or equal) the end roll number, and both must end with digits (e.g. start OPM-00001, end OPM-05000).`,
+          details: [{ label: 'Start', value: start }, { label: 'End', value: end }],
+        });
         return;
       }
       if (requested > c.capacity) {
-        toast.error(`${c.center}: maximum capacity reached — ${c.capacity} seat${c.capacity === 1 ? '' : 's'} available, ${requested} requested.`);
+        await showNotice({
+          tone: 'warning',
+          title: c.capacity === 0 ? 'Center is full' : 'Center capacity exceeded',
+          message: c.capacity === 0
+            ? `${c.center} is full — every seat is already allocated. Choose another center.`
+            : `${c.center} does not have enough seats for this range. Reduce the range or choose another center.`,
+          details: [
+            { label: 'Center', value: c.center },
+            { label: 'Total capacity', value: c.totalCapacity },
+            { label: 'Already allocated', value: Math.max(0, (c.totalCapacity || 0) - c.capacity) },
+            { label: 'Remaining capacity', value: c.capacity },
+            { label: 'Requested allocation', value: requested },
+          ],
+        });
         return;
       }
     }
@@ -1626,7 +1646,7 @@ const RollNumberExamFlow = () => {
       setCenterRanges({});
       await refreshBatch();
     } catch (err) {
-      toast.error(err?.message || 'Failed to allocate centers');
+      handleApiError(err, { fallback: 'Failed to allocate centers' });
     } finally {
       setAllocatingCenters(false);
       setBusy(false);
@@ -1642,7 +1662,7 @@ const RollNumberExamFlow = () => {
       toast.success('Slip generation started');
       await refreshBatch();
     } catch (err) {
-      toast.error(err?.message || 'Failed to generate slips');
+      handleApiError(err, { fallback: 'Failed to generate slips' });
     } finally {
       setGeneratingFinalSlips(false);
       setBusy(false);
@@ -1664,7 +1684,7 @@ const RollNumberExamFlow = () => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         toast.dismiss(tid);
-        toast.error(err.message || 'Failed to download slip');
+        handleApiError(err, { fallback: 'Failed to download slip' });
         return;
       }
       const blob = await res.blob();
@@ -2026,7 +2046,7 @@ const RollNumberExamFlow = () => {
                       a.click();
                       window.URL.revokeObjectURL(url);
                     } catch (err) {
-                      toast.error(err?.message || 'Export failed');
+                      handleApiError(err, { fallback: 'Export failed' });
                     }
                   }}
                   onResume={async () => {
@@ -2035,7 +2055,7 @@ const RollNumberExamFlow = () => {
                       toast.success('Batch resumed');
                       await refreshBatch();
                     } catch (err) {
-                      toast.error(err?.message || 'Failed to resume batch');
+                      handleApiError(err, { fallback: 'Failed to resume batch' });
                     }
                   }}
                   onGenerateSlips={handleGenerateFinalSlips}

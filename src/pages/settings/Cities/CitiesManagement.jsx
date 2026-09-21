@@ -24,6 +24,7 @@ import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+import { handleApiError } from 'utils/apiErrors';
 
 const PERM = "settings.cities";
 
@@ -116,10 +117,10 @@ const CitiesManagement = () => {
         setActiveCount(Number(result.data?.status_counts?.active ?? 0));
         setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
-        toast.error(result.message || "Failed to load cities");
+        handleApiError(result, { fallback: "Failed to load cities" });
         setRows([]);
       }
-    } catch { toast.error("Server error"); setRows([]); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); setRows([]); }
     finally { setLoading(false); }
   };
 
@@ -207,7 +208,7 @@ const CitiesManagement = () => {
       const res = await fetch(`${API_BASE}/settings/cities/${selectedRow.hash_id}/delete`, { method: "DELETE", headers: getHeaders(false) });
       const r   = await res.json();
       if (r.status === 200 || r.success) { toast.success("Deleted"); setSelectionModel((p) => p.filter((id) => id !== selectedRow.hash_id)); fetchCities(); }
-      else toast.error(r.message || "Delete failed");
+      else handleApiError(r, { fallback: "Delete failed" });
     } catch { toast.error("Delete failed"); }
   };
 
@@ -217,7 +218,7 @@ const CitiesManagement = () => {
       const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
       const r   = await res.json();
       if (r.status === 200 || r.success) { toast.success(r.success || successMsg); setSelectionModel([]); fetchCities(); }
-      else toast.error(r.message || "Action failed");
+      else handleApiError(r, { fallback: "Action failed" });
     } catch { toast.error("Action failed"); }
   };
 
@@ -247,7 +248,7 @@ const CitiesManagement = () => {
         setOpenModal(false);
         fetchCities();
       } else {
-        toast.error(r.message || "Operation failed");
+        handleApiError(r, { fallback: "Operation failed" });
       }
     } catch { toast.error("Operation failed"); }
     finally { setSaving(false); }
@@ -270,7 +271,7 @@ const CitiesManagement = () => {
       if (res.ok || r.status === 200 || r.success) {
         toast.success(`City marked as ${newStatus}`);
         fetchCities();
-      } else toast.error(r.message || "Status update failed");
+      } else handleApiError(r, { fallback: "Status update failed" });
     } catch { toast.error("Status update failed"); }
   };
 

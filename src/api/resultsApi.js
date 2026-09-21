@@ -1,4 +1,5 @@
 import Config from 'config/baseUrl';
+import { apiErrorMessage } from 'utils/apiErrors';
 import AuthService from 'services/authService';
 
 const API_BASE = Config.apiUrl;
@@ -32,7 +33,7 @@ const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));
   
   if (!response.ok) {
-    const error = new Error(result.message || result.error || 'Request failed');
+    const error = new Error(apiErrorMessage(result, response.status, 'The request could not be completed.'));
     error.status = response.status;
     error.errors = result.errors || {};
     throw error;
@@ -47,7 +48,7 @@ const handleResponse = async (response) => {
 const handleBlobResponse = async (response) => {
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
-    const error = new Error(result.message || result.error || 'Download failed');
+    const error = new Error(apiErrorMessage(result, response.status, 'The file could not be downloaded.'));
     error.status = response.status;
     throw error;
   }
@@ -188,7 +189,7 @@ const ResultsApi = {
     
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
-      const error = new Error(result.message || result.error || 'Download failed');
+      const error = new Error(apiErrorMessage(result, response.status, 'The file could not be downloaded.'));
       error.status = response.status;
       throw error;
     }

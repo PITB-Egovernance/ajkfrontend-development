@@ -1,4 +1,5 @@
 import Config from 'config/baseUrl';
+import { apiErrorMessage } from 'utils/apiErrors';
 
 // Candidate-portal backend, admin-scoped prefix — attempt tracking. An
 // "attempt" is only consumed when a candidate is selected for interview
@@ -21,7 +22,7 @@ const getCandidateAdminHeaders = (json = true) => {
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error  = new Error(result.message || `Request failed (${response.status})`);
+    const error  = new Error(apiErrorMessage(result, response.status, 'The request could not be completed.'));
     error.status = response.status;
     error.errors = result.errors || {};
     throw error;

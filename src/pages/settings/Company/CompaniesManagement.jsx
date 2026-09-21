@@ -5,7 +5,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -25,6 +24,8 @@ import { InlineLoader } from "components/ui/Loader";
 import { hasPermission } from "utils/permissions";
 import { GRID_SX } from 'utils/gridStyles';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { handleApiError } from 'utils/apiErrors';
+import FormDialog from 'components/ui/FormDialog';
 
 const PERM = "settings.companies";
 
@@ -165,7 +166,7 @@ const CompaniesManagement = () => {
         setActiveCount(Number(result.data?.status_counts?.active ?? 0));
         setInactiveCount(Number(result.data?.status_counts?.inactive ?? 0));
       } else {
-        toast.error(result.message || "Failed to load companies");
+        handleApiError(result, { fallback: "Failed to load companies" });
       }
     } catch (error) {
       toast.error("Failed to load companies");
@@ -225,11 +226,11 @@ const CompaniesManagement = () => {
         setEditingCompany(null);
         fetchCompanies();
       } else {
-        toast.error(result.message || "Operation failed");
+        handleApiError(result, { fallback: "Operation failed" });
       }
 
     } catch (error) {
-      toast.error("Server error");
+      handleApiError(error, { fallback: 'The request could not be completed. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -261,11 +262,11 @@ const CompaniesManagement = () => {
         toast.success("Company deleted successfully");
         fetchCompanies();
       } else {
-        toast.error(result.message || "Delete failed");
+        handleApiError(result, { fallback: "Delete failed" });
       }
 
     } catch (error) {
-      toast.error("Server error");
+      handleApiError(error, { fallback: 'The request could not be completed. Please try again.' });
     }
   };
   /* ===============================
@@ -285,7 +286,7 @@ const CompaniesManagement = () => {
         toast.success(`Company marked as ${newStatus}`);
         fetchCompanies();
       } else {
-        toast.error(result.message || "Status update failed");
+        handleApiError(result, { fallback: "Status update failed" });
       }
     } catch {
       toast.error("Status update failed");
@@ -474,7 +475,7 @@ const CompaniesManagement = () => {
         </Menu>
 
         {/* MODAL */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
+        <FormDialog fieldCount={5} open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
           <DialogTitle>
             {editingCompany ? "Edit Company" : "Add Company"}
           </DialogTitle>
@@ -538,7 +539,7 @@ const CompaniesManagement = () => {
               {editingCompany ? "Update" : "Create"}
             </Button>
           </DialogActions>
-        </Dialog>
+        </FormDialog>
       </div>
     </div>
   );

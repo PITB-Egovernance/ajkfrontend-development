@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, AlertTriangle, EyeOff, RefreshCw } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
+import { handleApiError } from 'utils/apiErrors';
 
 // Shared bulk-unpublish (withdraw) confirmation modal — mandatory reason,
 // all-or-nothing on the backend. Counterpart to BulkPublishModal.
@@ -22,7 +23,7 @@ export default function BulkWithdrawModal({ isOpen, onClose, jobIds = [], onSucc
       toast.success(res?.message || `${res?.data?.unpublished ?? jobIds.length} post(s) unpublished`);
       onSuccess?.();
     } catch (err) {
-      toast.error(err.message || 'Bulk unpublish failed', { duration: 8000 });
+      handleApiError(err, { fallback: 'Bulk unpublish failed' });
     } finally {
       setBusy(false);
     }

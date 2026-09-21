@@ -23,6 +23,7 @@ import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
+import { handleApiError } from 'utils/apiErrors';
 
 const PERM = "settings.wings";
 
@@ -127,10 +128,10 @@ const WingsManagement = () => {
         setActiveCount(Number(payload.status_counts?.active ?? 0));
         setInactiveCount(Number(payload.status_counts?.inactive ?? 0));
       } else {
-        toast.error(result.message || "Failed to load wings");
+        handleApiError(result, { fallback: "Failed to load wings" });
       }
-    } catch {
-      toast.error("Server error");
+    } catch (err) {
+      handleApiError(err, { fallback: 'The request could not be completed. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -211,7 +212,7 @@ const WingsManagement = () => {
         toast.success("Deleted successfully");
         fetchWings();
       } else {
-        toast.error(result.message || "Delete failed");
+        handleApiError(result, { fallback: "Delete failed" });
       }
     } catch {
       toast.error("Delete failed");
@@ -231,7 +232,7 @@ const WingsManagement = () => {
         toast.success(`Marked as ${newStatus}`);
         fetchWings();
       } else {
-        toast.error(result.message || "Status update failed");
+        handleApiError(result, { fallback: "Status update failed" });
       }
     } catch {
       toast.error("Status update failed");

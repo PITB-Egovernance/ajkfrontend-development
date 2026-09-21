@@ -27,6 +27,7 @@ import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
+import { handleApiError } from 'utils/apiErrors';
 
 const PERM = "settings.districts";
 
@@ -169,10 +170,10 @@ const DistrictsManagement = () => {
         setActiveCount(Number(payload.status_counts?.active ?? 0));
         setInactiveCount(Number(payload.status_counts?.inactive ?? 0));
       } else {
-        toast.error(result.message || "Failed to load districts");
+        handleApiError(result, { fallback: "Failed to load districts" });
       }
-    } catch {
-      toast.error("Server error");
+    } catch (err) {
+      handleApiError(err, { fallback: 'The request could not be completed. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -230,7 +231,7 @@ const DistrictsManagement = () => {
         toast.success("Deleted successfully");
         fetchDistricts();
       } else {
-        toast.error(result.message || "Delete failed");
+        handleApiError(result, { fallback: "Delete failed" });
       }
     } catch {
       toast.error("Delete failed");
@@ -307,7 +308,7 @@ const DistrictsManagement = () => {
         toast.success(`District marked as ${newStatus}`);
         fetchDistricts();
       } else {
-        toast.error(result.message || "Status update failed");
+        handleApiError(result, { fallback: "Status update failed" });
       }
     } catch {
       toast.error("Status update failed");

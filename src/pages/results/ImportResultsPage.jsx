@@ -10,6 +10,7 @@ import CSVUploadZone from 'components/results/CSVUploadZone';
 import ColumnMapperModal from 'components/results/ColumnMapperModal';
 import SearchableMultiSelect from 'components/ui/SearchableMultiSelect';
 import ResultsApi from 'api/resultsApi';
+import { handleApiError } from 'utils/apiErrors';
 import RollNumberApi from 'api/rollNumberApi';
 import toast from 'react-hot-toast';
 
@@ -828,7 +829,7 @@ const ImportResultsPage = () => {
       setMapperOpen(true);
     } catch (err) {
       toast.dismiss('csv-scan');
-      toast.error(err?.message || 'Failed to process file');
+      handleApiError(err, { fallback: 'Failed to process file' });
     } finally {
       setScanLoading(false);
     }
@@ -856,7 +857,7 @@ const ImportResultsPage = () => {
       setShowDryRun(true);
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error(err?.message || 'Validation failed', { position: 'top-right' });
+      handleApiError(err, { fallback: 'Validation failed. Please check the file and try again.' });
     }
   };
 
@@ -887,7 +888,7 @@ const ImportResultsPage = () => {
       }
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error(err?.message || 'Import failed', { position: 'top-right' });
+      handleApiError(err, { fallback: 'The import could not be completed. Please try again.' });
     } finally {
       setConfirming(false);
     }

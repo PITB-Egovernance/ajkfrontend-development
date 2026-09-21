@@ -12,6 +12,7 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import AdvertisementApi from "api/advertisementApi";
 import { toast } from "react-hot-toast";
+import { handleApiError } from 'utils/apiErrors';
 
 const API_BASE = Config.apiUrl;
 const getHeaders = () => ({
@@ -128,7 +129,7 @@ const AuditTrailReport = () => {
       link.click(); link.remove();
       toast.success("Excel exported successfully!");
     } catch (err) {
-      toast.error(err.message || "Export failed");
+      handleApiError(err, { fallback: "Export failed" });
     } finally {
       setExporting(false);
     }
@@ -151,7 +152,7 @@ const AuditTrailReport = () => {
       window.open(fileURL, "_blank");
       toast.success("PDF report generated!");
     } catch (err) {
-      toast.error(err.message || "PDF generation failed");
+      handleApiError(err, { fallback: "PDF generation failed" });
     } finally {
       setPdfExporting(false);
     }

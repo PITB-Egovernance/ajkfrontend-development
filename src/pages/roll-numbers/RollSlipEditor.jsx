@@ -8,6 +8,7 @@ import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import RollNumberApi from 'api/rollNumberApi';
+import { handleApiError } from 'utils/apiErrors';
 
 // HH:MM → "H:MM AM/PM"
 const formatTime12h = (value) => {
@@ -118,7 +119,7 @@ const RollSlipEditor = () => {
       toast.success('Roll number slip updated successfully');
       navigate('/dashboard/roll-numbers');
     } catch (err) {
-      toast.error(err?.message || 'Failed to update slip');
+      handleApiError(err, { fallback: 'Failed to update slip' });
     } finally {
       setSaving(false);
     }

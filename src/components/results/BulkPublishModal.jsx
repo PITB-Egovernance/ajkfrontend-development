@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Send, CheckCircle2, RefreshCw } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
+import { handleApiError } from 'utils/apiErrors';
 
 // Shared bulk-publish confirmation modal — used anywhere a post-listing page
 // offers "Publish Selected" / "Publish All" (Post-Result landing, Results
@@ -23,7 +24,7 @@ export default function BulkPublishModal({ isOpen, onClose, jobIds = [], onSucce
       // Bulk publish is all-or-nothing — surface the backend's own message
       // verbatim, since it names exactly which post stopped the batch and
       // confirms the rollback, rather than a generic failure toast.
-      toast.error(err.message || 'Bulk publish failed', { duration: 8000 });
+      handleApiError(err, { fallback: 'The results could not be published. Please try again.', title: 'Bulk publish stopped' });
     } finally {
       setBusy(false);
     }

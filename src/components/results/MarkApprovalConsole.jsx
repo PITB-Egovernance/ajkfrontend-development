@@ -14,6 +14,7 @@ import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDate } from 'utils/dateUtils';
+import { handleApiError } from 'utils/apiErrors';
 
 /**
  * MarkApprovalConsole
@@ -56,7 +57,7 @@ const MarkApprovalConsole = () => {
       toast.success(approved ? 'Edit Approved' : 'Edit Rejected');
       fetchPending();
     } catch (err) {
-      toast.error(err.message || 'Operation failed');
+      handleApiError(err, { fallback: 'Operation failed' });
     } finally {
       setProcessingId(null);
     }

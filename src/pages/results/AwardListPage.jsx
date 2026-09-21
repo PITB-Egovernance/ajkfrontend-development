@@ -23,6 +23,7 @@ import { toast } from 'react-hot-toast';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
 import { formatDate } from 'utils/dateUtils';
+import { handleApiError } from 'utils/apiErrors';
 
 /**
  * AwardListPage (v2.3) - Interview Secretary Merit List Builder
@@ -123,7 +124,7 @@ const AwardListPage = () => {
         toast.success(`Created list for ${data.data.created} eligible candidates`);
         handleLoadList();
       } else {
-        toast.error(data.message || 'Initialization failed');
+        handleApiError(data, { fallback: 'Initialization failed' });
       }
     } catch (err) {
       toast.error('Failed to initialize award list');
@@ -284,7 +285,7 @@ const AwardListPage = () => {
         }
         handleLoadList();
       } else {
-        toast.error(res.message || 'Import failed', { id: 'csv-import' });
+        handleApiError(res, { fallback: 'Import failed' });
       }
     } catch (err) {
       toast.error('Failed to import CSV file', { id: 'csv-import' });

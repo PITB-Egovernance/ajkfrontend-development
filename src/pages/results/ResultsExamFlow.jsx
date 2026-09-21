@@ -24,6 +24,7 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { examTypeToCategory, applyClubbedGroups } from 'utils/resultsClubbing';
 import BulkPublishModal from 'components/results/BulkPublishModal';
 import BulkWithdrawModal from 'components/results/BulkWithdrawModal';
+import { handleApiError } from 'utils/apiErrors';
 
 // Same publishable/unpublishable split used on the Post-Result landing page.
 const PUBLISHABLE_STATUSES = ['Approved', 'APPROVED', 'WITHDRAWN'];
@@ -359,7 +360,7 @@ const ResultsExamFlow = () => {
       toast.dismiss('delete-results');
       const alreadyInWorkflow = err?.status === 422 && /post-result workflow/i.test(err?.message || '');
       if (!alreadyInWorkflow) {
-        toast.error(err?.message || 'Failed to delete results');
+        handleApiError(err, { fallback: 'Failed to delete results' });
         return;
       }
 
@@ -377,7 +378,7 @@ const ResultsExamFlow = () => {
         toast.success(res2?.message || 'Results deleted', { id: 'delete-results-force' });
         fetchData();
       } catch (err2) {
-        toast.error(err2?.message || 'Failed to delete results', { id: 'delete-results-force' });
+        handleApiError(err2, { fallback: 'Failed to delete results' });
       }
     }
   };

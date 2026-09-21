@@ -16,6 +16,7 @@ import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
 import settingsCatalogApi from 'api/settingsCatalogApi';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { handleApiError } from 'utils/apiErrors';
 const PERM = 'settings.qualifications';
 
 const QualificationsManagement = () => {
@@ -94,7 +95,7 @@ const QualificationsManagement = () => {
           status:   String(item.status || 'active').toLowerCase(),
         })));
       setTotalRows(Number(pagination.total) || 0);
-    } catch { toast.error('Server error'); setRows([]); setTotalRows(0); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); setRows([]); setTotalRows(0); }
     finally { setLoading(false); }
   };
 
@@ -138,9 +139,9 @@ const QualificationsManagement = () => {
         setOpen(false);
         fetchPage(paginationModel.page, paginationModel.pageSize);
       } else {
-        toast.error(result.message || 'Operation failed');
+        handleApiError(result, { fallback: 'Operation failed' });
       }
-    } catch { toast.error('Server error'); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); }
     finally { setSaving(false); }
   };
 
@@ -156,9 +157,9 @@ const QualificationsManagement = () => {
           fetchPage(paginationModel.page, paginationModel.pageSize);
         }
       } else {
-        toast.error(result.message || 'Delete failed');
+        handleApiError(result, { fallback: 'Delete failed' });
       }
-    } catch { toast.error('Server error'); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); }
   };
 
   const handleToggle = async (row) => {
@@ -176,9 +177,9 @@ const QualificationsManagement = () => {
         toast.success(`Marked as ${newStatus}`);
         fetchPage(paginationModel.page, paginationModel.pageSize);
       } else {
-        toast.error(result.message || 'Status update failed');
+        handleApiError(result, { fallback: 'Status update failed' });
       }
-    } catch { toast.error('Server error'); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); }
   };
 
   const columns = [

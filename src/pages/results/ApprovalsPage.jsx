@@ -13,6 +13,7 @@ import ResultsApi from 'api/resultsApi';
 import Button from 'components/ui/Button';
 import { Card, CardContent } from 'components/ui/Card';
 import toast from 'react-hot-toast';
+import { handleApiError } from 'utils/apiErrors';
 
 const ApprovalsPage = () => {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ const ApprovalsPage = () => {
       toast.success(approved ? 'Correction approved successfully' : 'Correction rejected');
       fetchPendingEdits();
     } catch (err) {
-      toast.error(err.message || 'Operation failed');
+      handleApiError(err, { fallback: 'Operation failed' });
     } finally {
       setProcessing(null);
     }

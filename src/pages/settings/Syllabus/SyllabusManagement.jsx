@@ -5,7 +5,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -21,6 +20,7 @@ import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
+import FormDialog from 'components/ui/FormDialog';
 
 const PERM = "settings.syllabus";
 
@@ -522,7 +522,7 @@ const SyllabusManagement = () => {
         </Menu>
 
         {/* ADD / EDIT MODAL */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
+        <FormDialog fieldCount={4} open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
           <DialogTitle className="font-bold">
             {editingRow ? "Edit Syllabus" : "Add Syllabus"}
           </DialogTitle>
@@ -656,7 +656,7 @@ const SyllabusManagement = () => {
               {saving ? "Saving…" : editingRow ? "Update" : "Create"}
             </button>
           </DialogActions>
-        </Dialog>
+        </FormDialog>
 
       </div>
     </div>

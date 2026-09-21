@@ -22,6 +22,7 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import { getJobRouteId } from 'utils/jobMapper';
 import { fetchAndApplyClubbedGroups } from 'utils/resultsClubbing';
+import { handleApiError } from 'utils/apiErrors';
 
 const FILTER_DEBOUNCE_MS = 400;
 
@@ -529,7 +530,7 @@ const VerificationPage = () => {
       fetchCandidates(true);
     } catch (err) {
       toast.dismiss(tid);
-      toast.error(err.message || 'Bulk action failed');
+      handleApiError(err, { fallback: 'Bulk action failed' });
     } finally {
       setProcessingAction(false);
     }

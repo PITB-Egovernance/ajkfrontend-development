@@ -9,7 +9,11 @@ import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
 import Config from "../../config/baseUrl";
 import AuthService from "../../services/authService";
+import { showNotice, confirmNotice } from "components/ui/noticeDialog";
+import { getErrorMessage, getErrorCode } from "utils/apiErrors";
+import { getAdvertisementLifecycle } from "utils/advertisementLifecycle";
 import "../job-creation/JobCreationForm.css";
+import { handleApiError } from 'utils/apiErrors';
 
 const STATUS_OPTIONS = [
   // { value: 'pending', label: 'Pending' },
@@ -626,6 +630,19 @@ const AdvertisementEditForm = () => {
         const result = await AdvertisementApi.getById(id);
         if (result.success) {
           const data = result.data;
+
+          // Permanently / automatically closed advertisements are view-only.
+          const lifecycle = getAdvertisementLifecycle(data);
+          if (!lifecycle.canEdit) {
+            await showNotice({
+              tone: "warning",
+              title: "Advertisement is read-only",
+              message: lifecycle.editLockMessage,
+            });
+            navigate(`/dashboard/advertisements/view/${id}`, { replace: true });
+            return;
+          }
+
           setAdvDate(data.adv_date?.split("T")[0] || "");
           setAdvDateInput(formatDateForDisplay(data.adv_date?.split("T")[0] || ""));
           setAdvNumber(data.adv_number || "");
@@ -757,7 +774,7 @@ const AdvertisementEditForm = () => {
             }
           : prev
       );
-      toast.error(error.message || "Failed to load secretary");
+      handleApiError(error, { fallback: "Failed to load secretary" });
     }
   };
 
@@ -777,12 +794,22 @@ const AdvertisementEditForm = () => {
         navigate("/dashboard/advertisement-records");
       }
     } catch (err) {
-      if (err.errors) {
-        setFieldErrors(err.errors);
+      if (getErrorCode(err)) {
+        // Business-rule rejection (e.g. the advertisement got closed meanwhile) — explain it.
+        toast.dismiss(loadingToast);
+        await showNotice({
+          tone: "warning",
+          title: "Advertisement cannot be updated",
+          message: err.message,
+        });
+      } else {
+        if (err.errors) {
+          setFieldErrors(err.errors);
+        }
+        toast.error(getErrorMessage(err, "Could not update the advertisement."), {
+          id: loadingToast,
+        });
       }
-      toast.error(err.message || "Failed to update advertisement", {
-        id: loadingToast,
-      });
     } finally {
       setLoading(false);
     }
@@ -989,6 +1016,20 @@ const AdvertisementEditForm = () => {
     if (status === "active" && originalStatus !== "active") {
       openPublishModal(payload);
       return;
+    }
+
+    if (status === "permanently_closed" && originalStatus !== "permanently_closed") {
+      const confirmed = await confirmNotice({
+        tone: "warning",
+        title: "Permanently close this advertisement?",
+        message:
+          "Once an advertisement is permanently closed it becomes view-only. " +
+          "It can no longer be edited or deleted, and it cannot be reopened. " +
+          "Candidates will not be able to apply to it.",
+        confirmLabel: "Yes, permanently close",
+        cancelLabel: "Cancel",
+      });
+      if (!confirmed) return;
     }
 
     await saveAdvertisement(payload);

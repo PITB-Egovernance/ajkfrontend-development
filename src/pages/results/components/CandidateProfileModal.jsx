@@ -3,6 +3,7 @@ import { X, User, GraduationCap, Briefcase, FileText, Download, AlertTriangle, F
 import Button from 'components/ui/Button';
 import PostResultApi from 'api/postResultApi';
 import toast from 'react-hot-toast';
+import { handleApiError } from 'utils/apiErrors';
 
 // Candidate profile/documents live on the separate candidate-portal service —
 // this modal renders its real `data.personal` shape (confirmed live against
@@ -92,7 +93,7 @@ export default function CandidateProfileModal({ isOpen, onClose, identifier, can
     try {
       await PostResultApi.downloadCandidateDocument(identifier, docHash, doc.original_filename || doc.file_name);
     } catch (err) {
-      toast.error(err.message || 'Failed to download document');
+      handleApiError(err, { fallback: 'Failed to download document' });
     }
   };
 
@@ -100,7 +101,7 @@ export default function CandidateProfileModal({ isOpen, onClose, identifier, can
     try {
       await PostResultApi.downloadApplicationForm(identifier, `application-form-${identifier}.pdf`);
     } catch (err) {
-      toast.error(err.message || 'Failed to download application form');
+      handleApiError(err, { fallback: 'Failed to download application form' });
     }
   };
 

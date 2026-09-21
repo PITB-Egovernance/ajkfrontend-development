@@ -25,6 +25,7 @@ import AdvancedFilter from "components/tables/AdvancedFilter";
 import SearchableSelect from "components/ui/SearchableSelect";
 import { hasPermission } from "utils/permissions";
 import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+import { handleApiError } from 'utils/apiErrors';
 const PERM = "settings.exam_centers";
 
 const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
@@ -159,10 +160,10 @@ const ExamCentersManagement = () => {
         setTotal(Number(result.data?.total ?? data.length));
         setTotalCapacity(Number(result.data?.total_capacity ?? 0));
       } else {
-        toast.error(result.message || "Failed to load exam centers");
+        handleApiError(result, { fallback: "Failed to load exam centers" });
         setAllRows([]);
       }
-    } catch { toast.error("Server error"); setAllRows([]); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); setAllRows([]); }
     finally { setLoading(false); }
   };
 
@@ -262,7 +263,7 @@ const ExamCentersManagement = () => {
       const res = await fetch(`${API_BASE}/settings/exam-centers/${selectedRow.hash_id}/delete`, { method: "DELETE", headers: getHeaders(false) });
       const r   = await res.json();
       if (r.status === 200 || r.success) { toast.success("Deleted"); setSelectionModel((p) => p.filter((id) => id !== selectedRow.hash_id)); fetchCenters(); }
-      else toast.error(r.message || "Delete failed");
+      else handleApiError(r, { fallback: "Delete failed" });
     } catch { toast.error("Delete failed"); }
   };
 
@@ -272,7 +273,7 @@ const ExamCentersManagement = () => {
       const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
       const r   = await res.json();
       if (r.status === 200 || r.success) { toast.success(r.success || successMsg); setSelectionModel([]); fetchCenters(); }
-      else toast.error(r.message || "Action failed");
+      else handleApiError(r, { fallback: "Action failed" });
     } catch { toast.error("Action failed"); }
   };
 
@@ -307,7 +308,7 @@ const ExamCentersManagement = () => {
       });
       const r   = await res.json();
       if (r.status === 200 || r.status === 201 || r.success) { toast.success(isUpdate ? "Updated" : "Created"); setOpenModal(false); fetchCenters(); }
-      else toast.error(r.message || "Operation failed");
+      else handleApiError(r, { fallback: "Operation failed" });
     } catch { toast.error("Operation failed"); }
     finally { setSaving(false); }
   };
@@ -321,7 +322,7 @@ const ExamCentersManagement = () => {
       const res = await fetch(`${API_BASE}/settings/exam-centers/import`, { method: "POST", headers: getHeaders(false), body });
       const r   = await res.json();
       if (r.status === 200 || r.success) { toast.success(r.message || "Import successful"); fetchCenters(); }
-      else toast.error(r.message || "Import failed");
+      else handleApiError(r, { fallback: "Import failed" });
     } catch { toast.error("Import failed"); }
     finally { setImporting(false); }
   };
@@ -345,7 +346,7 @@ const ExamCentersManagement = () => {
       if (res.ok || r.status === 200 || r.success) {
         toast.success(`Center marked as ${newStatus}`);
         fetchCenters();
-      } else toast.error(r.message || "Status update failed");
+      } else handleApiError(r, { fallback: "Status update failed" });
     } catch { toast.error("Status update failed"); }
   };
 

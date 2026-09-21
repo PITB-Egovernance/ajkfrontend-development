@@ -17,6 +17,7 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 import settingsCatalogApi from 'api/settingsCatalogApi';
 import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
+import { handleApiError } from 'utils/apiErrors';
 
 const PERM = 'settings.degrees';
 
@@ -71,7 +72,7 @@ const DegreesManagement = () => {
       );
       setRows(mapped);
       setTotalRows(Number(pagination.total) || 0);
-    } catch { toast.error('Server error'); setRows([]); setTotalRows(0); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); setRows([]); setTotalRows(0); }
     finally { setLoading(false); }
   };
 
@@ -144,9 +145,9 @@ const DegreesManagement = () => {
         setOpen(false);
         fetchPage(paginationModel.page, paginationModel.pageSize);
       } else {
-        toast.error(result.message || 'Operation failed');
+        handleApiError(result, { fallback: 'Operation failed' });
       }
-    } catch { toast.error('Server error'); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); }
     finally { setSaving(false); }
   };
 
@@ -162,9 +163,9 @@ const DegreesManagement = () => {
           fetchPage(paginationModel.page, paginationModel.pageSize);
         }
       } else {
-        toast.error(result.message || 'Delete failed');
+        handleApiError(result, { fallback: 'Delete failed' });
       }
-    } catch { toast.error('Server error'); }
+    } catch (err) { handleApiError(err, { fallback: 'The request could not be completed. Please try again.' }); }
   };
 
   const handleToggle = async (row) => {
@@ -192,10 +193,10 @@ const DegreesManagement = () => {
         );
         toast.success(`Marked as ${newStatus}`);
       } else {
-        toast.error(result.message || 'Status update failed');
+        handleApiError(result, { fallback: 'Status update failed' });
       }
-    } catch {
-      toast.error('Server error');
+    } catch (err) {
+      handleApiError(err, { fallback: 'The request could not be completed. Please try again.' });
     } finally {
       setTogglingId(null);
     }

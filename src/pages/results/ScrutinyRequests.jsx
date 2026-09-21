@@ -11,6 +11,7 @@ import {
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import { toast } from "react-hot-toast";
+import { handleApiError } from 'utils/apiErrors';
 
 const API_BASE = Config.apiUrl;
 const getHeaders = () => ({
@@ -81,7 +82,7 @@ const ScrutinyRequests = () => {
       link.click(); link.remove();
       toast.success("Excel exported successfully!");
     } catch (err) {
-      toast.error(err.message || "Export failed");
+      handleApiError(err, { fallback: "Export failed" });
     } finally {
       setExporting(false);
     }

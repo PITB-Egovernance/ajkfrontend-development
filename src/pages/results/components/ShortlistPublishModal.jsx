@@ -4,6 +4,7 @@ import Button from 'components/ui/Button';
 import { X, Calculator, CheckCircle, AlertTriangle } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
 import toast from 'react-hot-toast';
+import { handleApiError } from 'utils/apiErrors';
 
 export default function ShortlistPublishModal({ isOpen, onClose, jobId, selectedIds = [], onConfirm }) {
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,7 @@ export default function ShortlistPublishModal({ isOpen, onClose, jobId, selected
       const res = await ResultsApi.getShortlistPreview(jobId, selectedIds);
       setPreviewData(res.data);
     } catch (err) {
-      toast.error(err.message || 'Failed to fetch shortlist preview');
+      handleApiError(err, { fallback: 'Failed to fetch shortlist preview' });
     } finally {
       setLoading(false);
     }
@@ -34,7 +35,7 @@ export default function ShortlistPublishModal({ isOpen, onClose, jobId, selected
       toast.success('Provisional Merit List published and candidates moved to interview award list!');
       onConfirm();
     } catch (err) {
-      toast.error(err.message || 'Failed to publish shortlist');
+      handleApiError(err, { fallback: 'Failed to publish shortlist' });
     } finally {
       setLoading(false);
     }

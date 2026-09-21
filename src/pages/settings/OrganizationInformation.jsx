@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { TextField, MenuItem } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from 'components/ui/Card';
@@ -24,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import FormOverlay from 'components/ui/FormOverlay';
 
  const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -496,16 +496,12 @@ const OrganizationInformation = () => {
         </div>
       </div>
 
-      <AnimatePresence>
-        {showModal && (
-          <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowModal(false)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide"
-            >
+      <FormOverlay
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        fieldCount={13}
+        cardClassName="max-w-4xl"
+      >
               <form onSubmit={handleSubmit}>
                 <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 px-6 py-4 flex items-center justify-between rounded-t-xl sticky top-0 z-10">
                   <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -738,10 +734,8 @@ const OrganizationInformation = () => {
                   </Button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
+            
+      </FormOverlay>
     </div>
   );
 };

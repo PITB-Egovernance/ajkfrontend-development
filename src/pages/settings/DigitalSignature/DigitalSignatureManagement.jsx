@@ -23,6 +23,7 @@ import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
 import AuthService from "services/authService";
+import FormDialog from 'components/ui/FormDialog';
 
 const PERM = "settings.digital_signatures";
 
@@ -742,7 +743,7 @@ const DigitalSignatureManagement = () => {
         </Menu>
 
         {/* ADD / EDIT MODAL */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
+        <FormDialog fieldCount={5} open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="xs">
           <DialogTitle className="font-bold">
             {editingRow ? "Edit Digital Signature" : "Add Digital Signature"}
           </DialogTitle>
@@ -949,7 +950,7 @@ const DigitalSignatureManagement = () => {
               {saving ? "Saving…" : editingRow ? "Update" : "Create"}
             </button>
           </DialogActions>
-        </Dialog>
+        </FormDialog>
 
         {/* IMAGE PREVIEW MODAL */}
         <Dialog open={Boolean(previewImage)} onClose={() => setPreviewImage(null)} maxWidth="md">

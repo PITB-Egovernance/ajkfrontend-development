@@ -4,8 +4,8 @@ import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { ArrowLeft, Send, Users, ClipboardCheck, Sparkles, Building, Award } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
-import toast from 'react-hot-toast';
 import ShortlistPublishModal from './components/ShortlistPublishModal';
+import { handleApiError } from 'utils/apiErrors';
 
 export default function InterviewShortlistPage() {
   const { jobId } = useParams();
@@ -27,7 +27,7 @@ export default function InterviewShortlistPage() {
       const res = await ResultsApi.getShortlist(jobId);
       setData(res.data);
     } catch (err) {
-      toast.error(err.message || 'Failed to fetch shortlisting candidates');
+      handleApiError(err, { fallback: 'Failed to fetch shortlisting candidates' });
     } finally {
       setLoading(false);
     }
