@@ -20,6 +20,7 @@ import {
   Stamp,
   Boxes,
   Newspaper,
+  CalendarClock,
   Hash,
   FileText,
   ImageIcon,
@@ -149,6 +150,14 @@ const Settings = () => {
       iconBg: 'bg-emerald-700',
       link: '/dashboard/settings/news',
       permModule: 'settings', permSub: 'news', category: 'Main Website',
+    },
+    {
+      icon: CalendarClock,
+      title: 'Service Year',
+      description: 'Save a date and see the service years calculated up to today',
+      iconBg: 'bg-teal-600',
+      link: '/dashboard/settings/service-years',
+      permModule: 'settings', permSub: 'service_years', category: 'Main Website',
     },
     {
       icon: BookOpen,
@@ -306,7 +315,7 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen p-6">
-      <div className="max-w-8xl mx-auto">
+      <div className="form-fill-width">
         
         {/* Header */}
         <div className="mb-8">

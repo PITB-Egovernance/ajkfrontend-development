@@ -161,7 +161,7 @@ const PostResultLanding = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-8xl mx-auto space-y-6">
+      <div className="form-fill-width space-y-6">
 
         {/* HEADER */}
         <div className="flex items-center justify-between flex-wrap gap-3">

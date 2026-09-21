@@ -3,7 +3,8 @@
  * (App\Models\Advertisement::lifecycleFlags). The backend is the source of truth and
  * ships a `lifecycle` object with every advertisement; this only derives the same
  * answer when that object is missing (e.g. an older API response), and the backend
- * enforces the rules again on update/delete regardless.
+ * enforces the delete rule again regardless. Closed advertisements (permanently or by the
+ * calendar) stay editable; they just cannot be deleted.
  */
 
 const REOPENED = ['reopen', 'temporary_closed'];
@@ -26,21 +27,18 @@ export const isAutoClosed = (ad) => {
   return last < startOfDay(new Date());
 };
 
-export const EDIT_LOCK_MESSAGES = {
-  ADVERTISEMENT_PERMANENTLY_CLOSED:
-    'This advertisement is permanently closed and can only be viewed. It can no longer be edited.',
-  ADVERTISEMENT_AUTO_CLOSED:
-    'The closing date of this advertisement has passed, so it is closed and can no longer be edited.',
-};
-
 export const DELETE_LOCK_MESSAGES = {
   ADVERTISEMENT_PERMANENTLY_CLOSED:
-    'This advertisement is permanently closed and can only be viewed. It can no longer be deleted.',
+    'This advertisement is permanently closed. It can still be edited, but it can no longer be deleted.',
   ADVERTISEMENT_AUTO_CLOSED:
-    'The closing date of this advertisement has passed, so it is closed and can no longer be deleted.',
+    'The closing date of this advertisement has passed, so it is closed. It can still be edited, but it can no longer be deleted.',
   ADVERTISEMENT_HAS_APPLICATIONS:
     'This advertisement cannot be deleted because candidates have already applied to it. Deleting it would remove their applications from the record.',
 };
+
+/** True when the delete lock is the "closed" one (as opposed to "candidates have applied"). */
+export const isClosedDeleteLock = (deleteLockCode) =>
+  deleteLockCode === 'ADVERTISEMENT_PERMANENTLY_CLOSED' || deleteLockCode === 'ADVERTISEMENT_AUTO_CLOSED';
 
 /** { canEdit, canDelete, editLockCode, editLockMessage, deleteLockCode, deleteLockMessage } */
 export const getAdvertisementLifecycle = (ad) => {
@@ -65,10 +63,10 @@ export const getAdvertisementLifecycle = (ad) => {
   const deleteCode = closedCode || (applied ? 'ADVERTISEMENT_HAS_APPLICATIONS' : null);
 
   return {
-    canEdit: !closedCode,
+    canEdit: true,
     canDelete: !deleteCode,
-    editLockCode: closedCode,
-    editLockMessage: closedCode ? EDIT_LOCK_MESSAGES[closedCode] : null,
+    editLockCode: null,
+    editLockMessage: null,
     deleteLockCode: deleteCode,
     deleteLockMessage: deleteCode ? DELETE_LOCK_MESSAGES[deleteCode] : null,
   };

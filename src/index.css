@@ -29,7 +29,27 @@
 }
 
 @layer components {
-  /* Add reusable component styles here */
+  /* Same height as every form field (MUI TextField, .ss-trigger, .form-control): the absolute
+     --form-control-height token. Tailwind's rem heights (h-10 etc.) are scaled by the 0.7 root
+     font-size above, so h-10 renders 28px and never lines up with a 40px field. Put this on a
+     Search / Reset button (or any control) that sits beside a field. */
+  .field-height {
+    height: var(--form-control-height);
+  }
+}
+
+/* Full-page add / edit forms fill every pixel of width the page layout gives them.
+   `-webkit-fill-available` is the project convention; the other lines are fallbacks for
+   browsers that spell it differently, and plain 100% for the rest. */
+.form-fill-width {
+  width: 100%;
+  width: -webkit-fill-available;
+  width: -moz-available;
+  min-width: -webkit-fill-available;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
 }
 
 /* ── Searchable Select / Multi-Select ─────────────────────────────────────────

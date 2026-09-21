@@ -17,7 +17,10 @@ import Config from "config/baseUrl";
 import AuthService from "services/authService";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import FormDialog from 'components/ui/FormDialog';
+import RichTextEditor from 'components/ui/RichTextEditor';
+import { apiErrorMessage } from 'utils/apiErrors';
 
+import { todayIsoDate } from 'utils/dateUtils';
 const PERM = "settings.news";
 
 const API_BASE = Config.apiUrl;
@@ -31,6 +34,34 @@ const authHeaders = (json = false) => ({
   "X-API-KEY": API_KEY,
   ...(json ? { "Content-Type": "application/json" } : {}),
 });
+
+// Short Description / Description are edited in the rich text editor and stored as HTML.
+// Records saved before that (plain text with line breaks) are turned into HTML for the editor.
+const toEditorHtml = (value) => {
+  const v = value ?? "";
+  if (!v || /<\/?[a-z][\s\S]*>/i.test(v)) return v;
+  return v
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .split(/\r?\n/).map((line) => `<p>${line || "<br>"}</p>`).join("");
+};
+
+// An empty editor still holds things like "<p><br></p>" — send nothing in that case.
+const blankToEmpty = (html) => {
+  const text = (html || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  return text || /<img\b/i.test(html || "") ? html : "";
+};
+
+// Uploads an image chosen (or pasted) in the editor and returns its public URL.
+const uploadEditorImage = async (file) => {
+  const fd = new FormData();
+  fd.append("image", file);
+  const res = await fetch(`${API_BASE}/settings/news/editor-image`, { method: "POST", headers: authHeaders(), body: fd });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.data?.url) {
+    throw new Error(apiErrorMessage(json, res.status, "The image could not be uploaded. Please try again."));
+  }
+  return json.data.url;
+};
 
 // Fixed news categories (seeded in news_categories) — names only.
 const NEWS_CATEGORIES = [
@@ -93,7 +124,7 @@ const NEWS_TYPES = [
   },
   {
     value: "advertisements",
-    label: "Advertisements",
+    label: "Archieve Advertisements",
   },
   {
     value: "annual_reports",
@@ -124,6 +155,10 @@ const NEWS_TYPES = [
   {
     value: "gallery",
     label: "Gallery",
+  },
+  {
+    value: "current_advertisments",
+    label: "Current Advertisements",
   },
 ];
 
@@ -291,8 +326,8 @@ const NewsManagement = () => {
     ...EMPTY_FORM,
     category:            r.category || "",
     title:               r.title || "",
-    short_description:   r.short_description || "",
-    description:         r.description || "",
+    short_description:   toEditorHtml(r.short_description || ""),
+    description:         toEditorHtml(r.description || ""),
     news_type:           r.news_type || "general",
     display_type:        r.display_type || "normal",
     attachmentName:      r.attachment || "",
@@ -354,8 +389,8 @@ const NewsManagement = () => {
       // slug + created_by/updated_by are stamped by the backend — do not send them.
       fd.append("title", form.title.trim());
       if (form.category)         fd.append("category", form.category);
-      fd.append("short_description", form.short_description || "");
-      fd.append("description", form.description || "");
+      fd.append("short_description", blankToEmpty(form.short_description));
+      fd.append("description", blankToEmpty(form.description));
       fd.append("news_type", form.news_type);
       fd.append("display_type", form.display_type);
       if (form.attachment_title) fd.append("attachment_title", form.attachment_title);
@@ -569,21 +604,35 @@ const NewsManagement = () => {
                 placeholder="— Select Display Type —"
               />
 
-              {/* Short description */}
-              <TextField fullWidth label="Short Description" margin="dense" size="small" multiline minRows={2}
-                value={form.short_description} onChange={(e) => setField("short_description", e.target.value)}
-                className="md:col-span-2" />
+              {/* Short description — rich text: links, images, formatting */}
+              <div className="md:col-span-2 mt-1">
+                <p className="text-xs font-semibold text-slate-600 mb-1">Short Description</p>
+                <RichTextEditor
+                  value={form.short_description}
+                  onChange={(html) => setField("short_description", html)}
+                  onImageUpload={uploadEditorImage}
+                  placeholder="A one or two line summary…"
+                  minHeight={110}
+                />
+              </div>
 
-              {/* Description */}
-              <TextField fullWidth label="Description" margin="dense" size="small" multiline minRows={4}
-                value={form.description} onChange={(e) => setField("description", e.target.value)}
-                className="md:col-span-2" />
+              {/* Description — rich text: links, images, formatting */}
+              <div className="md:col-span-2 mt-1">
+                <p className="text-xs font-semibold text-slate-600 mb-1">Description</p>
+                <RichTextEditor
+                  value={form.description}
+                  onChange={(html) => setField("description", html)}
+                  onImageUpload={uploadEditorImage}
+                  placeholder="Type the full news text here…"
+                  minHeight={260}
+                />
+              </div>
 
               {/* Dates */}
-              <TextField fullWidth type="date" label="Publish Date" margin="dense" size="small"
+              <TextField fullWidth type="date" inputProps={{ min: todayIsoDate() }} label="Publish Date" margin="dense" size="small"
                 InputLabelProps={{ shrink: true }}
                 value={form.publish_date} onChange={(e) => setField("publish_date", e.target.value)} />
-              <TextField fullWidth type="date" label="Expiry Date" margin="dense" size="small"
+              <TextField fullWidth type="date" inputProps={{ min: [form.publish_date, todayIsoDate()].filter(Boolean).sort().pop() }} label="Expiry Date" margin="dense" size="small"
                 InputLabelProps={{ shrink: true }}
                 value={form.expiry_date} onChange={(e) => setField("expiry_date", e.target.value)} />
 

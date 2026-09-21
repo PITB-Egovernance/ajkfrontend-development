@@ -164,7 +164,7 @@ const DispatchSentAddNew = () => {
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
+    <Box className="form-fill-width" sx={{ p: 4, bgcolor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h5" fontWeight="bold">
           Add New Dispatched Form

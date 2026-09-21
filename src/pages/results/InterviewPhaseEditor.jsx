@@ -9,6 +9,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import PostResultApi from 'api/postResultApi';
 import { handleApiError } from 'utils/apiErrors';
 
+import { todayIsoDate } from 'utils/dateUtils';
 const INTERVIEW_VENUE = 'AJK Public Service Commission Main Office';
 
 // Same "Edit Roll Number Slip" page pattern (pages/roll-numbers/RollSlipEditor.jsx) —
@@ -91,7 +92,7 @@ const InterviewPhaseEditor = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-4xl mx-auto">
+      <div className="form-fill-width">
 
         <button onClick={() => navigate(backPath)}
           className="text-sm text-slate-500 flex items-center gap-1 mb-2 hover:text-slate-700">
@@ -134,7 +135,7 @@ const InterviewPhaseEditor = () => {
 
           <h2 className="font-semibold text-slate-800 mt-4 mb-1 flex items-center gap-2"><Clock size={16} /> Interview Schedule</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <TextField fullWidth required type="date" label="Interview Date" margin="normal" size="small"
+            <TextField fullWidth required type="date" inputProps={{ min: todayIsoDate() }} label="Interview Date" margin="normal" size="small"
               InputLabelProps={{ shrink: true }}
               name="interview_date" value={formData.interview_date} onChange={handleFormChange}
               helperText="Day name is derived automatically" />

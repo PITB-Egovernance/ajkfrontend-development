@@ -195,7 +195,7 @@ const AnnexADetail = () => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-6xl mx-auto p-6"
+      className="form-fill-width p-6"
     >
       {/* Header with Back Button and Export */}
       <div className="flex items-center justify-between mb-6">

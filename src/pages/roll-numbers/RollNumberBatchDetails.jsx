@@ -96,9 +96,9 @@ const NewBatchForm = ({ onCreated }) => {
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && runSearch()}
             placeholder="Search candidate name / CNIC / application number…"
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2"
+            className="flex-1 field-height rounded-md border border-slate-300 px-3"
           />
-          <Button variant="outline" onClick={runSearch}>Search</Button>
+          <Button variant="outline" size="field" onClick={runSearch}>Search</Button>
         </div>
 
         <div className="text-sm text-slate-500">{selected.length} selected</div>

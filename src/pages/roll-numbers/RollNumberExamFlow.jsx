@@ -18,6 +18,8 @@ import RollNumberProgressCard from 'components/roll-numbers/RollNumberProgressCa
 import { handleApiError } from 'utils/apiErrors';
 import { showNotice } from 'components/ui/noticeDialog';
 
+import { todayIsoDate } from 'utils/dateUtils';
+import { formatScale } from 'utils/scaleUtils';
 // "View Slip" opens a separate route (/dashboard/roll-numbers/slip/:rollNumber).
 // Navigating there and pressing Back unmounts this page, so its stage/results
 // state would normally reset — leaving the admin back on stage 1 instead of
@@ -310,6 +312,30 @@ const StepHeader = ({ number, title, subtitle }) => (
     </div>
   </div>
 );
+
+// Names the post(s) the current step is acting on — one post, or the clubbed group — so the admin
+// always knows which post an action (generate / allocate / slips) applies to, on every step.
+const SelectedPostsBanner = ({ posts }) => {
+  if (!posts?.length) return null;
+  const clubbed = posts.length > 1;
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+        {clubbed ? `Clubbed Posts (${posts.length})` : 'Selected Post'}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {posts.map((post) => (
+          <span key={post.id} className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-900">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            {post.post}
+            {post.caseNo ? <span className="font-normal text-slate-500">· {post.caseNo}</span> : null}
+            {post.advertisement ? <span className="font-normal text-slate-500">· {post.advertisement}</span> : null}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const Pagination = ({ page, totalPages, onChange }) => {
   if (totalPages <= 1) return null;
@@ -938,8 +964,10 @@ const RollNumberExamFlow = () => {
               : getJobIdentifiers(job);
             const jobId = jobIdentifiers[0] || normalizeId(job.hash_id || job.id);
             const deptName = job.department_label || 'N/A';
-            const rawScale = gradeMap[job.scale] || job.scale || '';
-            const scaleDisplay = rawScale ? (rawScale.toUpperCase().startsWith('BPS') ? rawScale : `BPS-${rawScale}`) : '';
+            // job.scale is usually a grade hash id: show the grade name (from the grades list, else the
+            // backend's scale_text), and never the hash itself.
+            const mappedGrade = gradeMap[job.scale];
+            const scaleDisplay = formatScale(mappedGrade ? { ...job, scale_text: mappedGrade } : job, 'Grade not set');
 
             const candidateApiTotal = countUniqueApplicationsForIdentifiers(
               jobPostApplicationsMap,
@@ -1911,6 +1939,8 @@ const RollNumberExamFlow = () => {
           </div>
         )}
 
+        <SelectedPostsBanner posts={selectedPosts} />
+
         {stage === 1 && (
           <Card className="rounded-lg"><CardContent className="space-y-5 p-5">
             <StepHeader number="1" title="Select Advertisement, Posts, Departments & Applicants" subtitle="Select the posts you want to include in this roll number generation batch." />
@@ -1957,8 +1987,8 @@ const RollNumberExamFlow = () => {
                   placeholder="All Posts"
                 />
               </div>
-              <Button className="h-10 gap-2 lg:col-span-1" onClick={applyPostFilters}><Search size={15} /> Search</Button>
-              <Button variant="outline" className="h-10 gap-2 bg-white lg:col-span-1" onClick={resetPostFilters}><Filter size={15} /> Reset</Button>
+              <Button size="field" className="gap-2 lg:col-span-1" onClick={applyPostFilters}><Search size={15} /> Search</Button>
+              <Button variant="outline" size="field" className="gap-2 bg-white lg:col-span-1" onClick={resetPostFilters}><Filter size={15} /> Reset</Button>
             </div>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full min-w-[900px] text-left text-sm">
@@ -2167,7 +2197,7 @@ const RollNumberExamFlow = () => {
                                       </td>
                                       <td className="px-4 py-3">
                                         <TextField
-                                          size="small" type="date"
+                                          size="small" type="date" inputProps={{ min: todayIsoDate() }}
                                           disabled={!isSelected}
                                           value={sch.date}
                                           onChange={e => updateSubjectSchedule(subj.id, 'date', e.target.value)}
@@ -2214,7 +2244,7 @@ const RollNumberExamFlow = () => {
                           <div key={paper} className="rounded-lg border border-slate-200 bg-white p-4">
                             <div className="mb-4 flex items-center gap-2"><CalendarDays size={17} className="text-emerald-700" /><h3 className="text-sm font-bold text-slate-900">{paper} Schedule</h3></div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-                              <TextField size="small" type="date" label="Start Date *" value={scheduleDates[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
+                              <TextField size="small" type="date" inputProps={{ min: todayIsoDate() }} label="Start Date *" value={scheduleDates[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleDates((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleDates[index]} helperText={!scheduleDates[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
                               <TextField size="small" type="time" label="Start Time *" value={scheduleTimes[index] || ''} onChange={(e) => { const v = e.target.value; setScheduleTimes((cur) => { const a = [...cur]; while (a.length <= index) a.push(''); a[index] = v; return a; }); }} required error={!scheduleTimes[index]} helperText={!scheduleTimes[index] ? 'Required' : ''} InputLabelProps={{ shrink: true }} />
                               <TextField
                                 size="small" type="number"
@@ -2525,7 +2555,7 @@ const RollNumberExamFlow = () => {
                     options={examCities.map(p => ({ value: p, label: p }))}
                     placeholder="All Preferences"
                   />
-                  <Button className="h-10 gap-2" onClick={applyS3Filters}><Search size={14} /> Search</Button>
+                  <Button size="field" className="gap-2" onClick={applyS3Filters}><Search size={14} /> Search</Button>
                 </div>
                 <p className="text-xs text-slate-400">
                   Showing {s3FilteredCandidates.length} of {s3UniqueCandidateCount} candidate{s3UniqueCandidateCount !== 1 ? 's' : ''}

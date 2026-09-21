@@ -52,7 +52,7 @@ export default function FormDialog({ open, onClose, fieldCount = 0, backLabel = 
   if (!open) return null;
 
   return createPortal(
-    <div className="w-full">
+    <div className="form-fill-width">
       <button
         type="button"
         onClick={() => onClose?.({}, 'backButtonClick')}
@@ -60,7 +60,7 @@ export default function FormDialog({ open, onClose, fieldCount = 0, backLabel = 
       >
         <ArrowLeft size={16} /> {backLabel}
       </button>
-      <div className="mx-auto w-full max-w-4xl rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="form-fill-width rounded-xl border border-slate-200 bg-white shadow-sm">
         {children}
       </div>
     </div>,

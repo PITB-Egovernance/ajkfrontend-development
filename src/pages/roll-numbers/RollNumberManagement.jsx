@@ -997,7 +997,7 @@ const RollNumberManagement = ({ fixedTab } = {}) => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-8xl mx-auto">
+      <div className="form-fill-width">
 
         {/* HEADER */}
         <div className="flex items-start justify-between mb-6">

@@ -177,7 +177,7 @@ const PublicationPage = () => {
 
   return (
     <div className="p-8 bg-slate-50 min-h-screen">
-      <div className="max-w-6xl mx-auto space-y-10">
+      <div className="form-fill-width space-y-10">
         
         {/* Navigation & Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

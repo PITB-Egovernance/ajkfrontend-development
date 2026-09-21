@@ -268,7 +268,7 @@ export default function JobCreation() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-6 px-4">
+    <div className="form-fill-width py-6 px-4">
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-emerald-800">Job Creation Form</h2>

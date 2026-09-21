@@ -15,7 +15,8 @@ import {
   History,
   MoreHorizontal,
   RefreshCw,
-  Trophy
+  Trophy,
+  Clock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Button from 'components/ui/Button';
@@ -223,7 +224,7 @@ const InterviewAwardManagement = () => {
         </div>
       </div>
 
-      <div className="px-8 mt-8 grid grid-cols-12 gap-8 max-w-[1600px] mx-auto w-full">
+      <div className="form-fill-width px-8 mt-8 grid grid-cols-12 gap-8">
         {/* Sidebar Configuration */}
         <div className="col-span-3 space-y-6">
           <Card className="border-none shadow-2xl rounded-[2.5rem] p-8 space-y-6 bg-white overflow-hidden relative">

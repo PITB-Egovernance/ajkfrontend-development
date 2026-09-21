@@ -24,6 +24,8 @@ import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
 import { formatDate } from 'utils/dateUtils';
 import { handleApiError } from 'utils/apiErrors';
+import useResultsManageStatus from 'hooks/useResultsManageStatus';
+import ResultsNotManageableAlert from 'components/results/ResultsNotManageableAlert';
 
 /**
  * AwardListPage (v2.3) - Interview Secretary Merit List Builder
@@ -38,6 +40,9 @@ const AwardListPage = () => {
   const [districts] = useState(['all', 'Muzaffarabad', 'Mirpur', 'Poonch', 'Bagh', 'Bhimber', 'Kotli', 'Sudhnoti', 'Hattian', 'Haveli', 'Neelum']);
 
   const [selectedJob, setSelectedJob] = useState(urlJobId || '');
+
+  // Slips unpublished + exam not yet held: no template to download, and say why.
+  const { blocked: resultsBlocked, message: resultsBlockedMessage } = useResultsManageStatus(selectedJob ? [selectedJob] : []);
   const [selectedDistrict, setSelectedDistrict] = useState('all');
   const [interviewDate, setInterviewDate] = useState(new Date().toISOString().split('T')[0]);
   const [lastDocDate, setLastDocDate] = useState(new Date().toISOString().split('T')[0]);
@@ -261,7 +266,8 @@ const AwardListPage = () => {
       link.remove();
       toast.success('Template downloaded successfully!', { id: 'temp-download' });
     } catch (err) {
-      toast.error('Failed to download template', { id: 'temp-download' });
+      toast.dismiss('temp-download');
+      handleApiError(err, { fallback: 'Failed to download template' });
     }
   };
 
@@ -507,7 +513,7 @@ const AwardListPage = () => {
         </div>
       </div>
 
-      <div className="px-8 mt-8 space-y-8 max-w-[1700px] mx-auto w-full">
+      <div className="form-fill-width px-8 mt-8 space-y-8">
         {/* Top Panels: Configuration Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {isInitialized && currentJob ? (
@@ -653,6 +659,8 @@ const AwardListPage = () => {
           </div>
         </div>
 
+        {resultsBlocked && <ResultsNotManageableAlert message={resultsBlockedMessage} />}
+
         {/* Scoring Table - Full Width */}
         {!isInitialized ? (
           <div className="h-[650px] bg-white rounded-[3.5rem] border-4 border-dashed border-slate-100 flex flex-col items-center justify-center text-center p-12 shadow-sm">
@@ -691,6 +699,8 @@ const AwardListPage = () => {
                 />
                 <Button
                   onClick={handleDownloadTemplate}
+                  disabled={resultsBlocked}
+                  title={resultsBlocked ? resultsBlockedMessage : undefined}
                   className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
                 >
                   <FileText size={16} />

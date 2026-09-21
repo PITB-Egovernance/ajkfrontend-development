@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import RollNumberApi from 'api/rollNumberApi';
 
+import { todayIsoDate } from 'utils/dateUtils';
 // Center allocation bundles the exam schedule too (date/time), mirroring
 // the old one-shot flow where "where" and "when" were always one action —
 // skipped entirely for a CCE Written batch, whose schedule lives in
@@ -11,7 +12,6 @@ const CenterAllocationMode = ({ batch, onAllocateAutomatic, onAllocateCustom, al
   const [mode, setMode] = useState('automatic');
   const [strategy, setStrategy] = useState('preference');
   const [centers, setCenters] = useState([]);
-  const [selectedCenterIds, setSelectedCenterIds] = useState([]);
   const [customCenterId, setCustomCenterId] = useState('');
   const [startRollNumber, setStartRollNumber] = useState('');
   const [endRollNumber, setEndRollNumber] = useState('');
@@ -32,15 +32,11 @@ const CenterAllocationMode = ({ batch, onAllocateAutomatic, onAllocateCustom, al
     attendance_time: attendanceTime || undefined,
   });
 
-  const toggleCenter = (id) => {
-    setSelectedCenterIds((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
-  };
-
   const scheduleFields = !isWrittenStage && (
     <div className="grid grid-cols-2 gap-4 mb-4">
       <div>
         <label className="block text-sm text-slate-500 mb-1">Exam Date</label>
-        <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+        <input type="date" min={todayIsoDate()} value={examDate} onChange={(e) => setExamDate(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
       </div>
       <div>
         <label className="block text-sm text-slate-500 mb-1">Attendance Time</label>
@@ -55,54 +51,45 @@ const CenterAllocationMode = ({ batch, onAllocateAutomatic, onAllocateCustom, al
         <CardTitle>Center Allocation</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-4 mb-6">
-          <button type="button" onClick={() => setMode('automatic')}
-            className={`flex-1 rounded-lg border-2 px-4 py-3 text-left transition-colors ${mode === 'automatic' ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
-            <div className="font-semibold text-slate-900">Automatic</div>
-            <div className="text-sm text-slate-500">By District or Preference.</div>
-          </button>
-          <button type="button" onClick={() => setMode('custom')}
-            className={`flex-1 rounded-lg border-2 px-4 py-3 text-left transition-colors ${mode === 'custom' ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
-            <div className="font-semibold text-slate-900">Custom</div>
-            <div className="text-sm text-slate-500">Pick a center and a roll number range.</div>
-          </button>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mb-6">
+          {[
+            { value: 'automatic', label: 'Automatic', desc: 'By District or Preference.' },
+            { value: 'custom',    label: 'Custom',    desc: 'Pick a center and a roll number range.' },
+          ].map(({ value, label, desc }) => (
+            <label key={value} className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 px-4 py-3 transition-colors ${mode === value ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
+              <input type="radio" name="allocationMode" value={value} checked={mode === value} onChange={() => setMode(value)} className="mt-1 h-4 w-4 accent-emerald-800" />
+              <div>
+                <div className="font-semibold text-slate-900">{label}</div>
+                <div className="text-sm text-slate-500">{desc}</div>
+              </div>
+            </label>
+          ))}
         </div>
 
         {mode === 'automatic' ? (
           <div className="space-y-4">
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" checked={strategy === 'district'} onChange={() => setStrategy('district')} /> District
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" checked={strategy === 'preference'} onChange={() => setStrategy('preference')} /> Preference
-              </label>
-            </div>
-
-            {strategy === 'preference' && (
-              <div>
-                <label className="block text-sm text-slate-500 mb-2">Candidate centers (choose one or more)</label>
-                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-                  {centers.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => toggleCenter(c.id)}
-                      className={`rounded-full border px-3 py-1 text-sm ${selectedCenterIds.includes(c.id) ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-600'}`}
-                    >
-                      {c.name} ({c.city})
-                    </button>
-                  ))}
-                </div>
+            <div>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="radio" name="allocationStrategy" checked={strategy === 'district'} onChange={() => setStrategy('district')} className="h-4 w-4 accent-emerald-800" /> District
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="radio" name="allocationStrategy" checked={strategy === 'preference'} onChange={() => setStrategy('preference')} className="h-4 w-4 accent-emerald-800" /> Preference
+                </label>
               </div>
-            )}
+              <div className="mt-2 text-xs text-slate-500">
+                {strategy === 'preference'
+                  ? "Each candidate is placed at a center in their preferred exam city."
+                  : "Each candidate is placed at the center for their domicile district's zone."}
+              </div>
+            </div>
 
             {scheduleFields}
 
             <Button
               variant="primary"
-              disabled={allocating || (strategy === 'preference' && selectedCenterIds.length === 0)}
-              onClick={() => onAllocateAutomatic({ strategy, center_ids: selectedCenterIds, ...schedule() })}
+              disabled={allocating}
+              onClick={() => onAllocateAutomatic({ strategy, ...schedule() })}
             >
               {allocating ? 'Allocating…' : 'Allocate Centers'}
             </Button>

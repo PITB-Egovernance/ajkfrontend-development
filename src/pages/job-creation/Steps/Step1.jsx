@@ -1,5 +1,6 @@
 import SearchableSelect from 'components/ui/SearchableSelect';
 
+import { todayIsoDate } from 'utils/dateUtils';
 export default function Step1({ data, change, errors }) {
   const departments = [
     'Information Technology Board',
@@ -83,7 +84,7 @@ export default function Step1({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Advertisement Date *</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="advertisement_date"
           value={data.advertisement_date}
           onChange={change}

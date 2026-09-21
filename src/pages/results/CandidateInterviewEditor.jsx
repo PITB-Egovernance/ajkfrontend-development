@@ -96,7 +96,7 @@ const CandidateInterviewEditor = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-4xl mx-auto">
+      <div className="form-fill-width">
 
         <button onClick={() => navigate(backPath)}
           className="text-sm text-slate-500 flex items-center gap-1 mb-2 hover:text-slate-700">

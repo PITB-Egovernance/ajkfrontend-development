@@ -36,6 +36,14 @@ export const formatDateForInput = (date) => {
 };
 
 /**
+ * Today's date (local time, not UTC) as YYYY-MM-DD. Used as the `min` of future-only
+ * date inputs (closing / exam / interview dates); the global date guard in
+ * utils/dateInputGuard.js enforces it.
+ * @returns {string}
+ */
+export const todayIsoDate = () => formatDateForInput(new Date());
+
+/**
  * Checks if a date is in the future
  * @param {Date|string} date - The date to check
  * @returns {boolean} True if date is in the future

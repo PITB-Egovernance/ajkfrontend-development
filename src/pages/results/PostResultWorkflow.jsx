@@ -16,6 +16,7 @@ import { getJobRouteId } from 'utils/jobMapper';
 import CandidateProfileModal from './components/CandidateProfileModal';
 import { handleApiError } from 'utils/apiErrors';
 
+import { todayIsoDate } from 'utils/dateUtils';
 const FILTER_DEBOUNCE_MS = 400;
 const DEFAULT_FILTERS = { search: '', adv_number: '' };
 
@@ -980,7 +981,7 @@ const PostResultWorkflow = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-8xl mx-auto space-y-6">
+      <div className="form-fill-width space-y-6">
 
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1116,7 +1117,7 @@ const PostResultWorkflow = () => {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-500">Interview Date *</label>
-                  <input type="date" value={newPhase.interview_date}
+                  <input type="date" min={todayIsoDate()} value={newPhase.interview_date}
                     onChange={(e) => setNewPhase((p) => ({ ...p, interview_date: e.target.value }))}
                     className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
                 </div>

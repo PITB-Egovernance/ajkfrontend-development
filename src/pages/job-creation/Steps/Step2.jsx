@@ -1,3 +1,5 @@
+import { todayIsoDate } from 'utils/dateUtils';
+
 export default function Step2({ data, change, errors }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -50,7 +52,7 @@ export default function Step2({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Post Date (Creation Date) *</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="post_date"
           value={data.post_date}
           onChange={change}
@@ -64,7 +66,7 @@ export default function Step2({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Apply Start Date *</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="start_date"
           value={data.start_date}
           onChange={change}
@@ -78,7 +80,7 @@ export default function Step2({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Apply End Date *</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="end_date"
           value={data.end_date}
           onChange={change}
@@ -92,7 +94,7 @@ export default function Step2({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Press Release Date</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="release_date"
           value={data.release_date}
           onChange={change}
@@ -103,7 +105,7 @@ export default function Step2({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Close Job Date</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="close_date"
           value={data.close_date}
           onChange={change}

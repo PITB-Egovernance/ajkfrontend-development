@@ -1,6 +1,7 @@
 import {
   getAdvertisementLifecycle,
   isAutoClosed,
+  isClosedDeleteLock,
   isPermanentlyClosed,
   DELETE_LOCK_MESSAGES,
 } from 'utils/advertisementLifecycle';
@@ -36,15 +37,32 @@ describe('getAdvertisementLifecycle — fallback when the API sends no flags', (
     expect(lc).toMatchObject({ canEdit: true, canDelete: true, editLockCode: null, deleteLockCode: null });
   });
 
-  it('permanently closed: view only', () => {
+  it('permanently closed: editable but not deletable', () => {
     const lc = getAdvertisementLifecycle({ status: 'permanently_closed', closing_date: iso(5) });
-    expect(lc).toMatchObject({ canEdit: false, canDelete: false, editLockCode: 'ADVERTISEMENT_PERMANENTLY_CLOSED' });
-    expect(lc.editLockMessage).toMatch(/permanently closed/i);
+    expect(lc).toMatchObject({
+      canEdit: true,
+      canDelete: false,
+      editLockCode: null,
+      deleteLockCode: 'ADVERTISEMENT_PERMANENTLY_CLOSED',
+    });
+    expect(lc.deleteLockMessage).toMatch(/permanently closed/i);
+    expect(isClosedDeleteLock(lc.deleteLockCode)).toBe(true);
   });
 
-  it('past closing date: automatically closed', () => {
+  it('past closing date: automatically closed, still editable, not deletable', () => {
     const lc = getAdvertisementLifecycle({ status: 'published', closing_date: iso(-2) });
-    expect(lc).toMatchObject({ canEdit: false, canDelete: false, editLockCode: 'ADVERTISEMENT_AUTO_CLOSED' });
+    expect(lc).toMatchObject({
+      canEdit: true,
+      canDelete: false,
+      editLockCode: null,
+      deleteLockCode: 'ADVERTISEMENT_AUTO_CLOSED',
+    });
+    expect(isClosedDeleteLock(lc.deleteLockCode)).toBe(true);
+  });
+
+  it('the applications lock is not a closed lock', () => {
+    expect(isClosedDeleteLock('ADVERTISEMENT_HAS_APPLICATIONS')).toBe(false);
+    expect(isClosedDeleteLock(null)).toBe(false);
   });
 
   it('closing today is still open', () => {

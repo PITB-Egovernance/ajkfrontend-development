@@ -10,9 +10,10 @@ import Button from 'components/ui/Button';
  * @param {Function} props.onFileSelect - Callback when a file is chosen
  * @param {Function} props.onPreview - Callback when the scan action is triggered
  * @param {boolean} props.loading - Loading state
+ * @param {boolean} props.disabled - Nothing can be chosen, dropped or scanned (e.g. the exam has not been held yet)
  */
 
-const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
+const CSVUploadZone = ({ onFileSelect, onPreview, loading, disabled = false }) => {
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -20,6 +21,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (disabled) return;
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
@@ -31,6 +33,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+    if (disabled) return;
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       validateAndSetFile(e.dataTransfer.files[0]);
     }
@@ -54,6 +57,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
   };
 
   const onButtonClick = () => {
+    if (disabled) return;
     fileInputRef.current.click();
   };
 
@@ -67,6 +71,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
   return (
     <div 
       className={`relative p-10 border-2 border-dashed rounded-2xl transition-all duration-300 ${
+        disabled ? 'opacity-60 cursor-not-allowed ' : ''}${
         dragActive 
           ? 'border-emerald-500 bg-emerald-50/50 scale-[1.01]' 
           : selectedFile 
@@ -79,6 +84,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
       onDrop={handleDrop}
       role="region"
       aria-label="Result file upload area"
+      aria-disabled={disabled}
     >
       <input
         ref={fileInputRef}
@@ -86,6 +92,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
         accept=".csv,.xlsx,.xls"
         className="hidden"
         onChange={handleChange}
+        disabled={disabled}
         aria-label="Select spreadsheet file for results import"
       />
 
@@ -123,14 +130,14 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
                 variant="primary"
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 text-sm uppercase tracking-wider shadow-lg shadow-emerald-100"
                 onClick={() => onPreview(selectedFile)}
-                disabled={loading}
+                disabled={loading || disabled}
               >
                 {loading ? 'Scanning File...' : 'Scan & Map Columns'}
               </Button>
             </div>
             
-            {!loading && (
-              <button 
+            {!loading && !disabled && (
+              <button
                 onClick={onButtonClick}
                 className="mt-6 text-sm text-slate-400 hover:text-emerald-600 font-bold underline underline-offset-4"
               >
@@ -153,7 +160,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading }) => {
               variant="outline"
               className="mt-8 px-8 py-2.5 border-emerald-500 text-emerald-700 hover:bg-emerald-500 hover:text-white font-bold transition-all shadow-sm"
               onClick={onButtonClick}
-              disabled={loading}
+              disabled={loading || disabled}
             >
               Browse Files
             </Button>

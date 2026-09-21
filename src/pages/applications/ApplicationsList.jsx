@@ -400,7 +400,7 @@ const ApplicationsList = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-8xl mx-auto">
+      <div className="form-fill-width">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Applications Management</h1>

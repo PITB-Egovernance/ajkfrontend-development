@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import Button from 'components/ui/Button';
+import { todayIsoDate } from 'utils/dateUtils';
 import {
   Filter,
   Search as SearchIcon,
@@ -139,6 +140,7 @@ const AdvancedFilter = ({
                   key={config.name}
                   type="date"
                   label={config.label}
+                  inputProps={{ max: todayIsoDate() }}
                   InputLabelProps={{ shrink: true }}
                   variant="outlined"
                   size="small"
@@ -160,7 +162,7 @@ const AdvancedFilter = ({
           {showResetButton && (
             <Button
               variant="outline"
-              size="sm"
+              size="field"
               onClick={handleResetClick}
               className="gap-1.5"
             >
@@ -169,7 +171,7 @@ const AdvancedFilter = ({
           )}
           <Button
             variant="primary"
-            size="sm"
+            size="field"
             disabled={searching}
             onClick={handleSearchClick}
             className="gap-1.5"

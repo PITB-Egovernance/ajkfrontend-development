@@ -12,6 +12,9 @@ const Button = ({ children, variant = 'primary', size = 'md', disabled = false, 
     sm: 'px-3 py-1.5 text-sm',
     md: 'px-4 py-2 text-base',
     lg: 'px-6 py-3 text-lg',
+    // Sits beside a form field (Search / Reset): exactly the field's height (see .field-height
+    // in index.css), whatever the variant's border does to the padding-based sizes.
+    field: 'field-height px-4 py-0 text-sm',
   };
 
   return (

@@ -773,7 +773,7 @@ const RequisitionDetail = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="container mx-auto px-4 py-6 max-w-6xl"
+      className="form-fill-width px-4 py-6"
     >
       <div className="flex justify-between items-center mb-4">
         <button

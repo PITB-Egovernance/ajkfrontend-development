@@ -241,7 +241,7 @@ const QualificationGroupsManagement = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-sm p-6">
+      <div className="form-fill-width bg-white rounded-xl shadow-sm p-6">
 
         {/* HEADER */}
         <div className="flex justify-between items-start mb-6">

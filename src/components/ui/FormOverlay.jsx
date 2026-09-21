@@ -40,7 +40,7 @@ export default function FormOverlay({
   if (fullPage) {
     if (!open) return null;
     return createPortal(
-      <div className="w-full">
+      <div className="form-fill-width">
         <button
           type="button"
           onClick={() => onClose?.()}
@@ -48,7 +48,7 @@ export default function FormOverlay({
         >
           <ArrowLeft size={16} /> {backLabel}
         </button>
-        <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="form-fill-width overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           {children}
         </div>
       </div>,

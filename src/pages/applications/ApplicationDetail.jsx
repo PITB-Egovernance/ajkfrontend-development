@@ -921,7 +921,7 @@ const ApplicationDetail = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
+      <div className="form-fill-width">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
           <Button
             onClick={() => navigate('/dashboard/applications')}

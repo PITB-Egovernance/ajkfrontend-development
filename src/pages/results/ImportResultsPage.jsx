@@ -11,6 +11,8 @@ import ColumnMapperModal from 'components/results/ColumnMapperModal';
 import SearchableMultiSelect from 'components/ui/SearchableMultiSelect';
 import ResultsApi from 'api/resultsApi';
 import { handleApiError } from 'utils/apiErrors';
+import useResultsManageStatus from 'hooks/useResultsManageStatus';
+import ResultsNotManageableAlert from 'components/results/ResultsNotManageableAlert';
 import RollNumberApi from 'api/rollNumberApi';
 import toast from 'react-hot-toast';
 
@@ -67,7 +69,7 @@ const Modal = ({ open, onClose, maxWidth = 'max-w-lg', children }) => {
 };
 
 /* ── Template preview modal ───────────────────────────────────── */
-const TemplateModal = ({ open, onClose, columns, onDownload, downloading, postName }) => (
+const TemplateModal = ({ open, onClose, columns, onDownload, downloading, postName, blockedMessage }) => (
   <Modal open={open} onClose={onClose} maxWidth="max-w-2xl">
     {/* Header */}
     <div className="bg-gradient-to-r from-emerald-700 to-emerald-900 px-8 py-6 flex items-center justify-between">
@@ -85,7 +87,8 @@ const TemplateModal = ({ open, onClose, columns, onDownload, downloading, postNa
       <div className="flex items-center gap-3">
         <button
           onClick={onDownload}
-          disabled={downloading}
+          disabled={downloading || Boolean(blockedMessage)}
+          title={blockedMessage || undefined}
           className="flex items-center gap-2 px-5 py-2.5 bg-white text-emerald-800 font-bold text-sm rounded-xl hover:bg-emerald-50 transition-colors disabled:opacity-60 shadow-sm"
         >
           <Download size={15} /> {downloading ? 'Downloading…' : 'Download Template'}
@@ -95,6 +98,12 @@ const TemplateModal = ({ open, onClose, columns, onDownload, downloading, postNa
         </button>
       </div>
     </div>
+
+    {blockedMessage && (
+      <div className="px-8 pt-4">
+        <ResultsNotManageableAlert message={blockedMessage} />
+      </div>
+    )}
 
     {/* Legend */}
     <div className="px-8 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-6">
@@ -665,6 +674,11 @@ const ImportResultsPage = () => {
   });
   const [availableJobs, setAvailableJobs] = useState([]);
 
+  // Slips unpublished + exam not yet held: no template to download, and say why.
+  const {
+    blocked: resultsBlocked, message: resultsBlockedMessage, uploadBlocked, uploadMessage,
+  } = useResultsManageStatus(selectedJobIds);
+
   // Column mapper state (non-MCQ exams only)
   const [mapperOpen, setMapperOpen] = useState(false);
   const [csvHeaders, setCsvHeaders] = useState([]);
@@ -790,8 +804,8 @@ const ImportResultsPage = () => {
       link.remove();
       URL.revokeObjectURL(url);
       toast.success('Template downloaded');
-    } catch {
-      toast.error('Failed to download template');
+    } catch (err) {
+      handleApiError(err, { fallback: 'Failed to download template' });
     } finally {
       setDownloading(false);
     }
@@ -801,6 +815,7 @@ const ImportResultsPage = () => {
   const handlePreview = async (file) => {
     if (!jobId) { toast.error('Job ID is missing. Please return to the dashboard.'); return; }
     if (!file)  { toast.error('Please select a file first'); return; }
+    if (uploadBlocked) { toast.error(uploadMessage || 'Results cannot be uploaded before the examination date.', { id: 'exam-not-held' }); return; }
 
     setScanLoading(true);
     try {
@@ -915,7 +930,7 @@ const ImportResultsPage = () => {
       )}
 
       {/* ── Upload form — hidden while dry-run is showing */}
-      <div className={`max-w-5xl mx-auto space-y-6 ${showDryRun ? 'hidden' : ''}`}>
+      <div className={`form-fill-width space-y-6 ${showDryRun ? 'hidden' : ''}`}>
 
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -928,6 +943,10 @@ const ImportResultsPage = () => {
             {postName && <p className="text-xs text-slate-500 mt-0.5">{postName}</p>}
           </div>
         </div>
+
+        {uploadBlocked
+          ? <ResultsNotManageableAlert title="Results cannot be uploaded yet" message={uploadMessage} />
+          : <ResultsNotManageableAlert message={resultsBlockedMessage} />}
 
         {/* Upload Instructions */}
         <Card className="border border-emerald-200 bg-emerald-50">
@@ -1056,6 +1075,7 @@ const ImportResultsPage = () => {
               onFileSelect={() => {}}
               onPreview={handlePreview}
               loading={scanLoading}
+              disabled={uploadBlocked}
             />
 
           </CardContent>
@@ -1071,6 +1091,7 @@ const ImportResultsPage = () => {
         onDownload={handleDownloadTemplate}
         downloading={downloading}
         postName={postName}
+        blockedMessage={resultsBlocked ? resultsBlockedMessage : null}
       />
 
       {/* Column mapper modal — shows for ALL exam types after scan */}

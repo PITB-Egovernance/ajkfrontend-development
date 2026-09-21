@@ -10,6 +10,7 @@ import CceDateSheetApi from 'api/cceDateSheetApi';
 import { groupByClubbedAdvertisements } from 'utils/cceClubbing';
 import confirmDelete from 'components/ui/ConfirmDelete';
 
+import { todayIsoDate } from 'utils/dateUtils';
 // Same group ordering as the public CCE syllabus page (SubjectsSyllabus.jsx).
 const GROUP_ORDER = ['Compulsory', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G'];
 
@@ -284,7 +285,7 @@ const CceMasterDateSheet = () => {
       <div key={`${group}-${paperLabel || ''}`} className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-4">
         {title && <p className="text-sm font-bold text-indigo-900 mb-3">{title}</p>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-          <TextField type="date" size="small" label="Paper Date *" required InputLabelProps={{ shrink: true }}
+          <TextField type="date" inputProps={{ min: todayIsoDate() }} size="small" label="Paper Date *" required InputLabelProps={{ shrink: true }}
             error={!dateVal} value={dateVal} disabled={isPublished}
             onChange={(e) => updateGroupSchedule(group, paperLabel, 'paper_date', e.target.value)}
             sx={{ backgroundColor: 'white' }} />
@@ -332,7 +333,7 @@ const CceMasterDateSheet = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-8xl mx-auto">
+      <div className="form-fill-width">
 
         {/* HEADER */}
         <div className="flex justify-between items-start mb-6">
@@ -467,7 +468,7 @@ const CceMasterDateSheet = () => {
                                 </td>
                                 <td className="py-2 px-4 text-slate-500">{row.total_marks}</td>
                                 <td className="py-2 px-4">
-                                  <TextField type="date" size="small" InputLabelProps={{ shrink: true }} disabled={isPublished}
+                                  <TextField type="date" inputProps={{ min: todayIsoDate() }} size="small" InputLabelProps={{ shrink: true }} disabled={isPublished}
                                     value={row.paper_date || ''} onChange={(e) => updateRow(index, 'paper_date', e.target.value)} />
                                 </td>
                                 <td className="py-2 px-4 text-slate-500">{dayFromDate(row.paper_date)}</td>

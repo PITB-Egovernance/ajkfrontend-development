@@ -73,6 +73,7 @@ import StampManagement from 'pages/settings/Stamp/StampManagement';
 import ImageManagement from 'pages/settings/Images/ImageManagement';
 import SyllabusManagement from 'pages/settings/Syllabus/SyllabusManagement';
 import GroupsManagement from 'pages/settings/Groups/GroupsManagement';
+import ServiceYearManagement from 'pages/settings/ServiceYear/ServiceYearManagement';
 import NewsManagement from 'pages/settings/News/NewsManagement';
 import RollNumberSlipInstructions from 'pages/settings/RollNumberSlipInstructions/RollNumberSlipInstructions';
 import RollNumberPrefixes from 'pages/settings/RollNumberPrefixes/RollNumberPrefixes';
@@ -281,6 +282,7 @@ function App() {
           <Route path="settings/images" element={<ImageManagement />} />
           <Route path="settings/syllabus" element={<SyllabusManagement />} />
           <Route path="settings/groups" element={<GroupsManagement />} />
+          <Route path="settings/service-years" element={<ServiceYearManagement />} />
           <Route path="settings/news" element={<NewsManagement />} />
           <Route path="settings/roll-number-slip-instructions" element={<RollNumberSlipInstructions />} />
           <Route path="settings/roll-number-prefixes" element={<RollNumberPrefixes />} />

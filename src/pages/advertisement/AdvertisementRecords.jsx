@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import { showNotice } from 'components/ui/noticeDialog';
 import { getErrorMessage, getErrorCode } from 'utils/apiErrors';
-import { getAdvertisementLifecycle } from 'utils/advertisementLifecycle';
+import { getAdvertisementLifecycle, isClosedDeleteLock } from 'utils/advertisementLifecycle';
 import {
   Megaphone,
   Eye,
@@ -37,6 +37,7 @@ import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { handleApiError } from 'utils/apiErrors';
 
+import { todayIsoDate } from 'utils/dateUtils';
 const PERM = 'advertisement.advertisement'; // permission scope for this module
 const API_BASE = Config.apiUrl;
 const API_KEY = Config.apiKey;
@@ -169,9 +170,9 @@ const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelet
   const normalizedStatus = normalizeAdvertisementStatus(ad?.status);
   const isAlreadyPublished = normalizedStatus === 'active' || normalizedStatus === 'published';
   const lifecycle = getAdvertisementLifecycle(ad);
-  // Closed advertisements (permanently / automatically) are view-only: Edit, Publish
-  // and Delete stay visible but disabled, with the reason as a tooltip.
-  const isClosedLock = Boolean(lifecycle.editLockCode);
+  // Closed advertisements (permanently / automatically) stay editable, but Delete stays
+  // visible and disabled with the reason as a tooltip.
+  const isClosedLock = isClosedDeleteLock(lifecycle.deleteLockCode);
 
   return (
     <div className="flex justify-center items-center h-full w-full">
@@ -211,24 +212,14 @@ const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelet
           <Eye className="w-4 h-4" /> View
         </MenuItem>
         {canEdit && (
-          <div title={isClosedLock ? lifecycle.editLockMessage : undefined}>
-            <MenuItem
-              disabled={isClosedLock}
-              onClick={(e) => { handleClose(e); onEdit(ad.id); }}
-            >
-              <Pencil className="w-4 h-4" /> Edit
-            </MenuItem>
-          </div>
+          <MenuItem onClick={(e) => { handleClose(e); onEdit(ad.id); }}>
+            <Pencil className="w-4 h-4" /> Edit
+          </MenuItem>
         )}
         {canEdit && !isAlreadyPublished && (
-          <div title={isClosedLock ? lifecycle.editLockMessage : undefined}>
-            <MenuItem
-              disabled={isClosedLock}
-              onClick={(e) => { handleClose(e); onPublish(ad); }}
-            >
-              <Send className="w-4 h-4" /> Publish
-            </MenuItem>
-          </div>
+          <MenuItem onClick={(e) => { handleClose(e); onPublish(ad); }}>
+            <Send className="w-4 h-4" /> Publish
+          </MenuItem>
         )}
         {canDelete && (
           <div title={isClosedLock ? lifecycle.deleteLockMessage : undefined}>
@@ -713,7 +704,7 @@ const AdvertisementRecords = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-8xl mx-auto space-y-6">
+      <div className="form-fill-width space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -872,7 +863,7 @@ const AdvertisementRecords = () => {
                   Publish Date <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={publishModal.publish_date}
                   onChange={(e) => setPublishModal(prev => ({ ...prev, publish_date: e.target.value }))}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"

@@ -9,6 +9,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
+import { formatScale } from 'utils/scaleUtils';
 import { handleApiError } from 'utils/apiErrors';
 
 // Advertisement edits are recorded on the `advertisement_change_logs` /
@@ -363,14 +364,14 @@ const AdvertisementDetail = () => {
     return district ? district.name : hashId;
   };
 
-  const getScaleName = (rawScale) => {
-    if (rawScale === null || rawScale === undefined || rawScale === '') return 'N/A';
-    if (typeof rawScale === 'object') {
-      return rawScale.name || rawScale.hash_id || rawScale.id || 'N/A';
-    }
-    const str = String(rawScale).trim();
+  // The post's grade name: from the grades list, else the backend's resolved scale_text. A grade hash
+  // that points at no existing grade is never printed.
+  const getScaleName = (job) => {
+    const rawScale = job?.scale;
+    if (rawScale && typeof rawScale === 'object') return rawScale.name || 'Grade not set';
+    const str = String(rawScale ?? '').trim();
     const matched = gradeOptions.find((g) => String(g.id) === str || String(g.name) === str);
-    return matched ? matched.name : str;
+    return matched ? matched.name : formatScale(job, 'Grade not set');
   };
 
   const getFileUrl = (path) => {
@@ -1416,7 +1417,7 @@ const AdvertisementDetail = () => {
                       <header className="adv-post-head">
                         <div className="adv-post-title">
                           <span className="ptitle">{job.designation}</span>
-                          <span className="bps">{getScaleName(job.scale)}</span>
+                          <span className="bps">{getScaleName(job)}</span>
                         </div>
 
                         <div className="adv-post-vacancies">

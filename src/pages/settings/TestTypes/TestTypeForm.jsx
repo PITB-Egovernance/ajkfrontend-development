@@ -306,7 +306,7 @@ const TestTypeForm = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="mx-auto bg-white rounded-xl shadow-sm p-6 requisition-form-container" style={{ minWidth: '-webkit-fill-available', minHeight: 'auto' }}>
+      <div className="form-fill-width bg-white rounded-xl shadow-sm p-6 requisition-form-container" style={{ minHeight: 'auto' }}>
 
         {/* HEADER */}
         <div className="mb-6">

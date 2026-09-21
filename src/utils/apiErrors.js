@@ -129,6 +129,14 @@ const CODE_PRESENTATION = {
       { label: 'Days remaining', value: d.days_remaining },
     ],
   }),
+  RESULTS_NOT_MANAGEABLE: (d) => ({
+    title: 'Results cannot be managed yet',
+    details: [
+      { label: 'Post', value: d.post_name },
+      { label: 'Roll Number Slips', value: 'Not published' },
+      { label: 'Examination date', value: formatDate(d.exam_date) },
+    ],
+  }),
   CENTER_CAPACITY_EXCEEDED: (d) => ({
     title: 'Center capacity exceeded',
     details: [
@@ -171,8 +179,8 @@ const CODE_PRESENTATION = {
       { label: 'Batch range', value: d.batch_range },
     ],
   }),
-  ADVERTISEMENT_PERMANENTLY_CLOSED: () => ({ title: 'Advertisement is read-only' }),
-  ADVERTISEMENT_AUTO_CLOSED: () => ({ title: 'Advertisement is closed' }),
+  ADVERTISEMENT_PERMANENTLY_CLOSED: () => ({ title: 'Advertisement cannot be deleted' }),
+  ADVERTISEMENT_AUTO_CLOSED: () => ({ title: 'Advertisement cannot be deleted' }),
   ADVERTISEMENT_HAS_APPLICATIONS: (d) => ({
     title: 'Advertisement cannot be deleted',
     details: [{ label: 'Candidates who applied', value: d.applications_count }],

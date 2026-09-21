@@ -38,11 +38,11 @@ const ReportFilterBar = ({
 
       <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Button variant="primary" size="sm" className="gap-1.5" disabled={searching} onClick={onSearch}>
+          <Button variant="primary" size="field" className="gap-1.5" disabled={searching} onClick={onSearch}>
             <SearchActionIcon size={15} /> {searching ? (searchingLabel || `${searchLabel}…`) : searchLabel}
           </Button>
           {showResetButton && (
-            <Button variant="secondary" size="sm" className="gap-1.5" onClick={onClearFilters}>
+            <Button variant="secondary" size="field" className="gap-1.5" onClick={onClearFilters}>
               <RotateCcw size={15} /> Reset
             </Button>
           )}

@@ -25,6 +25,7 @@ import { examTypeToCategory, applyClubbedGroups } from 'utils/resultsClubbing';
 import BulkPublishModal from 'components/results/BulkPublishModal';
 import BulkWithdrawModal from 'components/results/BulkWithdrawModal';
 import { handleApiError } from 'utils/apiErrors';
+import { formatScale } from 'utils/scaleUtils';
 
 // Same publishable/unpublishable split used on the Post-Result landing page.
 const PUBLISHABLE_STATUSES = ['Approved', 'APPROVED', 'WITHDRAWN'];
@@ -497,7 +498,7 @@ const ResultsExamFlow = () => {
           <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-650 transition-colors">
             {params.row.designation}
           </p>
-          <p className="text-xs text-slate-400">Scale: BPS-{params.row.scale}</p>
+          <p className="text-xs text-slate-400">Scale: {formatScale(params.row)}</p>
         </div>
       )
     },
@@ -559,7 +560,7 @@ const ResultsExamFlow = () => {
 
   return (
     <div className="min-h-screen p-4">
-      <div className="max-w-8xl mx-auto space-y-6">
+      <div className="form-fill-width space-y-6">
 
         {/* Header */}
         <div>

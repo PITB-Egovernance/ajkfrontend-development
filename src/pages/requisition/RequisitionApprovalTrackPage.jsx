@@ -79,7 +79,7 @@ const PageError = ({ message, onRetry }) => (
 
 const HeaderSection = ({ requisition, onBack, onDownload, onTrackApproval }) => (
   <div className="bg-white border-b border-slate-200">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="form-fill-width px-4 sm:px-6 lg:px-8 py-6">
       <button
         onClick={onBack}
         className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors mb-4"
@@ -141,7 +141,7 @@ const TABS = [
 
 const TabsSection = ({ activeTab, onTabChange }) => (
   <div className="bg-white border-b border-slate-200">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="form-fill-width px-4 sm:px-6 lg:px-8">
       <nav className="flex gap-0 -mb-px overflow-x-auto">
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -625,18 +625,18 @@ const ActivityLogTab = ({ hashId }) => {
   }, [hashId]);
 
   if (loading) return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex justify-center">
+    <div className="form-fill-width px-4 sm:px-6 lg:px-8 py-12 flex justify-center">
       <Loader2 className="w-7 h-7 text-amber-500 animate-spin" />
     </div>
   );
   if (error) return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="form-fill-width px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center text-rose-700 text-sm">{error}</div>
     </div>
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="form-fill-width px-4 sm:px-6 lg:px-8 py-6">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-6">Activity Log</h3>
         {log.length === 0 ? (
@@ -737,7 +737,7 @@ const CommentsTab = ({ hashId }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="form-fill-width px-4 sm:px-6 lg:px-8 py-6">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-6">Comments</h3>
 
@@ -832,7 +832,7 @@ const RequestDetailsTab = ({ requisition }) => {
   const q = requisition.qualification || {};
   const e = requisition.eligibility || {};
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="form-fill-width px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-base font-semibold text-slate-900 mb-2">Qualification</h3>
         <DetailRow label="Academic Qualification" value={q.academic_qualification} />
@@ -918,7 +918,7 @@ const RequisitionApprovalTrackPage = () => {
 
       {/* Approvals tab — API 11: data.workflow_steps, data.workflow_info */}
       {activeTab === 'approvals' && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="form-fill-width px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <ApprovalTimeline steps={workflow_steps} />

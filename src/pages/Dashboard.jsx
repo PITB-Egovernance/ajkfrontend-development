@@ -294,7 +294,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen p-2">
-      <div className="max-w-8xl mx-auto space-y-6">
+      <div className="form-fill-width space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">

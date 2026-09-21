@@ -7,10 +7,13 @@
 }
 
 .job-creation-container .container {
-  max-width: 1200px;
+  /* full-page form: fill the available width (no 1200px cap, no centering gutter) */
+  width: 100%;
+  width: -webkit-fill-available;
+  max-width: none;
   background: white;
   border-radius: 10px;
-  margin: 10px auto;
+  margin: 10px 0;
   padding: 20px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }

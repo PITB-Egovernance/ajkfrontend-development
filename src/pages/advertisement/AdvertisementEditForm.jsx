@@ -11,10 +11,11 @@ import Config from "../../config/baseUrl";
 import AuthService from "../../services/authService";
 import { showNotice, confirmNotice } from "components/ui/noticeDialog";
 import { getErrorMessage, getErrorCode } from "utils/apiErrors";
-import { getAdvertisementLifecycle } from "utils/advertisementLifecycle";
 import "../job-creation/JobCreationForm.css";
+import { formatScale } from "utils/scaleUtils";
 import { handleApiError } from 'utils/apiErrors';
 
+import { todayIsoDate } from 'utils/dateUtils';
 const STATUS_OPTIONS = [
   // { value: 'pending', label: 'Pending' },
   { value: 'active', label: 'Published' },
@@ -179,6 +180,7 @@ const normalizeJobOption = (job) => {
     designation: job.designation || job.post_title || job.title || `Requisition ${id}`,
     department: getJobDepartmentName(job),
     scale: job.scale?.name || job.scale?.scale_name || job.scale || "",
+    scale_text: job.scale_text || "",
     num_posts: Number(job.num_posts || job.pivot?.num_posts || 1) || 1,
     qualificationText: getQualificationText(job),
     districtPosts: quotaBased ? normalizeDistrictPosts(job) : [],
@@ -630,18 +632,6 @@ const AdvertisementEditForm = () => {
         const result = await AdvertisementApi.getById(id);
         if (result.success) {
           const data = result.data;
-
-          // Permanently / automatically closed advertisements are view-only.
-          const lifecycle = getAdvertisementLifecycle(data);
-          if (!lifecycle.canEdit) {
-            await showNotice({
-              tone: "warning",
-              title: "Advertisement is read-only",
-              message: lifecycle.editLockMessage,
-            });
-            navigate(`/dashboard/advertisements/view/${id}`, { replace: true });
-            return;
-          }
 
           setAdvDate(data.adv_date?.split("T")[0] || "");
           setAdvDateInput(formatDateForDisplay(data.adv_date?.split("T")[0] || ""));
@@ -1111,7 +1101,7 @@ const AdvertisementEditForm = () => {
                     required
                     InputLabelProps={{ shrink: true }}
                     sx={formFieldSx}
-                    inputProps={{ style: { height: 28 } }}
+                    inputProps={{ min: todayIsoDate(), style: { height: 28 } }}
                     error={!!fieldErrors?.closing_date}
                     helperText={
                       Array.isArray(fieldErrors?.closing_date)
@@ -1211,7 +1201,7 @@ const AdvertisementEditForm = () => {
                       }}
                       InputLabelProps={{ shrink: true }}
                       sx={formFieldSx}
-                      inputProps={{ style: { height: 28 } }}
+                      inputProps={{ min: todayIsoDate(), style: { height: 28 } }}
                       error={!!fieldErrors?.extend_date}
                       helperText={
                         Array.isArray(fieldErrors?.extend_date)
@@ -1272,7 +1262,7 @@ const AdvertisementEditForm = () => {
                               {job.designation}
                             </p>
                             <p className="truncate text-xs text-slate-500">
-                              {[job.department, job.scale].filter(Boolean).join(" | ") || `Job ID: ${jobId}`}
+                              {[job.department, formatScale(job, "Grade not set")].filter(Boolean).join(" | ") || `Job ID: ${jobId}`}
                             </p>
                           </div>
                           <TextField

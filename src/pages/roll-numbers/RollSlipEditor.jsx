@@ -10,6 +10,7 @@ import { InlineLoader } from 'components/ui/Loader';
 import RollNumberApi from 'api/rollNumberApi';
 import { handleApiError } from 'utils/apiErrors';
 
+import { todayIsoDate } from 'utils/dateUtils';
 // HH:MM → "H:MM AM/PM"
 const formatTime12h = (value) => {
   if (!value) return '';
@@ -137,7 +138,7 @@ const RollSlipEditor = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-4xl mx-auto">
+      <div className="form-fill-width">
 
         <button onClick={() => navigate('/dashboard/roll-numbers')}
           className="text-sm text-slate-500 flex items-center gap-1 mb-2 hover:text-slate-700">
@@ -198,7 +199,7 @@ const RollSlipEditor = () => {
 
           <h2 className="font-semibold text-slate-800 mt-4 mb-1 flex items-center gap-2"><Calendar size={16} /> Exam Schedule</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <TextField fullWidth type="date" label="Exam Date" margin="normal" size="small"
+            <TextField fullWidth type="date" inputProps={{ min: todayIsoDate() }} label="Exam Date" margin="normal" size="small"
               InputLabelProps={{ shrink: true }}
               name="exam_date" value={formData.exam_date} onChange={handleFormChange}
               helperText="Day name is derived automatically (e.g. Sunday)" />

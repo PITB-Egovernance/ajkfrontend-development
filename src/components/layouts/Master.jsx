@@ -27,7 +27,7 @@ const Master = ({ Sidebar, Navbar, children }) => {
         </div>
 
         {/* Page Content */}
-        <main className="p-4 sm:p-6 lg:p-8 max-w-8xl mx-auto ">
+        <main className="form-fill-width p-4 sm:p-6 lg:p-8">
           <FullPageFormContext.Provider value={fullPageValue}>
             <div className={fullPageActive ? 'hidden' : undefined}>{children}</div>
             <div ref={setSlot} />

@@ -38,6 +38,7 @@ import BulkWithdrawModal from 'components/results/BulkWithdrawModal';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 import { fetchAndApplyClubbedGroups } from 'utils/resultsClubbing';
+import { formatScale } from 'utils/scaleUtils';
 
 const PERM = 'result.result_publishing'; // permission scope for publishing actions
 
@@ -504,7 +505,7 @@ const ResultsDashboard = () => {
           <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-650 transition-colors">
             {params.row.designation}
           </p>
-          <p className="text-xs text-slate-400">Scale: BPS-{params.row.scale}</p>
+          <p className="text-xs text-slate-400">Scale: {formatScale(params.row)}</p>
         </div>
       )
     },
@@ -574,7 +575,7 @@ const ResultsDashboard = () => {
 
   return (
     <div className="min-h-screen p-2">
-      <div className="max-w-8xl mx-auto space-y-6">
+      <div className="form-fill-width space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">

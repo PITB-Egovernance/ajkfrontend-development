@@ -656,7 +656,7 @@ const CceRollSlipGeneration = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-8xl mx-auto space-y-5">
+      <div className="form-fill-width space-y-5">
 
         {/* HEADER */}
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -805,6 +805,34 @@ const CceRollSlipGeneration = () => {
               </div>
             )}
 
+            {/* Names the post(s) every step below acts on — a single post or the clubbed group. */}
+            {selectedPosts.length > 0 && (() => {
+              const clubbed = selectedPosts.length > 1 || selectedPosts.some((p) => p.clubbedWith.length > 0);
+              const companions = [...new Set(selectedPosts.flatMap((p) => p.clubbedWith.map((w) => w.label)))]
+                .filter((label) => !selectedPosts.some((p) => label.includes(p.postName)));
+              return (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    {clubbed ? 'Clubbed Posts' : 'Selected Post'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedPosts.map((p) => (
+                      <span key={p.key} className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-900">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        {p.postName}
+                        {p.advertisementTitle && p.advertisementTitle !== '—' ? <span className="font-normal text-slate-500">· {p.advertisementTitle}</span> : null}
+                      </span>
+                    ))}
+                    {companions.map((label) => (
+                      <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                        Clubbed with {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {stage === 1 ? (
               <Card className="border border-slate-200">
                 <CardContent className="p-5 space-y-5">
@@ -841,8 +869,8 @@ const CceRollSlipGeneration = () => {
                         </MenuItem>
                       ))}
                     </TextField>
-                    <Button className="gap-2 lg:col-span-2" onClick={applyFilters}><Search size={15} /> Search</Button>
-                    <Button variant="outline" className="gap-2 bg-white lg:col-span-1" onClick={resetFilters}><Filter size={15} /> Reset</Button>
+                    <Button size="field" className="gap-2 lg:col-span-2" onClick={applyFilters}><Search size={15} /> Search</Button>
+                    <Button variant="outline" size="field" className="gap-2 bg-white lg:col-span-1" onClick={resetFilters}><Filter size={15} /> Reset</Button>
                   </div>
 
                   <div className="overflow-x-auto rounded-lg border border-slate-200">

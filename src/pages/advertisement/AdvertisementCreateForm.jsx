@@ -5,6 +5,7 @@ import SearchableSelect from 'components/ui/SearchableSelect';
 import { formFieldSx } from 'components/ui/formFieldSx';
 import { FileText, CheckCircle2, Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
+import { PAST_DATE_MESSAGE } from "utils/dateInputGuard";
 import AdvertisementApi from "../../api/advertisementApi";
 import RequisitionApi from "../../api/requisitionApi";
 import Config from "../../config/baseUrl";
@@ -12,6 +13,7 @@ import AuthService from "../../services/authService";
 import "../job-creation/JobCreationForm.css";
 import { handleApiError } from 'utils/apiErrors';
 
+import { todayIsoDate } from 'utils/dateUtils';
 const formatDateForDisplay = (value) => {
   if (!value) return "";
   if (/^\d{2}-\d{2}-\d{4}$/.test(value)) return value;
@@ -54,7 +56,17 @@ const updateDateFieldValue = (rawValue, setStoredValue, setDisplayValue) => {
     const month = limited.slice(2, 4);
     const year = limited.slice(4, 8);
     const parsed = new Date(`${year}-${month}-${day}`);
-    setStoredValue(Number.isNaN(parsed.getTime()) ? "" : `${year}-${month}-${day}`);
+    const iso = `${year}-${month}-${day}`;
+
+    // Advertisements are created for today or later: a complete past date typed in is refused.
+    if (!Number.isNaN(parsed.getTime()) && iso < todayIsoDate()) {
+      toast.error(PAST_DATE_MESSAGE, { id: "past-date-not-allowed" });
+      setDisplayValue("");
+      setStoredValue("");
+      return;
+    }
+
+    setStoredValue(Number.isNaN(parsed.getTime()) ? "" : iso);
   } else {
     setStoredValue("");
   }
@@ -607,7 +619,7 @@ const AdvertisementCreateForm = () => {
                     required
                     InputLabelProps={{ shrink: true }}
                     sx={formFieldSx}
-                    inputProps={{
+                    inputProps={{ min: todayIsoDate(),
                       style: { height: 28 },
                     }}
                     error={

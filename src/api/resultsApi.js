@@ -233,6 +233,21 @@ const ResultsApi = {
   /**
    * Download pre-filled CSV template for interview awards
    */
+  /**
+   * Whether results can be managed for a post yet: { can_manage, slips_published, exam_held, exam_date, message }.
+   */
+  managementStatus: async (jobPostId) => {
+    const response = await fetch(`${API_BASE}/results/management-status?job_post_id=${encodeURIComponent(jobPostId)}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(result, response.status, 'Could not check whether results can be managed.'));
+    }
+    return result.data || result;
+  },
+
   downloadAwardTemplate: async (jobPostId, district = 'all') => {
     const response = await fetch(`${API_BASE}/results/awards/export-template?job_post_id=${jobPostId}&district=${district}`, {
       method: 'GET',

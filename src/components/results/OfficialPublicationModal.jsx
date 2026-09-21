@@ -10,6 +10,7 @@ import Button from 'components/ui/Button';
 import ResultsApi from 'api/resultsApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { handleApiError } from 'utils/apiErrors';
+import { formatScale } from 'utils/scaleUtils';
 
 // Publication Type / Gazette Reference are no longer surfaced to the user —
 // every result publish always goes out as the final official merit list.
@@ -71,7 +72,7 @@ const OfficialPublicationModal = ({ isOpen, onClose, job, onSuccess }) => {
             <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Target Job</p>
               <h4 className="text-base font-black text-slate-900 leading-tight">{job.designation}</h4>
-              <p className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-tight">Scale: BPS-{job.scale} • Post ID: #{job.id}</p>
+              <p className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-tight">Scale: {formatScale(job)} • Post ID: #{job.id}</p>
             </div>
 
             {/* Publication Settings */}

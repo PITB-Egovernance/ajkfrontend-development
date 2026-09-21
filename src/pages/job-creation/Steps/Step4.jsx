@@ -1,5 +1,6 @@
 import SearchableSelect from 'components/ui/SearchableSelect';
 
+import { todayIsoDate } from 'utils/dateUtils';
 export default function Step4({ data, change, errors }) {
   const testCenters = [
     "Islamabad", "Lahore", "Karachi", "Peshawar", "Quetta",
@@ -37,7 +38,7 @@ export default function Step4({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">PSID Expiry Date</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="psid_expiry_date"
           value={data.psid_expiry_date}
           onChange={change}
@@ -81,7 +82,7 @@ export default function Step4({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Test Date *</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="test_date"
           value={data.test_date}
           onChange={change}
@@ -95,7 +96,7 @@ export default function Step4({ data, change, errors }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Interview Date</label>
         <input
-          type="date"
+          type="date" min={todayIsoDate()}
           name="interview_date"
           value={data.interview_date}
           onChange={change}

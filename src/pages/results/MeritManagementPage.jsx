@@ -107,7 +107,7 @@ const MeritManagementPage = () => {
 
   return (
     <div className="p-8 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto space-y-10">
+      <div className="form-fill-width space-y-10">
         
         {/* Header */}
         <div className="flex items-center justify-between">

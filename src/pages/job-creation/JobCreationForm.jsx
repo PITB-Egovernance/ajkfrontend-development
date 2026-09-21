@@ -9,6 +9,7 @@ import AuthService from 'services/authService';
 import { validateJobCreationStep } from 'schemas';
 import './JobCreationForm.css';
 
+import { todayIsoDate } from 'utils/dateUtils';
 const JobCreationForm = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
@@ -297,7 +298,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="Advertisement Date"
                   name="advertisement_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.advertisement_date}
                   onChange={handleChange}
                   error={errors.advertisement_date}
@@ -427,7 +428,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="Post Date (Creation Date)"
                   name="post_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.post_date}
                   onChange={handleChange}
                   error={errors.post_date}
@@ -436,7 +437,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="Apply Start Date"
                   name="start_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.start_date}
                   onChange={handleChange}
                   error={errors.start_date}
@@ -445,7 +446,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="Apply End Date"
                   name="end_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.end_date}
                   onChange={handleChange}
                   error={errors.end_date}
@@ -454,7 +455,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="Press Release Date"
                   name="release_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.release_date}
                   onChange={handleChange}
                   error={errors.release_date}
@@ -463,7 +464,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="Close Job Date"
                   name="close_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.close_date}
                   onChange={handleChange}
                   error={errors.close_date}
@@ -655,7 +656,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="PSID Expiry Date"
                   name="psid_expiry_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.psid_expiry_date}
                   onChange={handleChange}
                   error={errors.psid_expiry_date}
@@ -696,7 +697,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="Test Date"
                   name="test_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.test_date}
                   onChange={handleChange}
                   error={errors.test_date}
@@ -705,7 +706,7 @@ const JobCreationForm = () => {
                 <FormField
                   label="Interview Date"
                   name="interview_date"
-                  type="date"
+                  type="date" min={todayIsoDate()}
                   value={formData.interview_date}
                   onChange={handleChange}
                   error={errors.interview_date}
@@ -788,7 +789,7 @@ const JobCreationForm = () => {
 };
 
 // Helper Components
-const FormField = ({ label, name, type = 'text', value, onChange, error, required, placeholder }) => (
+const FormField = ({ label, name, type = 'text', value, onChange, error, required, placeholder, min }) => (
   <div className="col-md-6 form-group">
     <TextField
       fullWidth
@@ -802,6 +803,7 @@ const FormField = ({ label, name, type = 'text', value, onChange, error, require
       error={!!error}
       helperText={error}
       InputLabelProps={type === 'date' || type === 'time' ? { shrink: true } : undefined}
+      inputProps={min ? { min } : undefined}
     />
   </div>
 );
