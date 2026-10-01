@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
-  TextField, IconButton, Menu, MenuItem,
+  IconButton, Menu, MenuItem,
   Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
@@ -15,6 +15,8 @@ import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import { GRID_SX } from 'utils/gridStyles';
 import { handleApiError } from 'utils/apiErrors';
+import RichTextEditor from 'components/ui/RichTextEditor';
+import { toRichHtml, richTextToPlain, isRichTextEmpty } from 'utils/richText';
 
 const API_BASE = Config.apiUrl;
 
@@ -67,10 +69,12 @@ const TermsConditions = () => {
 
   /* ── build rows: each term is a row, important_note shown alongside ── */
   const buildRows = () => {
+    const notePlain = richTextToPlain(importantNotes);
     return rawTerms.map((t, i) => ({
       id: `term_${i}`,
-      important_note: importantNotes,
+      important_note: notePlain,
       terms_conditions: t,
+      terms_plain: richTextToPlain(t),
     }));
   };
 
@@ -100,8 +104,8 @@ const TermsConditions = () => {
 
   /* ── Save helper ─────────────────────────────── */
   const saveToServer = async (newNotes, newTerms) => {
-    const filtered = newTerms.filter((t) => t.trim().length > 0);
-    if (!newNotes.trim() || filtered.length === 0) {
+    const filtered = newTerms.filter((t) => !isRichTextEmpty(t)).map((t) => t.trim());
+    if (isRichTextEmpty(newNotes) || filtered.length === 0) {
       toast.error('Important notes and at least one term are required');
       return false;
     }
@@ -122,7 +126,7 @@ const TermsConditions = () => {
   /* ── Open Add dialog ────────────────────────── */
   const openAdd = () => {
     setEditingRow(null);
-    setNoteInput(importantNotes || '');
+    setNoteInput(toRichHtml(importantNotes));
     setTermInput('');
     setOpenModal(true);
   };
@@ -130,15 +134,15 @@ const TermsConditions = () => {
   /* ── Open Edit dialog ───────────────────────── */
   const openEdit = (row) => {
     setEditingRow(row);
-    setNoteInput(importantNotes || '');
-    setTermInput(row.terms_conditions || '');
+    setNoteInput(toRichHtml(importantNotes));
+    setTermInput(toRichHtml(row.terms_conditions));
     setOpenModal(true);
     handleMenuClose();
   };
 
   /* ── Submit Add / Edit ──────────────────────── */
   const handleSubmit = async () => {
-    if (!noteInput.trim()) { toast.error('Important Notes is required'); return; }
+    if (isRichTextEmpty(noteInput)) { toast.error('Important Notes is required'); return; }
 
     setSaving(true);
     try {
@@ -147,19 +151,19 @@ const TermsConditions = () => {
 
       if (!editingRow) {
         /* ── ADD mode: add the new term, keep existing ── */
-        if (termInput.trim()) {
+        if (!isRichTextEmpty(termInput)) {
           newTerms.push(termInput.trim());
         }
       } else {
         /* ── EDIT mode ─────────────────────────── */
         const idx = parseInt(editingRow.id.split('_')[1], 10);
-        if (termInput.trim()) {
+        if (!isRichTextEmpty(termInput)) {
           newTerms[idx] = termInput.trim();
         }
       }
 
       // if no term was added/edited and we had none before, fail
-      if (newTerms.filter((t) => t.trim()).length === 0) {
+      if (newTerms.filter((t) => !isRichTextEmpty(t)).length === 0) {
         toast.error('At least one term is required');
         setSaving(false);
         return;
@@ -185,7 +189,7 @@ const TermsConditions = () => {
 
     if (!(await confirmDelete({
       title: 'Delete Terms & Conditions',
-      identifier: row.terms_conditions.substring(0, 60) + (row.terms_conditions.length > 60 ? '…' : ''),
+      identifier: (() => { const t = richTextToPlain(row.terms_conditions); return t.substring(0, 60) + (t.length > 60 ? '…' : ''); })(),
     }))) return;
 
     try {
@@ -214,11 +218,11 @@ const TermsConditions = () => {
     const q = search.toLowerCase();
     const searchMatch = !q ||
       r.important_note?.toLowerCase().includes(q) ||
-      r.terms_conditions?.toLowerCase().includes(q);
+      r.terms_plain?.toLowerCase().includes(q);
     if (!searchMatch) return false;
     // advanced filters
     if (filters.important_note && !r.important_note?.toLowerCase().includes(filters.important_note.toLowerCase())) return false;
-    if (filters.terms_conditions && !r.terms_conditions?.toLowerCase().includes(filters.terms_conditions.toLowerCase())) return false;
+    if (filters.terms_conditions && !r.terms_plain?.toLowerCase().includes(filters.terms_conditions.toLowerCase())) return false;
     return true;
   });
 
@@ -232,7 +236,7 @@ const TermsConditions = () => {
     {
       field: 'terms_conditions', headerName: 'Terms & Conditions', flex: 1, minWidth: 250,
       renderCell: (p) => (
-        <span className="text-sm text-slate-700 line-clamp-2">{p.value}</span>
+        <span className="text-sm text-slate-700 line-clamp-2">{p.row.terms_plain}</span>
       ),
     },
     {
@@ -320,34 +324,32 @@ const TermsConditions = () => {
         </Menu>
 
         {/* Add / Edit Dialog — two fields side by side */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="md" fullWidth>
+        <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="lg" fullWidth>
           <DialogTitle className="font-bold">
             {editingRow ? 'Edit' : 'Add'} Notes & Terms
           </DialogTitle>
           <DialogContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-              {/* Left — Important Notes */}
+            <div className="flex flex-col gap-5 mt-2">
+              {/* Important Notes — rich text (same editor as News) */}
               <div>
                 <p className="text-xs font-semibold text-amber-700 mb-1">Important Note</p>
-                <TextField
-                  fullWidth multiline rows={8} size="small"
-                  label="Important Note"
+                <RichTextEditor
                   value={noteInput}
-                  onChange={(e) => setNoteInput(e.target.value)}
+                  onChange={setNoteInput}
                   placeholder="Enter important notes..."
+                  minHeight={160}
                 />
               </div>
-              {/* Right — Terms & Conditions */}
+              {/* Terms & Conditions — rich text */}
               <div>
-                <p className="text-xs font-semibold text-emerald-700 mb-1">Terms & Conditions</p>
-                <TextField
-                  fullWidth multiline rows={8} size="small"
-                  label={editingRow ? 'Edit Terms & Conditions' : 'New Terms & Conditions'}
+                <p className="text-xs font-semibold text-emerald-700 mb-1">
+                  {editingRow ? 'Edit Terms & Conditions' : 'New Terms & Conditions'}
+                </p>
+                <RichTextEditor
                   value={termInput}
-                  onChange={(e) => setTermInput(e.target.value)}
-                  placeholder={editingRow
-                    ? 'Update term text...'
-                    : 'Enter new term...'}
+                  onChange={setTermInput}
+                  placeholder={editingRow ? 'Update term text...' : 'Enter new term...'}
+                  minHeight={220}
                 />
               </div>
             </div>

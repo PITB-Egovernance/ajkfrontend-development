@@ -14,6 +14,8 @@ import { getErrorMessage, getErrorCode } from "utils/apiErrors";
 import "../job-creation/JobCreationForm.css";
 import { formatScale } from "utils/scaleUtils";
 import { handleApiError } from 'utils/apiErrors';
+import RichTextEditor from 'components/ui/RichTextEditor';
+import { toRichHtml, isRichTextEmpty } from 'utils/richText';
 
 import { todayIsoDate } from 'utils/dateUtils';
 const STATUS_OPTIONS = [
@@ -640,7 +642,8 @@ const AdvertisementEditForm = () => {
           setClosingDateInput(formatDateForDisplay(data.closing_date?.split("T")[0] || ""));
           setAdvertisementFee(data.advertisement_fee || "");
           setNote(data.note || data.notes || data.ad_note || "");
-          setImportantNotes(data.important_notes || "");
+          // Rich text (legacy plain text keeps its line breaks in the editor)
+          setImportantNotes(toRichHtml(data.important_notes));
           const normalizedStatus = normalizeAdvertisementStatus(data.status);
           setStatus(normalizedStatus);
           setOriginalStatus(normalizedStatus);
@@ -657,7 +660,7 @@ const AdvertisementEditForm = () => {
             try {
               const parsed = typeof data.terms_conditions === "string" ? JSON.parse(data.terms_conditions) : data.terms_conditions;
               if (Array.isArray(parsed) && parsed.length) {
-                terms = parsed;
+                terms = parsed.map(toRichHtml);
               }
             } catch {}
           }
@@ -859,7 +862,7 @@ const AdvertisementEditForm = () => {
       return;
     }
 
-    const filteredTerms = termsConditions.filter((t) => t.trim().length > 0);
+    const filteredTerms = termsConditions.filter((t) => !isRichTextEmpty(t)).map((t) => t.trim());
 
     if (filteredTerms.length === 0) {
       toast.error("Please add at least one term & condition");
@@ -1539,21 +1542,20 @@ const AdvertisementEditForm = () => {
                   flex: "0 !important",
                   minWidth: "-webkit-fill-available"
                 }}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    maxRows={12}
-                    label="Important Notes"
+                  {/* Rich text — same editor as Settings → News */}
+                  <RichTextEditor
                     value={importantNotes}
-                    onChange={(e) => setImportantNotes(e.target.value)}
-                    sx={formFieldSx}
-                    error={!!fieldErrors?.important_notes}
-                    helperText={
-                      Array.isArray(fieldErrors?.important_notes)
-                        ? fieldErrors.important_notes.join(", ")
-                        : fieldErrors?.important_notes
-                    }
+                    onChange={setImportantNotes}
+                    placeholder="Important Notes"
+                    minHeight={160}
                   />
+                  {!!fieldErrors?.important_notes && (
+                    <div style={{ marginTop: 6, color: "#dc3545", fontSize: 12 }}>
+                      {Array.isArray(fieldErrors.important_notes)
+                        ? fieldErrors.important_notes.join(", ")
+                        : fieldErrors.important_notes}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1581,15 +1583,15 @@ const AdvertisementEditForm = () => {
                         alignItems: "flex-start",
                       }}
                     >
-                      <TextField
-                        fullWidth
-                        multiline
-                        maxRows={12}
-                        label={`Term ${idx + 1}`}
-                        value={term}
-                        onChange={(e) => updateTerm(idx, e.target.value)}
-                        sx={formFieldSx}
-                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p className="text-xs font-semibold text-slate-600 mb-1">{`Term ${idx + 1}`}</p>
+                        <RichTextEditor
+                          value={term}
+                          onChange={(html) => updateTerm(idx, html)}
+                          placeholder={`Term ${idx + 1}`}
+                          minHeight={140}
+                        />
+                      </div>
                       {termsConditions.length > 1 && (
                         <button
                           type="button"

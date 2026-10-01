@@ -11,6 +11,7 @@ import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
 import { formatScale } from 'utils/scaleUtils';
 import { handleApiError } from 'utils/apiErrors';
+import RichTextContent from 'components/ui/RichTextContent';
 
 // Advertisement edits are recorded on the `advertisement_change_logs` /
 // `change_logs` JSON column (see BACKEND_ADVERTISEMENT_CHANGE_LOGS_IMPLEMENTATION.md).
@@ -850,7 +851,6 @@ const AdvertisementDetail = () => {
           font-size: 11px;
           color: #1a1a1a;
           text-align: justify;
-          white-space: pre-line;
         }
         .adv-important-note b {
           color: #9a7b1e;
@@ -1350,11 +1350,15 @@ const AdvertisementDetail = () => {
 
           {(advertisement.important_notes ||
             'The application must be complete in all respects and the candidate must possess the prescribed qualification / eligibility under the rules. Incomplete applications, or those received after the last date, will not be entertained.') && (
-            <p className="adv-important-note">
-              <b>Important Note:</b>{' '}
-              {advertisement.important_notes ||
-                'The application must be complete in all respects and the candidate must possess the prescribed qualification / eligibility under the rules. Incomplete applications, or those received after the last date, will not be entertained.'}
-            </p>
+            <div className="adv-important-note">
+              <b>Important Note:</b>
+              <RichTextContent
+                value={
+                  advertisement.important_notes ||
+                  'The application must be complete in all respects and the candidate must possess the prescribed qualification / eligibility under the rules. Incomplete applications, or those received after the last date, will not be entertained.'
+                }
+              />
+            </div>
           )}
 
           {groupedJobs.map((dept, deptIdx) => (
@@ -1521,7 +1525,7 @@ const AdvertisementDetail = () => {
           <ol className="adv-terms">
             {termsList.length > 0 ? (
               termsList.map((term, i) => (
-                <li key={i}>{term}</li>
+                <li key={i}><RichTextContent value={term} /></li>
               ))
             ) : (
               <li>No specific terms &amp; conditions provided.</li>

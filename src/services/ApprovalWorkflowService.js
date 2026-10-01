@@ -1,5 +1,6 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { richTextToPlain } from 'utils/richText';
 
 const API_BASE = Config.apiUrl;
 const ROLE_ACTION_CACHE_KEY = 'role_approval_actions_cache_v1';
@@ -175,7 +176,7 @@ const normalizeCase = (item, idx = 0) => {
     id: item?.hash_id || item?.id || `wf-${idx + 1}`,
     hash_id: item?.hash_id || item?.id || null,
     referenceNo: item?.adv_number || item?.application_no || item?.reference_no || `APP-${idx + 1}`,
-    title: item?.title || item?.note || item?.subject || item?.important_notes || 'Recruitment application',
+    title: item?.title || item?.note || item?.subject || richTextToPlain(item?.important_notes) || 'Recruitment application',
     submittedAt: item?.created_at || item?.adv_date || item?.submitted_at || null,
     currentStage: item?.current_stage || item?.currentStage || derived.currentStage,
     workflowStatus: item?.workflow_status || item?.workflowStatus || derived.workflowStatus,
