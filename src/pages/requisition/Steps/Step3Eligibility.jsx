@@ -4,7 +4,7 @@ import SearchableSelect from 'components/ui/SearchableSelect';
 import { Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 // Project green theme: emerald-700 (#047857). Used for the
 // Selection-Mode radio buttons so the checked dot and ring match the
@@ -174,11 +174,7 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
     (async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/settings/nationalities`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept:        'application/json',
-            'X-API-KEY':   Config.apiKey,
-          },
+          headers: authHeaders(false),
         });
         const result = await res.json();
         if (aborted) return;
@@ -201,13 +197,11 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
     return () => { aborted = true; };
   }, []);
 
-  // Update form data when data prop changes (for edit mode)
+  // Update form data when data prop changes (for edit mode). Only re-sync when the loaded
+  // data's content actually changes: re-running on every parent re-render would OVERWRITE the
+  // user's in-progress edits (e.g. a number typed in the promotional_post column).
+  const dataKey = data ? JSON.stringify(data) : '';
   useEffect(() => {
-    // Only re-sync when the loaded data's content actually changes. Without
-    // this guard the effect would re-run on every parent re-render and
-    // OVERWRITE the user's in-progress edits (e.g. typing a number in the
-    // promotional_post column) with the stale loaded data.
-    const dataKey = data ? JSON.stringify(data) : '';
     if (lastSyncedDataRef.current === dataKey) return;
 
     // The backend stores district/domicile as NAMES (e.g. "Muzaffarabad")
@@ -290,11 +284,8 @@ const Step3Eligibility = ({ data, step1Data = {}, tempId, onNext, onBack, onSave
       });
       setShowRelaxation(data.age_relaxation === 'Yes');
     }
-    // Use a string fingerprint of `data` as the dependency so this effect
-    // only re-runs when the loaded data's content actually changes — not
-    // on every parent re-render (which would otherwise overwrite the user's
-    // in-progress edits in the per-row number inputs).
-  }, [data && JSON.stringify(data), districtOptions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on dataKey (see above)
+  }, [dataKey, districtOptions]);
 
   const handleChange = (e) => {
     let { name, value } = e.target;

@@ -9,13 +9,13 @@ import { PAST_DATE_MESSAGE } from "utils/dateInputGuard";
 import AdvertisementApi from "../../api/advertisementApi";
 import RequisitionApi from "../../api/requisitionApi";
 import Config from "../../config/baseUrl";
-import AuthService from "../../services/authService";
 import "../job-creation/JobCreationForm.css";
 import { handleApiError } from 'utils/apiErrors';
 import RichTextEditor from 'components/ui/RichTextEditor';
 import { toRichHtml, isRichTextEmpty } from 'utils/richText';
 
 import { todayIsoDate } from 'utils/dateUtils';
+import { authHeaders } from 'utils/apiUtils';
 const formatDateForDisplay = (value) => {
   if (!value) return "";
   if (/^\d{2}-\d{2}-\d{4}$/.test(value)) return value;
@@ -26,17 +26,6 @@ const formatDateForDisplay = (value) => {
   return `${match[3]}-${match[2]}-${match[1]}`;
 };
 
-const parseDisplayDate = (value) => {
-  const digitsOnly = String(value).replace(/\D/g, "");
-  if (digitsOnly.length !== 8) return "";
-
-  const day = digitsOnly.slice(0, 2);
-  const month = digitsOnly.slice(2, 4);
-  const year = digitsOnly.slice(4, 8);
-  const parsed = new Date(`${year}-${month}-${day}`);
-
-  return Number.isNaN(parsed.getTime()) ? "" : `${year}-${month}-${day}`;
-};
 
 const updateDateFieldValue = (rawValue, setStoredValue, setDisplayValue) => {
   const digitsOnly = String(rawValue).replace(/\D/g, "");
@@ -92,8 +81,8 @@ const AdvertisementCreateForm = () => {
   const [advDateInput, setAdvDateInput] = useState(formatDateForDisplay(initialAdvDate));
   const [advNumber, setAdvNumber] = useState("");
   const [closingDate, setClosingDate] = useState("");
-  const [closingDateInput, setClosingDateInput] = useState("");
-  const [advertisementFee, setAdvertisementFee] = useState("");
+  const [, setClosingDateInput] = useState("");
+  const [advertisementFee] = useState("");
   const [note, setNote] = useState("");
   const [importantNotes, setImportantNotes] = useState("");
   const [termsConditions, setTermsConditions] = useState([""]);
@@ -114,11 +103,7 @@ const AdvertisementCreateForm = () => {
     (async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/settings/test-types/dropdown`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept: "application/json",
-            "X-API-KEY": Config.apiKey,
-          },
+          headers: authHeaders(false),
         });
 
         const result = await res.json();
@@ -150,11 +135,7 @@ const AdvertisementCreateForm = () => {
     (async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/settings/tests`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept: "application/json",
-            "X-API-KEY": Config.apiKey,
-          },
+          headers: authHeaders(false),
         });
 
         const result = await res.json();

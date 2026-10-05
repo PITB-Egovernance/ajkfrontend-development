@@ -8,7 +8,7 @@ import 'jspdf-autotable';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 const AnnexADetail = () => {
   const { id } = useParams();
@@ -18,6 +18,8 @@ const AnnexADetail = () => {
 
   useEffect(() => {
     fetchAnnexDetail();
+  // Re-runs only when the values in the array change, not whenever fetchAnnexDetail is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchAnnexDetail = async () => {
@@ -25,12 +27,7 @@ const AnnexADetail = () => {
     try {
       const response = await fetch(`${Config.apiUrl}/annex/${id}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: authHeaders(),
       });
 
       const result = await response.json();

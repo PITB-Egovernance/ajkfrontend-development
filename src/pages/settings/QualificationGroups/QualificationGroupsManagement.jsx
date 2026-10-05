@@ -14,22 +14,16 @@ import confirmDelete from 'components/ui/ConfirmDelete';
 import { localSettingsApi } from 'hooks/useLocalSettings';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { GRID_SX } from 'utils/gridStyles';
 import { hasPermission } from 'utils/permissions';
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = 'settings.qualifications';
 
 const API_BASE = Config.apiUrl;
-const getApiHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
+const getApiHeaders = () => authHeaders(false);
 
 const KEY  = 'groups';
-const QKEY = 'qualifications';
-const DKEY = 'degrees';
 
 const emptyForm = { name: '', qualification_id: '', degree_ids: [] };
 
@@ -189,10 +183,6 @@ const QualificationGroupsManagement = () => {
     load();
   };
 
-  const handleToggle = (row) => {
-    localSettingsApi.toggle(KEY, row.id);
-    load();
-  };
 
   const allDegIdsSelected = filteredDegrees.length > 0 &&
     filteredDegrees.every((d) => form.degree_ids.includes(d.id));

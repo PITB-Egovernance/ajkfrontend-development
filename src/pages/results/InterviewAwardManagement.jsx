@@ -1,19 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
-  Search,
   Save,
-  FileDown,
   Award,
   Filter,
   Printer,
-  AlertCircle,
-  CheckCircle2,
-  ChevronRight,
   ShieldCheck,
   UserCheck,
-  History,
-  MoreHorizontal,
   RefreshCw,
   Trophy,
   Clock
@@ -34,7 +27,7 @@ const InterviewAwardManagement = () => {
   
   // Selection State
   const [jobs, setJobs] = useState([]);
-  const [districts, setDistricts] = useState(['all', 'Muzaffarabad', 'Mirpur', 'Poonch', 'Bagh', 'Bhimber', 'Kotli', 'Sudhnoti', 'Hattian', 'Haveli', 'Neelum']);
+  const [districts] = useState(['all', 'Muzaffarabad', 'Mirpur', 'Poonch', 'Bagh', 'Bhimber', 'Kotli', 'Sudhnoti', 'Hattian', 'Haveli', 'Neelum']);
   
   const [selectedJob, setSelectedJob] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('all');

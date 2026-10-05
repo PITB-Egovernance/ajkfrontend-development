@@ -132,8 +132,6 @@ const DepartmentUserList = () => {
   const navigate = useNavigate();
   const canAdd = hasPermission(`${PERM}.add`);
   const canEdit = hasPermission(`${PERM}.edit`);
-  const canDelete = hasPermission(`${PERM}.delete`);
-  const canRowActions = canEdit || canDelete;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

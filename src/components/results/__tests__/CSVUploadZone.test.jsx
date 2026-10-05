@@ -21,10 +21,10 @@ describe('CSVUploadZone', () => {
 
     expect(screen.getByRole('button', { name: /browse files/i })).toBeDisabled();
     expect(screen.getByLabelText(/select spreadsheet file/i)).toBeDisabled();
-    expect(screen.getByRole('region', { name: /result file upload area/i })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('group', { name: /result file upload area/i })).toHaveAttribute('aria-disabled', 'true');
 
     const file = new File(['a,b'], 'results.csv', { type: 'text/csv' });
-    fireEvent.drop(screen.getByRole('region', { name: /result file upload area/i }), { dataTransfer: { files: [file] } });
+    fireEvent.drop(screen.getByRole('group', { name: /result file upload area/i }), { dataTransfer: { files: [file] } });
     expect(onFileSelect).not.toHaveBeenCalled();
   });
 });

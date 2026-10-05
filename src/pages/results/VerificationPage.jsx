@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   UserCheck,
   UserMinus,
-  RefreshCw,
 } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';

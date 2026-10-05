@@ -1,24 +1,14 @@
 import Config from 'config/baseUrl';
 import { apiErrorMessage } from 'utils/apiErrors';
-import AuthService from 'services/authService';
 import { buildQueryString } from 'utils/apiUtils';
+import { authHeaders } from 'utils/apiUtils';
 
-const CANDIDATE_API_BASE = Config.candidateApiUrl;
-const CANDIDATE_API_KEY  = Config.candidateApiKey;
 const ADMIN_API_BASE     = Config.apiUrl;
-const ADMIN_API_KEY      = Config.apiKey;
+// Candidate-portal applications, served by the admin backend from the shared
+// database — the browser never calls the candidate portal's API.
+const PORTAL_API_BASE    = `${ADMIN_API_BASE}/candidate-portal`;
 
-const getCandidateHeaders = () => ({
-  'Accept': 'application/json',
-  'X-API-KEY': CANDIDATE_API_KEY,
-});
-
-const getAdminHeaders = () => ({
-  'Accept': 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': ADMIN_API_KEY,
-  'Authorization': `Bearer ${AuthService.getToken()}`,
-});
+const getAdminHeaders = () => authHeaders();
 
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));
@@ -138,57 +128,33 @@ const ApplicationApi = {
     const filteredParams = Object.fromEntries(
       Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
     );
-    const url = `${CANDIDATE_API_BASE}/applications${buildQueryString(filteredParams)}`;
-    const response = await fetch(url, { method: 'GET', headers: getCandidateHeaders() });
+    const url = `${PORTAL_API_BASE}/applications${buildQueryString(filteredParams)}`;
+    const response = await fetch(url, { method: 'GET', headers: getAdminHeaders() });
     const result = await handleResponse(response);
     return overlayAdminStatuses(result);
   },
 
   getById: async (id) => {
-    // Application numbers (e.g. AJK-2026-00001) come from the admin backend
-    // (roll numbers page, shortlisted list). The candidate portal has the rich
-    // data (documents, education, experience…) keyed by hash_id, so first look
-    // up the hash_id from the candidate portal using the application_number,
-    // then fetch full detail by hash_id. Falls back to admin API if the
-    // application isn't present in the candidate portal.
-    const isAppNumber = /^[A-Z]+-\d{4}-\d+$/.test(String(id));
-    let lookupId = id;
+    // Accepts the candidate-portal hash_id / uuid or an application number
+    // (e.g. AJK-2026-00001, from the roll numbers page / shortlisted list).
+    // Falls back to the admin's own received-application record for an
+    // application the candidate portal doesn't have.
+    const response = await fetch(`${PORTAL_API_BASE}/applications/${encodeURIComponent(id)}`, {
+      method: 'GET',
+      headers: getAdminHeaders(),
+    });
 
-    if (isAppNumber) {
-      try {
-        const listResp = await fetch(
-          `${CANDIDATE_API_BASE}/applications?search=${encodeURIComponent(id)}&per_page=5`,
-          { method: 'GET', headers: getCandidateHeaders() }
-        );
-        if (listResp.ok) {
-          const listResult = await listResp.json();
-          const items      = listResult?.data?.data ?? listResult?.data ?? [];
-          const match      = items.find((a) => a.application_number === id) || items[0];
-          const candidateHashId = match?.hash_id || match?.id;
-          if (candidateHashId && !/^[A-Z]+-\d{4}-\d+$/.test(String(candidateHashId))) {
-            lookupId = candidateHashId; // got a real candidate-portal hash
-          }
-        }
-      } catch { /* silent — fall through to admin API */ }
-
-      // If we couldn't resolve a hash_id, hit the admin API as last resort.
-      if (lookupId === id) {
-        const response = await fetch(`${ADMIN_API_BASE}/applications/${id}`, {
-          method: 'GET',
-          headers: getAdminHeaders(),
-        });
-        const result   = await handleResponse(response);
-        const appData  = result?.data?.application ?? result?.data ?? result;
-        if (appData) appData._admin_status = appData.status ?? null;
-        return result;
-      }
+    if (response.status === 404 && /^[A-Z]+-\d{4}-\d+$/.test(String(id))) {
+      const fallback = await fetch(`${ADMIN_API_BASE}/applications/${id}`, {
+        method: 'GET',
+        headers: getAdminHeaders(),
+      });
+      const result  = await handleResponse(fallback);
+      const appData = result?.data?.application ?? result?.data ?? result;
+      if (appData) appData._admin_status = appData.status ?? null;
+      return result;
     }
 
-    // Fetch full data from candidate portal by hash_id.
-    const response = await fetch(`${CANDIDATE_API_BASE}/applications/${lookupId}`, {
-      method: 'GET',
-      headers: getCandidateHeaders(),
-    });
     const result = await handleResponse(response);
 
     const appData = result?.data?.application ?? result?.data ?? result;

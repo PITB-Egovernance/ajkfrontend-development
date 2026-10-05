@@ -8,13 +8,8 @@ import { showNotice } from 'components/ui/noticeDialog';
 import { getErrorMessage, getErrorCode } from 'utils/apiErrors';
 import { getAdvertisementLifecycle, isClosedDeleteLock } from 'utils/advertisementLifecycle';
 import {
-  Megaphone,
   Eye,
-  Calendar,
   Search,
-  FileText,
-  Clock,
-  Filter,
   MoreVertical,
   Pencil,
   Trash2,
@@ -25,22 +20,19 @@ import {
   Send,
 } from 'lucide-react';
 
-import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
-import Button from 'components/ui/Button';
 import AdvertisementApi from '../../api/advertisementApi';
-import { Menu, MenuItem, IconButton, TextField } from '@mui/material';
+import { Menu, MenuItem, IconButton } from '@mui/material';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { Link } from 'react-router-dom';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { handleApiError } from 'utils/apiErrors';
 
 import { todayIsoDate } from 'utils/dateUtils';
+import { authHeaders as apiAuthHeaders } from 'utils/apiUtils';
 const PERM = 'advertisement.advertisement'; // permission scope for this module
 const API_BASE = Config.apiUrl;
-const API_KEY = Config.apiKey;
 
 const STATUS_BADGES = {
   pending:             { label: 'Pending',            className: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
@@ -60,11 +52,7 @@ const normalizeAdvertisementStatus = (status) => {
   return status;
 };
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'X-API-KEY': API_KEY,
-});
+const authHeaders = () => apiAuthHeaders(false);
 
 const getDesignationName = (designation) => {
   if (!designation) return '';
@@ -125,33 +113,6 @@ const parseChangeLogs = (ad) => {
   return [];
 };
 
-const ChangeLogsCell = ({ logs = [] }) => {
-  if (!logs.length) {
-    return <span className="text-xs text-slate-400">No Changes</span>;
-  }
-
-  return (
-    <div className="flex h-full flex-col justify-center gap-1 py-1">
-      {logs.slice(0, 2).map((log, index) => (
-        <div key={index} className="max-w-full truncate text-xs text-slate-700">
-          <span className={`mr-1 rounded px-1.5 py-0.5 font-semibold ${
-            log.type === 'deleted' || log.field === 'job_deleted'
-              ? 'bg-red-50 text-red-700'
-              : 'bg-emerald-50 text-emerald-700'
-          }`}>
-            {log.type === 'deleted' || log.field === 'job_deleted' ? 'Deleted' : 'Changed'}
-          </span>
-          {log.message || `${log.designation || log.label}: ${log.before} -> ${log.after}`}
-        </div>
-      ))}
-      {logs.length > 2 && (
-        <span className="text-[11px] font-semibold text-slate-500">
-          +{logs.length - 2} more
-        </span>
-      )}
-    </div>
-  );
-};
 
 const ActionCell = ({ ad, onView, onEdit, onDelete, onPublish, canEdit, canDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -553,14 +514,6 @@ const AdvertisementRecords = () => {
     return true;
   });
 
-  const parseTermsConditions = (termsString) => {
-    if (Array.isArray(termsString)) return termsString;
-    try {
-      return JSON.parse(termsString);
-    } catch {
-      return [];
-    }
-  };
 
   const columns = [
     { 

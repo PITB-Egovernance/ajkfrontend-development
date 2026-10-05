@@ -11,21 +11,16 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import { GRID_SX } from 'utils/gridStyles';
 import { handleApiError } from 'utils/apiErrors';
 import RichTextEditor from 'components/ui/RichTextEditor';
 import { toRichHtml, richTextToPlain, isRichTextEmpty } from 'utils/richText';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
 
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
+const getHeaders = () => authHeaders();
 
 const TermsConditions = () => {
   const navigate = useNavigate();
@@ -35,7 +30,7 @@ const TermsConditions = () => {
   const [rawTerms, setRawTerms] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search] = useState('');
   const [filters, setFilters] = useState({ important_note: '', terms_conditions: '' });
 
   const filterConfig = [

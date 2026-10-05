@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { X, Calculator, CheckCircle, AlertTriangle } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
@@ -14,6 +13,8 @@ export default function ShortlistPublishModal({ isOpen, onClose, jobId, selected
     if (isOpen && jobId) {
       fetchPreview();
     }
+  // Re-runs only when the values in the array change, not whenever fetchPreview is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, jobId]);
 
   const fetchPreview = async () => {

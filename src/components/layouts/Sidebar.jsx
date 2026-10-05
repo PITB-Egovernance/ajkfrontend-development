@@ -4,38 +4,8 @@ import toast from "react-hot-toast";
 import { MENU_ITEMS } from "config/sidebarMenu";
 // import { Link, useLocation } from "react-router-dom";
 import {
-  FileText,
-  ClipboardList,
   ChevronDown,
-  StickyNote,
-  Megaphone,
-  BookOpen,
-  CheckCircle,
-  Briefcase,
-  Send,
-  Table,
-  Package,
-  Home,
   ChevronRight,
-  Settings,
-  MapPin,
-  Map,
-  DoorOpen,
-  Hash,
-  Users,
-  Award,
-  GraduationCap,
-  BookOpen as BookOpenIcon,
-  Building2,
-  TrendingUp,
-  BarChart3,
-  Eye,
-  Upload,
-  LayoutDashboard,
-  PlusCircle,
-  Flag,
-  DollarSign,
-  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "utils";
 import { useSidebar } from "context/SidebarContext";

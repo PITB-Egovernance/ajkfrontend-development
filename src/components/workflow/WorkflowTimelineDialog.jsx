@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Clock3,
   FileCheck2,
-  Info,
   UserRound,
   XCircle,
   MessageSquareText,

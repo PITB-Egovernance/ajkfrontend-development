@@ -128,6 +128,8 @@ const EmployeeDetailsModal = ({ open, hashId, onClose, onUpdated, initialEditing
       })
       .catch((error) => toast.error(error.message || 'Failed to load user details'))
       .finally(() => setLoading(false));
+  // Loads once each time the modal opens for a user; initialEditing is only read at that moment.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, hashId]);
 
   /* ── Fetch dropdown options (runs once per session) ── */

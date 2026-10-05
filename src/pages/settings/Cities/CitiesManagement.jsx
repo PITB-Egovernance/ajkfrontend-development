@@ -13,18 +13,18 @@ import {
 } from "@mui/material";
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from "components/ui/Card";
-import { Plus, ArrowLeft, MoreVertical, MapPin, Trash2, CheckCircle, XCircle, Filter } from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical, MapPin, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import { GRID_SX, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
 import { handleApiError } from 'utils/apiErrors';
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = "settings.cities";
 
@@ -46,15 +46,7 @@ const EXCLUDED_DISTRICTS = [
 
 const API_BASE = Config.apiUrl;
 
-const getHeaders = (json = true) => {
-  const h = {
-    Authorization: `Bearer ${AuthService.getToken()}`,
-    Accept: 'application/json',
-    'X-API-KEY': Config.apiKey,
-  };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
-};
+const getHeaders = (json = true) => authHeaders(json);
 
 const CitiesManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Download, Eye, Filter, Hash, MapPin, Plus, Search, Send, Users, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Eye, Filter, Hash, MapPin, Search, Send, Users, X } from 'lucide-react';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { TextField } from '@mui/material';
 import toast from 'react-hot-toast';
@@ -396,7 +396,6 @@ const Pagination = ({ page, totalPages, onChange }) => {
 };
 
 
-const newWrittenSchedule = () => ({ id: Date.now() + Math.random(), date: '', startTime: '10:00', duration: 90, subjectId: '' });
 
 // Returns 24-hour "HH:MM" — same format as the <input type="time"> start time —
 // so it stays parseable downstream (slip views' to12Hour() and the backend's
@@ -442,7 +441,7 @@ const RollNumberExamFlow = () => {
   // (e.g. Center A: OPM-00001 -> OPM-05000, Center B: OPM-05001 -> OPM-05500)
   // instead of an auto-distributed pool — keyed by center.id.
   const [centerRanges, setCenterRanges] = useState({});
-  const [generated, setGenerated] = useState(() => !!stage3Snapshot);
+  const [generated] = useState(() => !!stage3Snapshot);
   const [allocationMethod, setAllocationMethod] = useState('district');
   const [centerSelectionMode, setCenterSelectionMode] = useState('auto');
 
@@ -504,7 +503,7 @@ const RollNumberExamFlow = () => {
   const [rollStartSeq, setRollStartSeq] = useState('');
   const [manualUpdateCenterId, setManualUpdateCenterId] = useState('');
   const [updating, setUpdating] = useState(false);
-  const [s3BackStage, setS3BackStage] = useState(() => stage3Snapshot?.s3BackStage ?? 3);
+  const [s3BackStage] = useState(() => stage3Snapshot?.s3BackStage ?? 3);
   const [scheduleDates, setScheduleDates] = useState(() => stage3Snapshot?.scheduleDates || meta.papers.map(() => ''));
   const [scheduleTimes, setScheduleTimes] = useState(() => meta.papers.map((_, i) => i === 1 ? '14:00' : '10:00'));
   const [scheduleDurations, setScheduleDurations] = useState(() => meta.papers.map((_, i) => i === 1 ? 120 : 90));
@@ -512,7 +511,7 @@ const RollNumberExamFlow = () => {
   // subjectId → { selected, date, startTime, duration }
   const [subjectSchedules, setSubjectSchedules] = useState({});
   const [writtenExamSubjects, setWrittenExamSubjects] = useState([]);
-  const [testTypeSubjectsMap, setTestTypeSubjectsMap] = useState({}); // testTypeId → subject[]
+  const [, setTestTypeSubjectsMap] = useState({}); // testTypeId → subject[]
 
   // Reset schedule state when exam type actually changes (same component,
   // different route param) — but NOT on first mount, which would otherwise
@@ -585,13 +584,16 @@ const RollNumberExamFlow = () => {
   // small batches instead of all at once so a burst of parallel requests
   // doesn't get throttled or dropped by the portal.
   const fetchAllCandidateApps = useCallback(async () => {
+    // Candidate-portal applications, served by the admin backend from the
+    // shared database (never the candidate portal's API).
     const headers = {
       Accept: 'application/json',
-      'X-API-KEY': Config.candidateApiKey,
+      'X-API-KEY': Config.apiKey,
+      Authorization: `Bearer ${AuthService.getToken()}`,
     };
 
     const fetchPage = async (page = 1) => {
-      const url = `${Config.candidateApiUrl}/applications?per_page=100&page=${page}`;
+      const url = `${Config.apiUrl}/candidate-portal/applications?page=${page}`;
 
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
@@ -642,9 +644,7 @@ const RollNumberExamFlow = () => {
       for (let index = 0; index < pageNumbers.length; index += concurrency) {
         const batch = pageNumbers.slice(index, index + concurrency);
         const results = await Promise.all(batch.map(fetchPage));
-        results.forEach((result) => {
-          allApps = allApps.concat(result.rows);
-        });
+        for (const result of results) allApps = allApps.concat(result.rows);
       }
     }
 
@@ -698,7 +698,6 @@ const RollNumberExamFlow = () => {
         'X-API-KEY': Config.apiKey,
         Authorization: `Bearer ${AuthService.getToken()}`,
       };
-      const candidateHeaders = { Accept: 'application/json', 'X-API-KEY': Config.candidateApiKey };
 
       const [adsResult, centersResult, testTypesRes, gradesRes, candidateApps, utilizationResult, citiesRes, writtenSubjectsRes, designationsRes] = await Promise.all([
         RollNumberApi.getAdvertisementsWithJobs(200).catch((e) => { console.error('[RollNumberExamFlow] getAdvertisementsWithJobs failed:', e?.message); return {}; }),
@@ -902,23 +901,6 @@ const RollNumberExamFlow = () => {
         })
         .filter(Boolean);
 
-      // Debug: log as JSON string so values are immediately readable
-      if (process.env.NODE_ENV !== 'production') {
-        const dbg = getAdvertisementJobs(allAds[0]).slice(0, 2).map(j => ({
-          designation: j.designation,
-          designation_id: j.designation_id,
-          designation_hash_id: j.designation_hash_id,
-          job_hash_id: j.hash_id,
-          job_id: j.id,
-          test_type: j.test_type,
-          pivot_test_type: j.pivot?.test_type,
-        }));
-        // console.group(`[RollNumberExamFlow] examType=${examType} matched ${matchedAds.length}/${allAds.length}`);
-        // console.log('testTypeMap:', JSON.stringify(testTypeMap));
-        // console.log('first ad jobs:', JSON.stringify(dbg, null, 2));
-        // console.groupEnd();
-      }
-
       // Fallback: many advertisements' jobs have never been tagged with ANY
       // test type at all (neither pivot.test_type nor job_details.test_type
       // set) — dropping the fallback entirely (as a previous fix did, to stop
@@ -1076,7 +1058,7 @@ const RollNumberExamFlow = () => {
     } finally {
       if (!isStale()) setLoading(false);
     }
-  }, [examType, meta.badge]);
+  }, [examType, meta, fetchAllCandidateApps]);
 
   useEffect(() => {
     fetchData();
@@ -1227,62 +1209,6 @@ const RollNumberExamFlow = () => {
   const togglePost = (postId) => setSelectedPostIds((current) => current.includes(postId) ? current.filter((id) => id !== postId) : [...current, postId]);
   const toggleCenter = (centerId) => setSelectedCenterIds((current) => current.includes(centerId) ? current.filter((id) => id !== centerId) : [...current, centerId]);
 
-  // View already-generated slips for a specific post (navigates directly to Stage 3)
-  const viewGeneratedForPost = useCallback(async (post) => {
-    const tid = toast.loading('Loading generated slips…');
-    try {
-      const r = await RollNumberApi.getApplicationsByAdvertisement(post.advertisementId, { per_page: 1000 });
-      const adminApps = r?.data?.applications?.data ?? [];
-
-      // roll_number is a direct string field (e.g. "OPM-000001"), not a nested object
-      const appsWithRolls = adminApps.filter(a => {
-        const rollStr = typeof a.roll_number === 'string' ? a.roll_number
-                      : (a.roll_number?.roll_number || null);
-        return !!rollStr;
-      });
-
-      if (appsWithRolls.length === 0) {
-        toast.dismiss(tid);
-        toast.error('No generated slips found for this post');
-        return;
-      }
-
-      const slips = appsWithRolls.map(a => {
-        const rollStr = typeof a.roll_number === 'string' ? a.roll_number
-                      : (a.roll_number?.roll_number || '');
-        const name = a.candidate_name || a.personal_details?.name || '';
-        const centerName = centers.find(c => String(c.id) === String(a.exam_center_id))?.center
-                        || a.exam_center || '';
-        const startDate = a.exam_date ? a.exam_date.split('T')[0] : '';
-        const portalApp = allCandidateApps.find(ca => ca.application_number === a.application_number);
-        const preferredCities = (portalApp?.preferred_exam_cities || [])
-          .map(c => typeof c === 'string' ? c : (c?.city || '')).filter(Boolean);
-
-        return {
-          id: a.application_number,
-          photo: name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
-          roll: rollStr,
-          name,
-          cnic: a.candidate_cnic || '',
-          district: a.personal_details?.domicile_district || '',
-          center: centerName,
-          gender: (a.personal_details?.gender || '').toLowerCase(),
-          preferred_cities: preferredCities,
-          start_date: startDate,
-        };
-      });
-
-      toast.dismiss(tid);
-      setGeneratedCandidates(slips);
-      setSelectedPostIds([post.id]);
-      setGenerated(true);
-      setS3BackStage(1);
-      setStage(4);
-    } catch (err) {
-      toast.dismiss(tid);
-      handleApiError(err, { fallback: 'Failed to load generated slips' });
-    }
-  }, [allCandidateApps, centers]);
 
   // ── Resumable batch flow ─────────────────────────────────────────────────
   // Resolves the concrete list of applications behind `selectedPosts`,

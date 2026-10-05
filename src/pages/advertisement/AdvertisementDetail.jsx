@@ -7,7 +7,7 @@ import {
 import AdvertisementApi from '../../api/advertisementApi';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { fileUrl, authHeaders } from 'utils/apiUtils';
 import { formatDate } from 'utils/dateUtils';
 import { formatScale } from 'utils/scaleUtils';
 import { handleApiError } from 'utils/apiErrors';
@@ -47,13 +47,9 @@ const AdvertisementDetail = () => {
   const [districtOptions, setDistrictOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
   const [testTypeOptions, setTestTypeOptions] = useState([]);
-  const [subjectOptions, setSubjectOptions] = useState([]);
   const [secretarySignature, setSecretarySignature] = useState(null);
 
-  const API_ROOT = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   /* ── DATA FETCHING ── */
   useEffect(() => {
@@ -61,17 +57,12 @@ const AdvertisementDetail = () => {
     fetchDistricts();
     fetchGrades();
     fetchTestTypes();
-    fetchSubjects();
     fetchSecretarySignature();
+  // Re-runs only when the values in the array change, not whenever fetchAdvertisementDetails, fetchDistricts, fetchGrades, fetchSecretarySignature, fetchTestTypes are recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const resolveSignatureImage = (path) => {
-    if (!path) return null;
-    const imagePath = String(path).trim();
-    if (!imagePath) return null;
-    if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('data:')) return imagePath;
-    return `${API_ROOT}/${imagePath.replace(/^\/+/, '')}`;
-  };
+  const resolveSignatureImage = (path) => fileUrl(String(path ?? '').trim());
 
   const getDesignationName = (designation) => {
     if (!designation) return '';
@@ -84,11 +75,7 @@ const AdvertisementDetail = () => {
   const fetchSecretarySignature = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/digital-signature?per_page=200`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       const records = result.data?.data ?? result.data ?? [];
@@ -116,11 +103,7 @@ const AdvertisementDetail = () => {
   const fetchGrades = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.success || result.status === 200) {
@@ -139,11 +122,7 @@ const AdvertisementDetail = () => {
   const fetchDistricts = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/districts`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.success) {
@@ -161,11 +140,7 @@ const AdvertisementDetail = () => {
   const fetchTestTypes = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/test-types?per_page=200`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.success || result.status === 200) {
@@ -179,31 +154,6 @@ const AdvertisementDetail = () => {
       }
     } catch (error) {
       console.error("Error fetching test types:", error);
-    }
-  };
-
-  const fetchSubjects = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/settings/subjects?per_page=500`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
-      });
-      const result = await response.json();
-      if (result.success || result.status === 200) {
-        const list = result.data?.data ?? result.data ?? [];
-        setSubjectOptions(
-          list.map((s) => ({
-            id: String(s.id),
-            hash_id: s.hash_id ? String(s.hash_id) : '',
-            name: s.subject_name || s.name || s.title || 'N/A',
-          }))
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching subjects:", error);
     }
   };
 
@@ -282,82 +232,6 @@ const AdvertisementDetail = () => {
     return stageMap[key] || toTitleCase(rawStage);
   };
 
-  const getSubjectName = (subject) => {
-    if (!subject) return 'N/A';
-
-    if (subject.subject_name) return subject.subject_name;
-    if (subject.name) return subject.name;
-
-    const subjectId = subject.id ? String(subject.id) : '';
-    const subjectHashId = subject.hash_id ? String(subject.hash_id) : '';
-    const subjectIdFromApi = subject.subject_id ? String(subject.subject_id) : '';
-
-    const matched = subjectOptions.find((s) =>
-      (subjectId && String(s.id) === subjectId) ||
-      (subjectId && String(s.hash_id) === subjectId) ||
-      (subjectHashId && String(s.hash_id) === subjectHashId) ||
-      (subjectHashId && String(s.id) === subjectHashId) ||
-      (subjectIdFromApi && String(s.id) === subjectIdFromApi) ||
-      (subjectIdFromApi && String(s.hash_id) === subjectIdFromApi)
-    );
-
-    return matched?.name || subjectHashId || subjectIdFromApi || subjectId || 'N/A';
-  };
-
-  // Build a map of job_id → subjects from advertisement job_subjects.
-  // Subject name is resolved from relation first, then /settings/subjects API fallback.
-  const subjectsByJob = useMemo(() => {
-    const rows = advertisement?.job_subjects || advertisement?.jobSubjects || [];
-    if (!Array.isArray(rows) || rows.length === 0) return {};
-
-    const map = {};
-
-    rows.forEach((js) => {
-      const possibleJobKeys = [
-        js.job_id,
-        js.job?.id,
-        js.job?.hash_id,
-        js.job_hash_id,
-      ].filter((v) => v !== null && v !== undefined && v !== '');
-
-      possibleJobKeys.forEach((key) => {
-        const jId = String(key);
-
-        if (!map[jId]) map[jId] = [];
-
-        map[jId].push({
-          id: js.subject_id ? String(js.subject_id) : '',
-          subject_id: js.subject_id ? String(js.subject_id) : '',
-          hash_id: js.subject?.hash_id
-            ? String(js.subject.hash_id)
-            : (js.subject_hash_id ? String(js.subject_hash_id) : ''),
-          subject_name: js.subject?.subject_name || js.subject?.name || '',
-          name: js.subject?.subject_name || js.subject?.name || '',
-          marks: js.marks ?? js.total_marks ?? '',
-        });
-      });
-    });
-
-    return map;
-  }, [advertisement]);
-
-  const getJobSubjects = (job) => {
-    const possibleKeys = [
-      job.id,
-      job.job_id,
-      job.hash_id,
-      job.pivot?.job_id,
-      job.pivot?.id,
-    ]
-      .filter((v) => v !== null && v !== undefined && v !== '')
-      .map((v) => String(v));
-
-    for (const key of possibleKeys) {
-      if (subjectsByJob[key]?.length) return subjectsByJob[key];
-    }
-
-    return [];
-  };
 
   const getDistrictName = (hashId) => {
     if (!hashId || districtOptions.length === 0) return hashId || "N/A";
@@ -375,11 +249,6 @@ const AdvertisementDetail = () => {
     return matched ? matched.name : formatScale(job, 'Grade not set');
   };
 
-  const getFileUrl = (path) => {
-    if (!path) return null;
-    if (path.startsWith('http')) return path;
-    return `${API_ROOT}/${path}`;
-  };
 
   const parseTerms = (terms) => {
     if (Array.isArray(terms)) return terms;
@@ -390,34 +259,6 @@ const AdvertisementDetail = () => {
     }
   };
 
-  const getQualificationText = (job) => {
-    const pivotText = job.pivot?.qualification_text || job.qualification_text;
-    if (pivotText) return pivotText;
-
-    const q = job.qualification;
-    if (!q) return 'N/A';
-
-    const parts = [];
-
-    if (q.academic_qualification) {
-      parts.push(q.academic_qualification);
-    }
-
-    if (q.degree_equivalence) {
-      parts.push(`Degree Equivalence: ${q.degree_equivalence}`);
-    }
-
-    if (q.experience_length) {
-      const expType = q.experience_type === "4" ? "Professional" : "General";
-      parts.push(`Experience: ${q.experience_length} Years (${expType})`);
-    }
-
-    if (q.training_institute) {
-      parts.push(`Training Institute: ${q.training_institute}`);
-    }
-
-    return parts.join(' | ');
-  };
 
   const getServiceRuleText = (job) => {
     const value =
@@ -1364,7 +1205,6 @@ const AdvertisementDetail = () => {
           {groupedJobs.map((dept, deptIdx) => (
             <section key={deptIdx} className="adv-dept">
               {dept.jobs.map((job, jobIdx) => {
-                  const jobSubjects = getJobSubjects(job);
                   const examTypeName = getTestTypeName(
                     job.pivot?.test_type ||
                     job.pivot?.test_type_id ||

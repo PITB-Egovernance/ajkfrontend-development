@@ -24,8 +24,8 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import FormOverlay from 'components/ui/FormOverlay';
+import { authHeaders } from 'utils/apiUtils';
 
 const OrganizationalHierarchy = () => {
   const navigate = useNavigate();
@@ -44,8 +44,6 @@ const OrganizationalHierarchy = () => {
   });
 
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   useEffect(() => {
     fetchBranches();
@@ -57,11 +55,7 @@ const OrganizationalHierarchy = () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/settings/branches`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.status === 200) {
@@ -77,11 +71,7 @@ const OrganizationalHierarchy = () => {
   const fetchEmployees = async () => {
     try {
       const response = await fetch(`${API_BASE}/employees/list`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.status === 200) {
@@ -139,11 +129,7 @@ const OrganizationalHierarchy = () => {
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(),
         body: JSON.stringify(formData),
       });
 
@@ -172,10 +158,7 @@ const OrganizationalHierarchy = () => {
     try {
       const response = await fetch(`${API_BASE}/settings/branches/${branchId}/delete`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
 
       const result = await response.json();

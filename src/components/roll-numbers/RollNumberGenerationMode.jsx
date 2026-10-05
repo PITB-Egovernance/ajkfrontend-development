@@ -30,7 +30,9 @@ const RollNumberGenerationMode = ({ batch, onGenerate, generating = false }) => 
     }
   };
 
-  useEffect(() => { fetchPreview(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [batch?.hash_id]);
+  // Re-runs only when the values in the array change, not whenever fetchPreview is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchPreview(); }, [batch?.hash_id]);
 
   const handleModeChange = (nextMode) => {
     setMode(nextMode);

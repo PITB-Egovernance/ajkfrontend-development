@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { TextField } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { Briefcase, GraduationCap, UserCheck, FileText, ClipboardList } from 'lucide-react';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { validateJobCreationStep } from 'schemas';
 import './JobCreationForm.css';
 
 import { todayIsoDate } from 'utils/dateUtils';
+import { authHeaders } from 'utils/apiUtils';
 const JobCreationForm = () => {
-  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -197,12 +195,7 @@ const JobCreationForm = () => {
     try {
       const response = await fetch(`${Config.apiUrl}/jobs`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: authHeaders(),
         body: JSON.stringify(formData),
       });
 

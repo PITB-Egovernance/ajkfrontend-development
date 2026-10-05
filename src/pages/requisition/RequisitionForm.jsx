@@ -9,10 +9,12 @@ import Step3Eligibility from './Steps/Step3Eligibility';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
+import { parseApiJsonText, stripPhpDiagnostics } from 'utils/parseApiJsonText';
 import { extractFilePath, persistDraftFilePath, getPersistedDraftFilePath, clearPersistedDraftFiles, fetchPaginatedApiList } from 'utils';
 import { validateRequisitionStep } from 'schemas';
 import { CheckCircle2 } from 'lucide-react';
 import './RequisitionForm.css';
+import { authHeaders } from 'utils/apiUtils';
 
 const steps = [
   { number: 0, icon: Briefcase, label: 'Job Details' },
@@ -61,22 +63,24 @@ const RequisitionForm = () => {
     fetchDepartments();
     fetchGrades();
     fetchDesignations();
+  // Once on mount — the lookups never change during the wizard.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reload the saved draft when the draft id or the query string changes.
+  const searchKey = searchParams.toString();
   useEffect(() => {
     if (tempId) {
       loadTempData();
     }
-  }, [tempId, searchParams.toString()]);
+  // Re-runs only when the values in the array change, not whenever loadTempData is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tempId, searchKey]);
 
   const fetchDistricts = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/districts`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setDistrictOptions(
         list
@@ -94,11 +98,7 @@ const RequisitionForm = () => {
   const fetchDepartments = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/departments`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setDepartmentOptions(
         list
@@ -115,11 +115,7 @@ const RequisitionForm = () => {
   const fetchGrades = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/grades`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setGradeOptions(
         list
@@ -133,11 +129,7 @@ const RequisitionForm = () => {
   const fetchDesignations = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/designations`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setDesignationOptions(
         list
@@ -188,11 +180,7 @@ const RequisitionForm = () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/requisitions/form?temp_id=${tempId}`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.success && result.data) {
@@ -492,8 +480,8 @@ const RequisitionForm = () => {
         const responseText = await response.text();
         console.log('📥 Raw Response:', responseText.substring(0, 500));
 
-        if (contentType.includes('application/json') || responseText.trim().startsWith('{')) {
-          result = JSON.parse(responseText);
+        if (contentType.includes('application/json') || stripPhpDiagnostics(responseText).trim().startsWith('{')) {
+          result = parseApiJsonText(responseText);
         } else {
           const isSpaShell = /<title>AJKPSC Admin<\/title>/i.test(responseText)
             || /<div id="root"><\/div>/i.test(responseText)

@@ -20,15 +20,12 @@ import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import FormDialog from 'components/ui/FormDialog';
+import { authHeaders as apiAuthHeaders, fileUrl } from 'utils/apiUtils';
 
 const PERM = "settings.images";
 
 const API_BASE = Config.apiUrl;
-const API_KEY  = Config.apiKey;
-const BASE_URL = Config.apiUrl.replace("/api/v1", "");
-
 // Max upload size for an image asset — 10 MB.
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/svg+xml"];
@@ -40,17 +37,9 @@ const CATEGORIES = [
   { value: "logo",   label: "Logo" },
 ];
 
-const resolveImage = (path) => {
-  if (!path) return null;
-  if (path.startsWith("http")) return path;
-  return `${BASE_URL}/${path}`;
-};
+const resolveImage = fileUrl;
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "X-API-KEY": API_KEY,
-});
+const authHeaders = () => apiAuthHeaders(false);
 
 const gridSx = {
   border: "none",
@@ -198,7 +187,6 @@ const ImageManagement = () => {
   });
 
   const total        = totalRows;
-  const galleryCount = allRows.filter((r) => r.category === "gallery").length;
   const logoCount    = allRows.filter((r) => r.category === "logo").length;
   const imageCount    = allRows.filter((r) => r.category === "images").length;
 

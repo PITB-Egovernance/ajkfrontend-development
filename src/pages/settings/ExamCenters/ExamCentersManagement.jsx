@@ -12,20 +12,19 @@ import {
   Switch,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
-import Button from "components/ui/Button";
-import { Plus, ArrowLeft, MoreVertical, Building2, Upload, Trash2, CheckCircle, XCircle, Filter, X } from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical, Building2, Upload, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import SearchableSelect from "components/ui/SearchableSelect";
 import { hasPermission } from "utils/permissions";
-import { GRID_SX, GRID_INITIAL_STATE, GRID_PAGE_SIZE_OPTIONS } from 'utils/gridStyles';
+import { GRID_SX } from 'utils/gridStyles';
 import { handleApiError } from 'utils/apiErrors';
+import { authHeaders } from 'utils/apiUtils';
 const PERM = "settings.exam_centers";
 
 const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
@@ -40,15 +39,7 @@ const BulkBtn = ({ onClick, icon: Icon, label, className = "" }) => (
 
 const API_BASE = Config.apiUrl;
 
-const getHeaders = (json = true) => {
-  const h = {
-    Authorization: `Bearer ${AuthService.getToken()}`,
-    Accept: 'application/json',
-    'X-API-KEY': Config.apiKey,
-  };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
-};
+const getHeaders = (json = true) => authHeaders(json);
 
 const ExamCentersManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);

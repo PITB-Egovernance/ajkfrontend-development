@@ -3,31 +3,26 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Grid, IconButton,
-  Paper, Tab, Tabs, TextField, Tooltip, Typography, Alert,
+  Paper, Tab, Tabs, TextField, Typography, Alert,
   FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
-  ArrowLeft, RefreshCw, Upload, Calculator, Download,
+  ArrowLeft, Upload, Calculator, Download,
   Edit, CheckCircle, History, Send, X
 } from 'lucide-react';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import { formatDate } from 'utils/dateUtils';
 import { toast } from 'react-hot-toast';
 import CSVUploadZone from 'components/results/CSVUploadZone';
 import FormDialog from 'components/ui/FormDialog';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
+const getHeaders = () => authHeaders();
 
 const STATUS_OPTIONS = [
   { value: 'pending',      label: 'Pending',      color: 'default' },
@@ -65,12 +60,12 @@ export default function AwardListDetail() {
   const [tab, setTab]             = useState(0);
 
   const [marksOpen, setMarksOpen]     = useState(false);
-  const [marksEntry, setMarksEntry]   = useState(null);
+  const [marksEntry]   = useState(null);
   const [marksForm, setMarksForm]     = useState(emptyMarks);
   const [marksSaving, setMarksSaving] = useState(false);
 
   const [statusOpen, setStatusOpen]     = useState(false);
-  const [statusEntry, setStatusEntry]   = useState(null);
+  const [statusEntry]   = useState(null);
   const [newStatus, setNewStatus]       = useState('');
   const [statusNote, setStatusNote]     = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
@@ -203,10 +198,7 @@ export default function AwardListDetail() {
     try {
       const res = await fetch(`${API_BASE}/award-lists/${id}/import`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: authHeaders(false),
         body: formData,
       });
 
@@ -214,7 +206,6 @@ export default function AwardListDetail() {
       if (res.ok) {
         const importData = data?.data || {};
         const errorsList = importData.errors || [];
-        const updatedCount = importData.updated || 0;
 
         if (errorsList.length > 0) {
           toast.error(
@@ -288,40 +279,10 @@ export default function AwardListDetail() {
     } else if (tab === 2) {
       fetchCategoryMerit(categoryType, categoryValue);
     }
+  // Re-runs only when the values in the array change, not whenever fetchCategoryMerit, fetchOpenMerit are recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, id, categoryType, categoryValue]);
 
-  const openMarks = (entry) => {
-    setMarksEntry(entry);
-    const isAbsent = entry.status === 'absent' || entry.status === 'ABSENT';
-    const marks_board_pos = Number(entry.marks_board_pos ?? 0);
-    let board_uni_pos = 0;
-    let mphil_phd = 0;
-    if (marks_board_pos === 1) {
-      board_uni_pos = 1;
-    } else if (marks_board_pos === 2) {
-      mphil_phd = 2;
-    } else if (marks_board_pos >= 3) {
-      board_uni_pos = 1;
-      mphil_phd = 2;
-    }
-    setMarksForm({
-      marks_matric:      entry.marks_matric ?? '',
-      marks_inter:       entry.marks_inter ?? '',
-      marks_grad:        entry.marks_grad ?? '',
-      marks_masters:     entry.marks_masters ?? '',
-      marks_bs:          entry.marks_bs ?? '',
-      marks_board_pos:   marks_board_pos,
-      board_uni_pos:     board_uni_pos,
-      mphil_phd:         mphil_phd,
-      marks_written:     entry.marks_written ?? '',
-      marks_pak_studies: entry.marks_pak_studies ?? '',
-      marks_islamic:     entry.marks_islamic ?? '',
-      marks_current_aff: entry.marks_current_aff ?? '',
-      status:            isAbsent ? 'absent' : 'present',
-      notes:             entry.notes ?? '',
-    });
-    setMarksOpen(true);
-  };
 
   const saveMarks = async () => {
     setMarksSaving(true);
@@ -356,12 +317,6 @@ export default function AwardListDetail() {
     }));
   };
 
-  const openStatus = (entry) => {
-    setStatusEntry(entry);
-    setNewStatus(entry.status ?? 'pending');
-    setStatusNote('');
-    setStatusOpen(true);
-  };
 
   const saveStatus = async () => {
     setStatusSaving(true);

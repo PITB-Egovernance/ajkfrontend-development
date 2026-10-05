@@ -419,9 +419,9 @@ export default function Auth() {
             className="mt-6 text-center text-xs text-slate-500"
           >
             By continuing, you agree to our{' '}
-            <a href="#" className="text-emerald-600 hover:underline">Terms</a>
+            <span className="text-emerald-600">Terms</span>
             {' '}and{' '}
-            <a href="#" className="text-emerald-600 hover:underline">Privacy Policy</a>
+            <span className="text-emerald-600">Privacy Policy</span>
           </motion.div>
         </motion.div>
       </div>

@@ -19,13 +19,13 @@ import toast from "react-hot-toast";
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import { hasPermission } from "utils/permissions";
 import { GRID_SX } from 'utils/gridStyles';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { handleApiError } from 'utils/apiErrors';
 import FormDialog from 'components/ui/FormDialog';
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = "settings.companies";
 
@@ -48,8 +48,6 @@ const CompaniesManagement = () => {
   const navigate = useNavigate();
 
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -131,11 +129,7 @@ const CompaniesManagement = () => {
 
       const response = await fetch(`${API_BASE}/settings/company?${params.toString()}`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
+        headers: authHeaders(false),
       });
 
       if (!response.ok) {
@@ -144,7 +138,7 @@ const CompaniesManagement = () => {
 
       const result = await response.json();
 
-      if (result.success == true) {
+      if (result.success === true) {
         const dataArray = result.data?.data || [];
 
         const formatted = dataArray.map((item, i) => ({
@@ -200,12 +194,7 @@ const CompaniesManagement = () => {
 
       const response = await fetch(url, {
         method: isUpdate ? "PUT" : "POST",// Your API uses POST for both
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
+        headers: authHeaders(),
         body: JSON.stringify({
           company_name: formData.name,
           type: formData.company_type,
@@ -248,11 +237,7 @@ const CompaniesManagement = () => {
         `${API_BASE}/settings/company/${selectedRow.hash_id}/delete`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            Accept: "application/json",
-            "X-API-KEY": API_KEY,
-          },
+          headers: authHeaders(false),
         }
       );
 
@@ -278,7 +263,7 @@ const CompaniesManagement = () => {
     try {
       const res    = await fetch(`${API_BASE}/settings/company/${row.hash_id || row.id}/update`, {
         method: "PUT",
-        headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json", Accept: "application/json", "X-API-KEY": API_KEY },
+        headers: authHeaders(),
         body: JSON.stringify({ company_name: row.name, type: row.type || "Other", contact_person: row.contact_person || "", contact_number: row.contact_number || "", email: row.email || "", address: row.address || "", ntn: row.ntn || "", status: newStatus }),
       });
       const result = await res.json();

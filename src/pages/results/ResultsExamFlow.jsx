@@ -3,16 +3,13 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Award, ArrowLeft, ChevronDown,
-  FileSpreadsheet, ArrowRight, Send, FileText, EyeOff,
-  LayoutDashboard, ShieldAlert, ClipboardCheck, Trash2,
+  FileSpreadsheet, ArrowRight, Send, EyeOff, ClipboardCheck, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import confirmDelete from 'components/ui/ConfirmDelete';
-import RollNumberApi from 'api/rollNumberApi';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
 import Config from 'config/baseUrl';
@@ -327,7 +324,7 @@ const ResultsExamFlow = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleWithdraw = async (job, rId) => {
+  const handleWithdraw = useCallback(async (job, rId) => {
     const reason = await confirmWithdraw();
     if (!reason) return;
     try {
@@ -336,14 +333,14 @@ const ResultsExamFlow = () => {
       toast.success('Publication withdrawn', { id: 'withdraw' });
       fetchData();
     } catch { toast.error('Withdrawal failed', { id: 'withdraw' }); }
-  };
+  }, [fetchData]);
 
   // Two-step: a normal confirm first; if the backend reports candidates
   // already moved into the post-result workflow off these results, escalate
   // to a second, more explicit confirm before retrying with force — never
   // silently cascades into deleting shortlisting/interview/award/onboarding
   // records without the admin seeing exactly what that means first.
-  const handleDeleteResults = async (job, rId) => {
+  const handleDeleteResults = useCallback(async (job, rId) => {
     const ok = await confirmDelete({
       title: 'Delete Exam Results',
       message: `Permanently delete all exam results for "${job.designation}"? Marks and subject-wise breakdowns would need to be re-imported from scratch.`,
@@ -382,7 +379,7 @@ const ResultsExamFlow = () => {
         handleApiError(err2, { fallback: 'Failed to delete results' });
       }
     }
-  };
+  }, [fetchData]);
 
   const handleDownloadGazette = async (job) => {
     try {
@@ -539,7 +536,7 @@ const ResultsExamFlow = () => {
         );
       }
     }
-  ], [examType, activeDropdownJobId, isAdmin, isDirector, userRole]);
+  ], [examType, activeDropdownJobId, isAdmin, isDirector, userRole, handleWithdraw, handleDeleteResults]);
 
   if (!meta) {
     return (

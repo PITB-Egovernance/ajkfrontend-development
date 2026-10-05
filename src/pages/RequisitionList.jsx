@@ -26,12 +26,14 @@ import {
 import { InlineLoader } from "components/ui/Loader";
 import { useNavigate, Link } from "react-router-dom";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import RequisitionApi from "api/requisitionApi";
 import toast from "react-hot-toast";
 import confirmDelete from "components/ui/ConfirmDelete";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
+import { authHeaders } from 'utils/apiUtils';
+
+const API_BASE = Config.apiUrl;
 
 const PERM = "requisitions.admin_requisition"; // permission scope for this module
 
@@ -173,9 +175,6 @@ const RequisitionList = () => {
   });
   const navigate = useNavigate();
 
-  const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   useEffect(() => {
     try {
@@ -198,11 +197,7 @@ const RequisitionList = () => {
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            Accept: "application/json",
-            "X-API-KEY": API_KEY,
-          },
+          headers: authHeaders(false),
         });
         const result = await res.json();
         if (result.success || result.status === 200) {
@@ -248,11 +243,7 @@ const RequisitionList = () => {
       });
       const url = `${API_BASE}/requisitions?${params.toString()}`;
       const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
+        headers: authHeaders(false),
       });
 
       if (!response.ok) {
@@ -519,11 +510,7 @@ const RequisitionList = () => {
 
       const response = await fetch(`${API_BASE}/requisitions/upload`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "X-API-KEY": API_KEY,
-          Accept: "application/json",
-        },
+        headers: authHeaders(false),
         body: formData,
       });
 

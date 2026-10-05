@@ -9,6 +9,7 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
+import { authHeaders } from 'utils/apiUtils';
 
 const ApprovedRequisitions = () => {
   // Creating an advertisement from the job pool requires advertisement add rights.
@@ -18,7 +19,7 @@ const ApprovedRequisitions = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [total, setTotal] = useState(0);
+  const [, setTotal] = useState(0);
   const [selectionModel, setSelectionModel] = useState([]);
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
@@ -166,11 +167,7 @@ const ApprovedRequisitions = () => {
   const fetchGrades = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.success || result.status === 200) {

@@ -19,29 +19,18 @@ import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import FormDialog from 'components/ui/FormDialog';
+import { authHeaders as apiAuthHeaders, fileUrl } from 'utils/apiUtils';
 
 const PERM = "settings.syllabus";
 
 const API_BASE = Config.apiUrl;
-const API_KEY  = Config.apiKey;
-const BASE_URL = Config.apiUrl.replace("/api/v1", "");
-
 // Max upload size for a syllabus PDF — 10 MB.
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-const resolveFile = (path) => {
-  if (!path) return null;
-  if (String(path).startsWith("http")) return path;
-  return `${BASE_URL}/${path}`;
-};
+const resolveFile = fileUrl;
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "X-API-KEY": API_KEY,
-});
+const authHeaders = () => apiAuthHeaders(false);
 
 const gridSx = {
   border: "none",

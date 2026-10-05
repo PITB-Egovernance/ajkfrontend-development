@@ -5,22 +5,14 @@ import { ArrowLeft, FileText } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { hasPermission } from 'utils/permissions';
 import WrittenExamSubjectApi from 'api/writtenExamSubjectApi';
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = 'settings.test_types';
 const API_BASE = Config.apiUrl;
 
-const getHeaders = (json = true) => {
-  const h = {
-    Authorization: `Bearer ${AuthService.getToken()}`,
-    Accept: 'application/json',
-    'X-API-KEY': Config.apiKey,
-  };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
-};
+const getHeaders = (json = true) => authHeaders(json);
 
 // Dropdown values shown at the top of the page.
 const EXAM_CATEGORIES = [

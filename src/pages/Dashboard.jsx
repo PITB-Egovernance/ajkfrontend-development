@@ -3,33 +3,22 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent } from 'components/ui/Card';
 import { useAuth } from 'context/AuthContext';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import ApplicationApi from 'api/applicationApi';
 import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
 import { isAdminUser, hasModuleAccess, hasAnyModuleAccess } from 'utils/permissions';
 import {
   Megaphone, Briefcase, Users, Clock, CheckCircle2,
-  BarChart3, PieChart, Settings, Plus, Award,
+  BarChart3, PieChart, Award,
 } from 'lucide-react';
 import {
   BarChart, Bar, PieChart as RechartPieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE           = Config.apiUrl;
-const API_KEY            = Config.apiKey;
-const CANDIDATE_API_BASE = Config.candidateApiUrl;
-const CANDIDATE_API_KEY  = Config.candidateApiKey;
 
-const getAdminHeaders     = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'X-API-KEY': API_KEY,
-});
-const getCandidateHeaders = () => ({
-  Accept: 'application/json',
-  'X-API-KEY': CANDIDATE_API_KEY,
-});
+const getAdminHeaders = () => authHeaders(false);
 
 const extractTotal = (json) => {
   if (!json) return null;
@@ -83,7 +72,7 @@ const EmptyChart = ({ message }) => (
 
 const Dashboard = () => {
   useAuth();
-  const [draftMeta,     setDraftMeta]     = useState(null);
+  const [,     setDraftMeta]     = useState(null);
   const [statsLoading,  setStatsLoading]  = useState(true);
   const [liveStats,     setLiveStats]     = useState({
     totalApplicants: null, totalRequisitions: null,

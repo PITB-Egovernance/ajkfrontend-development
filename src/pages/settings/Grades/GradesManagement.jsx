@@ -19,11 +19,11 @@ import toast from "react-hot-toast";
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { GRID_SX } from 'utils/gridStyles';
 import { hasPermission } from "utils/permissions";
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = "settings.grades";
 
@@ -34,10 +34,7 @@ const GradesManagement = () => {
   const canDelete = hasPermission(`${PERM}.delete`);
   const canRowActions = canEdit || canDelete;
 
-  // Use productionUrl explicitly — avoids stale apiUrl in cached bundles
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,11 +97,7 @@ const GradesManagement = () => {
     status: "active",
   });
 
-  const headers = () => ({
-    Authorization: `Bearer ${TOKEN}`,
-    Accept: "application/json",
-    "X-API-KEY": API_KEY,
-  });
+  const headers = () => authHeaders(false);
 
   const formatGradeRows = (items) => items.map((item) => ({
     id: item.hash_id || item.id,
@@ -155,16 +148,10 @@ const GradesManagement = () => {
   // so submitting the same name fails the unique check. When the name hasn't
   // changed we do a two-step update: rename to a temp unique name first, then
   // rename back with the desired status. Both steps have a unique name → pass.
-  const LIVE = "https://api-admin-ajkpsc.punjab.gov.pk/api/v1";
-  const gradeHeaders = () => ({
-    Authorization:  `Bearer ${AuthService.getToken()}`,
-    "Content-Type": "application/json",
-    Accept:         "application/json",
-    "X-API-KEY":    "9kX7pL2mQ8rT5vY3nZ6bJ1hF4gD0eA9cU8iO2sV7tE5rW",
-  });
+  const gradeHeaders = () => authHeaders();
 
-  const updateGradeOnLive = async (hashId, finalName, finalStatus, originalName) => {
-    const url      = `${LIVE}/settings/grades/${hashId}/update`;
+  const updateGrade = async (hashId, finalName, finalStatus, originalName) => {
+    const url      = `${API_BASE}/settings/grades/${hashId}/update`;
     const nameUnchanged = finalName.trim() === (originalName || "").trim();
 
     if (nameUnchanged) {
@@ -213,7 +200,7 @@ const GradesManagement = () => {
       const isUpdate = !!editingGrade;
 
       if (isUpdate) {
-        await updateGradeOnLive(
+        await updateGrade(
           editingGrade.hash_id || editingGrade.id,
           formData.name,
           formData.status || 'active',
@@ -225,7 +212,7 @@ const GradesManagement = () => {
         fetchGrades();
       } else {
         // Create — no unique issue, just POST
-        const res    = await fetch(`${LIVE}/settings/grades/create`, {
+        const res    = await fetch(`${API_BASE}/settings/grades/create`, {
           method: "POST", headers: gradeHeaders(),
           body: JSON.stringify({ name: formData.name.trim(), status: formData.status || 'active' }),
         });
@@ -255,10 +242,7 @@ const GradesManagement = () => {
         `${API_BASE}/settings/grades/${selectedRow.hash_id}/delete`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            "X-API-KEY": API_KEY,
-          },
+          headers: authHeaders(false),
         }
       );
 
@@ -280,7 +264,7 @@ const GradesManagement = () => {
     if (!await confirmStatus({ newStatus })) return;
     try {
       // Use two-step workaround: name stays same → triggers unique bug on live backend
-      await updateGradeOnLive(
+      await updateGrade(
         row.hash_id || row.id,
         row.name,
         newStatus,

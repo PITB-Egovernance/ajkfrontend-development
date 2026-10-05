@@ -8,7 +8,6 @@ import { FileEdit, CheckCircle2, Plus, Trash2, Save, Send, X } from "lucide-reac
 import toast from "react-hot-toast";
 import AdvertisementApi from "../../api/advertisementApi";
 import Config from "../../config/baseUrl";
-import AuthService from "../../services/authService";
 import { showNotice, confirmNotice } from "components/ui/noticeDialog";
 import { getErrorMessage, getErrorCode } from "utils/apiErrors";
 import "../job-creation/JobCreationForm.css";
@@ -18,6 +17,7 @@ import RichTextEditor from 'components/ui/RichTextEditor';
 import { toRichHtml, isRichTextEmpty } from 'utils/richText';
 
 import { todayIsoDate } from 'utils/dateUtils';
+import { authHeaders as apiAuthHeaders } from 'utils/apiUtils';
 const STATUS_OPTIONS = [
   // { value: 'pending', label: 'Pending' },
   { value: 'active', label: 'Published' },
@@ -37,31 +37,6 @@ const formatDateForDisplay = (value) => {
   return `${match[3]}-${match[2]}-${match[1]}`;
 };
 
-const updateDateFieldValue = (rawValue, setStoredValue, setDisplayValue) => {
-  const digitsOnly = String(rawValue).replace(/\D/g, "");
-  const limited = digitsOnly.slice(0, 8);
-
-  let nextDisplay = "";
-  if (limited.length <= 2) {
-    nextDisplay = limited;
-  } else if (limited.length <= 4) {
-    nextDisplay = `${limited.slice(0, 2)}-${limited.slice(2)}`;
-  } else {
-    nextDisplay = `${limited.slice(0, 2)}-${limited.slice(2, 4)}-${limited.slice(4, 8)}`;
-  }
-
-  setDisplayValue(nextDisplay);
-
-  if (limited.length === 8) {
-    const day = limited.slice(0, 2);
-    const month = limited.slice(2, 4);
-    const year = limited.slice(4, 8);
-    const parsed = new Date(`${year}-${month}-${day}`);
-    setStoredValue(Number.isNaN(parsed.getTime()) ? "" : `${year}-${month}-${day}`);
-  } else {
-    setStoredValue("");
-  }
-};
 
 const normalizeAdvertisementStatus = (value) => {
   if (value === "published") return "active";
@@ -69,11 +44,7 @@ const normalizeAdvertisementStatus = (value) => {
   return "pending";
 };
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "X-API-KEY": Config.apiKey,
-});
+const authHeaders = () => apiAuthHeaders(false);
 
 const getDesignationName = (designation) => {
   if (!designation) return "";
@@ -318,7 +289,7 @@ const AdvertisementEditForm = () => {
   const [advDateInput, setAdvDateInput] = useState("");
   const [advNumber, setAdvNumber] = useState("");
   const [closingDate, setClosingDate] = useState("");
-  const [closingDateInput, setClosingDateInput] = useState("");
+  const [, setClosingDateInput] = useState("");
   const [advertisementFee, setAdvertisementFee] = useState("");
   const [note, setNote] = useState("");
   const [importantNotes, setImportantNotes] = useState("");
@@ -334,7 +305,7 @@ const AdvertisementEditForm = () => {
   const [status, setStatus] = useState("pending");
   const [originalStatus, setOriginalStatus] = useState("pending");
   const [extendDate, setExtendDate] = useState("");
-  const [extendDateInput, setExtendDateInput] = useState("");
+  const [, setExtendDateInput] = useState("");
   const [extendDateEnabled, setExtendDateEnabled] = useState(false);
   const [existingSecretaryName, setExistingSecretaryName] = useState("");
   const [existingPublishDate, setExistingPublishDate] = useState("");
@@ -357,11 +328,7 @@ const AdvertisementEditForm = () => {
     (async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/settings/test-types/dropdown`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept:        'application/json',
-            'X-API-KEY':   Config.apiKey,
-          },
+          headers: authHeaders(false),
         });
         const result = await res.json();
         if (aborted) return;
@@ -385,11 +352,7 @@ const AdvertisementEditForm = () => {
     (async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/settings/tests`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept:        'application/json',
-            'X-API-KEY':   Config.apiKey,
-          },
+          headers: authHeaders(false),
         });
         const result = await res.json();
         if (aborted) return;
