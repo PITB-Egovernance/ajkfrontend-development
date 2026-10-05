@@ -55,7 +55,6 @@ import QualificationGroupsManagement from 'pages/settings/QualificationGroups/Qu
 import DepartmentsManagement from 'pages/settings/Departments/DepartmentsManagement';
 import NationalitiesManagement from 'pages/settings/Nationality/NationalitiesManagement';
 import TestsManagement from 'pages/settings/Tests/TestsManagement';
-import ExamFeesManagement from 'pages/settings/ExamFees/ExamFeesManagement';
 import TestTypesManagement from 'pages/settings/TestTypes/TestTypesManagement';
 import TestTypeForm from 'pages/settings/TestTypes/TestTypeForm';
 import RequisitionApprovalFlow from 'pages/settings/ApprovalFlow/RequisitionApprovalFlow';
@@ -111,7 +110,6 @@ import PublicationPage from 'pages/results/PublicationPage';
 import ResultsDashboard from 'pages/results/ResultsDashboard';
 import ResultsViewPage from 'pages/results/ResultsViewPage';
 import CreateDepartmentUser from 'pages/settings/DepartmentUsers/EditDepartmentUser';
-import TermsAndConditionsManagement from "pages/settings/TermsAndConditions/TermsAndConditionsManagement";
 import VerificationPage from 'pages/results/VerificationPage';
 import InterviewShortlistPage from 'pages/results/InterviewShortlistPage';
 import ResultsExamFlow from 'pages/results/ResultsExamFlow';
@@ -264,7 +262,6 @@ function App() {
           <Route path="settings/departments" element={<DepartmentsManagement />} />
           <Route path="settings/nationalities" element={<NationalitiesManagement />} />
           <Route path="settings/tests" element={<TestsManagement />} />
-          <Route path="settings/exam-fees" element={<ExamFeesManagement />} />
           <Route path="settings/test-types" element={<TestTypesManagement />} />
           <Route path="settings/test-types/create" element={<TestTypeForm />} />
           <Route path="settings/test-types/:id/edit" element={<TestTypeForm />} />

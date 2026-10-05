@@ -6,21 +6,16 @@ import {
   MenuItem, Paper, Select, TextField, Typography, Alert, Chip, Pagination,
 } from "@mui/material";
 import {
-  ArrowLeft, Download, RefreshCw, Users, Shield, History, Search,
+  ArrowLeft, Download, RefreshCw, Shield, History, Search,
 } from "lucide-react";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import AdvertisementApi from "api/advertisementApi";
 import { toast } from "react-hot-toast";
 import { handleApiError } from 'utils/apiErrors';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "Content-Type": "application/json",
-  "X-API-KEY": Config.apiKey,
-});
+const getHeaders = () => authHeaders();
 
 const AuditTrailReport = () => {
   const navigate = useNavigate();

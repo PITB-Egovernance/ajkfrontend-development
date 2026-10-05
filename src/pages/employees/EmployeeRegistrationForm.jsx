@@ -10,11 +10,18 @@ import {
 } from '@mui/material';
 import { UserPlus, Save, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Config from '../../config/baseUrl';
-import AuthService from '../../services/authService';
 import EmployeeService from '../../services/EmployeeService';
 import PermissionMatrix from 'components/permissions/PermissionMatrix';
 import { PERMISSION_MODULES, buildEmptyPermissionsFrom } from 'config/permissionModules';
+import {
+  SINGLE_POSTS,
+  postOf,
+  findActiveHolder,
+  postBlockedMessage,
+  isPostConflictMessage,
+} from 'utils/singlePosts';
+import alertDialog from 'components/ui/alertDialog';
+import { InlineLoader } from 'components/ui/Loader';
 import '../job-creation/JobCreationForm.css';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
@@ -219,6 +226,7 @@ const mapApiErrors = (apiErrors = {}) => {
 
   if (mapped.date_of_birth) mapped.dob = mapped.date_of_birth;
   if (mapped.domicile) mapped.domicile_district = mapped.domicile;
+  if (mapped.role_id) mapped.role = mapped.role_id;
 
   return mapped;
 };
@@ -236,6 +244,11 @@ const EmployeeRegistrationForm = ({
   const isEdit = mode === 'edit' || !!routeHashId;
 
   const [loading, setLoading] = useState(false);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [detailsLoading, setDetailsLoading] = useState(isEdit);
+  const [initialError, setInitialError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [postHolders, setPostHolders] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [rawEmployee, setRawEmployee] = useState(null);
 
@@ -255,6 +268,17 @@ const EmployeeRegistrationForm = ({
     buildEmptyPermissionsFrom(PERMISSION_MODULES)
   );
   const [selectedWings, setSelectedWings] = useState([]);
+  // When a single-holder post (Secretary / Chairman) is selected: the post and its current
+  // active holder other than this employee.
+  const selectedPost = postOf({ role: rawEmployee?.role, role_name: selectedRole?.name, designation: designation?.name });
+  const activeHolder = selectedPost ? findActiveHolder(postHolders, selectedPost, effectiveHashId) : null;
+  // Blocked only when someone else holds the post and this employee does not already hold it.
+  const postConflict = activeHolder && postOf(rawEmployee) !== selectedPost ? activeHolder : null;
+  const postConflictField = postOf({ role_name: selectedRole?.name }) === selectedPost ? 'role' : 'designation';
+  const clearPostErrors = () => setFieldErrors((previous) => Object.fromEntries(
+    Object.entries(previous).filter(([field, errors]) => !['role', 'role_id', 'designation', 'status'].includes(field)
+      || ![].concat(errors).some(isPostConflictMessage))
+  ));
 
   const [rolePermTab, setRolePermTab] = useState('roles');
 
@@ -264,151 +288,34 @@ const EmployeeRegistrationForm = ({
   const [roleOptions, setRoleOptions] = useState([]);
 
   useEffect(() => {
-    const authHeaders = {
-      Authorization: `Bearer ${AuthService.getToken()}`,
-      Accept: 'application/json',
-      'X-API-KEY': Config.apiKey,
-    };
-
-    const fetchDistricts = async () => {
-      try {
-        const response = await fetch(`${Config.apiUrl}/settings/districts`, {
-          headers: authHeaders,
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          setDistrictOptions(
-            (result.data?.data ?? result.data ?? []).map((d) => ({
-              id: d.hash_id,
-              name: d.name,
-            }))
-          );
-        }
-      } catch (error) {
-        toast.error('Failed to load districts');
-      }
-    };
-
-    const fetchDesignations = async () => {
-      try {
-        const [desigRes, wingsRes] = await Promise.all([
-          fetch(`${Config.apiUrl}/settings/designations?per_page=100`, {
-            headers: authHeaders,
-          }),
-          fetch(`${Config.apiUrl}/settings/wings?per_page=200`, {
-            headers: authHeaders,
-          }),
-        ]);
-
-        const desigResult = await desigRes.json();
-        const wingsResult = await wingsRes.json();
-
-        const wingsList = wingsResult.success
-          ? wingsResult.data?.data ?? wingsResult.data ?? []
-          : [];
-
-        setWingOptions(
-          wingsList
-            .filter((w) => w.status === 'active' || !w.status)
-            .map((w) => ({
-              id: w.hash_id || String(w.id),
-              name: w.name,
-            }))
-        );
-
-        if (desigResult.success) {
-          setDesignationOptions(
-            (desigResult.data?.data ?? desigResult.data ?? [])
-              .filter((d) => String(d.type || '').toLowerCase() === 'internal')
-              .filter((d) => String(d.status ?? 'active').toLowerCase() === 'active')
-              .filter(
-                (d) =>
-                  !['chairman', 'secretary'].includes(
-                    d.name?.toLowerCase()
-                  )
-              )
-              .map((d) => {
-                let wingName = '';
-
-                if (d.wings) {
-                  const wing = wingsList.find(
-                    (w) =>
-                      w.hash_id === d.wings ||
-                      String(w.id) === String(d.wings)
-                  );
-
-                  wingName = wing?.name || '';
-                }
-
-                return {
-                  id: d.hash_id,
-                  name: d.name,
-                  wingName,
-                  gradeName: d.grade?.name || '',
-                  gradeId: d.grade?.hash_id || d.grade_id || '',
-                };
-              })
-          );
-        }
-      } catch (error) {
-        toast.error('Failed to load designations');
-      }
-    };
-
-    const fetchRoles = async () => {
-      try {
-        const response = await fetch(`${Config.apiUrl}/settings/roles`, {
-          headers: authHeaders,
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          const EXCLUDED_ROLES = [
-            'root / super admin',
-            'super admin',
-            'root',
-            'admin',
-            'secretary',
-            'chairman',
-          ];
-
-          setRoleOptions(
-            (result.data?.data ?? result.data ?? [])
-              .filter((r) => !r.deleted_at)
-              .filter((r) => !r.is_super_admin)
-              .filter(
-                (r) =>
-                  !EXCLUDED_ROLES.includes(
-                    String(r.role_name || '').trim().toLowerCase()
-                  )
-              )
-              .map((r) => ({
-                id: r.hash_id || String(r.id),
-                hash_id: r.hash_id,
-                numericId: r.id,
-                role_id: r.role_id || r.id,
-                name: r.role_name || r.name,
-                rawPermissions: r.permissions,
-              }))
-          );
-        }
-      } catch {
-        setRoleOptions([]);
-      }
-    };
-
-    fetchDistricts();
-    fetchDesignations();
-    fetchRoles();
-  }, []);
+    let active = true;
+    setOptionsLoading(true);
+    setInitialError('');
+    EmployeeService.getFormOptions()
+      .then((data) => {
+        if (!active) return;
+        setDistrictOptions(data.districts.map((d) => ({ id: d.hash_id, name: d.name })));
+        setWingOptions(data.wings.map((w) => ({ id: w.hash_id || String(w.id), name: w.name })));
+        setDesignationOptions(data.designations.map((d) => ({
+          id: d.hash_id, name: d.name, wingName: '',
+          gradeName: d.grade?.name || '', gradeId: d.grade?.hash_id || d.grade_id || '',
+        })));
+        setRoleOptions(data.roles.map((r) => ({
+          id: r.hash_id || String(r.id), hash_id: r.hash_id, numericId: r.id,
+          role_id: r.role_id || r.id, name: r.role_name || r.name, rawPermissions: r.permissions,
+        })));
+        setPostHolders(data.holders);
+      })
+      .catch((error) => { if (active) setInitialError(error.message || 'Failed to load form options'); })
+      .finally(() => { if (active) setOptionsLoading(false); });
+    return () => { active = false; };
+  }, [loadAttempt]);
 
   useEffect(() => {
-    if (!isEdit || !effectiveHashId) return;
+    if (!isEdit || !effectiveHashId) { setDetailsLoading(false); return; }
 
     let active = true;
+    setDetailsLoading(true);
 
     (async () => {
       try {
@@ -439,14 +346,16 @@ const EmployeeRegistrationForm = ({
             .slice(0, 11)
         );
       } catch (error) {
-        toast.error(error.message || 'Failed to load employee details');
+        if (active) setInitialError(error.message || 'Failed to load employee details');
+      } finally {
+        if (active) setDetailsLoading(false);
       }
     })();
 
     return () => {
       active = false;
     };
-  }, [isEdit, effectiveHashId]);
+  }, [isEdit, effectiveHashId, loadAttempt]);
 
   useEffect(() => {
     if (!isEdit || !rawEmployee) return;
@@ -619,6 +528,9 @@ const EmployeeRegistrationForm = ({
 
     if (!district) errors.domicile_district = ['Domicile district is required'];
     if (!designation) errors.designation = ['Designation is required'];
+    if (postConflict) {
+      errors[postConflictField] = [postBlockedMessage(selectedPost, postConflict)];
+    }
 
     if (!selectedWings || selectedWings.length === 0) {
       errors.wing = ['At least one wing is required'];
@@ -628,7 +540,11 @@ const EmployeeRegistrationForm = ({
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      toast.error('Please fill in all required fields');
+      if (postConflict) {
+        await alertDialog({ title: `Another ${SINGLE_POSTS[selectedPost]} is active`, message: errors[postConflictField][0] });
+      } else {
+        toast.error('Please fill in all required fields');
+      }
       return;
     }
 
@@ -678,6 +594,14 @@ const EmployeeRegistrationForm = ({
         setFieldErrors(mapApiErrors(error.errors));
       }
 
+      // The backend refused a second active Secretary / Chairman: say who has to be made inactive first.
+      const postError = [].concat(error.errors?.role_id || [], error.errors?.designation || [], error.errors?.status || []).find(isPostConflictMessage);
+      if (postError) {
+        toast.dismiss(loadingToast);
+        await alertDialog({ title: 'Post already held', message: postError });
+        return;
+      }
+
       toast.error(
         error.message ||
           (isEdit ? 'Failed to update employee' : 'Failed to register employee'),
@@ -687,6 +611,18 @@ const EmployeeRegistrationForm = ({
       setLoading(false);
     }
   };
+
+  if (optionsLoading || detailsLoading) {
+    return <InlineLoader text={isEdit ? 'Loading employee details and form options...' : 'Loading employee form options...'} variant="ring" size="lg" />;
+  }
+  if (initialError) {
+    return (
+      <div className="p-6" role="alert">
+        <p className="text-red-600 mb-4">{initialError}</p>
+        <button type="button" className="px-4 py-2 rounded-lg bg-emerald-900 text-white" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Retry loading</button>
+      </div>
+    );
+  }
 
   return (
     <div className="job-creation-container">
@@ -927,7 +863,7 @@ const EmployeeRegistrationForm = ({
                     required
                     label="Designation"
                     value={designation?.id || ''}
-                    onChange={(e) => setDesignation(designationOptions.find((d) => d.id === e.target.value) || null)}
+                    onChange={(e) => { clearPostErrors(); setDesignation(designationOptions.find((d) => d.id === e.target.value) || null); }}
                     options={designationOptions.map((o) => ({
                       value: o.id,
                       label: o.wingName ? `${o.name} — ${o.wingName}` : o.name,
@@ -935,6 +871,13 @@ const EmployeeRegistrationForm = ({
                     placeholder="— Select Designation —"
                     error={fieldErrors?.designation?.join(', ')}
                   />
+                  {selectedPost && postConflictField === 'designation' && !fieldErrors?.designation && (
+                    <p className={`text-xs mt-1 ${postConflict ? 'text-red-600' : 'text-amber-700'}`}>
+                      {postConflict
+                        ? postBlockedMessage(selectedPost, postConflict)
+                        : `Only one ${SINGLE_POSTS[selectedPost]} can be active at a time.`}
+                    </p>
+                  )}
                 </div>
 
                 <div className="col-md-6 form-group">
@@ -1020,13 +963,15 @@ const EmployeeRegistrationForm = ({
                       value={selectedRole?.id || ''}
                       onChange={(e) => {
                         const opt = roleOptions.find((r) => r.id === e.target.value) || null;
+                        clearPostErrors();
                         setSelectedRole(opt);
                         setPermissions(opt ? buildPerms(opt.rawPermissions) : buildEmptyPermissionsFrom(PERMISSION_MODULES));
-                        if (opt) setRolePermTab('permissions');
                       }}
                       options={roleOptions.map((r) => ({ value: r.id, label: r.name }))}
                       placeholder="— Select Role —"
-                      error={fieldErrors?.role?.join(', ')}
+                      error={postConflict && postConflictField === 'role'
+                        ? postBlockedMessage(selectedPost, postConflict)
+                        : fieldErrors?.role?.join(', ')}
                     />
                   </div>
                 </div>
@@ -1040,6 +985,9 @@ const EmployeeRegistrationForm = ({
                       width: '-webkit-fill-available',
                     }}
                   >
+                    {postConflict && postConflictField === 'role' && (
+                      <p className="text-xs text-red-600 mb-3" role="alert">{postBlockedMessage(selectedPost, postConflict)}</p>
+                    )}
                     {selectedRole ? (
                       <PermissionMatrix
                         modules={PERMISSION_MODULES}
@@ -1072,7 +1020,7 @@ const EmployeeRegistrationForm = ({
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={loading}
+                disabled={loading || Boolean(postConflict) || [].concat(fieldErrors?.role || [], fieldErrors?.designation || [], fieldErrors?.status || []).some(isPostConflictMessage)}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',

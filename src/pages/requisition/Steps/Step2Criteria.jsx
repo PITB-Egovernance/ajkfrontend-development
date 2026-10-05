@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TextField, MenuItem, Box, Chip, Checkbox, ListItemText, ListSubheader } from '@mui/material';
 import { useLocalSettings, localSettingsApi } from 'hooks/useLocalSettings';
-import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
-import toast from 'react-hot-toast';
 import { fetchPaginatedApiList } from 'utils';
+import { authHeaders } from 'utils/apiUtils';
 
 // Sentinel value used to detect "Other" selection in every dropdown.
 const OTHER = '__other__';
@@ -85,7 +84,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
 
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [allDegrees, setAllDegrees] = useState([]);
-  const [loadingDegrees, setLoadingDegrees] = useState(false);
+  const [, setLoadingDegrees] = useState(false);
 
   const API_BASE = Config.apiUrl;
   const TOKEN = AuthService.getToken();
@@ -97,11 +96,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       setLoadingDegrees(true);
       try {
         const degrees = await fetchPaginatedApiList(`${API_BASE}/settings/degrees`, {
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            Accept: 'application/json',
-            'X-API-KEY': API_KEY,
-          },
+          headers: authHeaders(false),
           perPage: 200,
         });
         setAllDegrees(
@@ -144,43 +139,6 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       : [];
   }, [formData.eligible_degrees]);
 
-  // Handle group selection change from dropdown
-  const handleGroupChange = (event) => {
-    const newGroups = typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
-    
-    // Find groups that were just added
-    const addedGroups = newGroups.filter(g => !selectedGroups.includes(g));
-    // Find groups that were just removed
-    const removedGroups = selectedGroups.filter(g => !newGroups.includes(g));
-
-    let updatedDegrees = [...selectedDegreeList];
-
-    // If a group was added, add all its degrees by default
-    addedGroups.forEach(groupName => {
-      const groupDegrees = groupedDegrees[groupName] || [];
-      groupDegrees.forEach(d => {
-        if (!updatedDegrees.includes(d.name)) {
-          updatedDegrees.push(d.name);
-        }
-      });
-    });
-
-    // If a group was removed, remove all its degrees
-    removedGroups.forEach(groupName => {
-      const groupDegreeNames = (groupedDegrees[groupName] || []).map(d => d.name);
-      updatedDegrees = updatedDegrees.filter(name => !groupDegreeNames.includes(name));
-    });
-
-    setSelectedGroups(newGroups);
-    setFormData(prev => {
-      const nextStr = updatedDegrees.join(',');
-      return {
-        ...prev,
-        eligible_degrees: nextStr,
-        degree_equivalence: nextStr
-      };
-    });
-  };
 
   // Handle individual degree checkbox toggle
   const handleDegreeCheckboxToggle = (degreeName) => {
@@ -300,6 +258,9 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
 
   const [showAuthority, setShowAuthority] = useState(false);
 
+  // Content fingerprint of `data`: the form is re-loaded only when the loaded data actually
+  // changes, not on every parent re-render (a new `data` object with the same content).
+  const dataKey = data ? JSON.stringify(data) : '';
   useEffect(() => {
     if (data && Object.keys(data).length > 0 && !isInitializedRef.current) {
       isInitializedRef.current = true;
@@ -355,10 +316,8 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
       });
       setShowAuthority(data.equivalent_qualification === 'Yes');
     }
-    // Use a string fingerprint of `data` as the dependency so this effect
-    // only re-runs when the loaded data's content actually changes — not
-    // on every parent re-render.
-  }, [data && JSON.stringify(data)]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on dataKey (see above)
+  }, [dataKey]);
 
   // Separate effect for selectedGroups — runs after allDegrees are available
   useEffect(() => {
@@ -375,7 +334,7 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
         setSelectedGroups(groups);
       }
     }
-  }, [allDegrees, formData.eligible_degrees]);
+  }, [allDegrees, formData.eligible_degrees, selectedGroups.length]);
 
   // Ascending, search-filtered option lists for the three checkbox dropdowns
   // above. "Select All" / toggle handlers keep using the unfiltered
@@ -406,16 +365,6 @@ const Step2Criteria = ({ data = {}, onNext, onBack, onSaveDraft }) => {
     });
     return result;
   }, [groupedDegrees, searchDegree]);
-
-  // Degrees filtered to match the selected academic qualification.
-  const filteredDegrees = activeDegrees.filter((d) => {
-    const qualArr = Array.isArray(formData.academic_qualification) ? formData.academic_qualification : [];
-    if (qualArr.length === 0) return true;
-    const matchingQualIds = activeQualifications
-      .filter((q) => qualArr.includes(q.name))
-      .map((q) => q.id);
-    return matchingQualIds.length === 0 || matchingQualIds.includes(d.qualification_id);
-  });
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 

@@ -1,15 +1,10 @@
 import Config from 'config/baseUrl';
 import { apiErrorMessage } from 'utils/apiErrors';
-import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
 
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
+const getHeaders = () => authHeaders();
 
 const parsePagination = (result, fallbackPage = 1, fallbackPerPage = 15, fallbackTotal = 0) => {
   const payload = result?.data && !Array.isArray(result.data) ? result.data : {};

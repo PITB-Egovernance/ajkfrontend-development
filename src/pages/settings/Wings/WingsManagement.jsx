@@ -13,17 +13,17 @@ import {
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import Button from "components/ui/Button";
-import { Plus, ArrowLeft, MoreVertical, LayoutList } from "lucide-react";
+import { Plus, ArrowLeft, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from "components/ui/ConfirmDelete";
 import confirmStatus from "components/ui/confirmStatus";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import { handleApiError } from 'utils/apiErrors';
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = "settings.wings";
 
@@ -49,15 +49,8 @@ const WingsManagement = () => {
   const canRowActions = canEdit || canDelete;
 
   const API_BASE = Config.apiUrl;
-  const TOKEN    = AuthService.getToken();
-  const API_KEY  = Config.apiKey;
 
-  const headers = (json = true) => ({
-    Authorization: `Bearer ${TOKEN}`,
-    Accept: "application/json",
-    "X-API-KEY": API_KEY,
-    ...(json ? { "Content-Type": "application/json" } : {}),
-  });
+  const headers = (json = true) => authHeaders(json);
 
   const [rows, setRows]                       = useState([]);
   const [loading, setLoading]                 = useState(true);

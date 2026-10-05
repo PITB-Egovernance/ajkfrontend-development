@@ -31,7 +31,7 @@ const formatTime12h = (value) => {
 const CandidateInterviewEditor = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { jobId, letterId } = useParams();
+  const { jobId } = useParams();
 
   const row = useMemo(() => location.state?.row ?? null, [location.state]);
 

@@ -1,13 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import {
-  TextField, MenuItem, Checkbox,
+import { Checkbox,
   Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import { Card, CardContent } from 'components/ui/Card';
 import {
   ArrowLeft, ChevronDown, ChevronRight, CheckCircle2,
   AlertCircle, RotateCcw, Save, GitBranch, User,
-  ArrowRight, Info, Layers, GripVertical, Loader2,
+  ArrowRight, Layers, GripVertical, Loader2,
   ArrowUp, ArrowDown, ShieldCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -106,7 +105,7 @@ const RequisitionApprovalFlow = () => {
 
   const [processType, setProcessType] = useState('requisition');
   const [wings, setWings] = useState([]);
-  const [allDesignations, setAllDesignations] = useState([]);
+  const [, setAllDesignations] = useState([]);
   const [selectedWings, setSelectedWings] = useState({});
   const [designationMap, setDesignationMap] = useState({});
   const [expandedWings, setExpandedWings] = useState({});
@@ -137,39 +136,9 @@ const RequisitionApprovalFlow = () => {
 
   const secretaryDesignation = HARDCODED_SECRETARY;
 
-  const [allEmployees, setAllEmployees] = useState([]);
+  const [, setAllEmployees] = useState([]);
 
-  /* ── Fetch all employees once ── */
-  const fetchAllEmployees = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/users?per_page=500`, { headers });
-      const result = await res.json();
-      const list = result?.data?.data ?? result?.data ?? [];
-      const mapped = (Array.isArray(list) ? list : []).map((e) => ({
-        id: e.hash_id || e.id,
-        name: e.username || e.name || e.full_name || '',
-        designation: e.designation || '',
-        wing: e.wing || '',
-      }));
-      setAllEmployees(mapped);
-      return mapped;
-    } catch (err) {
-      console.warn('Failed to fetch employees:', err);
-      return [];
-    }
-  };
 
-  /* ── Get employees matching a designation + wing ── */
-  const getEmployeesForDesignation = useCallback((designationName, wingName) => {
-    return allEmployees.filter((e) => {
-      const desigMatch = e.designation?.toLowerCase().includes(designationName.toLowerCase());
-      if (!desigMatch) return false;
-      if (wingName && e.wing) {
-        return e.wing.toLowerCase().includes(wingName.toLowerCase());
-      }
-      return true;
-    });
-  }, [allEmployees]);
 
   /* ── Build employeesMap from allEmployees whenever data changes ── */
   // An employee is listed under a wing→designation node when their designation
@@ -358,16 +327,6 @@ const RequisitionApprovalFlow = () => {
 
   const assignedCount = Object.keys(designationMap).length;
 
-  const completeCount = useMemo(() => {
-    let count = 0;
-    Object.entries(designationMap).forEach(([wingId, desigList]) => {
-      (desigList || []).forEach((desigHashId) => {
-        const empMap = selectedEmployees[`${wingId}_${desigHashId}`] || {};
-        if (Object.values(empMap).some(Boolean)) count++;
-      });
-    });
-    return count;
-  }, [designationMap, selectedEmployees]);
 
   // Valid when: at least one wing selected, every selected wing has at least
   // one designation, and every selected designation has at least one employee.
@@ -503,9 +462,6 @@ const RequisitionApprovalFlow = () => {
     return (employeesMap[mapKey] || []).filter((e) => selectedIds.includes(String(e.id)));
   }, [selectedEmployees, employeesMap]);
 
-  const hasEmployeeSelected = useCallback((wingId, desigHashId) => {
-    return getSelectedEmpNames(wingId, desigHashId).length > 0;
-  }, [getSelectedEmpNames]);
 
   const baseSummary = useMemo(() => {
     const items = [];

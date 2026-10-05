@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/Card';
 import Button from 'components/ui/Button';
-import { TextField, Switch, FormControlLabel, IconButton } from '@mui/material';
-import { ArrowLeft, Send, Download, AlertTriangle, CheckCircle2, History, Trash2, ShieldCheck, FileText } from 'lucide-react';
+import { TextField, Switch, FormControlLabel } from '@mui/material';
+import { ArrowLeft, Send, Download, CheckCircle2, History, Trash2, ShieldCheck, FileText } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
 import { handleApiError, getErrorCode, getErrorMessage } from 'utils/apiErrors';
 import PublicationChecklist from 'components/results/PublicationChecklist';
@@ -63,7 +63,7 @@ const confirmWithdraw = () => {
 const PublicationPage = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [checklist, setChecklist] = useState([]);
   const [history, setHistory] = useState([]);

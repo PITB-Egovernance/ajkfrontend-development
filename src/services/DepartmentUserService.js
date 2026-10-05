@@ -1,14 +1,9 @@
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
 
-const getHeaders = (contentType = true) => ({
-  Accept: 'application/json',
-  ...(contentType ? { 'Content-Type': 'application/json' } : {}),
-  ...(AuthService.getToken() && { Authorization: `Bearer ${AuthService.getToken()}` }),
-  'x-api-key': Config.apiKey,
-});
+const getHeaders = (contentType = true) => authHeaders(contentType);
 
 const safeJson = async (response) => {
   try { return await response.json(); } catch { return {}; }
@@ -69,11 +64,7 @@ class DepartmentUserService {
   static async getById(hashId) {
     const response = await fetch(`${Config.apiUrl}/department-users/${hashId}`, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${AuthService.getToken()}`,
-        Accept: 'application/json',
-        'X-API-KEY': Config.apiKey,
-      },
+      headers: authHeaders(false),
     });
 
     const result = await response.json();
@@ -104,12 +95,7 @@ class DepartmentUserService {
   static async update(hashId, payload) {
     const response = await fetch(`${API_BASE}/department-users/update/${hashId}`, {
       method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${AuthService.getToken()}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-API-KEY': Config.apiKey,
-      },
+      headers: authHeaders(),
       body: JSON.stringify(payload),
     });
 
@@ -129,12 +115,7 @@ class DepartmentUserService {
   static async updateProfile(hashId, payload) {
     const response = await fetch(`${API_BASE}/department/dept-users/update-profile/${hashId}`, {
       method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${AuthService.getToken()}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-API-KEY': Config.apiKey,
-      },
+      headers: authHeaders(),
       body: JSON.stringify(payload),
     });
 

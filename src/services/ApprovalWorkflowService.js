@@ -1,16 +1,11 @@
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { richTextToPlain } from 'utils/richText';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
 const ROLE_ACTION_CACHE_KEY = 'role_approval_actions_cache_v1';
 
-const getHeaders = (contentType = true) => ({
-  Accept: 'application/json',
-  ...(contentType ? { 'Content-Type': 'application/json' } : {}),
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  'X-API-KEY': Config.apiKey,
-});
+const getHeaders = (contentType = true) => authHeaders(contentType);
 
 const safeJson = async (response) => {
   try {

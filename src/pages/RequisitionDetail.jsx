@@ -7,7 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { InlineLoader } from 'components/ui/Loader';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { fileUrl, authHeaders } from 'utils/apiUtils';
 import RequisitionApi from 'api/requisitionApi';
 import RequisitionStatementApi from 'api/requisitionStatementApi';
 import { extractFilePath, getPersistedDraftFilePath } from 'utils';
@@ -90,8 +90,6 @@ const RequisitionDetail = () => {
   const [secretaryStamp, setSecretaryStamp] = useState(null);
 
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   useEffect(() => {
     fetchRequisition();
@@ -103,15 +101,7 @@ const RequisitionDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const resolveSignatureImage = (path) => {
-    if (!path) return null;
-    const imagePath = String(path).trim();
-    if (!imagePath) return null;
-    if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('data:')) return imagePath;
-
-    const baseUrl = Config.apiUrl.replace(/\/api\/v1\/?$/, '');
-    return `${baseUrl}/${imagePath.replace(/^\/+/, '')}`;
-  };
+  const resolveSignatureImage = (path) => fileUrl(String(path ?? '').trim());
 
   const getDesignationName = (designation) => {
     if (!designation) return '';
@@ -124,11 +114,7 @@ const RequisitionDetail = () => {
   const fetchSecretarySignature = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/digital-signature?per_page=200`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       const records = result.data?.data ?? result.data ?? [];
@@ -160,11 +146,7 @@ const RequisitionDetail = () => {
   const fetchSecretaryStamp = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/stamp?per_page=200`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       const records = result.data?.data ?? result.data ?? [];
@@ -206,11 +188,7 @@ const RequisitionDetail = () => {
   const fetchDistricts = async () => {
   try {
     const response = await fetch(`${API_BASE}/settings/districts`, {
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        Accept: "application/json",
-        "X-API-KEY": API_KEY,
-      },
+      headers: authHeaders(false),
     });
 
     const result = await response.json();
@@ -230,11 +208,7 @@ const RequisitionDetail = () => {
   const fetchGrades = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          "X-API-KEY": API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.success || result.status === 200) {
@@ -564,9 +538,8 @@ const RequisitionDetail = () => {
 
       // Build full URLs for service rules & syllabus so we can embed
       // proper clickable links in the PDF instead of raw text URLs.
-      const baseUrl = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
-      const serviceRulesUrl = requisition.service_rules ? `${baseUrl}/${requisition.service_rules}` : null;
-      const syllabusUrl = requisition.syllabus ? `${baseUrl}/${requisition.syllabus}` : null;
+      const serviceRulesUrl = fileUrl(requisition.service_rules);
+      const syllabusUrl = fileUrl(requisition.syllabus);
 
       // A numbered cell that vertically spans all of its sub-item rows, so the
       // serial number sits beside the whole group (mirrors the on-screen table).
@@ -865,7 +838,7 @@ const RequisitionDetail = () => {
               <td style={styles.tableCell}>Service Rules for the Post(s) to be filled</td>
               <td style={styles.tableCellValue}>
                 {requisition.service_rules ? (
-                  <a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.service_rules}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                  <a href={fileUrl(requisition.service_rules)} target="_blank" rel="noopener noreferrer" className="text-blue-600">
                     View Service Rules
                   </a>
                 ) : 'No service rule file uploaded yet'}
@@ -880,7 +853,7 @@ const RequisitionDetail = () => {
               <td style={styles.tableCell}>Approved syllabus for the Post(s) to be filled</td>
               <td style={styles.tableCellValue}>
                 {requisition.syllabus ? (
-                  <a href={`${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${requisition.syllabus}`} target="_blank" rel="noopener noreferrer" className="text-blue-600">
+                  <a href={fileUrl(requisition.syllabus)} target="_blank" rel="noopener noreferrer" className="text-blue-600">
                     View Syllabus
                   </a>
                 ) : 'No syllabus file uploaded yet'}

@@ -14,18 +14,13 @@ import {
   XCircle, AlertCircle, Award, BarChart2, TrendingUp,
 } from "lucide-react";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import AdvertisementApi from "api/advertisementApi";
 import { toast } from "react-hot-toast";
 import { handleApiError } from 'utils/apiErrors';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "Content-Type": "application/json",
-  "X-API-KEY": Config.apiKey,
-});
+const getHeaders = () => authHeaders();
 
 const BAND_COLORS = ["#ef4444","#f97316","#eab308","#22c55e","#16a34a"];
 

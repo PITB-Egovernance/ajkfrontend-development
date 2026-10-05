@@ -5,6 +5,7 @@ import { MoreVertical, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import Config from 'config/baseUrl';
+import { fileUrl, authHeaders } from 'utils/apiUtils';
 import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
 import { hasPermission } from 'utils/permissions';
@@ -18,13 +19,13 @@ const PscTable = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [total, setTotal] = useState(0);
+  const [, setTotal] = useState(0);
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 10,
   });
   const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedRow, setSelectedRow] = useState(null);
+  const [, setSelectedRow] = useState(null);
   const [updatingRequisitionId, setUpdatingRequisitionId] = useState(null);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -224,12 +225,7 @@ const PscTable = () => {
 
       const response = await fetch(`${API_BASE}/psc/requisitions/${updatingRequisitionId}/status`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -251,8 +247,7 @@ const PscTable = () => {
 
   const renderFileLink = (path) => {
     if (!path) return <span className="text-gray-400 italic">No file</span>;
-    const rootUrl = Config.apiUrl.replace('/api/v1', '').replace('/v1', '');
-    const fullUrl = `${rootUrl}/${path}`;
+    const fullUrl = fileUrl(path);
     const fileName = path.split('/').pop();
     const shortName = fileName.length > 35 ? fileName.substring(0, 35) + '...' : fileName;
 

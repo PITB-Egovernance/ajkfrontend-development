@@ -263,37 +263,8 @@ const RejectionModal = ({ open, total, rejected, onClose }) => (
   </Modal>
 );
 
-/* ── No file dialog ───────────────────────────────────────────── */
-const NoFileModal = ({ open, onClose }) => (
-  <Modal open={open} onClose={onClose} maxWidth="max-w-md">
-    <div className="bg-gradient-to-br from-rose-500 to-rose-700 px-8 py-8 flex flex-col items-center gap-4">
-      <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center">
-        <XCircle size={44} className="text-white" />
-      </div>
-      <div className="text-center">
-        <p className="text-white font-black text-2xl leading-tight">No File Selected</p>
-        <p className="text-white/80 text-sm mt-1.5">Please choose an Excel file first.</p>
-      </div>
-    </div>
-    <div className="px-8 py-7">
-      <p className="text-sm text-slate-500 text-center mb-6 leading-relaxed">
-        Drag and drop an <strong className="text-slate-700">.xlsx</strong> file into the upload zone,<br />or click it to browse your files.
-      </p>
-      <button onClick={onClose}
-        className="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-base rounded-2xl transition-colors">
-        OK, Got It
-      </button>
-    </div>
-  </Modal>
-);
 
 
-/* ── MCQ auto-mappings (no column mapper needed) ─────────────── */
-const MCQ_MAPPINGS = {
-  identifier_type:   'roll_number',
-  identifier_column: 'Roll No',
-  subjects:          {},
-};
 
 const isMcqExamType = (et) => {
   const clean = String(et || '').toLowerCase().replace(/_/g, '-');
@@ -788,7 +759,7 @@ const ImportResultsPage = () => {
     })();
 
     return () => { alive = false; };
-  }, [jobId]);
+  }, [jobId, examType, selectedJobIds]);
 
   /* Download xlsx template from backend */
   const handleDownloadTemplate = async () => {

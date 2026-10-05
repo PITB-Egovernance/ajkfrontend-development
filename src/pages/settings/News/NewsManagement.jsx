@@ -14,26 +14,18 @@ import { InlineLoader } from "components/ui/Loader";
 import { GRID_SX } from "utils/gridStyles";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import FormDialog from 'components/ui/FormDialog';
 import RichTextEditor from 'components/ui/RichTextEditor';
 import { apiErrorMessage } from 'utils/apiErrors';
 
 import { todayIsoDate } from 'utils/dateUtils';
+import { authHeaders as apiAuthHeaders, fileUrl } from 'utils/apiUtils';
 const PERM = "settings.news";
 
 const API_BASE = Config.apiUrl;
-const API_KEY  = Config.apiKey;
-const FILE_BASE = Config.apiUrl.replace("/api/v1", "");
-
 // json=false → no Content-Type so the browser sets the multipart boundary itself.
-const authHeaders = (json = false) => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "X-API-KEY": API_KEY,
-  ...(json ? { "Content-Type": "application/json" } : {}),
-});
+const authHeaders = (json = false) => apiAuthHeaders(json);
 
 // Short Description / Description are edited in the rich text editor and stored as HTML.
 // Records saved before that (plain text with line breaks) are turned into HTML for the editor.
@@ -176,11 +168,7 @@ const STATUSES = [
   { value: "archived",    label: "Archived",    color: "error" },
 ];
 
-const resolveFile = (path) => {
-  if (!path) return null;
-  if (String(path).startsWith("http")) return path;
-  return `${FILE_BASE}/${path}`;
-};
+const resolveFile = fileUrl;
 
 const EMPTY_FORM = {
   category:           "",     // free-text category name

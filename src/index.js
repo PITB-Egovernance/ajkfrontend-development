@@ -9,6 +9,7 @@ import { AuthProvider } from 'context/AuthContext';
 import { SidebarProvider } from 'context/SidebarContext';
 import { GenerationGuardProvider } from 'context/GenerationGuardContext';
 import { installDateInputGuard } from 'utils/dateInputGuard';
+import { installRecordInUseNotice } from 'utils/recordInUseNotice';
 
 const appTheme = createTheme({
   typography: {
@@ -86,6 +87,7 @@ const appTheme = createTheme({
 
 // Every <input type="date">: 4-digit year, and no past dates where a field sets a `min`.
 installDateInputGuard();
+installRecordInUseNotice();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

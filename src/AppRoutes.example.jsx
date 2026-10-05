@@ -6,7 +6,6 @@ import Login from "./pages/Auth/Login/Login";
 import Register from "./pages/Auth/Register/Register";
 
 // Protected Route
-import ProtectedRoute from "./middlewares/ProtectedRoute";
 
 // Protected Pages (Create these if they don't exist)
 // import Dashboard from "./pages/Dashboard/Dashboard";

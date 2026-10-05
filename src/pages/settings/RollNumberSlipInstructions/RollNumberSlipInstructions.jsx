@@ -16,20 +16,14 @@ import { GRID_SX } from "utils/gridStyles";
 import { hasPermission } from "utils/permissions";
 import RichTextEditor from "components/ui/RichTextEditor";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { authHeaders as apiAuthHeaders } from 'utils/apiUtils';
 
 const PERM = "settings.roll_number_slip_instructions";
 
 const API_BASE = Config.apiUrl;
-const API_KEY  = Config.apiKey;
 
-const authHeaders = (json = true) => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "X-API-KEY": API_KEY,
-  ...(json ? { "Content-Type": "application/json" } : {}),
-});
+const authHeaders = (json = true) => apiAuthHeaders(json);
 
 // The two kinds of text that can be authored for the roll-number slip.
 const SLIP_TEXT_TYPES = [

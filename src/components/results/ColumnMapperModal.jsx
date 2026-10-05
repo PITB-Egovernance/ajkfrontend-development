@@ -13,8 +13,7 @@ import {
   Info,
   X,
   FileSpreadsheet,
-  AlertCircle,
-  Sparkles
+  AlertCircle
 } from 'lucide-react';
 
 /**
@@ -96,7 +95,7 @@ const ColumnMapperModal = ({
   });
 
   const [validationError, setValidationError] = useState('');
-  const [sparkleActive, setSparkleActive] = useState(false);
+  const [, setSparkleActive] = useState(false);
 
   // Trigger Fuzzy Match Auto-suggestions on open or header load
   useEffect(() => {

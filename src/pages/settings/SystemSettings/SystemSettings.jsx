@@ -25,6 +25,17 @@ const getDesignationName = (designation) => {
   return String(designation);
 };
 
+// Recognise both assigned permission roles and the original system account roles,
+// even when the employee's job designation is different from their system role.
+const getPostName = (emp) => {
+  const designation = getDesignationName(emp.designation);
+  const roles = [emp.role_name, emp.role_permission?.role_name, emp.role];
+  const role = roles.map((value) => String(value || '').trim().toLowerCase())
+    .find((value) => ROLE_DESIGNATIONS.includes(value));
+  if (role) return role.charAt(0).toUpperCase() + role.slice(1);
+  return designation;
+};
+
 const FILTER_CONFIG = [
   { name: 'full_name', label: 'Full Name', type: 'text', placeholder: 'Filter by full name' },
   { name: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
@@ -51,10 +62,14 @@ const SystemSettings = () => {
     EmployeeService.getUsers({ per_page: 100 })
       .then((result) => {
         const filtered = result.data
+          .map((emp) => ({ ...emp, postName: getPostName(emp) }))
           .filter((emp) => {
-            const desigName = getDesignationName(emp.designation).toLowerCase();
+            const desigName = emp.postName.toLowerCase();
+            // Only people who currently hold the post: the account is switched on in Employees
+            // (status) and their job status is active. A retired Secretary has status inactive.
             return (
-              emp.status_job === 'active' &&
+              emp.status === 'active' &&
+              (emp.status_job ?? 'active') === 'active' &&
               ROLE_DESIGNATIONS.some((role) => desigName.includes(role))
             );
           })
@@ -62,8 +77,8 @@ const SystemSettings = () => {
             id: emp.hash_id || emp.id || `emp-${idx}`,
             hash_id: emp.hash_id || emp.id,
             full_name: emp.username || emp.name || emp.full_name || '-',
-            designation: getDesignationName(emp.designation) || '-',
-            status_job: emp.status_job || '-',
+            designation: emp.postName || '-',
+            status: emp.status || '-',
           }))
           .sort((a, b) => getHierarchyRank(a.designation) - getHierarchyRank(b.designation));
         setEmployees(filtered);
@@ -101,8 +116,8 @@ const SystemSettings = () => {
     { field: 'full_name',   headerName: 'Full Name',   flex: 1, minWidth: 180 },
     { field: 'designation', headerName: 'Designation', flex: 1, minWidth: 160 },
     {
-      field: 'status_job',
-      headerName: 'Job Status',
+      field: 'status',
+      headerName: 'Status',
       width: 140,
       renderCell: (params) => (
         <div className="flex items-center h-full">

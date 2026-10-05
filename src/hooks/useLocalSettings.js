@@ -9,15 +9,11 @@
 
 import { useState, useEffect } from 'react';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { fetchPaginatedApiList } from 'utils/paginatedApiUtils';
+import { authHeaders } from 'utils/apiUtils';
 
 const LIVE_API = Config.apiUrl;
-const liveHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
+const liveHeaders = () => authHeaders(false);
 
 export const KEYS = {
   qualifications: 'ajk_qualifications',
