@@ -4,9 +4,39 @@
  */
 
 import Config from 'config/baseUrl';
+import AuthService from 'services/authService';
 
 const API_URL = Config.apiUrl;
 const API_KEY = Config.apiKey;
+
+/**
+ * Headers for admin API calls: API key, the signed-in user's token (read fresh on every call)
+ * and, unless `json` is false (FormData / GET), a JSON Content-Type.
+ * @param {boolean} json - Include 'Content-Type: application/json'
+ * @returns {Object} Headers object
+ */
+export const authHeaders = (json = true) => {
+  const token = AuthService.getToken();
+  return {
+    Accept: 'application/json',
+    'X-API-KEY': API_KEY,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+  };
+};
+
+/**
+ * Full URL of a file stored by the admin backend (uploads/…). Absolute, blob: and data: URLs
+ * are returned unchanged; empty values return null.
+ * @param {string} path - Relative storage path or URL
+ * @returns {string|null}
+ */
+export const fileUrl = (path) => {
+  if (!path) return null;
+  const value = String(path);
+  if (/^(https?:|blob:|data:)/i.test(value)) return value;
+  return `${Config.fileBaseUrl}/${value.replace(/^\/+/, '')}`;
+};
 
 /**
  * Gets common headers for API requests

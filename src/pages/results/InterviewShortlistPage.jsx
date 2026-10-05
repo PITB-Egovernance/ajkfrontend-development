@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
-import { ArrowLeft, Send, Users, ClipboardCheck, Sparkles, Building, Award } from 'lucide-react';
+import { ArrowLeft, Send, Users, ClipboardCheck, Sparkles, Award } from 'lucide-react';
 import ResultsApi from 'api/resultsApi';
 import ShortlistPublishModal from './components/ShortlistPublishModal';
 import { handleApiError } from 'utils/apiErrors';
@@ -19,6 +19,8 @@ export default function InterviewShortlistPage() {
     if (jobId) {
       fetchShortlist();
     }
+  // Re-runs only when the values in the array change, not whenever fetchShortlist is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
   const fetchShortlist = async () => {

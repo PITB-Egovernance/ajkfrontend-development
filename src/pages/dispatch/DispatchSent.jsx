@@ -20,7 +20,7 @@ const DispatchSent = () => {
   const [loading, setLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [totalRows, setTotalRows] = useState(0);
+  const [, setTotalRows] = useState(0);
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 10,

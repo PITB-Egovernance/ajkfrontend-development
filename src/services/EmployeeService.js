@@ -1,14 +1,10 @@
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
 
-const getHeaders = (contentType = true) => ({
-  Accept: 'application/json',
-  ...(contentType ? { 'Content-Type': 'application/json' } : {}),
-  ...(AuthService.getToken() && { Authorization: `Bearer ${AuthService.getToken()}` }),
-  'x-api-key': Config.apiKey,
-});
+const getHeaders = (contentType = true) => authHeaders(contentType);
 
 const safeJson = async (response) => {
   try {
@@ -74,8 +70,7 @@ class EmployeeService {
   // 3) Get a single employee's details
   // ──────────────────────────────────────────────────────
   static async getUserDetails(id) {
-    // No single-employee GET route exists — resolve the detail from the list.
-    const response = await fetch(`${API_BASE}/employee/list?per_page=1000`, {
+    const response = await fetch(`${API_BASE}/users/${encodeURIComponent(id)}`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -86,14 +81,24 @@ class EmployeeService {
       throw new Error(result?.message || 'Failed to load employee details');
     }
 
-    const list = extractList(result);
-    const found = list.find((e) => (e.hash_id ?? e.id) === id || String(e.id) === String(id));
+    const found = result?.data;
 
     if (!found) {
       throw new Error('Employee not found');
     }
 
     return found;
+  }
+
+  static async getFormOptions() {
+    const response = await fetch(`${API_BASE}/employee/form-options`, {
+      headers: getHeaders(false),
+    });
+    const result = await safeJson(response);
+    if (!response.ok || !result?.data) {
+      throw new Error(result?.message || 'Failed to load employee form options');
+    }
+    return result.data;
   }
 
   // ──────────────────────────────────────────────────────

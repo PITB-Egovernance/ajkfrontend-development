@@ -56,6 +56,8 @@ const NewBatchForm = ({ onCreated }) => {
     }
   };
 
+  // Re-runs only when the values in the array change, not whenever runSearch is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { runSearch(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const toggle = (appNumber) => {

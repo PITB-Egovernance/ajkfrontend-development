@@ -1,7 +1,7 @@
 import React from 'react';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import StatusBadge from './StatusBadge';
-import { RotateCw, UserX, AlertCircle, ShieldCheck } from 'lucide-react';
+import { RotateCw, UserX, ShieldCheck } from 'lucide-react';
 import Button from 'components/ui/Button';
 import { DataGridLoader } from 'components/ui/Loader';
 import { formatDate } from 'utils/dateUtils';

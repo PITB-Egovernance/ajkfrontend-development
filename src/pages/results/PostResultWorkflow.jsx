@@ -309,7 +309,6 @@ const PostResultWorkflow = () => {
   // Unpublished/Published split as Roll Number Management's Slips tabs.
   const [interviewView, setInterviewView] = useState('unpublished');
 
-  const idField = activeTab === 'passed' ? 'exam_result_id' : 'award_list_entry_id';
 
   const selectedIds = useMemo(() => (Array.isArray(selectionModel) ? selectionModel : []), [selectionModel]);
 

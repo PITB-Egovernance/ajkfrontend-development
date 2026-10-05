@@ -2,20 +2,15 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { RefreshCw, MessageSquare, MessageSquareWarning, Inbox, Clock3, CheckCircle2, XCircle, FileSpreadsheet } from 'lucide-react';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { toast } from 'react-hot-toast';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import Button from 'components/ui/Button';
 import { InlineLoader } from 'components/ui/Loader';
 import { formatCNIC } from 'utils/stringUtils';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
+const getHeaders = () => authHeaders();
 
 const CATEGORY_LABELS = {
   technical:    'Technical',

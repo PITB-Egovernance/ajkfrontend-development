@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-node-access, testing-library/no-container -- drags images inside the contentEditable DOM */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';

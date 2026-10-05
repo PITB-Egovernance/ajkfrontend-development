@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-node-access -- checks layout containers, which have no accessible role */
 import React, { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';

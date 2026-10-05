@@ -195,13 +195,13 @@ const useFormValidation = (initialValues = {}, validationRules = {}, options = {
       [name]: true
     }));
 
-    // Validate on blur
+    if (!validateOnBlur) return;
     const error = validateField(name, values[name], values);
     setErrors(prev => ({
       ...prev,
       [name]: error
     }));
-  }, [validateField, values]);
+  }, [validateField, values, validateOnBlur]);
 
   // Reset form
   const reset = useCallback((newValues = initialValues) => {

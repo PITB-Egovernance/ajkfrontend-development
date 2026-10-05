@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Button } from 'components/ui';
+import { Button } from 'components/ui';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import { Box } from '@mui/material';
 import { InlineLoader } from 'components/ui/Loader';
@@ -8,15 +8,15 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
+import { authHeaders } from 'utils/apiUtils';
 
 export default function DispatchReceived() {
   const [rows, setRows] = useState([]);
   const [filteredRows, setFilteredRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
-  const [rowCount, setRowCount] = useState(0);
+  const [, setRowCount] = useState(0);
 
   const [filters, setFilters] = useState({
     ref: '',
@@ -85,18 +85,12 @@ export default function DispatchReceived() {
   const [openModal, setOpenModal] = useState(false);
 
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   const fetchReceivedForms = async (page = 1, pageSize = 10) => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/dispatch/received-forms`, {
-        headers: { 
-          Authorization: `Bearer ${TOKEN}`, 
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY
-        },
+        headers: authHeaders(false),
       });
       if (!response.ok) throw new Error('Network error');
 
@@ -134,11 +128,7 @@ export default function DispatchReceived() {
     setOpenModal(true);
     try {
       const response = await fetch(`${API_BASE}/dispatch/received-forms/${id}`, {
-        headers: { 
-          Authorization: `Bearer ${TOKEN}`, 
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY
-        },
+        headers: authHeaders(false),
       });
       
       if (!response.ok) {

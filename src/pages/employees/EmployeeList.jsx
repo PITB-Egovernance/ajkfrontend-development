@@ -9,7 +9,6 @@ import {
   Users,
   Search,
   Plus,
-  Upload,
   MoreVertical,
   Pencil,
   Trash2,
@@ -20,6 +19,8 @@ import AdvancedFilter from 'components/tables/AdvancedFilter';
 import EmployeeService from 'services/EmployeeService';
 import { GRID_SX } from 'utils/gridStyles';
 import confirmStatus from 'components/ui/confirmStatus';
+import alertDialog from 'components/ui/alertDialog';
+import { SINGLE_POSTS, postOf, postActivationMessage } from 'utils/singlePosts';
 import { hasPermission } from 'utils/permissions';
 
 const PERM = 'employee_management.employees'; // permission scope for this module
@@ -64,43 +65,6 @@ const asList = (v) => {
   return String(v).split(',').map((s) => s.trim()).filter(Boolean);
 };
 
-const getPermissionLabels = (permissions) => {
-  if (!permissions) return [];
-
-  // If permissions is already an array
-  if (Array.isArray(permissions)) {
-    return permissions
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (typeof item === 'object') return item.name || item.label || item.key || null;
-        return String(item);
-      })
-      .filter(Boolean);
-  }
-
-  // If permissions is object like { settings: { city: { add: true } } }
-  if (typeof permissions === 'object') {
-    const labels = [];
-
-    Object.entries(permissions).forEach(([moduleKey, subModules]) => {
-      if (!subModules || typeof subModules !== 'object') return;
-
-      Object.entries(subModules).forEach(([subModuleKey, actions]) => {
-        if (!actions || typeof actions !== 'object') return;
-
-        Object.entries(actions).forEach(([actionKey, allowed]) => {
-          if (allowed === true) {
-            labels.push(`${moduleKey}.${subModuleKey}.${actionKey}`);
-          }
-        });
-      });
-    });
-
-    return labels;
-  }
-
-  return [];
-};
 
 const mapUser = (user, idx) => ({
   id: user?.hash_id || user?.id || `user-${idx}`,
@@ -112,15 +76,28 @@ const mapUser = (user, idx) => ({
   father_husband_name: user?.father_husband_name || '-',
   designation: asText(user?.designation),
   scale: asText(user?.scale ?? user?.grade),
-  role: asText(user?.role_permission ?? user?.role),
+  // role_permission is the permission matrix, not a name; show the assigned role's name, or the
+  // account type for system accounts such as the original Secretary login.
+  role: asText(user?.role_name ?? (user?.role !== 'employee' ? user?.role : null))
+    .replace(/^\s*\S/, (letter) => letter.toUpperCase()),
   wing: asText(user?.wings ?? user?.wing),
   wingList: asList(user?.wings ?? user?.wing),
   status: user?.status || 'inactive',
   status_job: user?.status_job || '-',
+  account_role: user?.role || '',
+  role_name: user?.role_name || '',
+  // The system Admin login is listed for reference only: it cannot be switched off or edited here.
+  is_system_admin: String(user?.role || '').toLowerCase() === 'admin',
 });
 
-const ActionCell = ({ employee, onViewDetails, onDelete, canEdit, canDelete }) => {
+const ActionCell = ({ employee, onViewDetails, onDelete, canEdit: canEditAny, canDelete: canDeleteAny }) => {
   const [anchorEl, setAnchorEl] = useState(null);
+  // System logins (Admin / Secretary / Chairman accounts) and current or former Secretaries /
+  // Chairmen are never deleted (only made inactive); Admin is not edited here.
+  const canEdit = canEditAny && !employee.is_system_admin;
+  const canDelete = canDeleteAny && employee.account_role === 'employee'
+    && !postOf({ role: employee.account_role, role_name: employee.role_name, designation: employee.designation });
+  if (!canEdit && !canDelete) return null;
   const open = Boolean(anchorEl);
 
   const handleClose = (e) => {
@@ -194,9 +171,9 @@ const EmployeeList = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [designationOptions, setDesignationOptions] = useState([]);
+  const [, setDesignationOptions] = useState([]);
   const [wingOptions, setWingOptions] = useState([]);
-  const [roleOptions, setRoleOptions] = useState([]);
+  const [, setRoleOptions] = useState([]);
   const [selectedWings, setSelectedWings] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -241,7 +218,6 @@ const EmployeeList = () => {
         if (desigResult.success === true || desigResult.status === 200) {
           setDesignationOptions(
             (desigResult.data?.data ?? desigResult.data ?? [])
-              .filter((d) => !['chairman', 'secretary'].includes(d.name?.toLowerCase()))
               .map((d) => {
                 let wingName = '';
                 if (d.wings) {
@@ -271,6 +247,21 @@ const EmployeeList = () => {
 
   const handleToggleStatus = async (employee) => {
     const newStatus = employee.status === 'active' ? 'inactive' : 'active';
+
+    // Only one Secretary and one Chairman may be active: name the one who has to be made inactive first.
+    const postOfRow = (e) => postOf({ role: e.account_role, role_name: e.role_name, designation: e.designation });
+    const post = postOfRow(employee);
+    if (newStatus === 'active' && post) {
+      const holder = employees.find((e) => e.id !== employee.id && e.status === 'active' && postOfRow(e) === post);
+      if (holder) {
+        await alertDialog({
+          title: `Another ${SINGLE_POSTS[post]} is active`,
+          message: postActivationMessage(post, holder.full_name, employee.full_name),
+        });
+        return;
+      }
+    }
+
     if (!await confirmStatus({ newStatus })) return;
     try {
       await EmployeeService.updateUser(employee.hash_id, { status: newStatus });
@@ -284,7 +275,11 @@ const EmployeeList = () => {
         'Employee';
       toast.success(`${employeeName} marked as ${newStatus}`);
     } catch (error) {
-      toast.error(error.message || 'Failed to update employee status');
+      if (error.status === 422) {
+        await alertDialog({ title: 'Status not changed', message: error.message });
+      } else {
+        toast.error(error.message || 'Failed to update employee status');
+      }
     }
   };
 
@@ -459,6 +454,7 @@ const EmployeeList = () => {
           <Switch
             checked={params.value === 'active'}
             onChange={() => handleToggleStatus(params.row)}
+            disabled={params.row.is_system_admin}
             inputProps={{ 'aria-label': 'toggle employee status' }}
             size="small"
             color={params.value === 'active' ? 'success' : 'error'}

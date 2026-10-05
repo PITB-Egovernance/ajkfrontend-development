@@ -28,7 +28,7 @@ const ApplicationsList = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
+  const [, setTotal] = useState(0);
   const [apiError, setApiError] = useState(null);
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);

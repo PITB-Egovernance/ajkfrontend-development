@@ -16,12 +16,12 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import { InlineLoader } from "components/ui/Loader";
 import { GRID_SX } from 'utils/gridStyles';
 import { hasPermission } from 'utils/permissions';
 import { handleApiError } from 'utils/apiErrors';
 import FormDialog from 'components/ui/FormDialog';
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = 'settings.exam_center';
 
@@ -45,14 +45,8 @@ const ExamHallsManagement = () => {
   const canRowActions = canEdit || canDelete;
 
   const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
-  const API_KEY  = Config.apiKey;
 
-  const getHeaders = () => ({
-    Authorization: `Bearer ${AuthService.getToken()}`,
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    "X-API-KEY": API_KEY,
-  });
+  const getHeaders = () => authHeaders();
 
   const [allRows,        setAllRows]        = useState([]);
   const [loading,        setLoading]        = useState(true);

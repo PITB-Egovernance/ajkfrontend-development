@@ -28,7 +28,7 @@ const RolesManagement = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm] = useState("");
   const [filters, setFilters] = useState({ name: "", status: "" });
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 15 });
   const [anchorEl, setAnchorEl] = useState(null);

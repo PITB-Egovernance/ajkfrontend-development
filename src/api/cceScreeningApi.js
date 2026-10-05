@@ -1,19 +1,12 @@
 import Config from 'config/baseUrl';
 import { apiErrorMessage } from 'utils/apiErrors';
 import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 const ADMIN_API_BASE = Config.apiUrl;
 const ADMIN_API_KEY  = Config.apiKey;
 
-const getAdminHeaders = (json = true) => {
-  const h = {
-    Accept:          'application/json',
-    'X-API-KEY':     ADMIN_API_KEY,
-    Authorization:   `Bearer ${AuthService.getToken()}`,
-  };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
-};
+const getAdminHeaders = (json = true) => authHeaders(json);
 
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));

@@ -113,11 +113,13 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
    }, [departmentOptions]);
 
   // Update form data when data prop changes (for edit mode)
+  // Content fingerprint of `data`: the form is re-loaded only when the loaded data actually
+  // changes, not on every parent re-render (a new `data` object with the same content).
+  const dataKey = data ? JSON.stringify(data) : '';
   useEffect(() => {
     // Only re-sync when the loaded data's content actually changes. Without
     // this guard the effect would re-run on every parent re-render and
     // OVERWRITE the user's in-progress edits with the stale loaded data.
-    const dataKey = data ? JSON.stringify(data) : '';
     if (lastSyncedDataRef.current === dataKey) return;
     if (data && Object.keys(data).length > 0) {
       lastSyncedDataRef.current = dataKey;
@@ -175,7 +177,8 @@ const Step1JobDetails = ({ data, onNext, onSaveDraft, tempId, isEdit = false, de
         syllabus: data.syllabus || null,
       });
     }
-  }, [data && JSON.stringify(data)]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on dataKey (see above)
+  }, [dataKey]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

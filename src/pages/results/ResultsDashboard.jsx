@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
@@ -11,12 +11,8 @@ import {
   History,
   ArrowRight,
   ClipboardCheck,
-  LayoutDashboard,
   ShieldAlert,
-  Search,
-  FileText,
-  Award,
-  BarChart2
+  Search
 } from 'lucide-react';
 import { useAuth } from 'context/AuthContext';
 import { getUserRole } from 'utils/roleUtils';
@@ -25,22 +21,15 @@ import AdvertisementApi from 'api/advertisementApi';
 import toast from 'react-hot-toast';
 import { getJobRouteId } from 'utils/jobMapper';
 import { ChevronDown, EyeOff } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from 'components/ui/DropdownMenu';
+
+
 import OfficialPublicationModal from 'components/results/OfficialPublicationModal';
 import BulkPublishModal from 'components/results/BulkPublishModal';
 import BulkWithdrawModal from 'components/results/BulkWithdrawModal';
-import { formatDate } from 'utils/dateUtils';
-import { hasPermission } from 'utils/permissions';
 import { fetchAndApplyClubbedGroups } from 'utils/resultsClubbing';
 import { formatScale } from 'utils/scaleUtils';
 
-const PERM = 'result.result_publishing'; // permission scope for publishing actions
+ // permission scope for publishing actions
 
 // Same publishable/unpublishable split used on the Post-Result landing page.
 const PUBLISHABLE_STATUSES = ['Approved', 'APPROVED', 'WITHDRAWN'];
@@ -55,55 +44,6 @@ const checkboxThemeSx = {
   '& .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root': { color: '#064e3b' },
 };
 
-const confirmWithdraw = () => {
-  return new Promise((resolve) => {
-    let reasonText = '';
-    toast((t) => (
-      <div className="flex flex-col gap-3 min-w-[320px] p-1 text-left">
-        <div>
-          <p className="font-bold text-slate-800 text-sm">Emergency Withdrawal</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Provide a mandatory legal reason for taking these results offline:
-          </p>
-        </div>
-        <textarea
-          rows={3}
-          placeholder="Enter withdrawal reason..."
-          onChange={(e) => { reasonText = e.target.value; }}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 bg-white"
-        />
-        <div className="flex gap-2 justify-end">
-          <button
-            onClick={() => {
-              toast.dismiss(t.id);
-              resolve(null);
-            }}
-            className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-105 hover:bg-slate-200 rounded-md transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              const trimmed = reasonText.trim();
-              if (!trimmed) {
-                toast.error("Withdrawal reason is mandatory.", { id: 'withdraw-validation' });
-                return;
-              }
-              toast.dismiss(t.id);
-              resolve(trimmed);
-            }}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-md transition-colors"
-          >
-            Withdraw
-          </button>
-        </div>
-      </div>
-    ), {
-      duration: Infinity,
-      position: 'top-center',
-    });
-  });
-};
 
 const ActionCell = ({ job, isAdmin, isDirector, userRole, handleOpenPublish, handleDownloadGazette, fetchActiveJobs, getExamTypeParam }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -122,12 +62,6 @@ const ActionCell = ({ job, isAdmin, isDirector, userRole, handleOpenPublish, han
 
   const rId = getJobRouteId(job);
   const isImportable = !['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
-  const isShortlistable = ['Approved', 'APPROVED', 'WITHDRAWN'].includes(job.result_status);
-  const isGazetteReady = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
-  const isPublishedState = ['Published', 'PROVISIONAL PUBLISHED', 'FINAL PUBLISHED', 'GAZETTE PUBLISHED'].includes(job.result_status);
-  const hasInterviewPermission = isAdmin || isDirector || ['data_entry', 'dataentry', 'senior_admin'].includes(userRole);
-  const isInterviewAllowed = isPublishedState && hasInterviewPermission;
-  const isWithdrawable = isPublishedState && (isAdmin || isDirector);
 
   return (
     <div className="flex items-center h-full">
@@ -266,8 +200,6 @@ const ResultsDashboard = () => {
   const isAdmin = ['admin', 'chairman', 'secretary'].includes(userRole);
   const isDirector = ['director', 'admin', 'chairman', 'secretary'].includes(userRole);
 
-  // Action-level permission for the current role (publish = verify_result on publishing).
-  const canPublish = hasPermission(`${PERM}.verify_result`);
 
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -293,7 +225,6 @@ const ResultsDashboard = () => {
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [importHistory, setImportHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [activeDropdownJobId, setActiveDropdownJobId] = useState(null);
 
   // Bulk publish/unpublish — DataGrid's checkboxSelection model holds row
   // ids, set to job.hash_id below (job.id is hidden from every API response
@@ -339,13 +270,6 @@ const ResultsDashboard = () => {
     }
   };
 
-  const fetchPendingApprovals = async () => {
-    try {
-      const res = await ResultsApi.getPendingMarkEdits();
-      setPendingCount(res.data?.length || 0);
-    } catch (err) {
-    }
-  };
 
   const fetchStats = async () => {
     try {
@@ -399,48 +323,6 @@ const ResultsDashboard = () => {
     }
   };
 
-  const quickActions = [
-    {
-      title: 'Verification Queue',
-      desc: 'Review & approve candidate results',
-      link: '/dashboard/results/verification',
-      icon: ShieldAlert,
-      iconBg: 'bg-indigo-600',
-      show: isAdmin
-    },
-    // {
-    //   title: 'Statistical Summary',
-    //   desc: 'Pass %, score distribution, toppers & category breakdown',
-    //   link: '/dashboard/results/statistical-summary',
-    //   icon: BarChart2,
-    //   iconBg: 'bg-emerald-600',
-    //   show: isAdmin
-    // },
-    // {
-    //   title: 'Audit Trail Report',
-    //   desc: 'Chronological vigilance log of mark uploads, changes & approvals',
-    //   link: '/dashboard/results/audit-trail',
-    //   icon: History,
-    //   iconBg: 'bg-slate-700',
-    //   show: isAdmin
-    // },
-    // {
-    //   title: 'Scrutiny & Rechecking',
-    //   desc: 'Verify, review & resolve candidate paper recounting appeals',
-    //   link: '/dashboard/results/scrutiny',
-    //   icon: ClipboardCheck,
-    //   iconBg: 'bg-amber-600',
-    //   show: isAdmin
-    // },
-    // {
-    //   title: 'Award Lists',
-    //   desc: 'View, track & manage final candidate recommendation and merit award lists',
-    //   link: '/dashboard/award-lists',
-    //   icon: Award,
-    //   iconBg: 'bg-blue-600',
-    //   show: isAdmin
-    // }
-  ];
 
   const filteredRows = useMemo(() => {
     const q = searchTerm.toLowerCase();

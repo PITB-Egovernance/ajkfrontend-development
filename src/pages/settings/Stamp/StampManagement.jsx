@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogActions,
   Switch,
-  TextField,
 } from "@mui/material";
 import { Card, CardContent } from "components/ui/Card";
 import { Plus, ArrowLeft, MoreVertical, Stamp, Upload, X } from "lucide-react";
@@ -21,28 +20,17 @@ import { InlineLoader } from "components/ui/Loader";
 import AdvancedFilter from "components/tables/AdvancedFilter";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
+import { authHeaders as apiAuthHeaders, fileUrl } from 'utils/apiUtils';
 
 const PERM = "settings.stamps";
 
 const API_BASE = Config.apiUrl;
-const API_KEY  = Config.apiKey;
-const BASE_URL = Config.apiUrl.replace("/api/v1", "");
-
 // Max upload size for a stamp image — 2 MB.
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
-const resolveImage = (path) => {
-  if (!path) return null;
-  if (path.startsWith("http")) return path;
-  return `${BASE_URL}/${path}`;
-};
+const resolveImage = fileUrl;
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "X-API-KEY": API_KEY,
-});
+const authHeaders = () => apiAuthHeaders(false);
 
 const gridSx = {
   border: "none",
