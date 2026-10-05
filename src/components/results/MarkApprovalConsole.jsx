@@ -6,8 +6,7 @@ import {
   User, 
   ArrowRight,
   MessageSquare,
-  ShieldCheck,
-  AlertCircle
+  ShieldCheck
 } from 'lucide-react';
 import Button from 'components/ui/Button';
 import ResultsApi from 'api/resultsApi';

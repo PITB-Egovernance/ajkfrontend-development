@@ -263,7 +263,6 @@ const SearchableMultiSelect = ({
           aria-expanded={open}
           aria-controls={listboxId}
           aria-haspopup="listbox"
-          aria-multiselectable="true"
           disabled={disabled}
           onClick={toggle}
           className={cn('ss-trigger', error && 'ss-err', className)}

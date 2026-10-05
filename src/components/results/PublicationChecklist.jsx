@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/Card';
-import { CheckCircle2, XCircle, AlertCircle, ClipboardCheck, Info } from 'lucide-react';
+import { CheckCircle2, XCircle, ClipboardCheck, Info } from 'lucide-react';
 
 /**
  * PublicationChecklist Component

@@ -3,14 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from 'components/ui/Card';
 import {
   Building2,
-  Network,
   MapPin,
   Map,
   Briefcase,
   Award,
   Building,
   Users,
-  GitBranch,
   BookOpen,
   ScrollText,
   PenTool,
@@ -138,7 +136,7 @@ const Settings = () => {
     {
       icon: Landmark,
       title: 'Secretary and Officials',
-      description: 'Manage Secretary and Officials listings',
+      description: "Manage Secretary and Officials listings, and the Secretary's photo and message for the main website",
       iconBg: 'bg-emerald-700',
       link: '/dashboard/settings/secretary-officials',
       permModule: 'settings', permSub: 'secretary_officials', category: 'Main Website',

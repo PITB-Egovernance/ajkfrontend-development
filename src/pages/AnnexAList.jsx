@@ -15,15 +15,14 @@ import {
   User,
   X,
   Save,
-  Plus,
   AlertCircle
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
+import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
 import FormOverlay from 'components/ui/FormOverlay';
+import { authHeaders } from 'utils/apiUtils';
 
 const AnnexAList = () => {
   const navigate = useNavigate();
@@ -50,12 +49,7 @@ const AnnexAList = () => {
     try {
       const response = await fetch(`${Config.apiUrl}/annex/list`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: authHeaders(),
       });
 
       const result = await response.json();
@@ -87,12 +81,7 @@ const AnnexAList = () => {
     try {
       const response = await fetch(`${Config.apiUrl}/annex/edit/${id}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: authHeaders(),
       });
 
       const result = await response.json();
@@ -116,12 +105,7 @@ const AnnexAList = () => {
     try {
       const response = await fetch(`${Config.apiUrl}/annex/${editFormData.hash_id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: authHeaders(),
         body: JSON.stringify({
           name_with_father: editFormData.name_with_father,
           district_of_domicile: editFormData.district_of_domicile,
@@ -155,12 +139,7 @@ const AnnexAList = () => {
     try {
       const response = await fetch(`${Config.apiUrl}/annex/${selectedAnnex.hash_id}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${AuthService.getToken()}`,
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: authHeaders(),
       });
 
       const result = await response.json();

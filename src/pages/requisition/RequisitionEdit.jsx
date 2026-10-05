@@ -11,6 +11,7 @@ import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
 import { extractFilePath, getPersistedDraftFilePath, fetchPaginatedApiList } from 'utils';
 import './RequisitionForm.css';
+import { authHeaders } from 'utils/apiUtils';
 
 const steps = [
   { number: 0, icon: Briefcase, label: 'Job Details' },
@@ -41,7 +42,7 @@ const RequisitionEdit = () => {
   const [gradeOptions, setGradeOptions] = useState([]);
   const [designationOptions, setDesignationOptions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [changeLogEntries, setChangeLogEntries] = useState([]);
+  const [, setChangeLogEntries] = useState([]);
   const [formData, setFormData] = useState({
     step1: {},
     step2: {},
@@ -58,16 +59,14 @@ const RequisitionEdit = () => {
     fetchGrades();
     fetchDesignations();
     loadRequisitionData();
+  // Re-runs only when the values in the array change, not whenever fetchDepartments, fetchDesignations, fetchDistricts, fetchGrades, loadRequisitionData are recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchDistricts = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/districts`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setDistrictOptions(
         list
@@ -85,11 +84,7 @@ const RequisitionEdit = () => {
   const fetchDepartments = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/departments`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setDepartmentOptions(
         list
@@ -106,11 +101,7 @@ const RequisitionEdit = () => {
   const fetchGrades = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/grades`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setGradeOptions(
         list
@@ -124,11 +115,7 @@ const RequisitionEdit = () => {
   const fetchDesignations = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/designations`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setDesignationOptions(
         list

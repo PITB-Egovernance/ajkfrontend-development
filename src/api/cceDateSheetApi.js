@@ -1,29 +1,14 @@
 import Config from 'config/baseUrl';
 import { apiErrorMessage } from 'utils/apiErrors';
-import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 const ADMIN_API_BASE = Config.apiUrl;
-const ADMIN_API_KEY  = Config.apiKey;
 
-// Candidate-portal backend, admin-scoped prefix — hosts the candidate's
-// self-submitted CCE subject selection, looked up by roll number.
-const CANDIDATE_ADMIN_API_BASE = Config.candidateAdminApiUrl;
-const CANDIDATE_API_KEY        = Config.candidateApiKey;
+// The candidate's self-submitted CCE subject selections, served by the admin
+// backend from the shared database — never the candidate portal's API.
+const PORTAL_API_BASE = `${ADMIN_API_BASE}/candidate-portal`;
 
-const getAdminHeaders = (json = true) => {
-  const h = {
-    Accept:          'application/json',
-    'X-API-KEY':     ADMIN_API_KEY,
-    Authorization:   `Bearer ${AuthService.getToken()}`,
-  };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
-};
-
-const getCandidateAdminHeaders = () => ({
-  Accept:      'application/json',
-  'X-API-KEY': CANDIDATE_API_KEY,
-});
+const getAdminHeaders = (json = true) => authHeaders(json);
 
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));
@@ -124,16 +109,14 @@ const CceDateSheetApi = {
   // candidate portal), looked up by roll number rather than application number.
   getSubjectSelection: async (rollNumber) => {
     const res = await fetch(
-      `${CANDIDATE_ADMIN_API_BASE}/cce/subject-selection/${encodeURIComponent(rollNumber)}`,
-      { headers: getCandidateAdminHeaders() }
+      `${PORTAL_API_BASE}/cce/subject-selection/${encodeURIComponent(rollNumber)}`,
+      { headers: getAdminHeaders(false) }
     );
     return handleResponse(res);
   },
 
-  // Candidate portal's own subject-selection endpoint, called directly
-  // (bypasses the admin backend entirely — no application_number, screening
-  // status, or date-sheet progress attached, since the candidate portal
-  // doesn't have that admin-side data). roll_number narrows to one record;
+  // Raw subject selections (no application_number, screening status or
+  // date-sheet progress attached). roll_number narrows to one record;
   // omitting it returns every submitted selection, paginated.
   getEligibleCandidatesFromPortal: async ({ rollNumber, advertisementId, perPage, page } = {}) => {
     const search = new URLSearchParams();
@@ -142,8 +125,8 @@ const CceDateSheetApi = {
     if (perPage)          search.set('per_page', String(perPage));
     if (page)             search.set('page', String(page));
 
-    const res = await fetch(`${CANDIDATE_ADMIN_API_BASE}/cce/subject-selection?${search}`, {
-      headers: getCandidateAdminHeaders(),
+    const res = await fetch(`${PORTAL_API_BASE}/cce/subject-selection?${search}`, {
+      headers: getAdminHeaders(false),
     });
     return handleResponse(res);
   },

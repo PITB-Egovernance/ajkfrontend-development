@@ -8,18 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from 'components
 import { User, Mail, Phone, Save, Lock, ArrowLeft, KeyRound, PenTool, Upload, Eraser, X } from 'lucide-react';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
+import { fileUrl, authHeaders } from 'utils/apiUtils';
 
-// Resolve a stored signature value to something an <img> can render: pass
-// through data-URLs and absolute URLs as-is, and prefix server-relative paths
-// with the API origin. Mirrors the resolver used on the requisition detail page.
-const resolveSignatureUrl = (path) => {
-  if (!path) return '';
-  const imagePath = String(path).trim();
-  if (!imagePath) return '';
-  if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('data:')) return imagePath;
-  const baseUrl = Config.apiUrl.replace(/\/api\/v1\/?$/, '');
-  return `${baseUrl}/${imagePath.replace(/^\/+/, '')}`;
-};
+// Stored signature value → something an <img> can render.
+const resolveSignatureUrl = (path) => fileUrl(String(path ?? '').trim()) || '';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -91,11 +83,7 @@ const Profile = () => {
     const fetchProfile = async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/user`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept: 'application/json',
-            'X-API-KEY': Config.apiKey,
-          },
+          headers: authHeaders(false),
         });
         const result = await res.json().catch(() => null);
         const data = result?.data?.user ?? result?.data ?? result?.user ?? null;
@@ -280,12 +268,7 @@ const Profile = () => {
     try {
       const res = await fetch(`${Config.apiUrl}/employee/update/${hashId}`, {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${AuthService.getToken()}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-API-KEY': Config.apiKey,
-        },
+        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
       const result = await res.json().catch(() => null);

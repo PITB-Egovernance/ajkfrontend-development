@@ -82,7 +82,7 @@ const CSVUploadZone = ({ onFileSelect, onPreview, loading, disabled = false }) =
       onDragLeave={handleDrag}
       onDragOver={handleDrag}
       onDrop={handleDrop}
-      role="region"
+      role="group"
       aria-label="Result file upload area"
       aria-disabled={disabled}
     >

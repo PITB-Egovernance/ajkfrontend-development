@@ -9,7 +9,7 @@ import PostResultApi from 'api/postResultApi';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { fileUrl, authHeaders } from 'utils/apiUtils';
 import { formatApplicationDocumentType } from 'utils/applicationOcrUtils';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
@@ -45,11 +45,7 @@ const ApplicationDetail = () => {
     const fetchDistricts = async () => {
       try {
         const res = await fetch(`${Config.apiUrl}/settings/districts?per_page=500`, {
-          headers: {
-            Authorization: `Bearer ${AuthService.getToken()}`,
-            Accept: 'application/json',
-            'X-API-KEY': Config.apiKey,
-          },
+          headers: authHeaders(false),
         });
         const result = await res.json();
         const payload = result?.data ?? {};
@@ -132,6 +128,8 @@ const ApplicationDetail = () => {
 
   useEffect(() => {
     fetchApplication();
+  // Re-runs only when the values in the array change, not whenever fetchApplication is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchApplication = async () => {
@@ -747,13 +745,13 @@ const ApplicationDetail = () => {
                         <div className="w-full flex flex-col items-center justify-center">
                           {doc.mime_type?.startsWith('image/') || doc.file_url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
                             <a 
-                              href={doc.file_url?.startsWith('http') ? doc.file_url : `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${doc.file_url}`}
+                              href={fileUrl(doc.file_url)}
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="w-full h-32 mb-2 rounded overflow-hidden border border-slate-200 block transition-colors"
                             >
                               <img 
-                                src={doc.file_url?.startsWith('http') ? doc.file_url : `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${doc.file_url}`}
+                                src={fileUrl(doc.file_url)}
                                 alt={doc.doc_type || 'Document'}
                                 className="w-full h-full object-cover"
                               />
@@ -762,7 +760,7 @@ const ApplicationDetail = () => {
                             <FileText size={40} className="text-slate-300 mb-3" strokeWidth={1.5} />
                           )}
                           <a 
-                            href={doc.file_url?.startsWith('http') ? doc.file_url : `${Config.apiUrl.replace('/api/v1', '').replace('/v1', '')}/${doc.file_url}`}
+                            href={fileUrl(doc.file_url)}
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-emerald-600 hover:text-emerald-800 text-sm font-medium hover:underline"

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Typography, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import { Button, Typography, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableRow, Paper } from '@mui/material';
 import { InlineLoader } from 'components/ui/Loader';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from 'components/ui/Dialog';
 import { CheckCircle2, Printer } from 'lucide-react';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { fileUrl, authHeaders } from 'utils/apiUtils';
 import RequisitionApi from 'api/requisitionApi';
 import toast from 'react-hot-toast';
 import { extractFilePath, persistDraftFilePath, getPersistedDraftFilePath, clearPersistedDraftFiles, fetchPaginatedApiList } from 'utils';
@@ -19,7 +19,7 @@ const RequisitionPreview = () => {
   const [confirming, setConfirming] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showServiceRuleDialog, setShowServiceRuleDialog] = useState(false);
-  const [districtOptions, setDistrictOptions] = useState([]);
+  const [, setDistrictOptions] = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [previewData, setPreviewData] = useState({
@@ -31,14 +31,7 @@ const RequisitionPreview = () => {
   });
 
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
-  const getDocumentUrl = (path) => {
-    if (!path) return "";
-    if (/^https?:\/\//i.test(path)) return path;
-
-    return `https://api-admin-ajkpsc.punjab.gov.pk/${String(path).replace(/^\/+/, "")}`;
-  };
+  const getDocumentUrl = (path) => fileUrl(path) || "";
 
   useEffect(() => {
       fetchDistricts();
@@ -50,6 +43,8 @@ const RequisitionPreview = () => {
       return;
     }
     loadPreviewData();
+  // Re-runs only when the values in the array change, not whenever fetchDepartments, fetchDistricts, fetchGrades, loadPreviewData, navigate are recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tempId]);
 
   // Once the preview has loaded, if no Service Rule file is on record for
@@ -64,11 +59,7 @@ const RequisitionPreview = () => {
   const fetchDistricts = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/districts`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setDistrictOptions(
         list
@@ -85,11 +76,7 @@ const RequisitionPreview = () => {
   const fetchGrades = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings/grades?per_page=200`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
 
       const result = await response.json();
@@ -109,11 +96,7 @@ const RequisitionPreview = () => {
   const fetchDepartments = async () => {
     try {
       const list = await fetchPaginatedApiList(`${API_BASE}/settings/departments`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       setDepartmentOptions(
         list
@@ -141,17 +124,6 @@ const RequisitionPreview = () => {
   };
 
 
-  const getDistrictName = (id) => {
-    // Plain name strings (e.g. "Muzaffarabad") — return as-is, since
-    // the live API often stores district values as plain names rather
-    // than hash_ids.
-    if (typeof id === 'string' && id.includes(' ')) {
-      return id;
-    }
-    if (!id) return 'N/A';
-    const found = districtOptions.find(d => String(d.id) === String(id));
-    return found ? found.name : id;
-  };
 
   // Resolve a stored department value (hash_id, name, or relation object)
   // to the human-readable department name. Falls back to the raw value

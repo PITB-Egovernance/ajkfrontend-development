@@ -7,23 +7,18 @@ import {
 } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { DataGrid } from '@mui/x-data-grid';
-import { Plus, Search, X, RefreshCw, ExternalLink, Download, Edit2 } from 'lucide-react';
+import { Plus, Search, RefreshCw, ExternalLink, Download, Edit2 } from 'lucide-react';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { formatDate } from 'utils/dateUtils';
 import { hasPermission } from 'utils/permissions';
 import FormDialog from 'components/ui/FormDialog';
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = 'candidates.award_lists'; // permission scope for this module
 
 const API_BASE = Config.apiUrl; // local — switch to Config.apiUrl after deploying backend
 
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-  'X-API-KEY': Config.apiKey,
-});
+const getHeaders = () => authHeaders();
 
 const defaultForm = {
   advertisement_id: '',

@@ -1,89 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import {
   Users,
-  Download,
-  UploadCloud,
   UserPlus,
   ListChecks,
   CheckCircle2,
-  AlertCircle,
-  X,
   ArrowLeft,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
-import ExcelUploadZone from 'components/employees/ExcelUploadZone';
-import EmployeeService from 'services/EmployeeService';
 
-// These must match the backend column names exactly
-const TEMPLATE_HEADERS = [
-    'username',
-    'cnic',
-    'email',
-    'mobile',
-    'designation',
-    'grade'
-];
 
 const EmployeesLanding = () => {
   const navigate = useNavigate();
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [importErrors, setImportErrors] = useState([]);
-  const [importResult, setImportResult] = useState(null); // { message, imported, failed, rowErrors }
+ // { message, imported, failed, rowErrors }
 
-  const handleDownloadTemplate = () => {
-    const csvContent = TEMPLATE_HEADERS.join(',') + '\n';
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'Employee_Import_Template.csv');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-    toast.success('Employee template downloaded');
-  };
 
-  const handleImport = async () => {
-    if (!selectedFile) {
-      toast.error('Please select a file to import');
-      return;
-    }
-    setImporting(true);
-    setImportErrors([]);
-    setImportResult(null);
-    try {
-      const result = await EmployeeService.importUsers(selectedFile);
-      const imported  = result._imported  ?? 0;
-      const failed    = result._failed    ?? 0;
-      const failures  = result._failures  ?? [];
-      const totalRows = result._totalRows ?? imported + failed;
-      const msg       = result?.message   || 'Import processed';
-
-      if (imported > 0 && failed === 0) {
-        toast.success(msg);
-      } else if (imported > 0 && failed > 0) {
-        toast(`${imported} imported, ${failed} failed`, { icon: '⚠️' });
-      } else {
-        toast.error(`Import failed — ${failed} row${failed !== 1 ? 's' : ''} could not be imported`);
-      }
-
-      setImportResult({ message: msg, imported, failed, totalRows, failures });
-      setSelectedFile(null);
-    } catch (error) {
-      toast.error(error.message || 'Import failed');
-      const lines = error.errorLines?.length
-        ? error.errorLines
-        : [error.message || 'An unexpected error occurred. Check your file and try again.'];
-      setImportErrors(lines);
-    } finally {
-      setImporting(false);
-    }
-  };
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">

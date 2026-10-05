@@ -7,9 +7,9 @@ import { Building2, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import DepartmentUserService from 'services/DepartmentUserService';
 import { fetchPaginatedApiList } from 'utils';
+import { authHeaders } from 'utils/apiUtils';
 
 const CreateDepartmentUser = () => {
   const navigate = useNavigate();
@@ -32,21 +32,20 @@ const CreateDepartmentUser = () => {
 
   const [fieldErrors, setFieldErrors] = useState({});
 
-  const getHeaders = () => ({
-    Authorization: `Bearer ${AuthService.getToken()}`,
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-    'X-API-KEY': Config.apiKey,
-  });
+  const getHeaders = () => authHeaders();
 
   useEffect(() => {
     fetchDepartments();
+  // Re-runs only when the values in the array change, not whenever fetchDepartments is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (isEditMode && departmentOptions.length > 0) {
       fetchDepartmentUser();
     }
+  // Re-runs only when the values in the array change, not whenever fetchDepartmentUser is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, hashId, departmentOptions.length]);
 
   const normalizeDepartments = (list = []) => {

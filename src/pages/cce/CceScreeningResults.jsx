@@ -4,9 +4,6 @@ import { IconButton, Menu, MenuItem, TextField, ListItemText } from '@mui/materi
 import {
   ShieldCheck,
   MoreVertical,
-  CheckCircle2,
-  XCircle,
-  Clock3,
   Send,
   EyeOff,
   Download,
@@ -279,33 +276,7 @@ const CceScreeningResults = () => {
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
-  // ── Row-level status change (used by the row menu) ──────────────────────
-  const setRowStatus = async (row, status) => {
-    setBusy(true);
-    try {
-      await CceScreeningApi.bulkSetStatus([row.hash_id], status);
-      toast.success(`Marked as ${status}`);
-      await loadResults();
-    } catch (err) {
-      toast.error(err?.message || 'Failed to update status');
-    } finally {
-      setBusy(false);
-    }
-  };
 
-  const handleBulkStatus = async (status) => {
-    if (selectedIds.length === 0) { toast.error('Select at least one candidate'); return; }
-    setBusy(true);
-    try {
-      await CceScreeningApi.bulkSetStatus(selectedIds, status);
-      toast.success(`Marked ${selectedIds.length} candidate(s) as ${status}`);
-      await loadResults();
-    } catch (err) {
-      toast.error(err?.message || 'Failed to update status');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const handlePublish = async () => {
     if (selectedIds.length === 0) { toast.error('Select at least one candidate'); return; }

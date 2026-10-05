@@ -95,7 +95,7 @@ describe('Service Year page', () => {
 
     pickDate(dateInput, '2016-08-07');
 
-    await waitFor(() => expect(screen.getByText('10')).toBeInTheDocument());
+    await screen.findByText('10');
     expect(screen.getByText('10 years, 1 month and 14 days')).toBeInTheDocument();
     expect(screen.getByText(/3,697 days in total/)).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(

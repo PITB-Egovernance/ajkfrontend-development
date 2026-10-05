@@ -6,20 +6,14 @@ import { InlineLoader } from 'components/ui/Loader';
 import { Hash, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { hasPermission } from 'utils/permissions';
+import { authHeaders as apiAuthHeaders } from 'utils/apiUtils';
 
 const PERM = 'settings.roll_number_exam_type_configs';
 
 const API_BASE = Config.apiUrl;
-const API_KEY  = Config.apiKey;
 
-const authHeaders = (json = true) => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: 'application/json',
-  'X-API-KEY': API_KEY,
-  ...(json ? { 'Content-Type': 'application/json' } : {}),
-});
+const authHeaders = (json = true) => apiAuthHeaders(json);
 
 // Display labels for the exam types this module supports — must mirror
 // examTypeMeta in RollNumberExamFlow.jsx so the prefix shown here lines up

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, CheckCircle2, Circle } from 'lucide-react';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import toast from 'react-hot-toast';
+import { authHeaders } from 'utils/apiUtils';
 
 /**
  * DegreeGroupSelector Component
@@ -19,8 +19,6 @@ const DegreeGroupSelector = ({ value = '', onChange, required = false, label = '
   const [loading, setLoading] = useState(true);
 
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   // Parse comma-separated degree values into a set for easy lookup
   useEffect(() => {
@@ -39,17 +37,15 @@ const DegreeGroupSelector = ({ value = '', onChange, required = false, label = '
   // Fetch degrees and group them by degree_group
   useEffect(() => {
     fetchDegrees();
+  // Re-runs only when the values in the array change, not whenever fetchDegrees is recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchDegrees = async () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/settings/degrees?per_page=1000`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
 
       const result = await response.json();

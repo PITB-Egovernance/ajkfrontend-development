@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  Download,
   CheckCircle,
   Clock,
   XCircle,
@@ -11,7 +10,6 @@ import {
   MessageSquare,
   Activity,
   ClipboardList,
-  GitBranch,
   AlertCircle,
   Loader2,
   Send,
@@ -92,9 +90,9 @@ const HeaderSection = ({ requisition, onBack, onDownload, onTrackApproval }) => 
         <div>
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-slate-900">{requisition.designation}</h1>
-            {requisition.overall_status == "approved" ? 
+            {requisition.overall_status === "approved" ? 
            (<StatusBadge status={requisition.status} label="Approved" />)
-          : requisition.overall_status == "rejected" ? (<StatusBadge status={requisition.status} label="Rejected" />)
+          : requisition.overall_status === "rejected" ? (<StatusBadge status={requisition.status} label="Rejected" />)
           : null
           }
           </div>
@@ -549,9 +547,9 @@ const RequestSummary = ({ requisition, gradeOptions }) => {
         <div className="flex justify-between items-center gap-2 pt-1 border-t border-slate-100">
           <span className="text-sm text-slate-500">Current Status</span>
          
-          {requisition.status == "approved" ? 
+          {requisition.status === "approved" ? 
            (<StatusBadge status={requisition.status} label="Approved" />)
-          : requisition.status == "rejected" ? (<StatusBadge status={requisition.status} label="Rejected" />)
+          : requisition.status === "rejected" ? (<StatusBadge status={requisition.status} label="Rejected" />)
           : null
           }
         </div>

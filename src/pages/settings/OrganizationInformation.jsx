@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TextField, MenuItem } from '@mui/material';
+import { TextField } from '@mui/material';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { Card, CardContent } from 'components/ui/Card';
 import Button from 'components/ui/Button';
@@ -22,22 +22,11 @@ import {
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 import FormOverlay from 'components/ui/FormOverlay';
 
- const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
+const API_BASE = Config.apiUrl;
 
-const getHeaders = (json = true) => {
-  const h = {
-    Authorization: `Bearer ${AuthService.getsToken()}`,
-    Accept: 'application/json',
-    'X-API-KEY': Config.apiKey,
-  };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
-};
 
 const OrganizationInformation = () => {
   const navigate = useNavigate();
@@ -69,11 +58,7 @@ const OrganizationInformation = () => {
   const fetchEmployees = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/employees/list`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.status === 200) {
@@ -82,17 +67,13 @@ const OrganizationInformation = () => {
     } catch (error) {
       toast.error('Failed to load employees list');
     }
-  }, [API_BASE, TOKEN, API_KEY]);
+  }, []);
 
   const fetchOrganizationData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/settings/organization`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.status === 200 && result.data) {
@@ -102,7 +83,7 @@ const OrganizationInformation = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_BASE, TOKEN, API_KEY]);
+  }, []);
 
   const openEditModal = () => {
     if (organizationData) {
@@ -219,10 +200,7 @@ const OrganizationInformation = () => {
 
       const response = await fetch(`${API_BASE}/settings/organization/update`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
         body: formDataToSend,
       });
 

@@ -14,20 +14,14 @@ import { InlineLoader } from "components/ui/Loader";
 import { GRID_SX } from "utils/gridStyles";
 import { hasPermission } from "utils/permissions";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import AdvancedFilter from "components/tables/AdvancedFilter";
+import { authHeaders as apiAuthHeaders } from 'utils/apiUtils';
 
 const PERM = "settings.groups";
 
 const API_BASE = Config.apiUrl;
-const API_KEY  = Config.apiKey;
 
-const authHeaders = (json = false) => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "X-API-KEY": API_KEY,
-  ...(json ? { "Content-Type": "application/json" } : {}),
-});
+const authHeaders = (json = false) => apiAuthHeaders(json);
 
 const emptyForm = { group_name: "", status: "active" };
 

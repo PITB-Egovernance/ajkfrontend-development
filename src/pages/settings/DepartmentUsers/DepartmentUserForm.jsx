@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import SearchableSelect from 'components/ui/SearchableSelect';
 import { TextField } from '@mui/material';
 import { Building2, Save } from 'lucide-react';
-import { formFieldSx, formFieldAutoHeightSx } from 'components/ui/formFieldSx';
+import { formFieldSx } from 'components/ui/formFieldSx';
 import toast from 'react-hot-toast';
 import Config from 'config/baseUrl';
 import AuthService from 'services/authService';
@@ -11,7 +11,6 @@ import DepartmentUserService from 'services/DepartmentUserService';
 import { fetchPaginatedApiList } from 'utils';
 import 'pages/job-creation/JobCreationForm.css';
 
-const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 
 const mapApiErrors = (apiErrors = {}) => {
   const mapped = { ...apiErrors };
@@ -26,20 +25,14 @@ const DepartmentUserForm = () => {
   const [fieldErrors, setFieldErrors] = useState({});
 
   const [username, setUsername] = useState('');
-  const [cnic, setCnic] = useState('');
   const [email, setEmail] = useState('');
   const [designation, setDesignation] = useState('');
-  const [fatherHusbandName, setFatherHusbandName] = useState('');
-  const [dob, setDob] = useState('');
-  const [gender, setGender] = useState('');
   const [mobile, setMobile] = useState('');
-  const [district, setDistrict] = useState(null);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
-  const [selectedRoles, setSelectedRoles] = useState([]);
 
-  const [districtOptions, setDistrictOptions] = useState([]);
+  const [, setDistrictOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
-  const [roleOptions, setRoleOptions] = useState([]);
+  const [, setRoleOptions] = useState([]);
 
   useEffect(() => {
     const authHeaders = {

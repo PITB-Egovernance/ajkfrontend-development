@@ -8,11 +8,11 @@ import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import confirmStatus from 'components/ui/confirmStatus';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import { InlineLoader } from 'components/ui/Loader';
 import AdvancedFilter from 'components/tables/AdvancedFilter';
 import { hasPermission } from 'utils/permissions';
 import { GRID_SX } from 'utils/gridStyles';
+import { authHeaders } from 'utils/apiUtils';
 
 const PERM = 'settings.test_types';
 
@@ -26,15 +26,7 @@ const EXAM_CATEGORIES = [
 ];
 
 
-const getHeaders = (json = true) => {
-  const h = {
-    Authorization: `Bearer ${AuthService.getToken()}`,
-    Accept: 'application/json',
-    'X-API-KEY': Config.apiKey,
-  };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
-};
+const getHeaders = (json = true) => authHeaders(json);
 
 const TestTypesManagement = () => {
   const canAdd = hasPermission(`${PERM}.add`);

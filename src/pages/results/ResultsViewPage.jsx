@@ -1,17 +1,14 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import TooltipDataGrid from 'components/ui/TooltipDataGrid';
 import {
   ArrowLeft,
   Search,
-  Edit3,
-  MoreHorizontal,
   Download,
   Plus
 } from 'lucide-react';
 import Button from 'components/ui/Button';
 import { toast } from 'react-hot-toast';
-import { InlineLoader } from 'components/ui/Loader';
 import ResultsApi from 'api/resultsApi';
 import AdvertisementApi from 'api/advertisementApi';
 import { getJobRouteId } from 'utils/jobMapper';
@@ -38,7 +35,7 @@ const ResultsViewPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
 
   // Modal State
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [selectedCandidate] = useState(null);
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
 
   // Job Post Info State
@@ -137,10 +134,6 @@ const ResultsViewPage = () => {
     }
   }, [jobId]);
 
-  const handleEditClick = (candidate) => {
-    setSelectedCandidate(candidate);
-    setIsEntryModalOpen(true);
-  };
 
   const handleEntrySuccess = () => {
     setIsEntryModalOpen(false);

@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-node-access, testing-library/no-container, no-script-url -- asserts the editor HTML and that javascript: URLs are rejected */
 import React, { useState } from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';

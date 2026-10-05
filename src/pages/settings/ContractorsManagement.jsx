@@ -19,15 +19,14 @@ import {
   Phone,
   MapPin,
   CreditCard,
-  Briefcase,
-  Filter
+  Briefcase
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confirmDelete from 'components/ui/ConfirmDelete';
 import Config from 'config/baseUrl';
-import AuthService from 'services/authService';
 import FormOverlay from 'components/ui/FormOverlay';
+import { authHeaders } from 'utils/apiUtils';
 
 const ContractorsManagement = () => {
   const navigate = useNavigate();
@@ -60,8 +59,6 @@ const ContractorsManagement = () => {
   ];
 
   const API_BASE = Config.apiUrl;
-  const TOKEN = AuthService.getToken();
-  const API_KEY = Config.apiKey;
 
   useEffect(() => {
     fetchContractors();
@@ -72,11 +69,7 @@ const ContractorsManagement = () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/settings/contractors`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Accept': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
       const result = await response.json();
       if (result.status === 200) {
@@ -146,11 +139,7 @@ const ContractorsManagement = () => {
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(),
         body: JSON.stringify(formData),
       });
 
@@ -179,10 +168,7 @@ const ContractorsManagement = () => {
     try {
       const response = await fetch(`${API_BASE}/settings/contractors/${contractorId}/delete`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`,
-          'X-API-KEY': API_KEY,
-        },
+        headers: authHeaders(false),
       });
 
       const result = await response.json();

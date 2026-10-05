@@ -1,6 +1,7 @@
 import Config from 'config/baseUrl';
 import { apiErrorMessage } from 'utils/apiErrors';
 import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
 const API_KEY = Config.apiKey;
@@ -8,16 +9,7 @@ const API_KEY = Config.apiKey;
 // All department requisition endpoints are namespaced under /department/requisitions
 const REQ_BASE = `${API_BASE}/department/requisitions`;
 
-const getHeaders = (includeContentType = true) => {
-  const token = AuthService.getToken();
-  const headers = {
-    'Accept': 'application/json',
-    'X-API-KEY': API_KEY,
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (includeContentType) headers['Content-Type'] = 'application/json';
-  return headers;
-};
+const getHeaders = (includeContentType = true) => authHeaders(includeContentType);
 
 const handleResponse = async (response) => {
   const result = await response.json().catch(() => ({}));

@@ -1,15 +1,10 @@
 import Config from 'config/baseUrl';
 import { apiErrorMessage } from 'utils/apiErrors';
-import AuthService from 'services/authService';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
 
-const getHeaders = (json = true) => ({
-  Accept: 'application/json',
-  ...(json ? { 'Content-Type': 'application/json' } : {}),
-  ...(AuthService.getToken() && { Authorization: `Bearer ${AuthService.getToken()}` }),
-  'X-API-KEY': Config.apiKey,
-});
+const getHeaders = (json = true) => authHeaders(json);
 
 const handle = async (response) => {
   const result = await response.json().catch(() => ({}));

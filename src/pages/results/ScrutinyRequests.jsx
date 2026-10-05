@@ -6,20 +6,15 @@ import {
   MenuItem, Paper, Select, TextField, Typography, Alert, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
 } from "@mui/material";
 import {
-  ArrowLeft, Download, RefreshCw, Search, CheckCircle, ShieldAlert,
+  ArrowLeft, Download, RefreshCw, Search, ShieldAlert,
 } from "lucide-react";
 import Config from "config/baseUrl";
-import AuthService from "services/authService";
 import { toast } from "react-hot-toast";
 import { handleApiError } from 'utils/apiErrors';
+import { authHeaders } from 'utils/apiUtils';
 
 const API_BASE = Config.apiUrl;
-const getHeaders = () => ({
-  Authorization: `Bearer ${AuthService.getToken()}`,
-  Accept: "application/json",
-  "Content-Type": "application/json",
-  "X-API-KEY": Config.apiKey,
-});
+const getHeaders = () => authHeaders();
 
 const ScrutinyRequests = () => {
   const navigate = useNavigate();
